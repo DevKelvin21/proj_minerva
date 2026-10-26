@@ -169,6 +169,10 @@ describe('helpers', () => {
     expect(unsafePathReason('a/../b')).toBe('parent segment')
     expect(unsafePathReason('C:/x')).toBe('absolute path')
     expect(unsafePathReason('a\\b')).toBe('backslash in name')
+    expect(unsafePathReason('..foo')).toBeNull()
+    expect(unsafePathReason('docs/NUL.txt', 'win32')).toBe('reserved Windows device name')
+    expect(unsafePathReason('a.txt:stream', 'win32')).toBe('colon in name (NTFS stream)')
+    expect(unsafePathReason('docs/NUL.txt', 'darwin')).toBeNull()
   })
 
   it('classifyEntry ignores mode bits from non-unix archives', () => {

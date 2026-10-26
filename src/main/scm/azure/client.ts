@@ -238,8 +238,10 @@ export class AzureDevOpsClient {
     if (!contentType.includes('json')) {
       await response.body?.cancel()
       const signInPage = contentType.includes('text/html')
-      // An HTML sign-in page that slipped past FedAuthRedirect=Suppress.
-      if (signInPage) this.credentials.invalidate(org, 'rejected')
+      // An HTML page that slipped past FedAuthRedirect=Suppress. It may also be a
+      // captive portal or maintenance page, so drop the cache but do not blacklist
+      // the credential (only a real 401/203 does that).
+      if (signInPage) this.credentials.invalidate(org, 'refresh')
       throw new AzureApiError(
         signInPage ? 'UNAUTHENTICATED' : 'UNKNOWN',
         describeStatus(
@@ -309,14 +311,16 @@ export class AzureDevOpsClient {
         else callback(null, chunk)
       },
     })
+    let created = false
+    const out = createWriteStream(destPath, { flags: 'wx', mode: 0o600 })
+    out.once('open', () => {
+      created = true
+    })
     try {
-      await pipeline(
-        Readable.fromWeb(response.body as WebReadableStream<Uint8Array>),
-        cap,
-        createWriteStream(destPath, { flags: 'wx', mode: 0o600 }),
-      )
+      await pipeline(Readable.fromWeb(response.body as WebReadableStream<Uint8Array>), cap, out)
     } catch (error) {
-      await rm(destPath, { force: true })
+      // `wx` fails on an existing file: never delete a file another writer owns.
+      if (created) await rm(destPath, { force: true })
       throw error instanceof AzureScmError ? error : this.networkError(target, 'GET', error)
     }
     return total
@@ -386,12 +390,11 @@ export class AzureDevOpsClient {
     const timedOut = name === 'TimeoutError' || name === 'AbortError'
     const message = timedOut
       ? 'Azure DevOps did not answer in time [' + endpointOf(target) + ']'
-      : 'Could not reach Azure DevOps [' +
+      : // Never append the raw error text: undici can echo header values in it.
+        'Could not reach Azure DevOps [' +
         endpointOf(target) +
         ']' +
-        (error instanceof Error && error.message
-          ? ': ' + error.message.slice(0, MAX_ERROR_MESSAGE_CHARS)
-          : '')
+        (name ? ' (' + name + ')' : '')
     return new AzureApiError('NETWORK', message, { method, endpoint: endpointOf(target) })
   }
 

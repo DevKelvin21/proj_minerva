@@ -23,7 +23,7 @@
  */
 import { createWriteStream } from 'node:fs'
 import { mkdir, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import yauzl, { type Entry, type ZipFile } from 'yauzl'
@@ -86,14 +86,25 @@ export function classifyEntry(
 }
 
 /** Returns the reason a name is unsafe, or `null` when it is a plain relative path. */
-export function unsafePathReason(fileName: string): string | null {
+export function unsafePathReason(
+  fileName: string,
+  platform: NodeJS.Platform = process.platform,
+): string | null {
   if (fileName.length === 0) return 'empty name'
   if (fileName.includes('\0')) return 'NUL in name'
   if (fileName.includes('\\')) return 'backslash in name'
   if (fileName.startsWith('/') || /^[A-Za-z]:/.test(fileName)) return 'absolute path'
   if (fileName.split('/').some((segment) => segment === '..')) return 'parent segment'
+  if (platform === 'win32') {
+    for (const segment of fileName.split('/')) {
+      if (segment.includes(':')) return 'colon in name (NTFS stream)'
+      if (WINDOWS_RESERVED.test(segment)) return 'reserved Windows device name'
+    }
+  }
   return null
 }
+
+const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i
 
 function openZip(zipPath: string): Promise<ZipFile> {
   return yauzl.openPromise(zipPath, {
@@ -222,7 +233,7 @@ export async function extractZipSafely(
 
       const target = resolve(destRoot, cleanRel)
       const fromRoot = relative(destRoot, target)
-      if (fromRoot.startsWith('..') || isAbsolute(fromRoot)) {
+      if (fromRoot === '..' || fromRoot.startsWith('..' + sep) || isAbsolute(fromRoot)) {
         throw new ZipExtractError(
           'unsafe-path',
           'The repository archive has a path outside the snapshot.',

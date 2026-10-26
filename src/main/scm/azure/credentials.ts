@@ -72,6 +72,9 @@ export interface AzureCredentialDeps {
 /** Azure DevOps resource id for Entra tokens (fixed, public). */
 export const AZURE_DEVOPS_RESOURCE_ID = '499b84ac-1321-427f-aa17-267ca6975798'
 
+/** JWT-ish charset: anything else (CR/LF/NUL) could end up echoed in a header error. */
+const ENTRA_TOKEN_PATTERN = /^[A-Za-z0-9._~+/=-]+$/
+
 const PAT_USERNAME = 'Personal Access Token'
 const DEFAULT_CREDENTIAL_KEY = 'azdevops-cli: default'
 const KEY_PREFIX = 'azdevops-cli:'
@@ -509,7 +512,9 @@ export class AzureCredentialSource {
       this.cache.delete(key)
     }
     if (!org) {
-      // A full refresh also re-resolves binaries (the user may have installed az).
+      // A full refresh also forgets rejected headers (the user may have fixed the
+      // PAT's scopes) and re-resolves binaries (the user may have installed az).
+      if (reason === 'refresh') this.rejected.clear()
       this.azPath = undefined
       this.pythonPath = undefined
     }
@@ -688,7 +693,9 @@ export class AzureCredentialSource {
         expires_on?: unknown
         expiresOn?: unknown
       }
-      if (typeof json.accessToken !== 'string' || !json.accessToken) return null
+      if (typeof json.accessToken !== 'string' || !ENTRA_TOKEN_PATTERN.test(json.accessToken)) {
+        return null
+      }
       const expiresAt = parseEntraExpiry(json)
       const refreshAt =
         expiresAt === null ? this.now() + 10 * 60 * 1000 : expiresAt - ENTRA_REFRESH_MARGIN_MS
