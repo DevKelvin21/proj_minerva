@@ -1,4 +1,6 @@
 import { test, expect, attachScreenshot } from './fixtures'
+import { buildDidacticHash } from '../src/shared/didactic-route'
+import type { RepoRef } from '../src/shared/scm'
 
 /**
  * Port de los checks de VENTANA de scripts/smoke-detach.mjs (T14/T22):
@@ -7,9 +9,23 @@ import { test, expect, attachScreenshot } from './fixtures'
  * (Los checks puros de cache/dedupe viven en analysis-cache.spec.ts.)
  */
 
-const PR_482 = { repo: { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
-const PR_201 = { repo: { owner: 'shopwave', name: 'web', fullName: 'shopwave/web' }, number: 201 }
-const PR_479 = { repo: { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 479 }
+const PR_482 = {
+  repo: { provider: 'github' as const, owner: 'shopwave', name: 'api', fullName: 'shopwave/api' },
+  number: 482,
+}
+const PR_201 = {
+  repo: { provider: 'github' as const, owner: 'shopwave', name: 'web', fullName: 'shopwave/web' },
+  number: 201,
+}
+/** `#didactic/<base64url repo>/<n>` without the title query: the route encodes the full RepoRef. */
+function didacticPath(pr: { repo: RepoRef; number: number }): string {
+  return '#' + buildDidacticHash(pr.repo, pr.number, '').split('?')[0]
+}
+
+const PR_479 = {
+  repo: { provider: 'github' as const, owner: 'shopwave', name: 'api', fullName: 'shopwave/api' },
+  number: 479,
+}
 
 test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilización', async ({
   minerva,
@@ -25,7 +41,7 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci�
   await window.locator('button[aria-label="Abrir en ventana"]').click()
   const detached = await detachedPromise
   await detached.waitForLoadState('domcontentloaded')
-  expect(detached.url()).toContain('#didactic/shopwave/api/482')
+  expect(detached.url()).toContain(didacticPath(PR_482))
 
   // El panel acoplado se CIERRA tras desacoplar (T22).
   await expect(window.locator('button[aria-label="Abrir panel didáctico"]')).toBeVisible()
@@ -60,8 +76,9 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci�
   // Reutilización: reabrir con OTRO PR usa la MISMA ventana (re-navegación
   // same-document: verificar CONTENIDO, no solo URL — el bug histórico era
   // URL nueva con el PR viejo pintado).
-  await window.evaluate((p) =>
-    window.minerva.window.openDidactic({ ...p, title: 'Add refunds table' }), PR_479,
+  await window.evaluate(
+    (p) => window.minerva.window.openDidactic({ ...p, title: 'Add refunds table' }),
+    PR_479,
   )
   await expect
     .poll(() => detached.url(), { message: 'la misma ventana navega al 479' })
@@ -88,12 +105,13 @@ test('ventana abierta a mitad de streaming se engancha y se sincroniza con anál
     void window.minerva.ai.analyzePullRequest(p)
   }, PR_201)
   const detachedPromise = minerva.context.waitForEvent('page')
-  await window.evaluate((p) =>
-    window.minerva.window.openDidactic({ ...p, title: 'PR 201 en streaming' }), PR_201,
+  await window.evaluate(
+    (p) => window.minerva.window.openDidactic({ ...p, title: 'PR 201 en streaming' }),
+    PR_201,
   )
   const detached = await detachedPromise
   await detached.waitForLoadState('domcontentloaded')
-  expect(detached.url()).toContain('#didactic/shopwave/web/201')
+  expect(detached.url()).toContain(didacticPath(PR_201))
 
   // Contenido parcial: contenido visible MIENTRAS el estado sigue en
   // `streaming` (o cursor ▍). Carrera inherente (abrir la ventana tarda casi
@@ -138,7 +156,10 @@ test('ventana abierta a mitad de streaming se engancha y se sincroniza con anál
   // T22-bis (listener permanente): la ventana YA ABIERTA (sin remount) debe
   // enterarse de un análisis relanzado DESPUÉS desde otra superficie.
   const beforeReplay = await window.evaluate(
-    (p) => window.minerva.ai.getCachedAnalysis(p).then((a: { generatedAt: string } | null) => a?.generatedAt ?? null),
+    (p) =>
+      window.minerva.ai
+        .getCachedAnalysis(p)
+        .then((a: { generatedAt: string } | null) => a?.generatedAt ?? null),
     PR_201,
   )
   await window.evaluate((p) => window.minerva.ai.invalidateAnalysis(p), PR_201)
@@ -150,9 +171,11 @@ test('ventana abierta a mitad de streaming se engancha y se sincroniza con anál
       () =>
         window.evaluate(
           (p) =>
-            window.minerva.ai.getAnalysisState(p).then((s: { status: string; analysis?: { generatedAt: string } }) =>
-              s.status === 'cached' ? s.analysis?.generatedAt : null,
-            ),
+            window.minerva.ai
+              .getAnalysisState(p)
+              .then((s: { status: string; analysis?: { generatedAt: string } }) =>
+                s.status === 'cached' ? s.analysis?.generatedAt : null,
+              ),
           PR_201,
         ),
       { message: 'el re-análisis termina con generatedAt nuevo', timeout: 15_000 },

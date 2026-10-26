@@ -6,8 +6,8 @@ import { test, expect } from './fixtures'
  * un streaming. Todo vía window.minerva (IPC), sin UI.
  */
 
-const PR_482 = { repo: { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
-const PR_201 = { repo: { owner: 'shopwave', name: 'web', fullName: 'shopwave/web' }, number: 201 }
+const PR_482 = { repo: { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
+const PR_201 = { repo: { provider: 'github', owner: 'shopwave', name: 'web', fullName: 'shopwave/web' }, number: 201 }
 
 test('primer análisis streamea; el segundo es cache hit instantáneo sin eventos', async ({
   window,

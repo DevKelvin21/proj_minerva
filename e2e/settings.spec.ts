@@ -164,7 +164,7 @@ test('modelo opencode inexistente rechaza el análisis con error accionable', as
     const err = await window.evaluate(() =>
       window.minerva.ai
         .analyzePullRequest({
-          repo: { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' },
+          repo: { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' },
           number: 482,
         })
         .then(

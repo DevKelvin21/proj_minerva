@@ -18,7 +18,7 @@ import type { Page } from './fixtures'
  * userData aislado con un headSha falso y relanza sobre el mismo userData.
  */
 
-const PR_482 = { repo: { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
+const PR_482 = { repo: { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
 const EXPECTED_BANNER = 'vía OpenCode · opencode/big-pickle'
 
 const banner = (page: Page) => page.locator('span[title*="Proveedor y modelo activos"]')
@@ -78,7 +78,7 @@ test('análisis con headSha viejo muestra la barra de staleness y "Actualizar" l
   const persisted = JSON.parse(readFileSync(analysesPath, 'utf-8')) as {
     entries: { key: string; analysis: { headSha: string } }[]
   }
-  const entry = persisted.entries.find((e) => e.key === 'shopwave/api#482')
+  const entry = persisted.entries.find((e) => e.key === 'github:shopwave/api#482')
   expect(entry, 'entrada persistida de #482 presente en analyses.json').toBeTruthy()
   entry!.analysis.headSha = '0ld5ha000ld5ha000ld5ha000ld5ha000ld5ha00'
   writeFileSync(analysesPath, JSON.stringify(persisted, null, 2) + '\n', 'utf-8')

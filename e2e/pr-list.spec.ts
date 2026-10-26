@@ -83,16 +83,17 @@ test('refresh manual y dots de no-visto con markPrSeen', async ({ window }, test
   // 2 > 0 ⇒ hasNewComments), inmune al pr-seen.json del userData (aquí
   // limpio por construcción, pero el sellado lo hace explícito).
   const target = await window.evaluate(async (title) => {
-    const prs = await window.minerva.github.listPullRequests({ state: 'open' })
-    const pr = prs.find((p: { title: string }) => p.title.includes(title))
+    const { items: prs } = await window.minerva.scm.listPullRequests({ state: 'open' })
+    const pr = prs.find((p) => p.title.includes(title))
     if (!pr) return null
-    await window.minerva.github.markPrSeen({
-      prId: pr.id,
+    await window.minerva.scm.markPrSeen({
+      repo: pr.repo,
+      number: pr.number,
       updatedAt: '2020-01-01T00:00:00Z',
       commentCount: 0,
     })
-    const again = await window.minerva.github.listPullRequests({ state: 'open' })
-    return again.find((p: { id: string }) => p.id === pr.id)?.unread ?? null
+    const again = await window.minerva.scm.listPullRequests({ state: 'open' })
+    return again.items.find((p) => p.id === pr.id)?.unread ?? null
   }, OPEN_PR)
   expect(target, 'unread por IPC tras sellar visto viejo').toMatchObject({
     isNew: false,
@@ -115,8 +116,8 @@ test('refresh manual y dots de no-visto con markPrSeen', async ({ window }, test
 
   // markPrSeen persistió en main: una query nueva viene limpia.
   const persisted = await window.evaluate(async (title) => {
-    const prs = await window.minerva.github.listPullRequests({ state: 'open' })
-    return prs.find((p: { title: string }) => p.title.includes(title))?.unread ?? null
+    const { items: prs } = await window.minerva.scm.listPullRequests({ state: 'open' })
+    return prs.find((p) => p.title.includes(title))?.unread ?? null
   }, OPEN_PR)
   expect(persisted).toMatchObject({ isNew: false, hasUpdates: false, hasNewComments: false })
 })
@@ -129,15 +130,15 @@ test('watcher: un comentario nuevo refresca la lista sin refresh manual', async 
   try {
     const window = await mainWindow(app)
     const seed = await window.evaluate(async (title) => {
-      const prs = await window.minerva.github.listPullRequests({ state: 'open' })
-      const pr = prs.find((p: { title: string }) => p.title.includes(title))
+      const { items: prs } = await window.minerva.scm.listPullRequests({ state: 'open' })
+      const pr = prs.find((p) => p.title.includes(title))
       if (!pr) return null
-      await window.minerva.github.postComment({
+      await window.minerva.scm.postComment({
         repo: pr.repo,
         number: pr.number,
         bodyMarkdown: 'comentario del e2e pr-list (watcher)',
       })
-      return { commentCount: pr.commentCount as number }
+      return { commentCount: pr.commentCount ?? 0 }
     }, WATCHED_PR)
     expect(seed, 'fixture objetivo del watcher encontrado').not.toBeNull()
 
