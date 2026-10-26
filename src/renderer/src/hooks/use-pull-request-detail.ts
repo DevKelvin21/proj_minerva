@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PullRequestDetail, RepoRef } from '../../../shared/types'
+import { repoKey } from '../../../shared/scm'
 
 interface UsePullRequestDetailResult {
   detail: PullRequestDetail | null
@@ -12,11 +13,12 @@ function toErrorMessage(error: unknown): string {
 }
 
 /**
- * Detalle de un PR vía `github:getPullRequestDetail`, para el `repo`+`number`
+ * Detalle de un PR vía `scm:getPullRequestDetail`, para el `repo`+`number`
  * dados. La lógica va en una función async invocada de inmediato (ver nota en
  * `use-pull-requests.ts`) para no disparar `react-hooks/set-state-in-effect`.
  */
 export function usePullRequestDetail(repo: RepoRef, number: number): UsePullRequestDetailResult {
+  const repoIdentity = repoKey(repo)
   const [detail, setDetail] = useState<PullRequestDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +30,7 @@ export function usePullRequestDetail(repo: RepoRef, number: number): UsePullRequ
       setLoading(true)
       setError(null)
       try {
-        const result = await window.minerva.github.getPullRequestDetail({ repo, number })
+        const result = await window.minerva.scm.getPullRequestDetail({ repo, number })
         if (!cancelled) setDetail(result)
       } catch (err: unknown) {
         if (!cancelled) setError(toErrorMessage(err))
@@ -41,7 +43,7 @@ export function usePullRequestDetail(repo: RepoRef, number: number): UsePullRequ
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se depende de campos primitivos de `repo`, no de su identidad de objeto.
-  }, [repo.owner, repo.name, number])
+  }, [repoIdentity, number])
 
   return { detail, loading, error }
 }

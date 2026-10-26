@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { GraduationCap, PanelLeft, Search, Settings, X } from 'lucide-react'
 import { useAppStore } from '../../stores/app-store'
 import { useConnectionStatus } from '../../hooks/use-connection-status'
-import { useAuth } from '../../hooks/use-auth'
+import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { sidebarIsDrawer } from '../../lib/layout'
 import { useSettings } from '../../hooks/use-settings'
@@ -17,7 +17,7 @@ import { Badge } from '../ui/Badge'
  * reemplaza el botón cuadrado de solo-icono para que la config vigente sea
  * visible SIN abrir el modal (pedido de Edilson, ver `PLAN.md` § F12).
  * SIEMPRE mantiene el icono `Settings` de `lucide-react` DENTRO del botón —
- * los specs e2e (`e2e/settings.spec.ts`, `e2e/github-mode.spec.ts`) localizan
+ * los specs e2e (`e2e/settings.spec.ts`, `e2e/scm-access.spec.ts`) localizan
  * el engrane por `svg.lucide-settings`, no
  * puede sacarse de acá — y agrega el texto recién cuando `useSettings().info`
  * ya cargó (antes de eso solo el icono, igual que el `IconButton` viejo).
@@ -105,56 +105,32 @@ const CONNECTION_LABEL: Record<ReturnType<typeof useConnectionStatus>, string> =
 }
 
 /**
- * Controles de login/logout de GitHub, según `AuthStatus.state`/`.mode`:
- * - `signed_out` (oauth): botón para arrancar el device flow.
- * - `device_pending` (oauth): chip con el código (click = copiar al
- *   portapapeles) + enlace a github.com/login/device (`target="_blank"`:
- *   main ya filtra que `setWindowOpenHandler` solo abra http(s) en el
- *   navegador del sistema) + spinner mientras `main` hace polling en segundo
- *   plano.
- * - `signed_in` (oauth): login del usuario + botón de cerrar sesión.
- * - `signed_in` (gh-cli, F14/T71): login del usuario + badge discreto "vía
- *   GitHub CLI"; SIN botón de cerrar sesión (`signOut()` es no-op en este
- *   modo, ver `auth-manager.ts` — salir es cambiar a OAuth desde Settings) y
- *   en su lugar un botón sutil que abre el modal de Settings.
- * - `cli_unavailable` (gh-cli, F14/T71): el binario `gh` no está en PATH —
- *   texto compacto + botón a Settings.
- * - `cli_unauthenticated` (gh-cli, F14/T71): chip copiable con el comando
- *   `gh auth login` (mismo patrón visual que el chip del userCode del device
- *   flow) + spinner sutil — el polling declarativo de `use-auth.ts` sigue
- *   corriendo en este estado y descubre solo cuando el usuario complete el
- *   login en una terminal.
+ * GitHub auth chip, from `scm:getAuthStatus` (the `gh` token bridge):
+ * - `signed_in`: login + discreet "via GitHub CLI" badge + Settings shortcut
+ *   (there is no sign-out: the session belongs to `gh`, not Minerva).
+ * - `cli_unavailable`: `gh` not on PATH — short text + Settings button.
+ * - `cli_unauthenticated`: copyable `gh auth login` chip + spinner; the
+ *   declarative poll in `use-scm-auth.ts` notices when the user finishes the
+ *   login in a terminal.
+ * Azure DevOps gets its own chip in Phase 2; today it's always `disabled`.
  */
-function AuthControls({ compact }: { compact: boolean }): React.JSX.Element {
-  const { status, signIn, signOut } = useAuth()
+function AuthControls(): React.JSX.Element | null {
+  const { statuses } = useScmAuth()
   const openSettings = useAppStore((s) => s.openSettings)
+  const status = statuses?.github
 
-  if (status.state === 'signed_in' && status.mode === 'gh-cli') {
-    return (
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-text">{status.user?.login}</span>
-        <Badge tone="neutral">vía GitHub CLI</Badge>
-        <IconButton
-          icon={<Settings size={13} />}
-          label="El acceso se gestiona con GitHub CLI; cámbialo en Configuración"
-          onClick={openSettings}
-        />
-      </div>
-    )
-  }
+  if (status === undefined || status.state === 'disabled') return null
 
   if (status.state === 'signed_in') {
     return (
       <div className="flex min-w-0 items-center gap-2 text-xs">
         <span className="max-w-[120px] truncate text-text">{status.user?.login}</span>
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          title="Cerrar sesión"
-          className="shrink-0 rounded-md border border-border px-2 py-1 text-muted transition-colors duration-150 hover:border-danger/60 hover:text-danger"
-        >
-          {compact ? 'Salir' : 'Cerrar sesión'}
-        </button>
+        <Badge tone="neutral">via GitHub CLI</Badge>
+        <IconButton
+          icon={<Settings size={13} />}
+          label="Access is managed by GitHub CLI; change the account in Settings"
+          onClick={openSettings}
+        />
       </div>
     )
   }
@@ -162,75 +138,34 @@ function AuthControls({ compact }: { compact: boolean }): React.JSX.Element {
   if (status.state === 'cli_unavailable') {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-muted">GitHub CLI no encontrado</span>
+        <span className="text-muted">GitHub CLI not found</span>
         <button
           type="button"
           onClick={openSettings}
           className="rounded-md border border-border px-2 py-1 text-muted transition-colors duration-150 hover:border-accent hover:text-text"
         >
-          Abrir configuración
+          Open settings
         </button>
-      </div>
-    )
-  }
-
-  if (status.state === 'cli_unauthenticated') {
-    return (
-      <div className="flex items-center gap-2 text-xs">
-        <span
-          className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"
-          aria-hidden
-        />
-        <button
-          type="button"
-          title="Copiar comando"
-          onClick={() => void navigator.clipboard?.writeText('gh auth login').catch(() => {})}
-          className="rounded-md border border-accent/50 bg-accent/10 px-2 py-1 font-mono text-sm font-semibold text-accent transition-colors duration-150 hover:bg-accent/20"
-        >
-          gh auth login
-        </button>
-        <span className="text-muted">Esperando sesión…</span>
-      </div>
-    )
-  }
-
-  if (status.state === 'device_pending' && status.deviceCode) {
-    const { userCode, verificationUri } = status.deviceCode
-    return (
-      <div className="flex items-center gap-2 text-xs">
-        <span
-          className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"
-          aria-hidden
-        />
-        <button
-          type="button"
-          title="Copiar código"
-          onClick={() => void navigator.clipboard?.writeText(userCode).catch(() => {})}
-          className="rounded-md border border-accent/50 bg-accent/10 px-2 py-1 font-mono text-sm font-semibold tracking-widest text-accent transition-colors duration-150 hover:bg-accent/20"
-        >
-          {userCode}
-        </button>
-        <a
-          href={verificationUri}
-          target="_blank"
-          rel="noreferrer"
-          className="text-muted underline decoration-dotted transition-colors duration-150 hover:text-text"
-        >
-          ingresa el código en github.com/login/device
-        </a>
       </div>
     )
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => void signIn()}
-      title="Iniciar sesión con GitHub"
-      className="shrink-0 whitespace-nowrap rounded-md border border-border px-2.5 py-1 text-xs text-text transition-colors duration-150 hover:border-accent"
-    >
-      {compact ? 'Iniciar sesión' : 'Iniciar sesión con GitHub'}
-    </button>
+    <div className="flex items-center gap-2 text-xs" title={status.detail}>
+      <span
+        className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"
+        aria-hidden
+      />
+      <button
+        type="button"
+        title="Copy command"
+        onClick={() => void navigator.clipboard?.writeText('gh auth login').catch(() => {})}
+        className="rounded-md border border-accent/50 bg-accent/10 px-2 py-1 font-mono text-sm font-semibold text-accent transition-colors duration-150 hover:bg-accent/20"
+      >
+        gh auth login
+      </button>
+      <span className="text-muted">Waiting for session…</span>
+    </div>
   )
 }
 
@@ -240,7 +175,7 @@ function AuthControls({ compact }: { compact: boolean }): React.JSX.Element {
  *
  * 1. `lg`: el TEXTO del estado de conexión (queda el punto de color + title).
  * 2. `md`: el chip de Settings pierde su texto "Proveedor · Modelo" (queda el
- *    engrane), los botones de auth se acortan y aparece el botón de la lista
+ *    engrane) y aparece el botón de la lista
  *    de PRs (que en ese tier pasa a drawer, ver `Sidebar`).
  * 3. `sm`: el buscador colapsa a un icono que despliega el campo sobre la
  *    barra, y el nombre "Minerva" cede el paso al logo.
@@ -333,7 +268,7 @@ export function TitleBar(): React.JSX.Element {
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <SettingsChip compact={compact} />
 
-        <AuthControls compact={compact} />
+        <AuthControls />
 
         <span
           className="flex shrink-0 items-center gap-1.5 text-xs text-muted"

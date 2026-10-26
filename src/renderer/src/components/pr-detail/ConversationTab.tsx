@@ -41,7 +41,7 @@ export function ConversationTab({
     setPosting(true)
     setPostError(null)
     try {
-      await window.minerva.github.postComment({ repo: pr.repo, number: pr.number, bodyMarkdown })
+      await window.minerva.scm.postComment({ repo: pr.repo, number: pr.number, bodyMarkdown })
       setDraft('')
       await reload()
     } catch (err: unknown) {
@@ -52,7 +52,7 @@ export function ConversationTab({
   }
 
   async function handleReply(threadId: string, bodyMarkdown: string): Promise<void> {
-    await window.minerva.github.postComment({
+    await window.minerva.scm.postComment({
       repo: pr.repo,
       number: pr.number,
       bodyMarkdown,

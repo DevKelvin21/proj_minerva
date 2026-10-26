@@ -75,7 +75,7 @@ export function DiffView({
   }, [pendingThreadFocus, file.path, clearPendingThreadFocus])
 
   async function handleReply(threadId: string, bodyMarkdown: string): Promise<void> {
-    await window.minerva.github.postComment({ repo, number, bodyMarkdown, threadId })
+    await window.minerva.scm.postComment({ repo, number, bodyMarkdown, threadId })
     await reloadThreads()
   }
 
@@ -84,7 +84,7 @@ export function DiffView({
     side: LineSide,
     bodyMarkdown: string,
   ): Promise<void> {
-    const comment = await window.minerva.github.postComment({
+    const comment = await window.minerva.scm.postComment({
       repo,
       number,
       bodyMarkdown,

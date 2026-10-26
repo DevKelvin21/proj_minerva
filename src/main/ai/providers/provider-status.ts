@@ -10,7 +10,7 @@
  * proveedores (`./registry.ts`) son `cli`, así que el agregado delega
  * directo en el probe para todos.
  *
- * Mismo patrón que `AuthManager.getStatus()` (`../../auth/auth-manager.ts`):
+ * Mismo patrón que `ghCliAuth.getStatus()` (`../../scm/github/gh-cli-auth.ts`):
  * estado expuesto sin secretos, calculado on-demand (no hay estado propio que
  * mantener acá, todo vive en `getCliProviderStatus`).
  */

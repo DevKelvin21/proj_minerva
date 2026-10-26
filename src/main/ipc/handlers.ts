@@ -1,8 +1,5 @@
 import { app, BrowserWindow } from 'electron'
 import { handle } from './register'
-import { createGithubService } from '../github'
-import { createPrWatcher, type PrWatcher } from '../github/pr-watcher'
-import { seenStore } from '../github/seen-store'
 import { createAiService } from '../ai'
 import {
   getAiSettingsInfo,
@@ -13,8 +10,16 @@ import { getAiProviderStatusMap } from '../ai/providers/provider-status'
 import { getProviderModels, warmProviderModels } from '../ai/providers/provider-models'
 import { analysisCache } from '../ai/analysis-cache'
 import { settingsStore } from '../settings/store'
-import { authManager } from '../auth/auth-manager'
-import { ghCliAuth } from '../auth/gh-cli-auth'
+import { ghCliAuth } from '../scm/github/gh-cli-auth'
+import { isMockScmMode } from '../scm/mock-mode'
+import { createPrContextSource } from '../scm/pr-context-source'
+import { createPrWatcher, type PrWatcher } from '../scm/pr-watcher'
+import {
+  createDefaultScmRegistry,
+  getAuthStatusMap,
+  listAcrossProviders,
+} from '../scm/registry'
+import { seenStore } from '../scm/seen-store'
 import { openDidacticWindow } from '../windows/didactic-window'
 import * as updaterService from '../updater/updater'
 import {
@@ -25,19 +30,10 @@ import {
   type PrListChangedEvent,
 } from '../../shared/events'
 import type { IpcResponse } from '../../shared/ipc'
-import type { DidacticAnalysis, RepoRef } from '../../shared/types'
+import { prKey } from '../../shared/scm'
+import type { DidacticAnalysis, ScmSettingsInfo } from '../../shared/types'
 
-/**
- * Clave del registro de análisis EN CURSO (T22): mismo criterio
- * (`owner/name#number`) que `../ai/analysis-cache.ts` y `../ai/mock-service.ts`,
- * repetido acá en vez de importado porque `AnalysisCache` no expone su
- * formato de clave (encapsulado a propósito, no hace falta acoplar los dos).
- */
-function prKey(repo: RepoRef, number: number): string {
-  return repo.owner + '/' + repo.name + '#' + number
-}
-
-/** Empuja un snapshot de progreso a TODAS las ventanas abiertas (T13); el filtro por PR es cosa del hook del renderer, no de acá. */
+/** Pushes a progress snapshot to EVERY open window; filtering by PR is the renderer hook's job. */
 function broadcastProgress(payload: AnalysisProgressEvent): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
@@ -46,7 +42,7 @@ function broadcastProgress(payload: AnalysisProgressEvent): void {
   }
 }
 
-/** Empuja los cambios detectados por el watcher de PRs (T51, F10) a TODAS las ventanas abiertas; mismo patrón que `broadcastProgress`. */
+/** Pushes the PR watcher's changes to every open window (same pattern as `broadcastProgress`). */
 function broadcastPrListChanged(payload: PrListChangedEvent): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
@@ -56,11 +52,9 @@ function broadcastPrListChanged(payload: PrListChangedEvent): void {
 }
 
 /**
- * Intervalo del watcher de PRs (T51, F10): `MINERVA_WATCH_INTERVAL_MS` lo
- * overridea (los smokes e2e lo usan para no esperar 60s reales), `undefined`
- * deja que `createPrWatcher` aplique su propio default. Solo se acepta un
- * override si parsea a un entero positivo; cualquier otra cosa se ignora en
- * vez de tumbar el arranque de la app.
+ * PR watcher interval: `MINERVA_WATCH_INTERVAL_MS` overrides it (e2e uses it
+ * to avoid waiting 60 real seconds). Only a positive integer is accepted;
+ * anything else is ignored instead of breaking startup.
  */
 function resolveWatchIntervalMs(): number | undefined {
   const raw = process.env.MINERVA_WATCH_INTERVAL_MS
@@ -69,75 +63,74 @@ function resolveWatchIntervalMs(): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
 }
 
+function getScmSettings(): ScmSettingsInfo {
+  return { mockScm: isMockScmMode(), githubAccount: settingsStore.getGithubAccount() }
+}
+
 /**
- * Registra los handlers IPC disponibles hoy. Los canales `github:*`/`ai:*`
- * delegan a una única instancia de `GithubService`/`AiService` (real con
- * Octokit desde T6 salvo `MINERVA_MOCK=1`; `AiService` real con el proveedor
- * de IA activo — Claude Code/Codex/OpenCode, ver `../ai/index.ts`).
- * `createAiService` recibe `githubService` (la misma instancia usada por los
- * canales `github:*`) para que el pipeline de IA pida el detalle/archivos del
- * PR a lo que sea que esté activo, mock o real. Los canales `auth:*` delegan
- * al `AuthManager` singleton (`../auth/auth-manager.ts`) — quien llama a
- * `registerIpcHandlers` debe haber esperado `authManager.init()` antes, para
- * que `auth:getStatus` refleje el token persistido (si lo hay) desde la
- * primera llamada. `settings:get` (T12, reestructurado en T26 a
- * multi-proveedor) expone la selección efectiva de proveedor+modelo más el
- * catálogo completo (`getAiSettingsInfo`, `../ai/env.ts`);
- * `settings:setAiProvider` y `settings:setProviderModel` persisten la
- * elección (`settingsStore`, `../settings/store.ts`) y devuelven la misma
- * forma agregada. No delegan a una instancia de servicio porque no hay
- * estado por-request que mantener.
+ * Registers every IPC handler. `scm:*` channels go through ONE provider
+ * registry (`../scm/registry.ts`): per-repo calls resolve the provider with
+ * `forRepo`, list calls fan out over every enabled provider. The AI layer
+ * gets the same registry behind a narrow `PrContextSource`, so it analyzes
+ * whatever the SCM layer serves (mock or real) without knowing which.
  *
- * ASYNC desde T28: `createAiService` puede necesitar consultar el probe de
- * login de un proveedor `cli` (`../ai/providers/cli-probe.ts`, spawnea
- * `claude --version` con timeout corto) antes de decidir qué `AiService`
- * instanciar — quien llama debe `await`earlo, igual que ya hacía con
- * `authManager.init()` (ver `../index.ts`).
- *
- * Devuelve `{ stopPrWatcher }` (T51, F10) para que `../index.ts` pueda parar
- * el watcher de PRs en `app.on('before-quit')` — sin esto el timer seguiría
- * re-armándose después de que las ventanas ya se destruyeron.
+ * Async because `createAiService` may probe a CLI before picking a service.
+ * Returns `stopPrWatcher` so `../index.ts` can stop the watcher on quit.
  */
 export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void }> {
   handle('minerva:ping', () => 'pong from main @ electron ' + process.versions.electron)
-  // Ya es la implementación FINAL (T90, F17): `app.getVersion()` no depende
-  // del updater, solo no tenía ningún canal que lo expusiera hasta ahora.
   handle('minerva:getVersion', () => app.getVersion())
 
-  handle('auth:getStatus', () => authManager.getStatus())
-  handle('auth:startDeviceFlow', () => authManager.startDeviceFlow())
-  handle('auth:signOut', () => authManager.signOut())
-  // Cuentas de `gh` para el selector de Settings (F18). Lectura pura y
-  // cacheada (TTL 5s) en `ghCliAuth`; solo logins, nunca tokens.
-  handle('auth:listGhAccounts', () => ghCliAuth.listAccounts())
+  const scm = createDefaultScmRegistry()
+  const prContext = createPrContextSource(scm)
 
-  const githubService = createGithubService()
-  // `unread` (T51, F10) se decora ACÁ, en el handler — no en el servicio: los
-  // `GithubService` (real/mock) quedan puros y ajenos al estado de lectura,
-  // que vive en `seenStore` (`../github/seen-store.ts`). Spread inmutable
-  // (no se muta el summary que devuelve el servicio).
-  handle('github:listPullRequests', async (req) => {
-    const summaries = await githubService.listPullRequests(req)
-    return summaries.map((pr) => ({ ...pr, unread: seenStore.computeUnread(pr) }))
+  handle('scm:getAuthStatus', () => getAuthStatusMap(scm))
+  // `gh` accounts for the Settings picker. Read-only, cached 5s; logins only.
+  handle('scm:listGhAccounts', () => ghCliAuth.listAccounts())
+  handle('scm:getSettings', () => getScmSettings())
+  // Persists the chosen `gh` login (`null` = follow gh's active account) and
+  // DROPS the token-bridge caches — otherwise the next status would serve
+  // the previous account's probe for up to 5s and, worse, `getToken()` would
+  // keep feeding its token to the data path. Warms the probe for the new one.
+  handle('scm:setGithubAccount', async (req) => {
+    settingsStore.setGithubAccount(req.login)
+    ghCliAuth.invalidate()
+    await ghCliAuth.getStatus()
+    return getScmSettings()
   })
-  handle('github:markPrSeen', (req) => {
-    seenStore.markSeen(req.prId, { updatedAt: req.updatedAt, commentCount: req.commentCount })
+
+  // `unread` is decorated HERE, not in providers: they stay unaware of read
+  // state, which lives in `seenStore`.
+  handle('scm:listPullRequests', async (req) => {
+    const { items, errors } = await listAcrossProviders(scm, req)
+    return {
+      items: items.map((pr) => ({ ...pr, unread: seenStore.computeUnread(pr) })),
+      errors,
+    }
+  })
+  handle('scm:markPrSeen', (req) => {
+    seenStore.markSeen(prKey(req.repo, req.number), {
+      updatedAt: req.updatedAt,
+      commentCount: req.commentCount,
+    })
     return { ok: true as const }
   })
-  handle('github:getPullRequestDetail', (req) => githubService.getPullRequestDetail(req))
-  handle('github:getPullRequestFiles', (req) => githubService.getPullRequestFiles(req))
-  handle('github:getCommentThreads', (req) => githubService.getCommentThreads(req))
-  handle('github:postComment', (req) => githubService.postComment(req))
+  handle('scm:getPullRequestDetail', (req) =>
+    scm.forRepo(req.repo).getPullRequestDetail(req.repo, req.number),
+  )
+  handle('scm:getPullRequestFiles', (req) =>
+    scm.forRepo(req.repo).getPullRequestFiles(req.repo, req.number),
+  )
+  handle('scm:getCommentThreads', (req) =>
+    scm.forRepo(req.repo).getCommentThreads(req.repo, req.number),
+  )
+  handle('scm:postComment', (req) => scm.forRepo(req.repo).postComment(req))
 
-  // Watcher de PRs en background (T51, F10, `../github/pr-watcher.ts`): pide
-  // `listPullRequests({ state: 'all' })` a la MISMA instancia de
-  // `githubService` a intervalos regulares y empuja `prListChanged` cuando
-  // detecta cambios. Los summaries que diffea el watcher NO pasan por la
-  // decoración de `unread` de arriba (no la necesitan, solo comparan
-  // estado/updatedAt/commentCount entre dos snapshots). `start()` de
-  // inmediato; `stop()` la llama `../index.ts` en `before-quit`.
+  // Background PR watcher: lists `{ state: 'all' }` across providers on an
+  // interval and pushes `prListChanged` when something changed. Not decorated
+  // with `unread` (it only diffs state/updatedAt/commentCount).
   const prWatcher: PrWatcher = createPrWatcher({
-    list: () => githubService.listPullRequests({ state: 'all' }),
+    list: () => listAcrossProviders(scm, { state: 'all' }),
     broadcast: broadcastPrListChanged,
     intervalMs: resolveWatchIntervalMs(),
   })
@@ -151,7 +144,7 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
    * abajo (`analysisCache`) solo ve análisis ya COMPLETOS, nunca uno a medio
    * hacer. Vive local a esta función (no a nivel de módulo) porque
    * conceptualmente es estado del registro de handlers, igual que
-   * `githubService` de arriba.
+   * `scm` de arriba.
    */
   const inFlightAnalyses = new Map<
     string,
@@ -225,7 +218,7 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
         const providerToWarm = providerNeedingCatalogWarmup()
         if (providerToWarm) await warmProviderModels(providerToWarm)
         const selectionAtStart = getEffectiveAiSelection()
-        const aiService = await createAiService(githubService)
+        const aiService = await createAiService(prContext)
         const generated = await aiService.analyzePullRequest(req, {
           onProgress: (sections, meta) => {
             snapshotBox.current = sections
@@ -252,26 +245,14 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
           },
         })
 
-        // Sellado (T39/T40): el `AiService` produce `GeneratedAnalysis` (sin
-        // `headSha`/`generatedWith`, ver `../ai/service.ts`); acá se enriquece
-        // a `DidacticAnalysis` completo antes de cachear/persistir/devolver.
-        // `generatedWith` usa `selectionAtStart` (capturada ANTES de crear el
-        // servicio, ver arriba) — la selección REAL con la que se generó,
-        // aunque Settings haya cambiado durante el análisis (T65).
-        // `headSha` (T40) sale de un fetch aparte, barato pero con I/O, del
-        // detalle del PR — envuelto en su PROPIO try/catch: si fallara (red,
-        // rate limit, etc.) NO debe tumbar un análisis ya generado, se cae a
-        // `''` como en el sellado-puente de T39.
-        let headSha = ''
-        try {
-          const detail = await githubService.getPullRequestDetail(req)
-          headSha = detail.headSha
-        } catch {
-          headSha = ''
-        }
-
+        // Sealing: the service returns the content plus the `headSha` it
+        // analyzed (it already fetched the detail to build the snapshot, so
+        // no second fetch here). `generatedWith` is `selectionAtStart`,
+        // captured BEFORE creating the service — the selection actually used,
+        // even if Settings changed mid-analysis.
+        const { headSha, ...generatedContent } = generated
         const result: DidacticAnalysis = {
-          ...generated,
+          ...generatedContent,
           headSha,
           generatedWith: selectionAtStart,
         }
@@ -374,20 +355,6 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
   // `AiSettingsInfo` actualizado, mismo patrón que los dos handlers de arriba.
   handle('settings:setModelOption', (req) => {
     settingsStore.setModelOption(req.provider, req.optionId, req.value)
-    return getAiSettingsInfo()
-  })
-
-  // Cuenta de `gh` a usar (F18): persiste el login elegido (`null` = seguir
-  // la cuenta activa del CLI), TIRA las caches del puente de token — sin esto
-  // el `getStatus()` siguiente serviría el probe de la cuenta anterior por
-  // hasta 5s, y peor, `getToken()` seguiría entregando su token a la ruta de
-  // datos — y calienta el probe con la cuenta nueva, para que la UI vea el
-  // resultado sin esperar al próximo poll. Responde el mismo `AiSettingsInfo`
-  // agregado que los canales `settings:set*` de IA.
-  handle('settings:setGithubAccount', async (req) => {
-    settingsStore.setGithubAccount(req.login)
-    ghCliAuth.invalidate()
-    await ghCliAuth.getStatus()
     return getAiSettingsInfo()
   })
 

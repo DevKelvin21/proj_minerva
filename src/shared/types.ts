@@ -4,16 +4,14 @@
  */
 import type { AnalysisActivityItem, DraftDidacticSection } from './events'
 import type { AiProviderCatalogEntry, AiProviderId } from './ai-providers'
+import type { RepoRef, ReviewerVote, ScmErrorCode, ScmProviderId, ThreadStatus } from './scm'
 
-export interface RepoRef {
-  owner: string
-  name: string
-  fullName: string
-}
+export type { RepoRef } from './scm'
 
 export interface UserRef {
   login: string
-  avatarUrl: string
+  displayName?: string
+  avatarUrl?: string
 }
 
 export type PullRequestState = 'open' | 'closed' | 'merged'
@@ -23,19 +21,17 @@ export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required
 export type CiStatus = 'success' | 'failure' | 'pending' | null
 
 /**
- * Filtro de estado para `github:listPullRequests` (T50, F10): `'open'` es el
- * default (comportamiento actual, hoy hardcodeado en `real-service.ts`);
- * `'closed'` incluye tanto cerrados como mergeados (la UI distingue con un
- * badge, ver `PrListItem.tsx`); `'all'` no filtra por estado.
+ * State filter for `scm:listPullRequests`. `'open'` is the default; `'closed'`
+ * includes both closed and merged PRs (the UI tells them apart with a badge);
+ * `'all'` does not filter by state.
  */
 export type PrStateFilter = 'open' | 'closed' | 'all'
 
 /**
- * Estado de "visto" de un PR para la sidebar (T50/T51, F10), calculado por
- * `main/github/seen-store.ts` contra el snapshot sellado la última vez que el
- * usuario abrió el PR en el detalle: `isNew` (sin entrada sellada todavía),
- * `hasUpdates` (`updatedAt` avanzó desde que se selló) y `hasNewComments`
- * (`commentCount` subió desde que se selló).
+ * "Seen" state of a PR for the sidebar, computed by `main/scm/seen-store.ts`
+ * against the snapshot sealed the last time the user opened the PR:
+ * `isNew` (never sealed), `hasUpdates` (`updatedAt` moved forward) and
+ * `hasNewComments` (`commentCount` went up).
  */
 export interface PrUnread {
   isNew: boolean
@@ -44,6 +40,7 @@ export interface PrUnread {
 }
 
 export interface PullRequestSummary {
+  /** Provider-opaque PR id. Use `prKey(repo, number)` for cross-provider identity. */
   id: string
   number: number
   title: string
@@ -56,32 +53,47 @@ export interface PullRequestSummary {
   headRef: string
   baseRef: string
   /**
-   * SHA del último commit del head (T39). Se usa para detectar staleness de
-   * un análisis ya generado (`DidacticAnalysis.headSha` sellado al generar
-   * vs. este valor ACTUAL del PR, ver T41/T42). `''` si GitHub no lo
-   * devolviera (defensivo, no debería pasar en la práctica).
+   * SHA of the head commit. Used to detect a stale analysis
+   * (`DidacticAnalysis.headSha` vs. this current value). `''` if the provider
+   * did not report it.
    */
   headSha: string
-  commentCount: number
+  /** Link to the PR on the provider's website. */
+  webUrl: string
+  /** `null` = the provider didn't report it (the UI hides it). */
+  commentCount: number | null
   reviewDecision: ReviewDecision
   ciStatus: CiStatus
-  additions: number
-  deletions: number
-  changedFiles: number
+  additions: number | null
+  deletions: number | null
+  changedFiles: number | null
   /**
-   * Estado de "visto" (T50/T51, F10). OPCIONAL a propósito: lo decora SOLO el
-   * handler IPC (`github:listPullRequests` en `main/ipc/handlers.ts`) contra
-   * `seen-store.ts` — los servicios `GithubService` (real/mock) devuelven el
-   * summary sin este campo, permanecen puros y ajenos al estado de lectura.
+   * Optional on purpose: only the IPC handler (`scm:listPullRequests`)
+   * decorates it against `seen-store.ts`; providers stay unaware of read state.
    */
   unread?: PrUnread
 }
 
+export interface PrReviewer {
+  user: UserRef
+  vote: ReviewerVote
+  isRequired: boolean
+}
+
+export interface PrWorkItem {
+  id: string
+  title: string
+  url: string
+  type?: string
+  state?: string
+}
+
 export interface PullRequestDetail extends PullRequestSummary {
   bodyMarkdown: string
-  labels: { name: string; color: string }[]
-  reviewers: UserRef[]
+  labels: { name: string; color?: string }[]
+  reviewers: PrReviewer[]
   commits: number
+  workItems?: PrWorkItem[]
 }
 
 export type DiffFileStatus = 'added' | 'modified' | 'removed' | 'renamed'
@@ -92,7 +104,7 @@ export interface DiffFile {
   status: DiffFileStatus
   additions: number
   deletions: number
-  /** Unified diff hunks for this file; ausente para binarios. */
+  /** Unified diff hunks for this file; absent for binaries. Always built in main. */
   patch?: string
   isBinary: boolean
 }
@@ -104,88 +116,80 @@ export interface PrComment {
   createdAt: string
   isMinimized: boolean
   /**
-   * URL permanente del comentario en github.com (`#issuecomment-…` /
-   * `#discussion_r…`), para copiarla y referenciar el comentario fuera de la
-   * app (p. ej. en otros agentes). Opcional: sin ella la UI simplemente no
-   * ofrece el botón de copiar.
+   * Permanent URL of the comment on the provider's website, so it can be
+   * copied and referenced outside the app. Optional: without it the UI just
+   * doesn't offer the copy button.
    */
   htmlUrl?: string
 }
 
 export interface CommentThread {
   id: string
+  status: ThreadStatus
+  /** Derived: `!isThreadOpen(status)`. Kept for the many call sites that only care about open/closed. */
   isResolved: boolean
   isLineThread: boolean
   path?: string
   line?: number
+  /** Last line of a multi-line thread, when the provider reports a range. */
+  lineEnd?: number
   side?: 'LEFT' | 'RIGHT'
+  /** The thread's anchor no longer matches the latest iteration of the PR. */
+  isOutdated?: boolean
   comments: PrComment[]
 }
 
-/**
- * Modo de acceso a GitHub (F14, v0.5.0): `oauth` es el Device Flow de siempre
- * (`main/auth/auth-manager.ts`); `gh-cli` delega la autenticación al CLI `gh`
- * ya logueado del usuario (`main/auth/gh-cli-auth.ts`) — pensado para orgs
- * enterprise que bloquean la OAuth App de Minerva (*OAuth app access
- * restrictions*) pero sí permiten GitHub CLI. En ambos modos los datos
- * siguen fluyendo por el mismo `RealGithubService` (Octokit), solo cambia de
- * dónde sale el token (ver `main/github/index.ts` y `./PLAN.md` § F14).
- *
- * F18: `gh-cli` es el ÚNICO modo con UI. `oauth` sobrevive como escape hatch
- * detrás de la env `MINERVA_GITHUB_ACCESS=oauth` (`main/settings/store.ts`,
- * `resolveGithubAccessMode`) para quien no pueda instalar `gh`; ya no hay
- * toggle en Settings ni canal IPC para cambiarlo en caliente.
- */
-export type GithubAccessMode = 'oauth' | 'gh-cli'
+/** Request of `scm:postComment`. */
+export interface PostCommentRequest {
+  repo: RepoRef
+  number: number
+  bodyMarkdown: string
+  threadId?: string
+  path?: string
+  line?: number
+  /** Diff side of `line`; only applies to new line threads. */
+  side?: 'LEFT' | 'RIGHT'
+}
+
+/** One provider that failed while listing PRs (the others still return items). */
+export interface ScmListError {
+  provider: ScmProviderId
+  code: ScmErrorCode
+  message: string
+}
+
+/** Response of `scm:listPullRequests`: fan-out over every enabled provider. */
+export interface ListPullRequestsResult {
+  items: PullRequestSummary[]
+  errors: ScmListError[]
+}
 
 /**
- * Una cuenta que `gh` conoce en el host de GitHub (F18): `gh` admite varias a
- * la vez y, sin `--user`, resuelve la que él considera "activa". Minerva
- * ofrece elegir cuál usar (persistida como `githubAccount`) sin tocar esa
- * elección global del CLI — ver `main/auth/gh-accounts.ts`.
+ * One account the `gh` CLI knows on the GitHub host. `gh` supports several at
+ * once and, without `--user`, resolves the one it marks active. Minerva lets
+ * the user pick one (persisted as `githubAccount`) without touching the CLI's
+ * global choice — see `main/scm/github/gh-accounts.ts`.
  */
 export interface GhAccount {
   login: string
-  /** `true` en la cuenta activa del propio `gh` (la que se usaría sin `--user`). */
+  /** `true` for `gh`'s own active account (the one used without `--user`). */
   active: boolean
-  /** `false` cuando `gh` reporta el token de esa cuenta como inválido/expirado. */
+  /** `false` when `gh` reports that account's token as invalid/expired. */
   valid: boolean
 }
 
 /**
- * `cli_unavailable`/`cli_unauthenticated` (F14) solo aplican en modo
- * `gh-cli`: el binario `gh` no se encontró en PATH, o se encontró pero no
- * hay sesión válida (`gh auth token` falló, devolvió vacío, o el token ya no
- * sirve contra `GET /user`) — ver `main/auth/gh-cli-auth.ts`. `signed_in` se
- * reutiliza para "gh autenticado", no hace falta un estado nuevo para eso.
+ * Source-control settings, returned by `scm:getSettings`/`scm:setGithubAccount`.
+ *
+ * - `mockScm`: `true` with `MINERVA_MOCK=1` (mock SCM data, the "shopwave"
+ *   universe). The renderer needs it to hide the "you need an AI CLI" card:
+ *   with mock data the demo works without any AI CLI (via `MockAiService`).
+ * - `githubAccount`: the `gh` login picked by hand, or `null` to follow
+ *   `gh`'s active account.
  */
-export type AuthState =
-  'signed_out' | 'device_pending' | 'signed_in' | 'cli_unavailable' | 'cli_unauthenticated'
-
-export interface AuthStatus {
-  /**
-   * Modo con el que se generó este status (F14): REQUERIDO desde que existe
-   * más de un modo — sin esto la UI no podría distinguir un `signed_out` de
-   * OAuth (ofrece "Iniciar sesión") de uno hipotético de gh-cli (no
-   * aplicable, `gh-cli` nunca reporta `signed_out`, ver `gh-cli-auth.ts`).
-   */
-  mode: GithubAccessMode
-  state: AuthState
-  user?: UserRef
-  /**
-   * Login que Minerva le pidió a `gh` con `--user` (F18), presente SOLO en
-   * modo `gh-cli` y solo si hay una cuenta elegida a mano. Sirve para que un
-   * `cli_unauthenticated` pueda decir *cuál* cuenta falló ("la cuenta elegida
-   * ya no tiene sesión en gh") en vez del genérico "corré gh auth login" —
-   * que sería un consejo equivocado si el usuario SÍ tiene otras cuentas
-   * sanas. Nunca es el token, solo el nombre de usuario.
-   */
-  ghAccount?: string
-  deviceCode?: {
-    userCode: string
-    verificationUri: string
-    expiresAt: string
-  }
+export interface ScmSettingsInfo {
+  mockScm: boolean
+  githubAccount: string | null
 }
 
 /** Panel didáctico: cada sección se autodescribe con un `kind` discriminante. */
@@ -306,24 +310,6 @@ export type AiModelSource = 'settings' | 'env' | 'default'
  * proveedor+modelo ACTIVO — indexado por proveedor (mínimo: la entrada del
  * `provider` de arriba) para que T37 pinte el selector de opciones sin tener
  * que resolver nada del lado del renderer.
- *
- * `mockGithub` (T60): `true` si `MINERVA_MOCK=1` (`getAiSettingsInfo`,
- * `main/ai/env.ts`) — SOLO afecta la capa GitHub mock (universo "shopwave"),
- * nunca a la IA (ver `CLAUDE.md`), pero el renderer lo necesita para decidir
- * si mostrar la card "Necesitás al menos un CLI de IA"
- * (`NoCliProvidersCard`): con GitHub mock la demo funciona sin ningún CLI
- * instalado (vía `MockAiService`), así que la card NO debe aparecer aunque
- * los tres proveedores reales reporten `unavailable`.
- *
- * `githubAccessMode` (F14, redefinido en F18): el modo de acceso a GitHub
- * VIGENTE — ya no una preferencia persistida sino el resultado de
- * `settingsStore.getGithubAccessMode()`, que es `'gh-cli'` salvo que la env
- * `MINERVA_GITHUB_ACCESS=oauth` fuerce el escape hatch. La UI lo usa para
- * decidir si la sección "Acceso a GitHub" muestra los controles de `gh` o la
- * nota de "modo OAuth forzado por entorno".
- *
- * `githubAccount` (F18): el login de `gh` elegido a mano, o `null` para
- * "seguir la cuenta activa de gh". Solo tiene sentido en modo `gh-cli`.
  */
 export interface AiSettingsInfo {
   provider: AiProviderId
@@ -332,9 +318,6 @@ export interface AiSettingsInfo {
   perProviderModel: Partial<Record<AiProviderId, string>>
   catalog: Record<AiProviderId, AiProviderCatalogEntry>
   selectedOptions?: Partial<Record<AiProviderId, Record<string, string>>>
-  mockGithub: boolean
-  githubAccessMode: GithubAccessMode
-  githubAccount: string | null
 }
 
 /**

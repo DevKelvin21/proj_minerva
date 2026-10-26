@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GithubService } from '../github/service'
+import type { PrContextSource } from './pr-context'
 
 /**
  * `createAiService` (T27, factory multi-proveedor; ASYNC desde T28 — ver el
@@ -64,8 +64,8 @@ vi.mock('./mock-service', () => ({
 
 const { createAiService } = await import('./index')
 
-function makeGithub(): GithubService {
-  return {} as GithubService
+function makeGithub(): PrContextSource {
+  return {} as PrContextSource
 }
 
 describe('createAiService (T27, factory multi-proveedor; async desde T28)', () => {

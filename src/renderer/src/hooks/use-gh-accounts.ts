@@ -14,14 +14,13 @@ interface UseGhAccountsResult {
 }
 
 /**
- * Cuentas que `gh` conoce (F18), para el selector de la sección "Acceso a
- * GitHub". Canal `auth:listGhAccounts` — lectura pura, ya cacheada en main
+ * Cuentas que `gh` conoce (F18), para el selector de la sección "GitHub
+ * access". Canal `scm:listGhAccounts` — lectura pura, ya cacheada en main
  * (TTL 5s + single-flight), así que este hook no agrega cache propia.
  *
- * `enabled` existe para NO spawnear `gh` cuando la sección no aplica (escape
- * hatch `MINERVA_GITHUB_ACCESS=oauth`): el hook debe llamarse igual en todos
- * los renders (regla de hooks), así que la condición entra como argumento y
- * no como un `if` alrededor de la llamada.
+ * `enabled` lets a caller skip spawning `gh` when the section doesn't apply:
+ * the hook must be called on every render (rules of hooks), so the condition
+ * is an argument, not an `if` around the call.
  *
  * Un fallo del canal se trata como lista vacía a propósito, sin superficie de
  * error: la lista es una AYUDA para elegir cuenta, y quien de verdad reporta
@@ -41,7 +40,7 @@ export function useGhAccounts(enabled: boolean): UseGhAccountsResult {
 
   const fetchAccounts = useCallback(async (): Promise<GhAccount[]> => {
     try {
-      return await window.minerva.auth.listGhAccounts()
+      return await window.minerva.scm.listGhAccounts()
     } catch {
       return []
     }

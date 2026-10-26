@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { DiffFile, RepoRef } from '../../../shared/types'
+import { repoKey } from '../../../shared/scm'
 
 interface UsePullRequestFilesResult {
   files: DiffFile[]
@@ -12,11 +13,12 @@ function toErrorMessage(error: unknown): string {
 }
 
 /**
- * Archivos cambiados de un PR vía `github:getPullRequestFiles`. La lógica va
+ * Archivos cambiados de un PR vía `scm:getPullRequestFiles`. La lógica va
  * en una función async invocada de inmediato (ver nota en
  * `use-pull-requests.ts`) para no disparar `react-hooks/set-state-in-effect`.
  */
 export function usePullRequestFiles(repo: RepoRef, number: number): UsePullRequestFilesResult {
+  const repoIdentity = repoKey(repo)
   const [files, setFiles] = useState<DiffFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +30,7 @@ export function usePullRequestFiles(repo: RepoRef, number: number): UsePullReque
       setLoading(true)
       setError(null)
       try {
-        const result = await window.minerva.github.getPullRequestFiles({ repo, number })
+        const result = await window.minerva.scm.getPullRequestFiles({ repo, number })
         if (!cancelled) setFiles(result)
       } catch (err: unknown) {
         if (!cancelled) setError(toErrorMessage(err))
@@ -41,7 +43,7 @@ export function usePullRequestFiles(repo: RepoRef, number: number): UsePullReque
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se depende de campos primitivos de `repo`, no de su identidad de objeto.
-  }, [repo.owner, repo.name, number])
+  }, [repoIdentity, number])
 
   return { files, loading, error }
 }

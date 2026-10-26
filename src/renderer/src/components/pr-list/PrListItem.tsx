@@ -13,6 +13,7 @@ import type {
 import { useAppStore } from '../../stores/app-store'
 import { Avatar } from '../ui/Avatar'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
+import { prKey } from '../../../../shared/scm'
 
 interface PrListItemProps {
   pr: PullRequestSummary
@@ -86,8 +87,10 @@ function StateBadge({ state }: { state: PullRequestState }): React.JSX.Element |
 }
 
 export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element {
-  const selectedPrId = useAppStore((s) => s.selectedPr?.id ?? null)
-  const isSelected = selectedPrId === pr.id
+  const selectedPrKey = useAppStore((s) =>
+    s.selectedPr ? prKey(s.selectedPr.repo, s.selectedPr.number) : null,
+  )
+  const isSelected = selectedPrKey === prKey(pr.repo, pr.number)
 
   // Tratar `unread` ausente (main viejo / summary sin decorar) como "ya
   // visto": sin dot, título en el tono atenuado normal.
@@ -131,7 +134,7 @@ export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element
             title={reviewDecisionLabel(pr.reviewDecision)}
           />
         )}
-        {pr.commentCount > 0 && (
+        {pr.commentCount !== null && pr.commentCount > 0 && (
           <span className="relative flex items-center gap-0.5">
             <MessageSquare size={12} aria-hidden />
             <span>{pr.commentCount}</span>
@@ -144,10 +147,12 @@ export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element
             )}
           </span>
         )}
-        <span className="ml-auto flex items-center gap-1.5 font-mono text-[11px]">
-          <span className="text-success">+{pr.additions}</span>
-          <span className="text-danger">-{pr.deletions}</span>
-        </span>
+        {pr.additions !== null && pr.deletions !== null && (
+          <span className="ml-auto flex items-center gap-1.5 font-mono text-[11px]">
+            <span className="text-success">+{pr.additions}</span>
+            <span className="text-danger">-{pr.deletions}</span>
+          </span>
+        )}
       </div>
     </button>
   )

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { AnalysisCache } from './analysis-cache'
 import type { AnalysisStoreEntry, AnalysisStoreLike } from './analysis-store'
-import type { DidacticAnalysis, RepoRef } from '../../shared/types'
+import type { RepoRef } from '../../shared/scm'
+import type { DidacticAnalysis } from '../../shared/types'
 
 /**
  * Fake en memoria de `AnalysisStoreLike` (T40): evita I/O real a disco en
@@ -22,7 +23,7 @@ class FakeAnalysisStore implements AnalysisStoreLike {
 }
 
 function repo(name: string): RepoRef {
-  return { owner: 'shopwave', name, fullName: 'shopwave/' + name }
+  return { provider: 'github', owner: 'shopwave', name, fullName: 'shopwave/' + name }
 }
 
 function analysis(prId: string): DidacticAnalysis {
@@ -46,7 +47,12 @@ describe('AnalysisCache', () => {
     const value = analysis('shopwave/api#1')
     cache.set(repo('api'), 1, value)
 
-    expect(cache.get({ owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, 1)).toBe(value)
+    expect(
+      cache.get(
+        { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' },
+        1,
+      ),
+    ).toBe(value)
   })
 
   it('distingue por repo y por number: no hay colisión entre PRs distintos', () => {
@@ -129,8 +135,8 @@ describe('AnalysisCache', () => {
     it('hidrata del store en el PRIMER acceso: entries ya persistidas aparecen sin haber llamado set()', () => {
       const store = new FakeAnalysisStore()
       store.entries = [
-        { key: 'shopwave/api#1', analysis: analysis('a') },
-        { key: 'shopwave/api#2', analysis: analysis('b') },
+        { key: 'github:shopwave/api#1', analysis: analysis('a') },
+        { key: 'github:shopwave/api#2', analysis: analysis('b') },
       ]
 
       const cache = new AnalysisCache(store)
@@ -142,8 +148,8 @@ describe('AnalysisCache', () => {
     it('hidrata preservando el orden LRU persistido (la primera del array es la menos reciente)', () => {
       const store = new FakeAnalysisStore()
       store.entries = [
-        { key: 'shopwave/api#1', analysis: analysis('a') },
-        { key: 'shopwave/api#2', analysis: analysis('b') },
+        { key: 'github:shopwave/api#1', analysis: analysis('a') },
+        { key: 'github:shopwave/api#2', analysis: analysis('b') },
       ]
 
       const cache = new AnalysisCache(store)
@@ -163,7 +169,7 @@ describe('AnalysisCache', () => {
 
       cache.set(repo('api'), 1, analysis('a'))
 
-      expect(store.entries).toEqual([{ key: 'shopwave/api#1', analysis: analysis('a') }])
+      expect(store.entries).toEqual([{ key: 'github:shopwave/api#1', analysis: analysis('a') }])
     })
 
     it('set hace write-through de TODAS las entries en orden LRU, no solo de la nueva', () => {
@@ -173,7 +179,10 @@ describe('AnalysisCache', () => {
       cache.set(repo('api'), 1, analysis('a'))
       cache.set(repo('api'), 2, analysis('b'))
 
-      expect(store.entries.map((e) => e.key)).toEqual(['shopwave/api#1', 'shopwave/api#2'])
+      expect(store.entries.map((e) => e.key)).toEqual([
+        'github:shopwave/api#1',
+        'github:shopwave/api#2',
+      ])
 
       // Un get sobre #1 la refresca como más reciente; el próximo write-through
       // (disparado por otro set) debe reflejar el nuevo orden.
@@ -181,9 +190,9 @@ describe('AnalysisCache', () => {
       cache.set(repo('api'), 3, analysis('c'))
 
       expect(store.entries.map((e) => e.key)).toEqual([
-        'shopwave/api#2',
-        'shopwave/api#1',
-        'shopwave/api#3',
+        'github:shopwave/api#2',
+        'github:shopwave/api#1',
+        'github:shopwave/api#3',
       ])
     })
 
@@ -195,7 +204,7 @@ describe('AnalysisCache', () => {
 
       cache.invalidate(repo('api'), 1)
 
-      expect(store.entries.map((e) => e.key)).toEqual(['shopwave/api#2'])
+      expect(store.entries.map((e) => e.key)).toEqual(['github:shopwave/api#2'])
     })
 
     it('el evict de LRU se refleja en el store: tras pasar de MAX_ENTRIES, la más vieja desaparece de disco', () => {
@@ -209,8 +218,8 @@ describe('AnalysisCache', () => {
       cache.set(repo('api'), 21, analysis('pr21'))
 
       expect(store.entries).toHaveLength(20)
-      expect(store.entries.map((e) => e.key)).not.toContain('shopwave/api#1')
-      expect(store.entries.map((e) => e.key)).toContain('shopwave/api#21')
+      expect(store.entries.map((e) => e.key)).not.toContain('github:shopwave/api#1')
+      expect(store.entries.map((e) => e.key)).toContain('github:shopwave/api#21')
     })
 
     it('"reinicio": una instancia nueva de AnalysisCache sobre el mismo store lee lo persistido por la anterior', () => {

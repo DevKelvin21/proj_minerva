@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GithubService } from '../../github/service'
+import type { PrContextSource } from '../pr-context'
 import type { DiffFile, PullRequestDetail } from '../../../shared/types'
 import type { DraftDidacticSection } from '../../../shared/events'
 import { AGENTIC_INACTIVITY_TIMEOUT_MS, AGENTIC_REQUEST_TIMEOUT_MS } from '../analysis-timeouts'
@@ -27,9 +27,6 @@ vi.mock('../env', () => ({
  * devuelve como `cwd` de `thread/start` (T58).
  */
 const ensureSnapshotMock = vi.fn()
-vi.mock('../../github/snapshot-store', () => ({
-  ensureSnapshot: (...args: unknown[]) => ensureSnapshotMock(...args),
-}))
 
 /**
  * `createAnalysisTimeouts` (T56) se envuelve (NO se reemplaza: se preserva
@@ -172,7 +169,12 @@ function itemDelta(text: string): { method: string; params: unknown } {
   return { method: 'item/agentMessage/delta', params: { threadId: 't-1', turnId: 'x', itemId: 'y', delta: text } }
 }
 
-const repo = { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }
+const repo = {
+  provider: 'github' as const,
+  owner: 'shopwave',
+  name: 'api',
+  fullName: 'shopwave/api',
+}
 
 const detail: PullRequestDetail = {
   id: 'shopwave/api#482',
@@ -187,6 +189,7 @@ const detail: PullRequestDetail = {
   headRef: 'feat/apply-coupon',
   baseRef: 'main',
   headSha: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+  webUrl: 'https://github.com/shopwave/api/pull/482',
   commentCount: 0,
   reviewDecision: null,
   ciStatus: 'success',
@@ -210,14 +213,12 @@ const files: DiffFile[] = [
   },
 ]
 
-function makeGithubService(): GithubService {
+function makeGithubService(): PrContextSource {
   return {
-    listPullRequests: vi.fn(),
-    getPullRequestDetail: vi.fn().mockResolvedValue(detail),
-    getPullRequestFiles: vi.fn().mockResolvedValue(files),
-    getCommentThreads: vi.fn(),
-    postComment: vi.fn(),
-  } as unknown as GithubService
+    getDetail: vi.fn().mockResolvedValue(detail),
+    getFiles: vi.fn().mockResolvedValue(files),
+    ensureSnapshot: (...args: unknown[]) => ensureSnapshotMock(...args),
+  } as unknown as PrContextSource
 }
 
 describe('CodexAiService.analyzePullRequest', () => {
@@ -242,7 +243,7 @@ describe('CodexAiService.analyzePullRequest', () => {
     const service = new CodexAiService(makeGithubService())
     const result = await service.analyzePullRequest({ repo, number: 482 })
 
-    expect(result.prId).toBe('shopwave/api#482')
+    expect(result.prId).toBe('github:shopwave/api#482')
     expect(result.sections).toEqual([{ kind: 'summary', markdown: 'Resumen del PR' }])
     expect(typeof result.generatedAt).toBe('string')
 
@@ -276,7 +277,7 @@ describe('CodexAiService.analyzePullRequest', () => {
     })
 
     // `ensureSnapshot` se llama con el headSha del detail (T58).
-    expect(ensureSnapshotMock).toHaveBeenCalledWith(expect.anything(), repo, detail.headSha)
+    expect(ensureSnapshotMock).toHaveBeenCalledWith(repo, detail.headSha)
 
     expect(fake.getKillCalls()).toBeGreaterThan(0)
   })

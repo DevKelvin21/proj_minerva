@@ -11,8 +11,10 @@
  * ni de claves por PR — solo persiste/lee la lista de entries en el orden que
  * le pasen (la recencia la decide `AnalysisCache`).
  *
- * Forma en disco: `{ version: 1, entries: [{ key, analysis }] }` — `key` es
- * `owner/name#number` (mismo formato que `prKey` en `analysis-cache.ts`),
+ * Forma en disco: `{ version: 2, entries: [{ key, analysis }] }` — `key` es
+ * `prKey(repo, number)` (`shared/scm.ts`, provider-neutral since version 2).
+ * Version 1 files used `owner/name#number` keys; they are dropped on load
+ * (cache only: the worst case is re-paying one analysis per PR),
  * `analysis` es un `DidacticAnalysis` completo (con `headSha`+`generatedWith`
  * sellados por el handler, T39/T40). El orden del array es recencia LRU:
  * menos reciente primero, más reciente último.
@@ -34,10 +36,13 @@ import type { AnalysisGenerationInfo, DidacticAnalysis, DidacticSection } from '
 
 const ANALYSES_FILE_NAME = 'analyses.json'
 
+/** Bumped when the key format changes; older files are dropped, never migrated. */
+const ANALYSES_STORE_VERSION = 2
+
 /** Cap de entries persistidas, igual al `MAX_ENTRIES` de `AnalysisCache` (T14/T40). */
 const MAX_ENTRIES = 20
 
-/** Una entrada persistida: clave `owner/name#number` + el análisis completo. */
+/** Una entrada persistida: clave `prKey(repo, number)` + el análisis completo. */
 export interface AnalysisStoreEntry {
   key: string
   analysis: DidacticAnalysis
@@ -45,7 +50,7 @@ export interface AnalysisStoreEntry {
 
 /** Forma completa del archivo en disco. */
 interface PersistedAnalyses {
-  version: 1
+  version: typeof ANALYSES_STORE_VERSION
   entries: AnalysisStoreEntry[]
 }
 
@@ -106,7 +111,14 @@ function isValidEntry(value: unknown): value is AnalysisStoreEntry {
 function isPersistedShape(value: unknown): value is { version: unknown; entries: unknown[] } {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
-  return v.version === 1 && Array.isArray(v.entries)
+  return v.version === ANALYSES_STORE_VERSION && Array.isArray(v.entries)
+}
+
+/** A well-formed file from an older schema (different key format). */
+function isOlderVersion(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false
+  const version = (value as Record<string, unknown>).version
+  return typeof version === 'number' && version < ANALYSES_STORE_VERSION
 }
 
 export class AnalysisStore implements AnalysisStoreLike {
@@ -137,6 +149,11 @@ export class AnalysisStore implements AnalysisStoreLike {
 
     try {
       const parsed: unknown = JSON.parse(raw)
+      if (isOlderVersion(parsed)) {
+        // Old key format: start empty; the next save overwrites the file.
+        this.cache = []
+        return this.cache
+      }
       if (!isPersistedShape(parsed)) {
         console.warn('[analysis-store] analyses.json tiene una forma inválida, se ignora:', raw)
         this.cache = []
@@ -170,7 +187,7 @@ export class AnalysisStore implements AnalysisStoreLike {
   }
 
   private writeAtomic(entries: AnalysisStoreEntry[]): void {
-    const data: PersistedAnalyses = { version: 1, entries }
+    const data: PersistedAnalyses = { version: ANALYSES_STORE_VERSION, entries }
     const finalPath = this.filePath()
     const tmpPath = finalPath + '.tmp'
     writeFileSync(tmpPath, JSON.stringify(data, null, 2) + '\n', 'utf-8')

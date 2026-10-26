@@ -134,7 +134,7 @@ export interface AnalysisProgressEvent {
 
 /**
  * Un cambio individual detectado por el watcher de PRs (T50/T51, F10,
- * `main/github/pr-watcher.ts`) entre dos snapshots de
+ * `main/scm/pr-watcher.ts`) entre dos snapshots de
  * `listPullRequests({ state: 'all' })`: `new_pr` (id nuevo), `pr_closed` /
  * `pr_merged` (transición desde `open`), `new_comments` (`commentCount`
  * subió) o `updated` (cualquier otro cambio de `updatedAt`). `title`/`repo`
@@ -142,7 +142,8 @@ export interface AnalysisProgressEvent {
  */
 export interface PrChange {
   type: 'new_pr' | 'pr_closed' | 'pr_merged' | 'new_comments' | 'updated'
-  prId: string
+  /** `prKey(repo, number)` — stable across providers. */
+  prKey: string
   number: number
   title: string
   repo: RepoRef

@@ -1,15 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { payloadValidators } from './validators'
 
-const validRepo = { owner: 'octocat', name: 'hello-world', fullName: 'octocat/hello-world' }
+const validRepo = {
+  provider: 'github',
+  owner: 'octocat',
+  name: 'hello-world',
+  fullName: 'octocat/hello-world',
+}
+const validAzureRepo = {
+  provider: 'azure',
+  organization: 'contoso',
+  project: 'Studio v2',
+  name: 'cms-api',
+  repositoryId: '3f2c1a9e-0000-4000-8000-000000000001',
+  fullName: 'contoso/Studio v2/cms-api',
+}
 
 describe('payloadValidators', () => {
-  describe('minerva:ping / auth:* / settings:get', () => {
+  describe('void channels', () => {
     const channels = [
       'minerva:ping',
-      'auth:getStatus',
-      'auth:startDeviceFlow',
-      'auth:signOut',
+      'scm:getAuthStatus',
+      'scm:listGhAccounts',
+      'scm:getSettings',
       'settings:get',
     ] as const
 
@@ -24,8 +37,8 @@ describe('payloadValidators', () => {
     })
   })
 
-  describe('github:listPullRequests', () => {
-    const validate = payloadValidators['github:listPullRequests']
+  describe('scm:listPullRequests', () => {
+    const validate = payloadValidators['scm:listPullRequests']
 
     it('acepta payload sin search', () => {
       expect(validate({})).toBe(true)
@@ -82,28 +95,23 @@ describe('payloadValidators', () => {
     })
   })
 
-  describe('github:markPrSeen', () => {
-    const validate = payloadValidators['github:markPrSeen']
-    const base = { prId: 'PR_kwDOA1', updatedAt: '2026-07-11T10:00:00Z', commentCount: 3 }
+  describe('scm:markPrSeen', () => {
+    const validate = payloadValidators['scm:markPrSeen']
+    const base = { repo: validRepo, number: 7, updatedAt: '2026-07-11T10:00:00Z', commentCount: 3 }
 
-    it('acepta payload válido', () => {
+    it('acepta payload válido (GitHub y Azure)', () => {
       expect(validate(base)).toBe(true)
+      expect(validate({ ...base, repo: validAzureRepo })).toBe(true)
     })
 
-    it('acepta commentCount en 0', () => {
+    it('acepta commentCount en 0 o null (provider no lo reporta)', () => {
       expect(validate({ ...base, commentCount: 0 })).toBe(true)
+      expect(validate({ ...base, commentCount: null })).toBe(true)
     })
 
-    it('rechaza prId vacío', () => {
-      expect(validate({ ...base, prId: '' })).toBe(false)
-    })
-
-    it('rechaza prId > 200 chars', () => {
-      expect(validate({ ...base, prId: 'a'.repeat(201) })).toBe(false)
-    })
-
-    it('acepta prId justo en el límite (200)', () => {
-      expect(validate({ ...base, prId: 'a'.repeat(200) })).toBe(true)
+    it('rechaza repo inválido o number fuera de rango', () => {
+      expect(validate({ ...base, repo: { ...validRepo, provider: 'gitlab' } })).toBe(false)
+      expect(validate({ ...base, number: 0 })).toBe(false)
     })
 
     it('rechaza updatedAt vacío', () => {
@@ -127,23 +135,24 @@ describe('payloadValidators', () => {
       expect(validate({ ...base, commentCount: '3' })).toBe(false)
     })
 
-    it('rechaza claves desconocidas', () => {
+    it('rechaza claves desconocidas (incluido el viejo prId)', () => {
       expect(validate({ ...base, evil: true })).toBe(false)
+      expect(validate({ ...base, prId: 'PR_kwDOA1' })).toBe(false)
     })
 
     it('rechaza payload incompleto o no-objeto', () => {
-      expect(validate({ prId: 'PR_kwDOA1' })).toBe(false)
+      expect(validate({ repo: validRepo })).toBe(false)
       expect(validate(undefined)).toBe(false)
       expect(validate('x')).toBe(false)
       expect(validate([])).toBe(false)
     })
   })
 
-  describe('github:getPullRequestDetail / Files / getCommentThreads / ai:analyzePullRequest / ai:getCachedAnalysis / ai:invalidateAnalysis / ai:getAnalysisState', () => {
+  describe('scm:getPullRequestDetail / Files / getCommentThreads / ai:analyzePullRequest / ai:getCachedAnalysis / ai:invalidateAnalysis / ai:getAnalysisState', () => {
     const channels = [
-      'github:getPullRequestDetail',
-      'github:getPullRequestFiles',
-      'github:getCommentThreads',
+      'scm:getPullRequestDetail',
+      'scm:getPullRequestFiles',
+      'scm:getCommentThreads',
       'ai:analyzePullRequest',
       'ai:getCachedAnalysis',
       'ai:invalidateAnalysis',
@@ -168,23 +177,52 @@ describe('payloadValidators', () => {
     })
 
     it.each(channels)('rechaza repo con campos vacíos para %s', (channel) => {
-      expect(
-        payloadValidators[channel]({ repo: { owner: '', name: 'x', fullName: 'a/x' }, number: 1 }),
-      ).toBe(false)
+      expect(payloadValidators[channel]({ repo: { ...validRepo, owner: '' }, number: 1 })).toBe(
+        false,
+      )
     })
 
     it.each(channels)('rechaza repo con campos > 200 chars para %s', (channel) => {
       expect(
         payloadValidators[channel]({
-          repo: { owner: 'a'.repeat(201), name: 'x', fullName: 'a/x' },
+          repo: { ...validRepo, owner: 'a'.repeat(201) },
           number: 1,
         }),
       ).toBe(false)
     })
 
     it.each(channels)('rechaza repo incompleto para %s', (channel) => {
-      expect(payloadValidators[channel]({ repo: { owner: 'a', name: 'b' }, number: 1 })).toBe(false)
+      expect(
+        payloadValidators[channel]({
+          repo: { provider: 'github', owner: 'a', name: 'b' },
+          number: 1,
+        }),
+      ).toBe(false)
     })
+
+    it.each(channels)('acepta un repo de Azure DevOps válido para %s', (channel) => {
+      expect(payloadValidators[channel]({ repo: validAzureRepo, number: 12561 })).toBe(true)
+    })
+
+    it.each(channels)(
+      'rechaza repos sin provider, de provider desconocido o mezclados para %s',
+      (channel) => {
+        const { provider: _omit, ...noProvider } = validRepo
+        void _omit
+        const bad = [
+          noProvider,
+          { ...validRepo, provider: 'gitlab' },
+          { ...validRepo, provider: 'azure' },
+          { ...validAzureRepo, owner: 'x' },
+          { ...validAzureRepo, repositoryId: '' },
+          { ...validAzureRepo, project: 'p'.repeat(201) },
+          { ...validAzureRepo, provider: 'github' },
+        ]
+        for (const repo of bad) {
+          expect(payloadValidators[channel]({ repo, number: 1 })).toBe(false)
+        }
+      },
+    )
 
     it.each(channels)('rechaza payload sin repo/number para %s', (channel) => {
       expect(payloadValidators[channel]({})).toBe(false)
@@ -196,8 +234,8 @@ describe('payloadValidators', () => {
     })
   })
 
-  describe('github:postComment', () => {
-    const validate = payloadValidators['github:postComment']
+  describe('scm:postComment', () => {
+    const validate = payloadValidators['scm:postComment']
     const base = { repo: validRepo, number: 1, bodyMarkdown: 'Looks good!' }
 
     it('acepta comentario general mínimo', () => {
@@ -396,8 +434,8 @@ describe('payloadValidators', () => {
     })
   })
 
-  describe('settings:setGithubAccount', () => {
-    const validate = payloadValidators['settings:setGithubAccount']
+  describe('scm:setGithubAccount', () => {
+    const validate = payloadValidators['scm:setGithubAccount']
 
     it('acepta un login de gh', () => {
       expect(validate({ login: 'octocat' })).toBe(true)

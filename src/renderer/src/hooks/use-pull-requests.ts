@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { PrStateFilter, PullRequestSummary } from '../../../shared/types'
+import { prKey } from '../../../shared/scm'
+import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../shared/types'
 
 const SEARCH_DEBOUNCE_MS = 250
 
 interface UsePullRequestsResult {
   pullRequests: PullRequestSummary[]
+  /** Providers that failed this time (typed codes); the others' items are still listed. */
+  providerErrors: ScmListError[]
   loading: boolean
+  /** The whole call failed (IPC/main), not a single provider. */
   error: string | null
   /** Re-pide la lista de inmediato (sin debounce), con `search`/`state` vigentes. */
   refetch: () => void
   /**
    * Sella "visto" para `pr` (T52, F10): fire-and-forget contra
-   * `github:markPrSeen` (el fallo se loguea con `console.warn`, no bloquea la
+   * `scm:markPrSeen` (el fallo se loguea con `console.warn`, no bloquea la
    * UI) + clear optimista del `unread` de ESE item en el estado local, para
    * que el dot desaparezca al instante sin esperar un refetch.
    */
@@ -23,7 +27,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 /**
- * Lista PRs vía `github:listPullRequests`, re-pidiendo a `main` cuando cambia
+ * Lista PRs vía `scm:listPullRequests` (fan-out over every enabled provider), re-pidiendo a `main` cuando cambia
  * `search` (con debounce), `state` (T52, filtro de estado — SIN debounce,
  * fetch inmediato) o `authState`, y cuando se llama `refetch()` manualmente
  * o llega un evento `prListChanged` del watcher de main.
@@ -47,6 +51,7 @@ export function usePullRequests(
   state: PrStateFilter = 'open',
 ): UsePullRequestsResult {
   const [pullRequests, setPullRequests] = useState<PullRequestSummary[]>([])
+  const [providerErrors, setProviderErrors] = useState<ScmListError[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [debouncedSearch, setDebouncedSearch] = useState(search)
@@ -63,7 +68,7 @@ export function usePullRequests(
 
   // `authState` está en las dependencias a propósito: al pasar de
   // `signed_out` a `signed_in` (o al cerrar sesión) hay que volver a pedir la
-  // lista — el error 'No autenticado' previo al login no se corrige solo.
+  // lista — un UNAUTHENTICATED previo al login no se corrige solo.
   // `state` e `refetchToken` disparan un fetch inmediato (sin debounce).
   useEffect(() => {
     let cancelled = false
@@ -73,11 +78,14 @@ export function usePullRequests(
       setError(null)
 
       try {
-        const result = await window.minerva.github.listPullRequests({
+        const result = await window.minerva.scm.listPullRequests({
           search: debouncedSearch.trim() || undefined,
           state,
         })
-        if (!cancelled) setPullRequests(result)
+        if (!cancelled) {
+          setPullRequests(result.items)
+          setProviderErrors(result.errors)
+        }
       } catch (err: unknown) {
         if (!cancelled) setError(toErrorMessage(err))
       } finally {
@@ -105,20 +113,25 @@ export function usePullRequests(
   }, [refetch])
 
   const markSeen = useCallback((pr: PullRequestSummary) => {
-    window.minerva.github
-      .markPrSeen({ prId: pr.id, updatedAt: pr.updatedAt, commentCount: pr.commentCount })
+    window.minerva.scm
+      .markPrSeen({
+        repo: pr.repo,
+        number: pr.number,
+        updatedAt: pr.updatedAt,
+        commentCount: pr.commentCount,
+      })
       .catch((err: unknown) => {
         console.warn('No se pudo marcar el PR como visto', err)
       })
 
     setPullRequests((prev) =>
       prev.map((item) =>
-        item.id === pr.id
+        prKey(item.repo, item.number) === prKey(pr.repo, pr.number)
           ? { ...item, unread: { isNew: false, hasUpdates: false, hasNewComments: false } }
           : item,
       ),
     )
   }, [])
 
-  return { pullRequests, loading, error, refetch, markSeen }
+  return { pullRequests, providerErrors, loading, error, refetch, markSeen }
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CommentThread, RepoRef } from '../../../shared/types'
+import { repoKey } from '../../../shared/scm'
 
 interface UseCommentThreadsResult {
   threads: CommentThread[]
@@ -19,7 +20,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 /**
- * Hilos de comentarios de un PR vía `github:getCommentThreads`.
+ * Hilos de comentarios de un PR vía `scm:getCommentThreads`.
  *
  * `reload` llama a `setState` directamente (para poder usarse también desde
  * el handler de "publicar comentario" en `ConversationTab`), así que el efecto
@@ -29,6 +30,7 @@ function toErrorMessage(error: unknown): string {
  * literales a `setX`). Se invoca desde una función anidada en su lugar.
  */
 export function useCommentThreads(repo: RepoRef, number: number): UseCommentThreadsResult {
+  const repoIdentity = repoKey(repo)
   const [threads, setThreads] = useState<CommentThread[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,7 +39,7 @@ export function useCommentThreads(repo: RepoRef, number: number): UseCommentThre
     setLoading(true)
     setError(null)
     try {
-      const result = await window.minerva.github.getCommentThreads({ repo, number })
+      const result = await window.minerva.scm.getCommentThreads({ repo, number })
       setThreads(result)
       return result
     } catch (err: unknown) {
@@ -47,7 +49,7 @@ export function useCommentThreads(repo: RepoRef, number: number): UseCommentThre
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se depende de campos primitivos de `repo`, no de su identidad de objeto.
-  }, [repo.owner, repo.name, number])
+  }, [repoIdentity, number])
 
   useEffect(() => {
     void (async () => {

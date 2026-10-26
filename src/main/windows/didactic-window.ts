@@ -35,7 +35,7 @@ const DIDACTIC_WINDOW_MIN_HEIGHT = 420
 let didacticWindow: BrowserWindow | null = null
 
 function windowTitleFor(repo: RepoRef, number: number): string {
-  return 'Minerva — Análisis ' + repo.owner + '/' + repo.name + '#' + number
+  return 'Minerva — Análisis ' + repo.fullName + '#' + number
 }
 
 /**

@@ -16,11 +16,6 @@ vi.mock('../settings/store', () => ({
   settingsStore: {
     getPersistedSettings: vi.fn(() => null),
     getPersistedModelOptions: vi.fn(() => ({})),
-    // F14/F18: `getAiSettingsInfo` incluye `githubAccessMode` + `githubAccount`
-    // — valores fijos acá, sin ejercitar el modo ni la cuenta en sí (eso lo
-    // cubren `settings/store.test.ts` y `auth/gh-cli-auth.test.ts`).
-    getGithubAccessMode: vi.fn(() => 'gh-cli'),
-    getGithubAccount: vi.fn(() => null),
   },
 }))
 
@@ -458,32 +453,5 @@ describe('getAiSettingsInfo (T34, selectedOptions)', () => {
 
   it('modelo activo sin descriptores (default de OpenCode) → selectedOptions con un objeto vacío para ese proveedor', () => {
     expect(getAiSettingsInfo().selectedOptions).toEqual({ opencode: {} })
-  })
-})
-
-describe('getAiSettingsInfo (T60, mockGithub)', () => {
-  beforeEach(() => {
-    vi.mocked(settingsStore.getPersistedSettings).mockReturnValue(null)
-    vi.mocked(settingsStore.getPersistedModelOptions).mockReturnValue({})
-  })
-
-  afterEach(() => {
-    delete process.env.MINERVA_MOCK
-    vi.clearAllMocks()
-  })
-
-  it('mockGithub es true SOLO cuando MINERVA_MOCK="1" (nunca afecta la IA)', () => {
-    process.env.MINERVA_MOCK = '1'
-    expect(getAiSettingsInfo().mockGithub).toBe(true)
-  })
-
-  it('mockGithub es false sin MINERVA_MOCK', () => {
-    delete process.env.MINERVA_MOCK
-    expect(getAiSettingsInfo().mockGithub).toBe(false)
-  })
-
-  it('mockGithub es false con cualquier otro valor de MINERVA_MOCK', () => {
-    process.env.MINERVA_MOCK = 'true'
-    expect(getAiSettingsInfo().mockGithub).toBe(false)
   })
 })

@@ -1,42 +1,58 @@
 /**
- * Ruteo por hash para la ventana didáctica desacoplable (T14, ver
- * `src/main/windows/didactic-window.ts` y `src/renderer/src/main.tsx`).
+ * Hash routing for the detachable didactic window (see
+ * `src/main/windows/didactic-window.ts` and `src/renderer/src/main.tsx`).
  *
- * `main` abre la ventana desacoplada cargando el MISMO renderer que la
- * ventana principal, pero con un hash `didactic/<owner>/<name>/<number>`
- * (más un `title` de query opcional, el título humano del PR, para que el
- * renderer pueda pintar el header al instante sin esperar un round-trip de
- * `github:getPullRequestDetail`). `main.tsx` decide si monta `<App>` o
- * `<DidacticWindowApp>` mirando `location.hash` con este mismo parser, así
- * que quien arma el hash (main) y quien lo lee (renderer) comparten
- * literalmente la misma lógica — vive en `shared` (no en `main` ni en
- * `renderer`) exactamente por eso.
+ * Main opens the detached window loading the SAME renderer as the main window,
+ * with a hash `didactic/<repo>/<number>?title=...`. `<repo>` is the full
+ * `RepoRef` as base64url-encoded JSON, so every provider variant (GitHub,
+ * Azure DevOps) round-trips without a per-provider path format. On parse it is
+ * validated with the same strict rules as IPC payloads (`./scm-guards.ts`):
+ * the hash is an input to the renderer like any other.
  *
- * A propósito el prefijo NO incluye el `#`: `BrowserWindow.loadFile` recibe
- * el hash vía `{ hash }` (pasado a `url.format()` de Node, que antepone el
- * `#` él solo), mientras que `loadURL` en dev necesita el `#` concatenado a
- * mano. `parseDidacticHash` acepta el valor con o sin `#` inicial (en el
- * renderer, `location.hash` siempre lo trae) para no repetir esa asimetría
- * en cada punto de uso.
+ * The prefix has no leading `#`: `BrowserWindow.loadFile` receives the hash
+ * via `{ hash }` (Node's `url.format()` adds the `#`), while `loadURL` in dev
+ * needs it concatenated by hand. `parseDidacticHash` accepts it with or
+ * without the leading `#` (`location.hash` always has it).
  */
-import type { RepoRef } from './types'
+import type { RepoRef } from './scm'
+import { isRepoRef } from './scm-guards'
 
 export const DIDACTIC_ROUTE_PREFIX = 'didactic/'
+
+/** Upper bound for the encoded repo segment; generous for the longest valid `RepoRef`. */
+const MAX_ENCODED_REPO_LEN = 4096
 
 export interface DidacticRouteTarget {
   repo: RepoRef
   number: number
-  /** `null` si el hash no traía `title` en el query (no debería pasar si se armó con `buildDidacticHash`, pero se tolera). */
+  /** `null` when the hash had no `title` query (shouldn't happen with `buildDidacticHash`, but tolerated). */
   title: string | null
 }
 
-/** Arma el hash (sin `#` inicial, ver comentario de cabecera) para navegar la ventana didáctica a `repo#number`. */
+function toBase64Url(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function fromBase64Url(encoded: string): string | null {
+  if (!/^[A-Za-z0-9_-]*$/.test(encoded)) return null
+  try {
+    const padded = encoded.replace(/-/g, '+').replace(/_/g, '/')
+    const binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4))
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return null
+  }
+}
+
+/** Builds the hash (no leading `#`, see header) that navigates the didactic window to `repo#number`. */
 export function buildDidacticHash(repo: RepoRef, number: number, title: string): string {
   return (
     DIDACTIC_ROUTE_PREFIX +
-    encodeURIComponent(repo.owner) +
-    '/' +
-    encodeURIComponent(repo.name) +
+    toBase64Url(JSON.stringify(repo)) +
     '/' +
     number +
     '?title=' +
@@ -44,7 +60,7 @@ export function buildDidacticHash(repo: RepoRef, number: number, title: string):
   )
 }
 
-/** `null` si `hash` no es una ruta didáctica válida (prefijo ausente, o owner/name/number malformados). */
+/** `null` if `hash` is not a valid didactic route (missing prefix, invalid repo or number). */
 export function parseDidacticHash(hash: string): DidacticRouteTarget | null {
   const withoutLeadingHash = hash.startsWith('#') ? hash.slice(1) : hash
   if (!withoutLeadingHash.startsWith(DIDACTIC_ROUTE_PREFIX)) return null
@@ -52,20 +68,35 @@ export function parseDidacticHash(hash: string): DidacticRouteTarget | null {
   const rest = withoutLeadingHash.slice(DIDACTIC_ROUTE_PREFIX.length)
   const [pathPart, queryPart] = rest.split('?')
   const segments = pathPart.split('/')
-  if (segments.length < 3) return null
+  if (segments.length !== 2) return null
 
-  const owner = decodeURIComponent(segments[0])
-  const name = decodeURIComponent(segments[1])
-  const number = Number(segments[2])
-  if (owner.length === 0 || name.length === 0 || !Number.isInteger(number) || number <= 0) {
+  const [encodedRepo, numberPart] = segments
+  if (encodedRepo.length === 0 || encodedRepo.length > MAX_ENCODED_REPO_LEN) return null
+  const json = fromBase64Url(encodedRepo)
+  if (json === null) return null
+  let repo: unknown
+  try {
+    repo = JSON.parse(json)
+  } catch {
     return null
   }
+  if (!isRepoRef(repo)) return null
+
+  if (!/^\d+$/.test(numberPart)) return null
+  const number = Number(numberPart)
+  if (!Number.isSafeInteger(number) || number <= 0) return null
 
   let title: string | null = null
   if (queryPart) {
     const match = /(?:^|&)title=([^&]*)/.exec(queryPart)
-    if (match) title = decodeURIComponent(match[1])
+    if (match) {
+      try {
+        title = decodeURIComponent(match[1])
+      } catch {
+        title = null
+      }
+    }
   }
 
-  return { repo: { owner, name, fullName: owner + '/' + name }, number, title }
+  return { repo, number, title }
 }

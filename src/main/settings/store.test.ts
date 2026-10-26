@@ -35,15 +35,10 @@ function orphanedOpenRouterKeyFilePath(): string {
 describe('SettingsStore', () => {
   beforeEach(() => {
     userDataDir = mkdtempSync(join(tmpdir(), 'minerva-settings-test-'))
-    // F18: `getGithubAccessMode()` lee el entorno, no el disco. Se limpia acá
-    // para que un `MINERVA_GITHUB_ACCESS` del shell que corre los tests (o el
-    // que dejó puesto un test anterior) no cambie el resultado.
-    delete process.env.MINERVA_GITHUB_ACCESS
   })
 
   afterEach(() => {
     rmSync(userDataDir, { recursive: true, force: true })
-    delete process.env.MINERVA_GITHUB_ACCESS
   })
 
   it('devuelve null si no hay settings.json (defaults, sin crashear)', () => {
@@ -400,55 +395,23 @@ describe('SettingsStore', () => {
     })
   })
 
-  describe('githubAccessMode (F14, redefinido en F18)', () => {
-    // F18 retiró el toggle de Settings: el modo ya no se persiste, lo decide
-    // el entorno. `MINERVA_GITHUB_ACCESS` se limpia en el `beforeEach` global
-    // de este archivo (ver arriba) y cada test que lo necesita lo pone.
-    it('default "gh-cli" cuando no hay env que lo fuerce', () => {
-      expect(new SettingsStore().getGithubAccessMode()).toBe('gh-cli')
+  describe('legacy githubAccessMode key', () => {
+    it('is ignored whatever its value, without invalidating the file', () => {
+      for (const legacy of ['oauth', 'ssh-key']) {
+        writeFileSync(
+          settingsFilePath(),
+          JSON.stringify({
+            aiProvider: 'opencode',
+            models: { opencode: 'opencode/big-pickle' },
+            githubAccessMode: legacy,
+          }),
+          'utf-8',
+        )
+        expect(new SettingsStore().getPersistedModel('opencode')).toBe('opencode/big-pickle')
+      }
     })
 
-    it('MINERVA_GITHUB_ACCESS=oauth fuerza el escape hatch', () => {
-      process.env.MINERVA_GITHUB_ACCESS = 'oauth'
-      expect(new SettingsStore().getGithubAccessMode()).toBe('oauth')
-    })
-
-    it('un valor de env fuera de la whitelist se ignora (cae al default)', () => {
-      process.env.MINERVA_GITHUB_ACCESS = 'ssh-key'
-      expect(new SettingsStore().getGithubAccessMode()).toBe('gh-cli')
-    })
-
-    it('IGNORA un githubAccessMode persistido por una versión ≤0.6.x, pero no invalida el archivo', () => {
-      writeFileSync(
-        settingsFilePath(),
-        JSON.stringify({
-          aiProvider: 'opencode',
-          models: { opencode: 'opencode/big-pickle' },
-          githubAccessMode: 'oauth',
-        }),
-        'utf-8',
-      )
-
-      const store = new SettingsStore()
-      expect(store.getGithubAccessMode()).toBe('gh-cli')
-      // El resto de los settings de ese archivo se siguen leyendo.
-      expect(store.getPersistedModel('opencode')).toBe('opencode/big-pickle')
-    })
-
-    it('devuelve null si "githubAccessMode" tiene un valor fuera de la whitelist (settings.json corrupto/editado a mano)', () => {
-      writeFileSync(
-        settingsFilePath(),
-        JSON.stringify({
-          aiProvider: 'opencode',
-          models: {},
-          githubAccessMode: 'ssh-key',
-        }),
-        'utf-8',
-      )
-      expect(new SettingsStore().getPersistedSettings()).toBeNull()
-    })
-
-    it('deja de escribir githubAccessMode: la clave vieja desaparece en la próxima escritura', () => {
+    it('disappears on the next write', () => {
       writeFileSync(
         settingsFilePath(),
         JSON.stringify({ aiProvider: 'opencode', models: {}, githubAccessMode: 'gh-cli' }),

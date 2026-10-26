@@ -6,6 +6,7 @@ import { PrHeader } from '../pr-detail/PrHeader'
 import { ConversationTab } from '../pr-detail/ConversationTab'
 import { FilesTab } from '../pr-detail/FilesTab'
 import { EmptyState } from '../ui/EmptyState'
+import type { RepoRef } from '../../../../shared/scm'
 
 function TabButton({
   active,
@@ -30,6 +31,9 @@ function TabButton({
   )
 }
 
+/** Placeholder for the hooks while nothing is selected (their result is ignored). */
+const NO_REPO: RepoRef = { provider: 'github', owner: '', name: '', fullName: '' }
+
 export function CenterPane(): React.JSX.Element {
   const selectedPr = useAppStore((s) => s.selectedPr)
   const centerTab = useAppStore((s) => s.centerTab)
@@ -39,7 +43,7 @@ export function CenterPane(): React.JSX.Element {
   // hay selección: se le pasa un placeholder y se ignora su resultado (ver
   // guard de `!selectedPr` más abajo) para no romper las reglas de hooks.
   const { detail, loading, error } = usePullRequestDetail(
-    selectedPr?.repo ?? { owner: '', name: '', fullName: '' },
+    selectedPr?.repo ?? NO_REPO,
     selectedPr?.number ?? 0,
   )
 
@@ -51,10 +55,7 @@ export function CenterPane(): React.JSX.Element {
     loading: threadsLoading,
     error: threadsError,
     reload: reloadThreads,
-  } = useCommentThreads(
-    selectedPr?.repo ?? { owner: '', name: '', fullName: '' },
-    selectedPr?.number ?? 0,
-  )
+  } = useCommentThreads(selectedPr?.repo ?? NO_REPO, selectedPr?.number ?? 0)
 
   if (!selectedPr) {
     return (
@@ -97,7 +98,7 @@ export function CenterPane(): React.JSX.Element {
           Conversación
         </TabButton>
         <TabButton active={centerTab === 'files'} onClick={() => setCenterTab('files')}>
-          Archivos ({detail.changedFiles})
+          {detail.changedFiles === null ? 'Archivos' : `Archivos (${detail.changedFiles})`}
         </TabButton>
       </nav>
       <div className="flex-1 overflow-hidden">

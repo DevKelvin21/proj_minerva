@@ -8,10 +8,10 @@
  *
  * Pipeline de `analyzePullRequest` (mismo contrato que el resto de los
  * proveedores de IA, ver `../service.ts`):
- * 1. Pide el detalle y los archivos del PR al `GithubService` ACTIVO
+ * 1. Pide el detalle y los archivos del PR al `PrContextSource` (registro SCM)
  *    (inyectado por constructor, igual que el resto de proveedores).
- * 2. AGÉNTICO (F11/T58): `ensureSnapshot(this.github, req.repo, detail.headSha)`
- *    (`../../github/snapshot-store.ts`, T54) materializa una copia local del
+ * 2. AGÉNTICO (F11/T58): `this.context.ensureSnapshot(req.repo, detail.headSha)`
+ *    (`../../scm/snapshot-store.ts`, T54) materializa una copia local del
  *    repo AL COMMIT del PR — ese directorio es el `cwd` que se le pasa a
  *    `query()`, y el mensaje de usuario (`buildAgenticUserMessage`, en vez de
  *    `buildUserMessage`) le pide explícitamente que lo explore.
@@ -92,10 +92,9 @@
  */
 import { AbortError, query } from '@anthropic-ai/claude-agent-sdk'
 import type { SDKAssistantMessageError } from '@anthropic-ai/claude-agent-sdk'
-import type { AiService, AnalyzePullRequestOptions } from '../service'
-import type { GithubService } from '../../github/service'
+import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from '../service'
+import type { PrContextSource } from '../pr-context'
 import type { IpcRequest } from '../../../shared/ipc'
-import type { GeneratedAnalysis } from '../../../shared/types'
 import { getEffectiveAiSelection } from '../env'
 import { ANALYZE_PR_SYSTEM_PROMPT } from '../prompts/analyze-pr'
 import { buildAgenticUserMessage, prId } from '../analysis-prompt'
@@ -105,7 +104,6 @@ import { createActivityTracker } from '../activity-tracker'
 import type { AnalysisActivityKind } from '../../../shared/events'
 import { resolveCliPath } from './resolve-cli'
 import { buildSanitizedSpawnEnv } from './spawn-env'
-import { ensureSnapshot } from '../../github/snapshot-store'
 import {
   AGENTIC_INACTIVITY_TIMEOUT_MS,
   AGENTIC_REQUEST_TIMEOUT_MS,
@@ -207,12 +205,12 @@ function looksLikeMissingCli(message: string): boolean {
 }
 
 export class ClaudeCodeAiService implements AiService {
-  constructor(private readonly github: GithubService) {}
+  constructor(private readonly context: PrContextSource) {}
 
   async analyzePullRequest(
     req: IpcRequest<'ai:analyzePullRequest'>,
     options?: AnalyzePullRequestOptions,
-  ): Promise<GeneratedAnalysis> {
+  ): Promise<AnalyzeResult> {
     const { model, options: modelOptions } = getEffectiveAiSelection()
 
     const claudeCliPath = resolveCliPath('claude')
@@ -221,15 +219,15 @@ export class ClaudeCodeAiService implements AiService {
     }
 
     const [detail, files] = await Promise.all([
-      this.github.getPullRequestDetail(req),
-      this.github.getPullRequestFiles(req),
+      this.context.getDetail(req.repo, req.number),
+      this.context.getFiles(req.repo, req.number),
     ])
 
     // AGÉNTICO (F11/T58): copia local del repo al commit del PR — el `cwd`
     // que `query()` explora con `Read`/`Grep`/`Glob` (ver el comentario del
     // módulo). Dedupeado/cacheado en disco por `ensureSnapshot` (T54): un
     // segundo análisis del mismo repo+sha no vuelve a pagar la descarga.
-    const snapshotDir = await ensureSnapshot(this.github, req.repo, detail.headSha)
+    const snapshotDir = await this.context.ensureSnapshot(req.repo, detail.headSha)
 
     const userMessage = buildAgenticUserMessage(detail, files)
 
@@ -472,6 +470,7 @@ export class ClaudeCodeAiService implements AiService {
 
     return {
       prId: prId(req),
+      headSha: detail.headSha,
       sections,
       generatedAt: new Date().toISOString(),
     }

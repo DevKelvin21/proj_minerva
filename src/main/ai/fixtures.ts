@@ -1,6 +1,6 @@
 /**
  * Fixtures de `DidacticAnalysis` para el universo mock "shopwave" (mismos PRs
- * que `src/main/github/fixtures.ts`). Cuatro PRs tienen contenido enriquecido
+ * que `src/main/scm/github/fixtures.ts`). Cuatro PRs tienen contenido enriquecido
  * (secciones `endpoint`/`schema`/`architecture`/`cloud` con diagramas
  * Mermaid, esta última solo en `shopwave/checkout-service#77`, T76); el
  * resto recibe un resumen genérico armado a partir de su `PullRequestDetail`.
@@ -13,6 +13,8 @@
  * `código inline` en Markdown) sí son seguros, como ya se usa en
  * `github/fixtures.ts`.
  */
+import { prKey } from '../../shared/scm'
+import { githubRepo } from '../../shared/scm-guards'
 import type { DidacticSection, PullRequestDetail } from '../../shared/types'
 
 /** Resumen genérico para PRs sin sección enriquecida en esta demo mock. */
@@ -31,11 +33,11 @@ export function genericSummarySection(detail: PullRequestDetail): DidacticSectio
       detail.number +
       ')\n\n' +
       'Cambia ' +
-      detail.changedFiles +
+      (detail.changedFiles ?? '?') +
       ' archivo(s): +' +
-      detail.additions +
+      (detail.additions ?? '?') +
       ' / -' +
-      detail.deletions +
+      (detail.deletions ?? '?') +
       '. Etiquetas: ' +
       labels +
       '.\n\n' +
@@ -357,9 +359,10 @@ const pr77Sections: DidacticSection[] = [
 ]
 
 /** Secciones enriquecidas por `prId` (`owner/name#number`, igual formato que `PullRequestDetail.id`). */
+/** Keyed by `prKey`. */
 export const richDidacticSections: Record<string, DidacticSection[]> = {
-  'shopwave/api#482': pr482Sections,
-  'shopwave/api#479': pr479Sections,
-  'shopwave/web#201': pr201Sections,
-  'shopwave/checkout-service#77': pr77Sections,
+  [prKey(githubRepo('shopwave', 'api'), 482)]: pr482Sections,
+  [prKey(githubRepo('shopwave', 'api'), 479)]: pr479Sections,
+  [prKey(githubRepo('shopwave', 'web'), 201)]: pr201Sections,
+  [prKey(githubRepo('shopwave', 'checkout-service'), 77)]: pr77Sections,
 }

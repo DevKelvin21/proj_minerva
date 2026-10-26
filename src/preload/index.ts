@@ -88,7 +88,7 @@ function isPrChange(value: unknown): value is PrChange {
       v.type === 'pr_merged' ||
       v.type === 'new_comments' ||
       v.type === 'updated') &&
-    typeof v.prId === 'string' &&
+    typeof v.prKey === 'string' &&
     typeof v.number === 'number' &&
     typeof v.title === 'string' &&
     typeof v.repo === 'object' &&
@@ -176,19 +176,17 @@ const minervaApi = {
     ping: invoke('minerva:ping'),
     getVersion: invoke('minerva:getVersion'),
   },
-  auth: {
-    getStatus: invoke('auth:getStatus'),
-    startDeviceFlow: invoke('auth:startDeviceFlow'),
-    signOut: invoke('auth:signOut'),
-    listGhAccounts: invoke('auth:listGhAccounts'),
-  },
-  github: {
-    listPullRequests: invoke('github:listPullRequests'),
-    markPrSeen: invoke('github:markPrSeen'),
-    getPullRequestDetail: invoke('github:getPullRequestDetail'),
-    getPullRequestFiles: invoke('github:getPullRequestFiles'),
-    getCommentThreads: invoke('github:getCommentThreads'),
-    postComment: invoke('github:postComment'),
+  scm: {
+    getAuthStatus: invoke('scm:getAuthStatus'),
+    listGhAccounts: invoke('scm:listGhAccounts'),
+    getSettings: invoke('scm:getSettings'),
+    setGithubAccount: invoke('scm:setGithubAccount'),
+    listPullRequests: invoke('scm:listPullRequests'),
+    markPrSeen: invoke('scm:markPrSeen'),
+    getPullRequestDetail: invoke('scm:getPullRequestDetail'),
+    getPullRequestFiles: invoke('scm:getPullRequestFiles'),
+    getCommentThreads: invoke('scm:getCommentThreads'),
+    postComment: invoke('scm:postComment'),
   },
   ai: {
     analyzePullRequest: invoke('ai:analyzePullRequest'),
@@ -203,7 +201,6 @@ const minervaApi = {
     setAiProvider: invoke('settings:setAiProvider'),
     setProviderModel: invoke('settings:setProviderModel'),
     setModelOption: invoke('settings:setModelOption'),
-    setGithubAccount: invoke('settings:setGithubAccount'),
   },
   window: {
     openDidactic: invoke('window:openDidactic'),
