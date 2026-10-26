@@ -7,27 +7,24 @@ files:
   - package.json
   - '!**/.env'
   - '!**/.env.*'
-  # `@anthropic-ai/claude-agent-sdk` (dependency, T28) trae un binario nativo
-  # por plataforma (~250MB c/u: linux-x64, darwin-arm64, win32-x64, ...) como
-  # optionalDependency SOLO para poder correr el CLI bundleado si nadie pasa
-  # `pathToClaudeCodeExecutable`. Minerva SIEMPRE pasa esa opción apuntando al
-  # `claude` del sistema (`src/main/ai/providers/claude-code-service.ts` +
-  # `resolve-cli.ts`, T31) — bundlear esos binarios inflaría el instalador
-  # +250MB por SO sin que se usen nunca. El glob matchea "claude-agent-sdk-*"
-  # (los paquetes de plataforma) SIN matchear "claude-agent-sdk" a secas (el
-  # paquete JS principal, ~3.8MB, que sí hace falta: expone `query()`).
+  # `@anthropic-ai/claude-agent-sdk` ships a native binary per platform (~250MB
+  # each) as an optionalDependency, only so it can run its bundled CLI when no
+  # `pathToClaudeCodeExecutable` is given. Minerva ALWAYS passes that option pointing
+  # at the system `claude` (`src/main/ai/providers/claude-code-service.ts` +
+  # `resolve-cli.ts`), so bundling those binaries would add ~250MB per OS for
+  # nothing. The glob matches the platform packages ("claude-agent-sdk-*") but NOT
+  # the main JS package ("claude-agent-sdk", ~3.8MB), which is needed for `query()`.
   - '!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**'
-# Feed del auto-updater (F17/T89): esta sección es lo que hace que
-# electron-builder escriba `app-update.yml` DENTRO del paquete (en
-# resources/), con provider/owner/repo embebidos. Sin esta sección
-# `app-update.yml` no existe y `electron-updater` lanza un error en
-# runtime apenas la app arranca (no hay feed que consultar). El repo
-# es PÚBLICO, así que el provider `github` no necesita credenciales
-# para que los clientes LEAN el feed (sí las necesita el pipeline de
-# release para publicar, ver .github/workflows/release.yml).
+# Auto-updater feed: this section makes electron-builder write `app-update.yml`
+# INSIDE the package (in resources/) with provider/owner/repo embedded. Without it
+# `electron-updater` throws at runtime as soon as the app starts (no feed to query).
+# The repo is PUBLIC, so the `github` provider needs no credentials for clients to
+# READ the feed (the release pipeline does need them to publish, see
+# .github/workflows/release.yml). Keep owner/repo in sync with
+# `src/main/updater/config.ts`.
 publish:
   provider: github
-  owner: amiedygg
+  owner: DevKelvin21
   repo: proj_minerva
 asar: true
 npmRebuild: false
@@ -39,12 +36,10 @@ linux:
   maintainer: Edilson
 mac:
   category: public.app-category.developer-tools
-  # macOS queda notify-only por ahora (decisión de producto F17: sin
-  # Developer ID todavía, el updater real solo compara versión y
-  # enlaza a la release). El target `zip` se genera YA de todos modos:
-  # Squirrel.Mac (el mecanismo de electron-updater en macOS) necesita
-  # el zip para que `latest-mac.yml` sirva de algo — así el día que
-  # haya firma es solo firmar y no hay que volver a tocar el packaging.
+  # macOS is notify-only for now (no Developer ID yet: the real updater only
+  # compares versions and links to the release). The `zip` target is still built
+  # because Squirrel.Mac (electron-updater's macOS mechanism) needs it for
+  # `latest-mac.yml` to be useful, so the day signing exists nothing here changes.
   target:
     - target: dmg
       arch:

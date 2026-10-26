@@ -3,38 +3,57 @@ import { join } from 'node:path'
 import { test, expect, launchMinerva, closeMinerva, attachScreenshot } from './fixtures'
 
 /**
- * Port de scripts/smoke-packaged.mjs (T24): la app EMPAQUETADA por
- * electron-builder, lanzada desde el binario de `dist/linux-unpacked/`.
- * Que el renderer cargue desde `file://…app.asar…` es en sí la prueba de que
- * corre el build empaquetado (main+preload+fixtures dentro del asar) y no el
- * dev server ni `out/`.
+ * The app PACKAGED by electron-builder, launched from the unpacked binary in
+ * `dist/` (per OS, see `candidateBinaries`). The renderer loading from
+ * `file://…app.asar…` is itself the proof that the packaged build runs
+ * (main + preload + fixtures inside the asar) and not the dev server or `out/`.
  *
- * El binario NO se construye aquí (electron-builder tarda minutos): el test
- * se auto-skipea si falta. Para cubrirlo: `npm run dist:dir` antes de la
- * suite.
+ * The binary is NOT built here (electron-builder takes minutes): the test
+ * auto-skips when it is missing. To cover it, run `npm run dist:mac:dir`
+ * (macOS) or `npm run dist:dir` (Linux) before the suite.
  */
 
-const PACKAGED_BINARY = join(process.cwd(), 'dist', 'linux-unpacked', 'minerva')
+/**
+ * Where `electron-builder --<os> dir` leaves the unpacked app. The macOS folder
+ * depends on the arch it was built for (`mac-arm64` on Apple Silicon, `mac` for
+ * x64), so the candidates are tried in order. `PRODUCT_NAME` comes from
+ * `electron-builder.yml` (`productName`); on Linux the executable is
+ * `linux.executableName`.
+ */
+const PRODUCT_NAME = 'Minerva'
+
+function candidateBinaries(): string[] {
+  const dist = join(process.cwd(), 'dist')
+  if (process.platform === 'darwin') {
+    return ['mac-arm64', 'mac'].map((dir) =>
+      join(dist, dir, PRODUCT_NAME + '.app', 'Contents', 'MacOS', PRODUCT_NAME),
+    )
+  }
+  if (process.platform === 'win32') {
+    return [join(dist, 'win-unpacked', PRODUCT_NAME + '.exe')]
+  }
+  return [join(dist, 'linux-unpacked', 'minerva')]
+}
+
+const PACKAGED_BINARY = candidateBinaries().find((path) => existsSync(path)) ?? candidateBinaries()[0]
 
 /**
- * Versión que la app EMPAQUETADA reporta por `window.minerva.system.getVersion()`
- * (`minerva:getVersion` → `app.getVersion()`, T90/F17) debe coincidir EXACTO
- * con `package.json`: es la única superficie donde Minerva muestra su propia
- * versión (sección "Actualizaciones" del modal de Settings, `UpdateSection.tsx`)
- * y hoy nada la protegía. Sin empaquetar `app.getVersion()` devuelve la
- * versión de Electron (por eso el resto de la suite, `updater.spec.ts`, nunca
- * afirma un literal) — acá SÍ es seguro afirmarlo porque el binario está
- * empaquetado de verdad.
+ * The version the PACKAGED app reports through `window.minerva.system.getVersion()`
+ * (`minerva:getVersion` → `app.getVersion()`) must match `package.json` EXACTLY:
+ * it is the only surface where Minerva shows its own version (the "Updates"
+ * section of the Settings modal). Unpackaged, `app.getVersion()` returns
+ * Electron's version (which is why the rest of the suite, `updater.spec.ts`,
+ * never asserts a literal) — here it is safe because the binary is really packaged.
  */
 const PACKAGE_JSON_VERSION = (
   JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as { version: string }
 ).version
 
 // eslint-disable-next-line no-empty-pattern
-test('la app empaquetada arranca, expone el preload y sirve los fixtures del asar', async ({}, testInfo) => {
+test('the packaged app starts, exposes the preload and serves the fixtures from the asar', async ({}, testInfo) => {
   test.skip(
     !existsSync(PACKAGED_BINARY),
-    'no hay binario empaquetado en dist/linux-unpacked/ — correr npm run dist:dir antes',
+    'no packaged binary at ' + PACKAGED_BINARY + ' — run npm run dist:mac:dir (macOS) or npm run dist:dir (Linux) first',
   )
 
   const app = await launchMinerva(testInfo.outputPath('user-data'), {
@@ -42,35 +61,35 @@ test('la app empaquetada arranca, expone el preload y sirve los fixtures del asa
     args: [],
   })
   try {
-    // Ventana principal a mano (no mainWindow()): antes de esperar contenido
-    // se verifica el ORIGEN del renderer, que es el punto de la suite.
+    // Main window by hand (not mainWindow()): the renderer ORIGIN is checked
+    // before waiting for content, which is the point of this spec.
     let window = app.context.pages().find((p) => !p.url().includes('#didactic'))
     if (!window) {
       window = await app.context.waitForEvent('page', { timeout: 15_000 })
     }
     await window.waitForLoadState('domcontentloaded')
-    expect(window.url(), 'renderer servido desde el asar (no dev server ni out/)').toMatch(
+    expect(window.url(), 'renderer served from the asar (not the dev server or out/)').toMatch(
       /^file:\/\/.*app\.asar.*index\.html/,
     )
 
-    // Preload CJS cargado: window.minerva expuesto por contextBridge.
+    // CJS preload loaded: window.minerva exposed by contextBridge.
     expect(await window.evaluate(() => typeof window.minerva)).toBe('object')
 
-    // La versión reportada por IPC coincide EXACTO con package.json (T94).
+    // The version reported over IPC matches package.json exactly.
     const reportedVersion = await window.evaluate(() => window.minerva.system.getVersion())
-    expect(reportedVersion, 'getVersion() == package.json en el binario empaquetado').toBe(
+    expect(reportedVersion, 'getVersion() == package.json in the packaged binary').toBe(
       PACKAGE_JSON_VERSION,
     )
 
-    // Lista de PRs mock vía IPC (fixtures de main DENTRO del asar) + ping.
+    // Mock PR list over IPC (main fixtures INSIDE the asar) + ping.
     await expect(window.getByText('apply-coupon').first()).toBeVisible({ timeout: 20_000 })
     await expect(window.getByText('Conectado').first()).toBeVisible()
 
-    // Detalle + tab Archivos (diff parseado + Shiki desde el bundle).
+    // Detail + Files tab (parsed diff + Shiki from the bundle).
     await window.getByText('Add refunds table and migration').first().click()
     await expect(window.getByText('#479').first()).toBeVisible()
-    // Nombre de archivo del fixture, no un regex laxo: el título del PR
-    // también contiene "refunds" y taparía un diff que no carga.
+    // The fixture's file name, not a loose regex: the PR title also contains
+    // "refunds" and would mask a diff that fails to load.
     await window.getByText('Archivos').first().click()
     await expect(window.getByText('2026070401_create_refunds.sql').first()).toBeVisible()
 
