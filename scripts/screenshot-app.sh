@@ -1,28 +1,39 @@
 #!/bin/bash
-# Captura la ventana de Minerva (o la didáctica desacoplada) a un PNG, para
-# VERIFICACIÓN VISUAL en las pruebas e2e — lección T15-bis: los checks
-# geométricos por CDP (getBoundingClientRect) ignoran el clipping y dieron
-# por bueno un visor que el usuario veía vacío. Toda verificación de UI debe
-# terminar MIRANDO una captura.
+# Capture a Minerva window to a PNG, for VISUAL VERIFICATION. DOM/rect checks
+# ignore clipping and have passed a viewer the user saw empty — every UI check
+# must end with LOOKING at a screenshot.
 #
-# Mismo mecanismo que `omarchy-capture-screenshot` (hyprctl + grim), pero no
-# interactivo (sin slurp) y apuntando a la ventana por título.
+# Dispatches by platform:
+#   - macOS / anything else: CDP (scripts/screenshot-cdp.mjs). Needs the app
+#     started with `npm run dev -- -- --remote-debugging-port=9222`.
+#   - Linux + Hyprland (hyprctl and grim installed, window found): native window
+#     capture, as before. Set MINERVA_SCREENSHOT=cdp to force the CDP path.
 #
-# Uso: scripts/screenshot-app.sh [salida.png] [patrón-de-título]
-#   patrón por defecto: "Minerva" (la principal); usar "Análisis" para la
-#   ventana didáctica desacoplada.
+# Usage: scripts/screenshot-app.sh [out.png] [title-pattern]
+#   pattern: the main window by default; on the CDP path it is a regex over the
+#   page title or url (e.g. "didactic" for the detached didactic window).
 set -euo pipefail
 
 OUT="${1:-/tmp/minerva-$(date +%H%M%S).png}"
-TITLE_PATTERN="${2:-Minerva}"
+TITLE_PATTERN="${2:-}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-GEO=$(hyprctl clients -j | jq -r --arg t "$TITLE_PATTERN" \
-  '.[] | select(.class == "proj-minerva" and (.title | test($t))) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' | head -1)
+use_hyprland() {
+  [[ ${MINERVA_SCREENSHOT:-} != cdp ]] &&
+    [[ $(uname -s) == Linux ]] &&
+    command -v hyprctl >/dev/null && command -v grim >/dev/null && command -v jq >/dev/null &&
+    [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]
+}
 
-if [[ -z $GEO ]]; then
-  echo "No se encontró ventana proj-minerva con título ~ '$TITLE_PATTERN'" >&2
-  exit 1
+if use_hyprland; then
+  GEO=$(hyprctl clients -j | jq -r --arg t "${TITLE_PATTERN:-Minerva}" \
+    '.[] | select(.class == "proj-minerva" and (.title | test($t))) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' | head -1)
+  if [[ -n $GEO ]]; then
+    grim -g "$GEO" "$OUT"
+    echo "$OUT"
+    exit 0
+  fi
+  echo "No Hyprland window matched; falling back to CDP." >&2
 fi
 
-grim -g "$GEO" "$OUT"
-echo "$OUT"
+exec node "$HERE/screenshot-cdp.mjs" "$OUT" ${TITLE_PATTERN:+"$TITLE_PATTERN"}
