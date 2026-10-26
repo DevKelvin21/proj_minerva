@@ -100,7 +100,8 @@ author's Spanish logs, not maintained)
 9. **E2E: never `_electron.launch`** (`close()` hangs, playwright#39248). `e2e/fixtures.ts` spawns Electron with `--remote-debugging-port=0` and uses `connectOverCDP`.
 10. Measure nodes with the callback ref of `useElementWidth`, not `useRef` + `useEffect([])` (early returns leave the ref null).
 11. A `detached: true` child outlives its parent: register its pid in the same tick as `spawn` and make async work before it cancelable (`opencode-runtime.ts`), or quitting during startup leaks a ~300 MB `opencode serve`. Every launch starts one, even with `MINERVA_MOCK_AI=1`; `e2e/opencode-sweep.ts` reaps test orphans only (never the user's opencode) and logs if it finds any. After fixing main, rebuild `dist/` (`npm run build` does not).
-12. Resize windows in tests with `setViewport` in `e2e/fixtures.ts` (CDP `Emulation.setDeviceMetricsOverride`), not `page.setViewportSize()`.
+12. Electron-hosted terminals (VS Code, T3 Code) export `ELECTRON_RUN_AS_NODE=1`, which makes Electron run as plain Node and die on `import … from 'electron'`: `unset` it before `npm run dev` (the e2e fixture strips it).
+13. Resize windows in tests with `setViewport` in `e2e/fixtures.ts` (CDP `Emulation.setDeviceMetricsOverride`), not `page.setViewportSize()`.
 
 ## Commands
 

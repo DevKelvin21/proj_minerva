@@ -78,6 +78,10 @@ export async function launchMinerva(
     // en `initUpdater()` (`main/updater/updater.ts`), así que no se pisan.
     MINERVA_UPDATER: 'off',
     MINERVA_USER_DATA_DIR: userDataDir,
+    // Terminals hosted inside an Electron app (VS Code, T3 Code…) export this, and it
+    // turns the spawned Electron into plain Node ("does not provide an export named
+    // 'BrowserWindow'", exit 1). Always strip it.
+    ELECTRON_RUN_AS_NODE: undefined,
     ...opts.env,
   }
   for (const key of Object.keys(env)) {

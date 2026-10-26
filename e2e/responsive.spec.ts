@@ -140,8 +140,13 @@ test('Settings: todo el contenido es alcanzable con la ventana tileada', async (
     await expect(tab).toBeVisible()
     await tab.click()
 
+    // With a real CLI session on the machine (Codex/Claude installed and logged in) the
+    // dynamic model catalog arrives mid-test and swaps the list, detaching the first
+    // card while Playwright waits for it to be stable; retry until the list settles.
     const firstModelCard = window.locator('[role="tabpanel"] button').first()
-    await firstModelCard.scrollIntoViewIfNeeded()
+    await expect(async () => {
+      await firstModelCard.scrollIntoViewIfNeeded({ timeout: 2_000 })
+    }).toPass({ timeout: 15_000 })
     await expect(firstModelCard).toBeVisible()
 
     await attachScreenshot(window, testInfo, `settings-${viewport.w}x${viewport.h}`)
