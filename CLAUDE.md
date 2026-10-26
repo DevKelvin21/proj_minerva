@@ -16,9 +16,12 @@ AI CLIs, secrets, caches), `src/preload/` (`contextBridge`, small typed API, no
 `nodeIntegration`, built as **CJS**), `src/renderer/` (React 19, strict TS, Tailwind v4
 CSS-first, Zustand).
 
-**Source control.** Providers implement `ScmProvider` (`main/scm/provider.ts`), found via
-`main/scm/registry.ts`; IPC channels are `scm:*`. Rule for every provider: the renderer
-gets unified patches built in main.
+**Source control.** Contract in `src/shared/scm.ts` (`RepoRef` union, `repoKey`/`prKey`/
+`sameRepo`, `ScmErrorCode`). Providers implement `ScmProvider` (`main/scm/provider.ts`),
+found via `main/scm/registry.ts` (`forRepo`, `enabled`, `allSettled` fan-out); IPC channels
+are `scm:*`. Errors cross IPC as a `[SCM:CODE]` message prefix (`shared/scm-errors.ts`):
+branch on the code, never on message text. Rule for every provider: the renderer gets
+unified patches built in main.
 - GitHub (`main/scm/github/`): Octokit. Auth is the `gh` CLI only: `gh auth token
   --hostname …` feeds Octokit, validated against `GET /user`, one retry on 401. The
   token lives only in main's memory, never persisted or logged. `githubAccount` in
@@ -45,8 +48,8 @@ commit** and the model explores it with **read-only tools**. Jails: OpenCode
   cache in main; prompts in `src/main/ai/prompts/`.
 - Mermaid renders in the renderer (lazy, `securityLevel: 'strict'`); the AI writes
   Mermaid text, it does not draw.
-- Detached didactic window: `#didactic/<owner>/<name>/<n>` hash; `main.tsx` reacts to
-  `hashchange`.
+- Detached didactic window: `#didactic/…` hash carrying the full `RepoRef` as validated
+  base64url JSON (`shared/didactic-route.ts`); `main.tsx` reacts to `hashchange`.
 
 ### Security boundary (critical)
 
@@ -70,7 +73,8 @@ src/main/    index.ts, scm/ (provider.ts, registry.ts, github/, azure/ coming,
              providers/, stream-parser, analysis-cache), ipc/ (handlers, validators),
              settings/, updater/, windows/
 src/preload/ index.ts → window.minerva.*
-src/shared/  ipc.ts (single contract), types.ts, ai-providers.ts, didactic-route.ts
+src/shared/  ipc.ts (single contract), types.ts, scm.ts (+ scm-guards, scm-errors),
+             ai-providers.ts, didactic-route.ts
 src/renderer/src/  components/ hooks/ stores/ lib/
 e2e/ Playwright suite · scripts/ screenshot + debug helpers · docs/ (archive/ = original
 author's Spanish logs, not maintained)
