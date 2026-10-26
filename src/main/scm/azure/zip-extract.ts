@@ -1,7 +1,7 @@
 /**
  * Safe extraction of a repository zip (Azure DevOps `items?$format=zip`) into
  * a snapshot directory. Same protections as the GitHub tarball path in
- * `main/github/real-service.ts`, because the archive is HOSTILE input (it is
+ * `main/scm/github/real-service.ts`, because the archive is HOSTILE input (it is
  * the PR author's code):
  *
  * - Size caps on the compressed file and on the sum of DECLARED uncompressed
