@@ -3,7 +3,7 @@ import type { Page } from './fixtures'
 
 /**
  * F16/T88 — layout responsivo con la ventana tileada. Los tamaños son los del
- * mapa de `.agents/PLAN.md` § F16: una ventana completa, las dos mitades y un
+ * mapa de `docs/archive/PLAN.md` § F16: una ventana completa, las dos mitades y un
  * cuarto de un monitor 1080p, que es como se usa la app en un WM de tiling.
  *
  * Lo que sella este spec (todo esto FALLABA antes de F16):
