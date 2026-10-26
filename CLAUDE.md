@@ -69,7 +69,7 @@ commit** and the model explores it with **read-only tools**. Jails: OpenCode
 
 ```
 src/main/    index.ts, scm/ (provider.ts, registry.ts, github/, azure/ coming,
-             snapshot-store, seen-store, pr-watcher), auth/ (gh bridge), ai/ (prompts/,
+             snapshot-store, seen-store, pr-watcher; github/ = Octokit + gh bridge), ai/ (prompts/,
              providers/, stream-parser, analysis-cache), ipc/ (handlers, validators),
              settings/, updater/, windows/
 src/preload/ index.ts → window.minerva.*
