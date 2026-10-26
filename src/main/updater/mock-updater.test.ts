@@ -52,7 +52,7 @@ describe('createMockUpdaterEngine', () => {
     const available = statuses.find((s) => s.phase === 'available')
     expect(available?.phase === 'available' && available.info.version).toBe('0.7.0')
     expect(available?.phase === 'available' && available.info.releaseUrl).toContain(
-      'github.com/amiedygg/proj_minerva/releases/tag/v0.7.0',
+      'github.com/DevKelvin21/proj_minerva/releases/tag/v0.7.0',
     )
 
     const percents = statuses

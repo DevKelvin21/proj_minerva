@@ -126,7 +126,7 @@ describe('updater singleton (T91 núcleo real + T92 selección de mock)', () => 
     await updater.openReleasePage()
 
     expect(openExternalMock).toHaveBeenCalledExactlyOnceWith(
-      'https://github.com/amiedygg/proj_minerva/releases/tag/v0.7.0',
+      'https://github.com/DevKelvin21/proj_minerva/releases/tag/v0.7.0',
     )
     updater.stop()
   })

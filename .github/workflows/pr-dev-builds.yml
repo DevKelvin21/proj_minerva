@@ -6,7 +6,7 @@ name: PR dev builds
 # pestaña del workflow run y expiran solos a los 14 días.
 
 # F17/T89: electron-builder.yml ahora tiene una sección `publish` (github/
-# amiedygg/proj_minerva) para que el auto-updater tenga feed. Efecto
+# DevKelvin21/proj_minerva) para que el auto-updater tenga feed. Efecto
 # secundario aceptado acá: como --publish never NO desactiva la escritura
 # de `app-update.yml` (solo desactiva la SUBIDA de assets), los binarios
 # dev de este workflow quedan con ese archivo embebido — una AppImage
