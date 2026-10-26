@@ -71,7 +71,9 @@ const DOS_DIRECTORY = 0x10
 
 type EntryKind = 'file' | 'directory' | 'symlink' | 'special'
 
-export function classifyEntry(entry: Pick<Entry, 'fileName' | 'externalFileAttributes' | 'versionMadeBy'>): EntryKind {
+export function classifyEntry(
+  entry: Pick<Entry, 'fileName' | 'externalFileAttributes' | 'versionMadeBy'>,
+): EntryKind {
   const attrs = entry.externalFileAttributes >>> 0
   if (entry.versionMadeBy >>> 8 === MADE_BY_UNIX) {
     const type = (attrs >>> 16) & S_IFMT
@@ -134,7 +136,9 @@ function byteCounter(limit: number, already: () => number, add: (n: number) => v
     transform(chunk: Buffer, _encoding, callback) {
       add(chunk.length)
       if (already() > limit) {
-        callback(new ZipExtractError('too-large', 'The repository archive expands past the size limit.'))
+        callback(
+          new ZipExtractError('too-large', 'The repository archive expands past the size limit.'),
+        )
         return
       }
       callback(null, chunk)
@@ -167,7 +171,10 @@ export async function extractZipSafely(
   try {
     zip = await openZip(zipPath)
   } catch (error) {
-    throw new ZipExtractError('corrupt', 'The repository archive is not a valid zip: ' + errorText(error))
+    throw new ZipExtractError(
+      'corrupt',
+      'The repository archive is not a valid zip: ' + errorText(error),
+    )
   }
 
   try {
@@ -177,14 +184,20 @@ export async function extractZipSafely(
     } catch (error) {
       if (error instanceof ZipExtractError) throw error
       // yauzl's own name validation (absolute / `..`) surfaces here.
-      throw new ZipExtractError('unsafe-path', 'The repository archive is unsafe: ' + errorText(error))
+      throw new ZipExtractError(
+        'unsafe-path',
+        'The repository archive is unsafe: ' + errorText(error),
+      )
     }
 
     let declared = 0
     for (const entry of entries) {
       const reason = unsafePathReason(entry.fileName)
       if (reason) {
-        throw new ZipExtractError('unsafe-path', 'The repository archive has an unsafe path (' + reason + ').')
+        throw new ZipExtractError(
+          'unsafe-path',
+          'The repository archive has an unsafe path (' + reason + ').',
+        )
       }
       declared += entry.uncompressedSize
     }
@@ -210,7 +223,10 @@ export async function extractZipSafely(
       const target = resolve(destRoot, cleanRel)
       const fromRoot = relative(destRoot, target)
       if (fromRoot.startsWith('..') || isAbsolute(fromRoot)) {
-        throw new ZipExtractError('unsafe-path', 'The repository archive has a path outside the snapshot.')
+        throw new ZipExtractError(
+          'unsafe-path',
+          'The repository archive has a path outside the snapshot.',
+        )
       }
 
       const kind = classifyEntry(entry)

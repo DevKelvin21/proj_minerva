@@ -16,8 +16,7 @@ const HOME = '/home/u'
 const AZ = '/opt/homebrew/bin/az'
 const AZ_REAL = '/opt/homebrew/Cellar/azure-cli/2.90.0/bin/az'
 const PY = '/opt/homebrew/Cellar/azure-cli/2.90.0/libexec/bin/python'
-const WRAPPER =
-  '#!/usr/bin/env bash\nAZ_INSTALLER=HOMEBREW ' + PY + ' -Im azure.cli "$@"\n'
+const WRAPPER = '#!/usr/bin/env bash\nAZ_INSTALLER=HOMEBREW ' + PY + ' -Im azure.cli "$@"\n'
 
 function deps(overrides: {
   files?: Record<string, string>
@@ -42,7 +41,10 @@ function deps(overrides: {
   }
 }
 
-function keyringExec(tokens: Record<string, string>, entra?: object): ExecFileFn & ReturnType<typeof vi.fn> {
+function keyringExec(
+  tokens: Record<string, string>,
+  entra?: object,
+): ExecFileFn & ReturnType<typeof vi.fn> {
   return vi.fn(async (file: string, args: string[]) => {
     if (file === PY) {
       const keys = args.slice(args.indexOf('-c') + 3)
@@ -59,8 +61,12 @@ function keyringExec(tokens: Record<string, string>, entra?: object): ExecFileFn
 
 describe('org naming', () => {
   it('normalizes like the extension', () => {
-    expect(normalizeOrgUrlForKey('https://dev.azure.com/Contoso/Platform')).toBe('https://dev.azure.com/contoso')
-    expect(normalizeOrgUrlForKey('https://Contoso.visualstudio.com/x')).toBe('https://contoso.visualstudio.com')
+    expect(normalizeOrgUrlForKey('https://dev.azure.com/Contoso/Platform')).toBe(
+      'https://dev.azure.com/contoso',
+    )
+    expect(normalizeOrgUrlForKey('https://Contoso.visualstudio.com/x')).toBe(
+      'https://contoso.visualstudio.com',
+    )
     expect(organizationName('https://dev.azure.com/Contoso/')).toBe('Contoso')
     expect(organizationName('https://contoso.visualstudio.com')).toBe('contoso')
     expect(organizationName('Contoso')).toBe('Contoso')
@@ -77,34 +83,46 @@ describe('pythonCandidatesFromLauncher', () => {
       '#!/usr/bin/env bash\nbin_dir=`cd "$(dirname "$BASH_SOURCE[0]")"; pwd`\npython_cmd=python3\n' +
       'if [ -f "$bin_dir/../../opt/az/bin/python3" ]; then\n  python_cmd="$bin_dir/../../opt/az/bin/python3"\nfi\n' +
       'AZ_INSTALLER=DEB "$python_cmd" -Im azure.cli "$@"\n'
-    expect(pythonCandidatesFromLauncher(deb, '/usr/bin/az', 'linux')).toEqual(['/opt/az/bin/python3'])
+    expect(pythonCandidatesFromLauncher(deb, '/usr/bin/az', 'linux')).toEqual([
+      '/opt/az/bin/python3',
+    ])
   })
 
   it('uses a venv shebang', () => {
     const text = '#!/home/u/venv/bin/python3\nimport sys\n'
-    expect(pythonCandidatesFromLauncher(text, '/home/u/venv/bin/az', 'linux')[0]).toBe('/home/u/venv/bin/python3')
+    expect(pythonCandidatesFromLauncher(text, '/home/u/venv/bin/az', 'linux')[0]).toBe(
+      '/home/u/venv/bin/python3',
+    )
   })
 
   it('handles the Windows az.cmd layout', () => {
-    const cmd = '@IF EXIST "%~dp0\\..\\python.exe" (\n  "%~dp0\\..\\python.exe" -IBm azure.cli %*\n)'
-    expect(pythonCandidatesFromLauncher(cmd, 'C:\\CLI2\\wbin\\az.cmd', 'win32')).toEqual(['C:\\CLI2\\python.exe'])
+    const cmd =
+      '@IF EXIST "%~dp0\\..\\python.exe" (\n  "%~dp0\\..\\python.exe" -IBm azure.cli %*\n)'
+    expect(pythonCandidatesFromLauncher(cmd, 'C:\\CLI2\\wbin\\az.cmd', 'win32')).toEqual([
+      'C:\\CLI2\\python.exe',
+    ])
   })
 })
 
 describe('AzureCredentialSource', () => {
   it('prefers AZURE_DEVOPS_EXT_PAT and never spawns', async () => {
     const exec = keyringExec({})
-    const source = new AzureCredentialSource(deps({ env: { AZURE_DEVOPS_EXT_PAT: 'envpat' }, exec }))
+    const source = new AzureCredentialSource(
+      deps({ env: { AZURE_DEVOPS_EXT_PAT: 'envpat' }, exec }),
+    )
     const auth = await source.getAuthHeader('Contoso')
     expect(auth).toEqual({ header: basicPatHeader('envpat'), source: 'env-pat' })
     expect(auth.header).toBe('Basic ' + Buffer.from(':envpat').toString('base64'))
     expect(exec).not.toHaveBeenCalled()
   })
 
-  it('reads the az devops PAT with az\'s python, org key first, and caches it', async () => {
+  it("reads the az devops PAT with az's python, org key first, and caches it", async () => {
     const exec = keyringExec({ 'azdevops-cli: default': 'defaultpat' })
     const source = new AzureCredentialSource(deps({ exec }))
-    const [a, b] = await Promise.all([source.getAuthHeader('Contoso'), source.getAuthHeader('contoso')])
+    const [a, b] = await Promise.all([
+      source.getAuthHeader('Contoso'),
+      source.getAuthHeader('contoso'),
+    ])
     expect(a).toEqual({ header: basicPatHeader('defaultpat'), source: 'az-devops-pat' })
     expect(b).toEqual(a)
     await source.getAuthHeader('https://dev.azure.com/Contoso')
@@ -151,7 +169,10 @@ describe('AzureCredentialSource', () => {
     let now = 1_000_000
     const exec = keyringExec({}, { accessToken: 'jwt', expires_on: (now + 3600_000) / 1000 })
     const source = new AzureCredentialSource(deps({ exec, now: () => now }))
-    expect(await source.getAuthHeader('Contoso')).toEqual({ header: 'Bearer jwt', source: 'az-entra' })
+    expect(await source.getAuthHeader('Contoso')).toEqual({
+      header: 'Bearer jwt',
+      source: 'az-entra',
+    })
     const spawns = exec.mock.calls.length
     await source.getAuthHeader('Contoso')
     expect(exec.mock.calls.length).toBe(spawns)
@@ -169,7 +190,9 @@ describe('AzureCredentialSource', () => {
     const noCred = new AzureCredentialSource(deps({ exec: keyringExec({}) }))
     const error = await noCred.getAuthHeader('Contoso').catch((e: Error) => e)
     expect(error).toMatchObject({ code: 'UNAUTHENTICATED' })
-    expect((error as Error).message).toContain('az devops login --organization https://dev.azure.com/Contoso')
+    expect((error as Error).message).toContain(
+      'az devops login --organization https://dev.azure.com/Contoso',
+    )
   })
 
   it('skips a rejected PAT after invalidate(org, "rejected") and never leaks it in errors', async () => {

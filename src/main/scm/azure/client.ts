@@ -194,7 +194,8 @@ function describeStatus(status: number, endpoint: string, detail: string): strin
   return base + ' [' + endpoint + ']' + (detail ? ': ' + detail : '')
 }
 
-const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms))
 
 export class AzureDevOpsClient {
   private readonly credentials: CredentialProvider
@@ -334,14 +335,11 @@ export class AzureDevOpsClient {
     const items: T[] = []
     let token: string | null = null
     do {
-      const { data, headers }: { data: { value?: T[] }; headers: Headers } = await this.jsonWithHeaders(
-        org,
-        url,
-        {
+      const { data, headers }: { data: { value?: T[] }; headers: Headers } =
+        await this.jsonWithHeaders(org, url, {
           query: { ...options.query, continuationToken: token ?? undefined },
           apiVersion: options.apiVersion,
-        },
-      )
+        })
       items.push(...(data.value ?? []))
       token = headers.get(CONTINUATION_HEADER)
     } while (token && items.length < maxItems)
@@ -374,7 +372,11 @@ export class AzureDevOpsClient {
   private tooLarge(target: URL, maxBytes: number): AzureApiError {
     return new AzureApiError(
       'UNKNOWN',
-      'Download larger than ' + Math.floor(maxBytes / (1024 * 1024)) + ' MB [' + endpointOf(target) + ']',
+      'Download larger than ' +
+        Math.floor(maxBytes / (1024 * 1024)) +
+        ' MB [' +
+        endpointOf(target) +
+        ']',
       { method: 'GET', endpoint: endpointOf(target) },
     )
   }
@@ -384,8 +386,12 @@ export class AzureDevOpsClient {
     const timedOut = name === 'TimeoutError' || name === 'AbortError'
     const message = timedOut
       ? 'Azure DevOps did not answer in time [' + endpointOf(target) + ']'
-      : 'Could not reach Azure DevOps [' + endpointOf(target) + ']' +
-        (error instanceof Error && error.message ? ': ' + error.message.slice(0, MAX_ERROR_MESSAGE_CHARS) : '')
+      : 'Could not reach Azure DevOps [' +
+        endpointOf(target) +
+        ']' +
+        (error instanceof Error && error.message
+          ? ': ' + error.message.slice(0, MAX_ERROR_MESSAGE_CHARS)
+          : '')
     return new AzureApiError('NETWORK', message, { method, endpoint: endpointOf(target) })
   }
 
@@ -502,12 +508,19 @@ export class AzureDevOpsClient {
       }
       const next = new URL(location, current)
       if (next.protocol !== 'https:') {
-        throw new AzureApiError('NETWORK', 'Refusing a non-HTTPS redirect [' + endpointOf(start) + ']', {
-          method,
-          endpoint: endpointOf(start),
-        })
+        throw new AzureApiError(
+          'NETWORK',
+          'Refusing a non-HTTPS redirect [' + endpointOf(start) + ']',
+          {
+            method,
+            endpoint: endpointOf(start),
+          },
+        )
       }
-      if (response.status === 303 || ((response.status === 301 || response.status === 302) && method !== 'GET')) {
+      if (
+        response.status === 303 ||
+        ((response.status === 301 || response.status === 302) && method !== 'GET')
+      ) {
         method = 'GET'
         body = undefined
       }

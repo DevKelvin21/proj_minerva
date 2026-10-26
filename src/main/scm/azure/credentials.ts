@@ -47,7 +47,13 @@ export interface ExecResult {
 export type ExecFileFn = (
   file: string,
   args: string[],
-  options: { timeout: number; env: NodeJS.ProcessEnv; cwd: string; maxBuffer: number; windowsHide: boolean },
+  options: {
+    timeout: number
+    env: NodeJS.ProcessEnv
+    cwd: string
+    maxBuffer: number
+    windowsHide: boolean
+  },
 ) => Promise<ExecResult>
 
 export interface AzureCredentialDeps {
@@ -195,12 +201,18 @@ export interface AzConfigPaths {
   devopsExtensionDir: string
 }
 
-export function azConfigPaths(env: NodeJS.ProcessEnv = process.env, home: string = homedir()): AzConfigPaths {
+export function azConfigPaths(
+  env: NodeJS.ProcessEnv = process.env,
+  home: string = homedir(),
+): AzConfigPaths {
   const cliConfigDir = env.AZURE_CONFIG_DIR || join(home, '.azure')
   return {
     cliConfigDir,
     devopsConfigDir: env.AZURE_DEVOPS_EXT_CONFIG_DIR || join(cliConfigDir, 'azuredevops'),
-    devopsExtensionDir: join(env.AZURE_EXTENSION_DIR || join(cliConfigDir, 'cliextensions'), 'azure-devops'),
+    devopsExtensionDir: join(
+      env.AZURE_EXTENSION_DIR || join(cliConfigDir, 'cliextensions'),
+      'azure-devops',
+    ),
   }
 }
 
@@ -246,14 +258,17 @@ async function defaultReadText(path: string): Promise<string | null> {
  * never fails (missing files give empty results). Honors knack's env
  * overrides (`AZURE_DEVOPS_EXT_DEFAULTS_ORGANIZATION` / `..._PROJECT`).
  */
-export async function readAzDevopsDefaults(deps: AzureCredentialDeps = {}): Promise<AzDevopsDefaults> {
+export async function readAzDevopsDefaults(
+  deps: AzureCredentialDeps = {},
+): Promise<AzDevopsDefaults> {
   const env = deps.env ?? process.env
   const readText = deps.readText ?? defaultReadText
   const paths = azConfigPaths(env, deps.home ?? homedir())
 
   const config = parseIni((await readText(join(paths.devopsConfigDir, 'config'))) ?? '')
   const defaults = config.get('defaults')
-  const orgSetting = env.AZURE_DEVOPS_EXT_DEFAULTS_ORGANIZATION || defaults?.get('organization') || ''
+  const orgSetting =
+    env.AZURE_DEVOPS_EXT_DEFAULTS_ORGANIZATION || defaults?.get('organization') || ''
   const project = env.AZURE_DEVOPS_EXT_DEFAULTS_PROJECT || defaults?.get('project') || ''
 
   const result: AzDevopsDefaults = { knownOrganizations: [] }
@@ -324,7 +339,12 @@ export function findAzExecutable(deps: AzureCredentialDeps = {}): string | null 
     }
   } else {
     // GUI launches (Finder, .desktop) may not inherit the shell PATH.
-    dirs.push('/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', join(deps.home ?? homedir(), '.local', 'bin'))
+    dirs.push(
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+      '/usr/bin',
+      join(deps.home ?? homedir(), '.local', 'bin'),
+    )
   }
   const joinFn = isWin ? win32.join : join
   for (const dir of dirs) {
@@ -393,7 +413,10 @@ const defaultExecFile: ExecFileFn = (file, args, options) =>
   promisify(execFileCb)(file, args, { ...options, encoding: 'utf8' }) as Promise<ExecResult>
 
 /** Seconds since epoch (`expires_on`, newer az) or local `YYYY-MM-DD HH:MM:SS.ffffff` (`expiresOn`). */
-export function parseEntraExpiry(json: { expires_on?: unknown; expiresOn?: unknown }): number | null {
+export function parseEntraExpiry(json: {
+  expires_on?: unknown
+  expiresOn?: unknown
+}): number | null {
   const epoch = Number(json.expires_on)
   if (json.expires_on !== undefined && Number.isFinite(epoch) && epoch > 0) return epoch * 1000
   if (typeof json.expiresOn === 'string') {
@@ -510,7 +533,8 @@ export class AzureCredentialSource {
     const pat = await this.readStoredPat(org)
     if (pat) {
       const header = basicPatHeader(pat)
-      if (!this.isRejected(orgKey, header)) return { header, source: 'az-devops-pat', refreshAt: null }
+      if (!this.isRejected(orgKey, header))
+        return { header, source: 'az-devops-pat', refreshAt: null }
     }
 
     if (!az) {
@@ -529,7 +553,9 @@ export class AzureCredentialSource {
     throw new AzureScmError(
       'UNAUTHENTICATED',
       (rejectedAny
-        ? 'Azure DevOps rejected the stored credential for ' + org + ' (expired or missing scopes). '
+        ? 'Azure DevOps rejected the stored credential for ' +
+          org +
+          ' (expired or missing scopes). '
         : 'No Azure DevOps credential found for ' + org + '. ') +
         'Run: ' +
         loginHint +
@@ -557,7 +583,9 @@ export class AzureCredentialSource {
     const text = (await this.readText(launcher)) ?? ''
     // A binary launcher (not a script) has no interpreter to find.
     const head = text.slice(0, 64 * 1024)
-    const candidates = head.includes('\0') ? [] : pythonCandidatesFromLauncher(head, launcher, this.platform)
+    const candidates = head.includes('\0')
+      ? []
+      : pythonCandidatesFromLauncher(head, launcher, this.platform)
     const found = candidates.find((candidate) => this.isExecutable(candidate)) ?? null
     // Only positive results are cached: a later install should be picked up.
     if (found) this.pythonPath = found
@@ -588,7 +616,8 @@ export class AzureCredentialSource {
       const key = line.trim()
       if (!key.startsWith(KEY_PREFIX) || key === DEFAULT_CREDENTIAL_KEY) continue
       try {
-        if (organizationName(key.slice(KEY_PREFIX.length)).toLowerCase() === org.toLowerCase()) add(key)
+        if (organizationName(key.slice(KEY_PREFIX.length)).toLowerCase() === org.toLowerCase())
+          add(key)
       } catch {
         // Ignore unparseable lines.
       }
@@ -635,7 +664,14 @@ export class AzureCredentialSource {
   private async readEntraToken(): Promise<CachedCredential | null> {
     const az = this.resolveAz()
     if (!az) return null
-    const azArgs = ['account', 'get-access-token', '--resource', AZURE_DEVOPS_RESOURCE_ID, '-o', 'json']
+    const azArgs = [
+      'account',
+      'get-access-token',
+      '--resource',
+      AZURE_DEVOPS_RESOURCE_ID,
+      '-o',
+      'json',
+    ]
     let file = az
     let args = azArgs
     if (this.platform === 'win32') {
@@ -647,10 +683,15 @@ export class AzureCredentialSource {
     }
     try {
       const { stdout } = await this.execFile(file, args, this.spawnOptions(ENTRA_TIMEOUT_MS))
-      const json = JSON.parse(stdout) as { accessToken?: unknown; expires_on?: unknown; expiresOn?: unknown }
+      const json = JSON.parse(stdout) as {
+        accessToken?: unknown
+        expires_on?: unknown
+        expiresOn?: unknown
+      }
       if (typeof json.accessToken !== 'string' || !json.accessToken) return null
       const expiresAt = parseEntraExpiry(json)
-      const refreshAt = expiresAt === null ? this.now() + 10 * 60 * 1000 : expiresAt - ENTRA_REFRESH_MARGIN_MS
+      const refreshAt =
+        expiresAt === null ? this.now() + 10 * 60 * 1000 : expiresAt - ENTRA_REFRESH_MARGIN_MS
       if (refreshAt <= this.now()) return null
       return { header: 'Bearer ' + json.accessToken, source: 'az-entra', refreshAt }
     } catch {
@@ -659,4 +700,3 @@ export class AzureCredentialSource {
     }
   }
 }
-

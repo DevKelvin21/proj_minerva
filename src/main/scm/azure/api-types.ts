@@ -53,12 +53,7 @@ export interface AzCommitRef {
 export type AzPullRequestStatus = 'notSet' | 'active' | 'abandoned' | 'completed' | 'all'
 
 export type AzMergeStatus =
-  | 'notSet'
-  | 'queued'
-  | 'conflicts'
-  | 'succeeded'
-  | 'rejectedByPolicy'
-  | 'failure'
+  'notSet' | 'queued' | 'conflicts' | 'succeeded' | 'rejectedByPolicy' | 'failure'
 
 export interface AzPullRequest {
   pullRequestId: number
@@ -163,13 +158,7 @@ export interface AzPullRequestThreadContext {
 }
 
 export type AzThreadStatus =
-  | 'unknown'
-  | 'active'
-  | 'fixed'
-  | 'wontFix'
-  | 'closed'
-  | 'byDesign'
-  | 'pending'
+  'unknown' | 'active' | 'fixed' | 'wontFix' | 'closed' | 'byDesign' | 'pending'
 
 export type AzCommentType = 'unknown' | 'text' | 'codeChange' | 'system'
 
@@ -226,7 +215,8 @@ export interface AzGitRef {
   objectId: string
 }
 
-export type AzStatusState = 'notSet' | 'pending' | 'succeeded' | 'failed' | 'error' | 'notApplicable'
+export type AzStatusState =
+  'notSet' | 'pending' | 'succeeded' | 'failed' | 'error' | 'notApplicable'
 
 /** `GET …/pullRequests/{id}/statuses` */
 export interface AzPullRequestStatusEntry {
@@ -241,12 +231,7 @@ export interface AzPullRequestStatusEntry {
 }
 
 export type AzPolicyEvaluationStatus =
-  | 'queued'
-  | 'running'
-  | 'approved'
-  | 'rejected'
-  | 'notApplicable'
-  | 'broken'
+  'queued' | 'running' | 'approved' | 'rejected' | 'notApplicable' | 'broken'
 
 /** `GET {org}/{project}/_apis/policy/evaluations?artifactId=…` (7.1-preview) */
 export interface AzPolicyEvaluation {

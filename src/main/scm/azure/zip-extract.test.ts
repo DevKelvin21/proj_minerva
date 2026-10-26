@@ -172,8 +172,14 @@ describe('helpers', () => {
   })
 
   it('classifyEntry ignores mode bits from non-unix archives', () => {
-    const fromDos = { fileName: 'x', externalFileAttributes: (0o120777 << 16) >>> 0, versionMadeBy: 20 }
+    const fromDos = {
+      fileName: 'x',
+      externalFileAttributes: (0o120777 << 16) >>> 0,
+      versionMadeBy: 20,
+    }
     expect(classifyEntry(fromDos)).toBe('file')
-    expect(classifyEntry({ fileName: 'd', externalFileAttributes: 0x10, versionMadeBy: 20 })).toBe('directory')
+    expect(classifyEntry({ fileName: 'd', externalFileAttributes: 0x10, versionMadeBy: 20 })).toBe(
+      'directory',
+    )
   })
 })
