@@ -44,7 +44,8 @@ function SettingsChip({ compact }: { compact: boolean }): React.JSX.Element {
   const { info } = useSettings()
   const { status: updaterStatus } = useUpdater()
 
-  const showUpdateBadge = updaterStatus?.phase === 'available' || updaterStatus?.phase === 'downloaded'
+  const showUpdateBadge =
+    updaterStatus?.phase === 'available' || updaterStatus?.phase === 'downloaded'
   const updateDot = showUpdateBadge ? (
     <span
       className="pointer-events-none absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-panel"
@@ -68,7 +69,12 @@ function SettingsChip({ compact }: { compact: boolean }): React.JSX.Element {
 
   const modelLabel = getModelOption(info.catalog, info.provider, info.model)?.label ?? info.model
   const effortValue = info.selectedOptions?.[info.provider]?.effort
-  const { providerLabel, effortLabel } = resolveModelHintLabels(info.catalog, info.provider, info.model, effortValue)
+  const { providerLabel, effortLabel } = resolveModelHintLabels(
+    info.catalog,
+    info.provider,
+    info.model,
+    effortValue,
+  )
 
   const title =
     'Configuración — ' +
@@ -204,7 +210,9 @@ export function TitleBar(): React.JSX.Element {
       type="search"
       value={searchQuery}
       onChange={(e) => setSearchQuery(e.target.value)}
-      placeholder="Buscar PRs por título o repo…"
+      placeholder="Search by title, repo, branch or #number"
+      aria-label="Search pull requests"
+      title="Search by title, repo, branch or #number"
       className="w-full rounded-md border border-border bg-bg py-1 pl-8 pr-3 text-sm text-text placeholder:text-muted transition-colors duration-150 focus:border-accent"
     />
   )

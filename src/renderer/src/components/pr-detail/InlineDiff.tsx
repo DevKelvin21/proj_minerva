@@ -1,29 +1,15 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
-import { buildInlineRows, type DiffHunk, type DiffLineKind, type InlineRow } from '../../lib/diff-parser'
-import type { HighlightToken } from '../../lib/highlighter'
-import { lineThreadKey, resolveNewThreadPosition, type LineSide } from '../../lib/line-threads'
+import { buildInlineRows, type DiffLineKind, type InlineRow } from '../../lib/diff-parser'
+import { linePositions } from '../../lib/diff-threads'
+import { resolveNewThreadPosition } from '../../lib/line-threads'
 import { DiffLineContent } from './DiffLineContent'
+import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
-
-interface InlineDiffProps {
-  hunks: DiffHunk[]
-  wordWrap: boolean
-  getTokens: (content: string) => HighlightToken[] | undefined
-  threadsByPosition: Map<string, CommentThread>
-  expandedThreadId: string | null
-  onToggleExpand: (threadId: string) => void
-  onReply: (threadId: string, bodyMarkdown: string) => Promise<void>
-  onCreateThread: (line: number, side: LineSide, bodyMarkdown: string) => Promise<void>
-}
-
-const KIND_BG: Partial<Record<DiffLineKind, string>> = {
-  add: 'bg-[#1d3a28]',
-  del: 'bg-[#3f1d24]',
-}
+import { asHunk, KIND_BG, rangeClasses, type DiffBodyProps, type OpenComposer } from './diff-body'
 
 const KIND_MARKER: Record<DiffLineKind, string> = {
   context: ' ',
@@ -31,30 +17,136 @@ const KIND_MARKER: Record<DiffLineKind, string> = {
   del: '-',
 }
 
-interface OpenComposer {
-  key: string
-  side: LineSide
-  line: number
-}
-
 /**
- * Vista inline (una columna, dos gutters old/new) de todos los hunks de un
- * archivo en un único grid CSS: así las columnas de gutter comparten su
- * ancho entre hunks y no se desalinean (ver T18).
+ * Inline view (one column, old/new gutters) of a file's diff sections in a
+ * single CSS grid, so gutter columns share their width across hunks (T18).
+ * A context row can host threads on both sides (LEFT on its old number,
+ * RIGHT on its new one); they all render under it.
  */
 export function InlineDiff({
-  hunks,
+  sections,
+  hunkCount,
   wordWrap,
   getTokens,
-  threadsByPosition,
-  expandedThreadId,
-  onToggleExpand,
-  onReply,
+  threads: model,
+  expander,
   onCreateThread,
-}: InlineDiffProps): React.JSX.Element {
+}: DiffBodyProps): React.JSX.Element {
   const [openComposer, setOpenComposer] = useState<OpenComposer | null>(null)
 
-  const rowsByHunk = useMemo(() => hunks.map((hunk) => buildInlineRows([hunk])), [hunks])
+  const rowsBySection = useMemo(
+    () =>
+      sections.map((s) =>
+        s.type === 'gap' ? [] : buildInlineRows([s.type === 'hunk' ? s.hunk : asHunk(s.lines)]),
+      ),
+    [sections],
+  )
+  const contentClass = wordWrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'
+
+  function renderRow(rowKey: string, row: InlineRow): React.ReactNode {
+    const bg = KIND_BG[row.kind] ?? ''
+    const keys = linePositions(row)
+    const lineThreads: Array<[string, CommentThread[]]> = keys
+      .map((key) => [key, model.byPosition.get(key) ?? []] as [string, CommentThread[]])
+      .filter(([, list]) => list.length > 0)
+    const inRange = keys.some((key) => model.rangeKeys.has(key))
+    const focused = keys.some((key) => model.focusedKeys.has(key))
+    const marks = rangeClasses(inRange, focused)
+
+    // A comment on a deletion uses the old line (LEFT); on context or an
+    // addition, the new line (RIGHT).
+    const position = resolveNewThreadPosition(row.kind === 'del', row.oldNumber, row.newNumber)
+    const indicatorKey = lineThreads[0]?.[0]
+    const commentCount = lineThreads.reduce(
+      (sum, [, list]) => sum + list.reduce((n, t) => n + t.comments.length, 0),
+      0,
+    )
+    const composerHere = openComposer?.key === rowKey ? openComposer : null
+
+    return (
+      <Fragment key={rowKey}>
+        <div className="group/row contents">
+          <span className={`select-none px-2 text-right text-muted/70 ${bg} ${marks}`}>
+            {row.oldNumber ?? ''}
+          </span>
+          <span className={`flex items-center gap-1 px-2 text-muted/70 ${bg}`}>
+            {indicatorKey ? (
+              <LineThreadIndicator
+                hidden={lineThreads.every(([key]) => model.hiddenKeys.has(key))}
+                count={commentCount}
+                onClick={() => {
+                  for (const [key] of lineThreads) model.toggleHidden(key)
+                }}
+              />
+            ) : position ? (
+              <button
+                type="button"
+                onClick={() => setOpenComposer({ key: rowKey, content: row.content, ...position })}
+                aria-label="Add a comment on this line"
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
+              >
+                <Plus size={12} />
+              </button>
+            ) : (
+              <span className="inline-block h-4 w-4 shrink-0" />
+            )}
+            <span className="select-none">{row.newNumber ?? ''}</span>
+          </span>
+          <span
+            className={`select-none px-1.5 text-center ${bg} ${
+              row.kind === 'add'
+                ? 'text-success'
+                : row.kind === 'del'
+                  ? 'text-danger'
+                  : 'text-muted'
+            }`}
+          >
+            {KIND_MARKER[row.kind]}
+          </span>
+          <span
+            data-old-line={row.kind !== 'add' ? row.oldNumber : undefined}
+            data-new-line={row.kind !== 'del' ? row.newNumber : undefined}
+            data-focused={focused || undefined}
+            className={`px-2 ${contentClass} ${bg} ${focused ? 'bg-accent/20' : ''} text-text`}
+          >
+            <DiffLineContent content={row.content} tokens={getTokens(row.content)} />
+          </span>
+        </div>
+
+        {lineThreads.map(([key, list]) =>
+          model.hiddenKeys.has(key)
+            ? null
+            : list.map((thread) => (
+                <div
+                  key={`thread-${thread.id}`}
+                  style={{ gridColumn: '1 / -1' }}
+                  className="min-w-0"
+                >
+                  <InlineThreadCard
+                    thread={thread}
+                    highlighted={thread.id === model.focusedThreadId}
+                    onHide={() => model.toggleHidden(key)}
+                  />
+                </div>
+              )),
+        )}
+        {composerHere && (
+          <div style={{ gridColumn: '1 / -1' }} className="min-w-0">
+            <LineCommentComposer
+              line={composerHere.line}
+              side={composerHere.side}
+              lineContent={composerHere.content}
+              onCancel={() => setOpenComposer(null)}
+              onSubmit={async (bodyMarkdown) => {
+                await onCreateThread(composerHere.line, composerHere.side, bodyMarkdown)
+                setOpenComposer(null)
+              }}
+            />
+          </div>
+        )}
+      </Fragment>
+    )
+  }
 
   return (
     <div
@@ -65,100 +157,31 @@ export function InlineDiff({
           : 'max-content max-content max-content minmax(max-content, 1fr)',
       }}
     >
-      {hunks.map((hunk, h) => (
-        <Fragment key={h}>
-          <div
-            style={{ gridColumn: '1 / -1' }}
-            className="border-y border-border bg-panel px-3 py-1 font-mono text-[11px] text-muted"
-          >
-            {hunk.header}
-          </div>
-          {rowsByHunk[h].map((row: InlineRow, i) => {
-            const rowKey = `${h}:${i}`
-            const bg = KIND_BG[row.kind] ?? ''
-            const contentClass = wordWrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'
-
-            // Comentar sobre una deleción usa la línea vieja (lado LEFT); sobre
-            // contexto o adición usa la línea nueva (lado RIGHT).
-            const position = resolveNewThreadPosition(
-              row.kind === 'del',
-              row.oldNumber,
-              row.newNumber,
-            )
-            const thread = position
-              ? threadsByPosition.get(lineThreadKey(position.line, position.side))
-              : undefined
-            const canAdd = Boolean(position) && !thread
-
-            const expandedHere = thread?.id === expandedThreadId ? thread : undefined
-            const composerHere = openComposer?.key === rowKey ? openComposer : null
-
-            return (
-              <Fragment key={rowKey}>
-                <div className="group/row contents">
-                  <span className={`select-none px-2 text-right text-muted/70 ${bg}`}>
-                    {row.oldNumber ?? ''}
-                  </span>
-                  <span className={`flex items-center gap-1 px-2 text-muted/70 ${bg}`}>
-                    {thread ? (
-                      <LineThreadIndicator
-                        active={thread.id === expandedThreadId}
-                        count={thread.comments.length}
-                        onClick={() => onToggleExpand(thread.id)}
-                      />
-                    ) : canAdd && position ? (
-                      <button
-                        type="button"
-                        onClick={() => setOpenComposer({ key: rowKey, ...position })}
-                        aria-label="Agregar comentario en esta línea"
-                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent group-hover/row:opacity-100"
-                      >
-                        <Plus size={12} />
-                      </button>
-                    ) : (
-                      <span className="inline-block h-4 w-4 shrink-0" />
-                    )}
-                    <span className="select-none">{row.newNumber ?? ''}</span>
-                  </span>
-                  <span
-                    className={`select-none px-1.5 text-center ${bg} ${
-                      row.kind === 'add'
-                        ? 'text-success'
-                        : row.kind === 'del'
-                          ? 'text-danger'
-                          : 'text-muted'
-                    }`}
-                  >
-                    {KIND_MARKER[row.kind]}
-                  </span>
-                  <span className={`px-2 ${contentClass} ${bg} text-text`}>
-                    <DiffLineContent content={row.content} tokens={getTokens(row.content)} />
-                  </span>
+      {sections.map((section, s) => (
+        <Fragment key={section.key}>
+          {section.type === 'gap' ? (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <DiffExpander
+                gap={section.gap}
+                hunkCount={hunkCount}
+                loading={expander.loading}
+                error={expander.error}
+                onExpand={(direction) => expander.onExpand(section.gap, direction)}
+              />
+            </div>
+          ) : (
+            <>
+              {section.type === 'hunk' && (
+                <div
+                  style={{ gridColumn: '1 / -1' }}
+                  className="border-y border-border bg-panel px-3 py-1 font-mono text-[11px] text-muted"
+                >
+                  {section.hunk.header}
                 </div>
-
-                {expandedHere && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <InlineThreadCard
-                      thread={expandedHere}
-                      onReply={onReply}
-                      onClose={() => onToggleExpand(expandedHere.id)}
-                    />
-                  </div>
-                )}
-                {composerHere && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <LineCommentComposer
-                      onCancel={() => setOpenComposer(null)}
-                      onSubmit={async (bodyMarkdown) => {
-                        await onCreateThread(composerHere.line, composerHere.side, bodyMarkdown)
-                        setOpenComposer(null)
-                      }}
-                    />
-                  </div>
-                )}
-              </Fragment>
-            )
-          })}
+              )}
+              {rowsBySection[s].map((row, i) => renderRow(`${section.key}:${i}`, row))}
+            </>
+          )}
         </Fragment>
       ))}
     </div>

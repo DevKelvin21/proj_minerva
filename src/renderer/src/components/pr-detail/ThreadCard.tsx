@@ -1,192 +1,277 @@
-import { useState } from 'react'
-import { Check, Link } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Check, ChevronDown, ChevronRight, Link } from 'lucide-react'
+import { isThreadOpen } from '../../../../shared/scm'
+import type { ThreadStatus } from '../../../../shared/scm'
 import type { CommentThread } from '../../../../shared/types'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
-import { Markdown } from '../ui/Markdown'
-import { providerOfWebUrl, SCM_PROVIDER_LABEL, threadStatusBadge } from '../../lib/scm-labels'
+import { providerOfWebUrl, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
+import { formatAbsoluteTime, formatRelativeTime } from '../../lib/relative-time'
+import { hasSuggestion } from '../../lib/suggestions'
+import { threadLineRange } from '../../lib/line-threads'
+import { settableStatusesFor } from '../../lib/thread-groups'
+import {
+  suggestionSourceFor,
+  useThreadActions,
+  useThreadFileLines,
+} from '../../hooks/thread-actions'
+import { CommentBody } from './CommentBody'
+import { CommentComposer } from './CommentComposer'
+import { ThreadCodeExcerpt } from './CodeExcerpt'
+import { ThreadStatusPicker } from './ThreadStatusPicker'
 
 interface ThreadCardProps {
   thread: CommentThread
-  onReply: (threadId: string, bodyMarkdown: string) => Promise<void>
-  /** Colapsado por defecto; se usa para hilos resueltos en `ConversationTab`. */
+  /** Default: collapsed when the thread is no longer open (resolved, closed, won't fix…). */
   collapsedByDefault?: boolean
-  /** Al pasarlo, `path:line` se pinta como botón clickeable (navegar a Archivos). */
+  /** Makes `path:line` a link (jump to the Files tab). */
   onNavigateToLine?: () => void
-  /** Contenido extra a la derecha del header (p. ej. botón de cerrar en el diff). */
+  /** Extra controls at the right of the header (e.g. "hide" in the diff). */
   extraHeaderContent?: React.ReactNode
+  /** Show the code the thread points at above the comments (always on for outdated threads). */
+  showExcerpt?: boolean
+  /** In the diff the file is obvious: show only "Line 12". */
+  showPath?: boolean
+  /** Focused (jumped to from the Comments view). */
+  highlighted?: boolean
 }
 
-function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function positionLabel(thread: CommentThread, showPath: boolean): string | null {
+  const range = threadLineRange(thread)
+  if (!thread.path) return null
+  const lines = range
+    ? range.end > range.start
+      ? `${range.start}–${range.end}`
+      : `${range.start}`
+    : null
+  if (!showPath)
+    return lines ? (range && range.end > range.start ? 'Lines ' : 'Line ') + lines : 'File comment'
+  return lines ? `${thread.path}:${lines}` : thread.path
 }
 
 /**
- * Card de un hilo de comentarios: header colapsable (chip `path:line` para
- * hilos de línea, badge "Resuelto"), lista de comentarios (avatar/login/fecha
- * corta + body renderizado como Markdown, igual que en GitHub) y un
- * formulario de respuesta. Se reutiliza
- * en `ConversationTab` (hilos generales y de línea) y, envuelto por
- * `InlineThreadCard`, bajo la fila del diff que originó el hilo.
+ * One comment thread: header (where it points, how many comments, status
+ * picker, Outdated badge), the comments (author, relative time with the
+ * absolute one on hover, safe Markdown with suggestions as mini-diffs), the
+ * code it points at when useful, and a reply composer.
+ *
+ * Status changes are optimistic: the picker shows the new status at once and
+ * rolls back with a visible error if the provider refuses. Threads that are
+ * no longer open start collapsed (header only) so open discussions stand out.
  */
 export function ThreadCard({
   thread,
-  onReply,
-  collapsedByDefault = false,
+  collapsedByDefault,
   onNavigateToLine,
   extraHeaderContent,
+  showExcerpt = false,
+  showPath = true,
+  highlighted = false,
 }: ThreadCardProps): React.JSX.Element {
-  const [collapsed, setCollapsed] = useState(collapsedByDefault)
-  const statusBadge = threadStatusBadge(thread.status)
-  const [draft, setDraft] = useState('')
-  const [posting, setPosting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const actions = useThreadActions()
+  const [collapsed, setCollapsed] = useState(
+    highlighted ? false : (collapsedByDefault ?? !isThreadOpen(thread.status)),
+  )
+  const [pendingStatus, setPendingStatus] = useState<ThreadStatus | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
   const [copiedCommentId, setCopiedCommentId] = useState<string | null>(null)
+
+  const status = pendingStatus ?? thread.status
+  const allowed = settableStatusesFor(actions.repo.provider, thread)
+  const range = threadLineRange(thread)
+  const label = positionLabel(thread, showPath)
+
+  // Original lines for suggestion mini-diffs: only fetched when a comment has one.
+  const wantsOriginal = useMemo(
+    () => thread.line !== undefined && thread.comments.some((c) => hasSuggestion(c.bodyMarkdown)),
+    [thread.line, thread.comments],
+  )
+  const fileLines = useThreadFileLines(thread, wantsOriginal && !collapsed)
+  const originalLines =
+    range && fileLines.status === 'ready' && range.start <= fileLines.lines.length
+      ? fileLines.lines.slice(range.start - 1, range.end)
+      : null
+
+  async function handleStatusChange(next: ThreadStatus): Promise<void> {
+    if (next === status) return
+    setPendingStatus(next)
+    setStatusError(null)
+    try {
+      await actions.setStatus(thread.id, next)
+    } catch (err: unknown) {
+      setStatusError('Could not change the status: ' + toErrorMessage(err))
+    } finally {
+      setPendingStatus(null)
+    }
+  }
 
   async function handleCopyUrl(commentId: string, htmlUrl: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(htmlUrl)
       setCopiedCommentId(commentId)
-      setTimeout(() => setCopiedCommentId((current) => (current === commentId ? null : current)), 1500)
+      setTimeout(
+        () => setCopiedCommentId((current) => (current === commentId ? null : current)),
+        1500,
+      )
     } catch {
-      // Sin permiso de portapapeles o API no disponible en este contexto:
-      // no hay un fallback razonable, se ignora silenciosamente el clic.
+      // No clipboard permission in this context: nothing sensible to fall back to.
     }
   }
 
-  async function handleReply(event: React.FormEvent): Promise<void> {
-    event.preventDefault()
-    const bodyMarkdown = draft.trim()
-    if (!bodyMarkdown || posting) return
-
-    setPosting(true)
-    setError(null)
-    try {
-      await onReply(thread.id, bodyMarkdown)
-      setDraft('')
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setPosting(false)
-    }
-  }
-
-  const positionLabel =
-    thread.isLineThread && thread.path
-      ? `${thread.path}${thread.line ? `:${thread.line}` : ''}`
-      : null
+  const first = thread.comments[0]
+  const count = thread.comments.length
 
   return (
-    <div className="rounded-md border border-border bg-panel">
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+    <div
+      data-thread-id={thread.id}
+      data-collapsed={collapsed || undefined}
+      className={`min-w-0 rounded-md border bg-panel ${
+        highlighted ? 'border-accent ring-1 ring-accent/60' : 'border-border'
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-1.5">
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
-          className="flex min-w-0 items-center gap-2 text-xs text-muted"
+          aria-expanded={!collapsed}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs text-muted"
         >
-          <span className="shrink-0">{collapsed ? '▸' : '▾'}</span>
-          {positionLabel ? (
+          {collapsed ? (
+            <ChevronRight size={13} className="shrink-0" />
+          ) : (
+            <ChevronDown size={13} className="shrink-0" />
+          )}
+          {label ? (
             onNavigateToLine ? (
               <span
                 role="link"
                 tabIndex={0}
+                title="Show this line in the Files tab"
                 onClick={(event) => {
                   event.stopPropagation()
                   onNavigateToLine()
                 }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
                     event.stopPropagation()
                     onNavigateToLine()
                   }
                 }}
-                className="truncate font-mono text-accent underline decoration-dotted hover:text-text"
+                className={`${showPath ? 'min-w-[6rem] truncate' : 'shrink-0'} font-mono text-accent underline decoration-dotted hover:text-text`}
               >
-                {positionLabel}
+                {label}
               </span>
             ) : (
-              <span className="truncate font-mono">{positionLabel}</span>
+              <span className={`${showPath ? 'min-w-[6rem] truncate' : 'shrink-0'} font-mono`}>
+                {label}
+              </span>
             )
           ) : (
-            <span>Comentario general</span>
+            <span>General comment</span>
           )}
           <span className="shrink-0">
-            · {thread.comments.length} {thread.comments.length === 1 ? 'comentario' : 'comentarios'}
+            · {count} {count === 1 ? 'comment' : 'comments'}
           </span>
+          {collapsed && first && (
+            <span className="min-w-0 truncate text-muted/80">
+              · {first.author.displayName ?? first.author.login}:{' '}
+              {first.bodyMarkdown.replace(/\s+/g, ' ').slice(0, 120)}
+            </span>
+          )}
         </button>
         <div className="flex shrink-0 items-center gap-2">
-          {statusBadge && (
-            <Badge tone={statusBadge.tone}>
-              <span data-thread-status={thread.status}>{statusBadge.label}</span>
+          {thread.isOutdated && (
+            <Badge tone="warning">
+              <span data-testid="outdated-badge" title="Left on an earlier version of the code">
+                Outdated
+              </span>
             </Badge>
           )}
-          {thread.isOutdated && <Badge tone="neutral">Outdated</Badge>}
+          <ThreadStatusPicker
+            status={status}
+            allowed={allowed}
+            busy={pendingStatus !== null}
+            onChange={(next) => void handleStatusChange(next)}
+          />
           {extraHeaderContent}
         </div>
       </div>
+      {statusError && (
+        <p role="alert" className="border-t border-border px-3 py-1.5 text-xs text-danger">
+          {statusError}
+        </p>
+      )}
 
       {!collapsed && (
         <>
+          {(showExcerpt || thread.isOutdated) && range && (
+            <div className="border-t border-border px-3 py-2">
+              <ThreadCodeExcerpt thread={thread} />
+            </div>
+          )}
           <ul className="divide-y divide-border border-t border-border">
-            {thread.comments.map((comment) => (
-              <li key={comment.id} className="p-3">
-                <div className="mb-1 flex items-center gap-2 text-xs text-muted">
-                  <Avatar user={comment.author} size={16} />
-                  <span className="font-medium text-text">
-                    {comment.author.displayName ?? comment.author.login}
-                  </span>
-                  <span>{formatShortDate(comment.createdAt)}</span>
-                  {comment.htmlUrl && (
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyUrl(comment.id, comment.htmlUrl!)}
-                      title={
-                        'Copiar URL del comentario en ' +
-                        SCM_PROVIDER_LABEL[providerOfWebUrl(comment.htmlUrl!)]
-                      }
-                      aria-label={
-                        'Copiar URL del comentario en ' +
-                        SCM_PROVIDER_LABEL[providerOfWebUrl(comment.htmlUrl!)]
-                      }
-                      className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted transition-colors hover:bg-border/60 hover:text-text"
+            {thread.comments.map((comment) => {
+              const provider = comment.htmlUrl ? providerOfWebUrl(comment.htmlUrl) : null
+              const copyLabel = provider
+                ? 'Copy link to the comment on ' + SCM_PROVIDER_LABEL[provider]
+                : ''
+              return (
+                <li key={comment.id} className="min-w-0 p-3">
+                  <div className="mb-1 flex min-w-0 items-center gap-2 text-xs text-muted">
+                    <Avatar user={comment.author} size={16} />
+                    <span className="truncate font-medium text-text" title={comment.author.login}>
+                      {comment.author.displayName ?? comment.author.login}
+                    </span>
+                    <time
+                      dateTime={comment.createdAt}
+                      title={formatAbsoluteTime(comment.createdAt)}
+                      className="shrink-0"
                     >
-                      {copiedCommentId === comment.id ? (
-                        <>
-                          <Check size={12} className="text-success" />
-                          Copiado
-                        </>
-                      ) : (
-                        <Link size={12} />
-                      )}
-                    </button>
-                  )}
-                </div>
-                <Markdown content={comment.bodyMarkdown} />
-              </li>
-            ))}
+                      {formatRelativeTime(comment.createdAt)}
+                    </time>
+                    {comment.htmlUrl && (
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyUrl(comment.id, comment.htmlUrl!)}
+                        title={copyLabel}
+                        aria-label={copyLabel}
+                        className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted transition-colors hover:bg-border/60 hover:text-text"
+                      >
+                        {copiedCommentId === comment.id ? (
+                          <>
+                            <Check size={12} className="text-success" />
+                            Copied
+                          </>
+                        ) : (
+                          <Link size={12} />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  <CommentBody
+                    body={comment.bodyMarkdown}
+                    originalLines={originalLines}
+                    outdated={thread.isOutdated}
+                  />
+                </li>
+              )
+            })}
           </ul>
 
-          <form
-            onSubmit={(event) => void handleReply(event)}
-            className="flex flex-col gap-2 border-t border-border p-3"
-          >
-            <textarea
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              disabled={posting}
-              rows={2}
-              placeholder="Responder…"
-              className="resize-y rounded-md border border-border bg-bg px-2 py-1.5 text-sm text-text placeholder:text-muted focus:border-accent"
-            />
-            {error && <p className="text-xs text-danger">No se pudo publicar: {error}</p>}
-            <button
-              type="submit"
-              disabled={posting || draft.trim().length === 0}
-              className="self-end rounded-md border border-border bg-accent/90 px-2.5 py-1 text-xs font-medium text-bg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
-            >
-              {posting ? 'Publicando…' : 'Responder'}
-            </button>
-          </form>
+          <CommentComposer
+            className="border-t border-border p-3"
+            label="Reply to this thread"
+            placeholder="Reply…"
+            submitLabel="Reply"
+            clearOnSubmit
+            suggestion={suggestionSourceFor(actions, thread)}
+            onSubmit={(bodyMarkdown) => actions.reply(thread.id, bodyMarkdown)}
+          />
         </>
       )}
     </div>

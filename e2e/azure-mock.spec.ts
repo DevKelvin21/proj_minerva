@@ -107,7 +107,7 @@ test('Azure: renamed + binary files, and an outdated thread', async ({ window },
     .click()
   await expect(window.getByText('virtual-network').first()).toBeVisible()
   await window.getByText('logo.png').first().click()
-  await expect(window.getByText(/[Ss]in vista previa/).first()).toBeVisible()
+  await expect(window.getByText(/No preview available|[Ss]in vista previa/).first()).toBeVisible()
   await attachScreenshot(window, testInfo, 'azure-rename-binary')
 
   await aside(window).getByText('Checkout v2: submit validation').first().click()

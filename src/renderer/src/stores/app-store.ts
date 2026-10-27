@@ -24,7 +24,7 @@ import type {
 } from '../../../shared/types'
 import { prKey, type ScmAuthStatus, type ScmProviderId } from '../../../shared/scm'
 
-export type CenterTab = 'conversation' | 'files'
+export type CenterTab = 'conversation' | 'files' | 'comments'
 export type DiffViewMode = 'split' | 'inline'
 export type FileTreeMode = 'tree' | 'list'
 /** What the left column shows: the PR list or the stacked-PR view. */
@@ -95,7 +95,11 @@ interface AppState {
   fileTreeMode: FileTreeMode
   wordWrap: boolean
 
-  /** Hilo de línea expandido actualmente en la vista de diff (T8); uno solo a la vez. */
+  /**
+   * Thread focused in the diff (jumped to from the Comments view, a `path:line`
+   * chip, or just created): its card is open and its line range highlighted.
+   * Threads themselves always show under their line.
+   */
   expandedThreadId: string | null
   pendingThreadFocus: PendingThreadFocus | null
 
