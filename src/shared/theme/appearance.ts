@@ -116,6 +116,7 @@ export function isStoredCustomTheme(value: unknown): value is ThemeDefinition {
     const collection = value.collection
     if (!isRecord(collection) || !hasOnlyKeys(collection, ['id', 'label'])) return false
     if (!isThemeCollectionId(collection.id) || !isThemeLabel(collection.label)) return false
+    if (collection.label !== collection.label.trim()) return false
   }
   return true
 }

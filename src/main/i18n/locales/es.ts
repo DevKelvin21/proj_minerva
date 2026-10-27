@@ -281,6 +281,7 @@ export const es: MessageShape<typeof en> = {
       mismatch: 'El paquete descargado no coincide con la extensi\u00f3n elegida.',
       noThemes: 'Esa extensi\u00f3n no contiene temas de color.',
       tooManyThemes: 'Esa extensi\u00f3n tiene demasiados temas de color para importarlos.',
+      busy: 'Otra solicitud a Open VSX sigue en curso. Inténtalo de nuevo en un momento.',
     },
   },
 }

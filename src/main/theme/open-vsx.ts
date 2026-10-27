@@ -310,7 +310,25 @@ export function createOpenVsxClient(fetchImpl: FetchLike = fetch): OpenVsxClient
     return { extension: publicExtension(detail), themes }
   }
 
-  return { search, install }
+  /**
+   * One request of each kind at a time: the UI already waits for each one,
+   * so a second concurrent call can only come from a misbehaving renderer
+   * (a search fans out to ~48 requests, an install buffers up to 20 MB).
+   */
+  function singleFlight<A extends unknown[], R>(run: (...args: A) => Promise<R>) {
+    let busy = false
+    return async (...args: A): Promise<R> => {
+      if (busy) throw new OpenVsxError(mt('themes.openVsx.busy'))
+      busy = true
+      try {
+        return await run(...args)
+      } finally {
+        busy = false
+      }
+    }
+  }
+
+  return { search: singleFlight(search), install: singleFlight(install) }
 }
 
 type ThemeContribution = { label?: unknown; uiTheme?: unknown; path?: unknown }

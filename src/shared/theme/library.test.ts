@@ -77,6 +77,13 @@ describe('appearance settings', () => {
     ],
     ['reserved id', withCustom({ ...darkOnly, id: 'ocean' })],
     ['duplicate id', withCustom(darkOnly, darkOnly)],
+    [
+      'padded collection label',
+      withCustom({
+        ...darkOnly,
+        collection: { id: 'open-vsx:x.y', label: 'X' + ' '.repeat(5000) },
+      }),
+    ],
   ])('rejects %s', (_name, value) => {
     expect(isAppearanceSettings(value)).toBe(false)
   })

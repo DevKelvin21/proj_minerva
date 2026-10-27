@@ -276,6 +276,7 @@ export const en = {
       mismatch: 'The downloaded package does not match the selected extension.',
       noThemes: 'That extension does not contain color themes.',
       tooManyThemes: 'That extension contains too many color themes to import.',
+      busy: 'Another Open VSX request is still running. Try again in a moment.',
     },
   },
 }

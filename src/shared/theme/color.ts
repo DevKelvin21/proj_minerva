@@ -293,12 +293,19 @@ function formatThemeColorNumber(value: number, precision: number): string {
   return rounded.toFixed(precision).replace(/(?:\.0+|(?:(\.[0-9]*?)0+))$/, '$1')
 }
 
+/**
+ * Chroma cap of the canonical form: real sRGB/P3 colors stay under ~0.37,
+ * so this never changes a visible color, and it keeps the printed form
+ * inside what `isCanonicalThemeColor` accepts.
+ */
+const MAX_CANONICAL_CHROMA = 0.5
+
 export function formatOklchThemeColor(color: ThemeOklch, alpha = 1): string {
   const normalizedHue = color.C < 0.0000005 ? 0 : ((color.h % 360) + 360) % 360
   const body =
-    formatThemeColorNumber(color.L, 6) +
+    formatThemeColorNumber(Math.min(1, Math.max(0, color.L)), 6) +
     ' ' +
-    formatThemeColorNumber(color.C, 6) +
+    formatThemeColorNumber(Math.min(MAX_CANONICAL_CHROMA, Math.max(0, color.C)), 6) +
     ' ' +
     formatThemeColorNumber(normalizedHue, 3)
   return alpha < 1

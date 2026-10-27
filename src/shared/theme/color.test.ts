@@ -89,3 +89,10 @@ describe('readableThemeColorOn', () => {
     expect(themeContrastRatio(fixedRgb, surface)).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+describe('canonical form bounds', () => {
+  it('prints out-of-gamut chroma inside what the validator accepts', () => {
+    const canonical = toCanonicalThemeColor('oklch(0.5 150 0)')
+    expect(isCanonicalThemeColor(canonical)).toBe(true)
+  })
+})

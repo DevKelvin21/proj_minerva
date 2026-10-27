@@ -173,3 +173,14 @@ describe('createOpenVsxClient (fake registry)', () => {
     await expect(client.search('x', 'relevance')).rejects.toThrow(OpenVsxError)
   })
 })
+
+describe('single flight', () => {
+  it('refuses a second concurrent install', async () => {
+    const client = createOpenVsxClient(createFakeOpenVsxFetch())
+    const first = client.install('minerva-fixtures', 'harbor-themes')
+    await expect(client.install('minerva-fixtures', 'harbor-themes')).rejects.toThrow(OpenVsxError)
+    await expect(first).resolves.toMatchObject({ themes: expect.any(Array) })
+    // Free again once the first one finished.
+    await expect(client.install('minerva-fixtures', 'harbor-themes')).resolves.toBeDefined()
+  })
+})
