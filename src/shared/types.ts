@@ -4,6 +4,7 @@
  */
 import type { AnalysisActivityItem, DraftDidacticSection } from './events'
 import type { AiProviderCatalogEntry, AiProviderId } from './ai-providers'
+import type { AppLocale } from './locale'
 import type {
   FileContentSide,
   PrStack,
@@ -344,6 +345,14 @@ export interface AnalysisGenerationInfo {
 export interface DidacticAnalysis extends GeneratedAnalysis {
   headSha: string
   generatedWith: AnalysisGenerationInfo
+  /**
+   * Language the analysis was written in: the UI language when it was
+   * requested (captured at start, like `generatedWith`). The renderer offers
+   * to regenerate when it differs from the current UI language. Analyses
+   * persisted before i18n carry no field on disk: they were Spanish, and
+   * `analysis-store.ts` loads them as `es`.
+   */
+  language: AppLocale
 }
 
 /**

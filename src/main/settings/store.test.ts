@@ -583,4 +583,46 @@ describe('SettingsStore', () => {
       ).toBe(false)
     })
   })
+
+  describe('language', () => {
+    it('defaults to English without settings.json, and without a language key (migration)', () => {
+      expect(new SettingsStore().getLanguage()).toBe('en')
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({ aiProvider: 'codex', models: { codex: 'gpt-5' } }),
+        'utf-8',
+      )
+      const store = new SettingsStore()
+      expect(store.getLanguage()).toBe('en')
+      expect(store.getPersistedModel('codex')).toBe('gpt-5')
+    })
+
+    it('persists the language without touching other fields, and reads it back after a restart', () => {
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({ aiProvider: 'codex', models: { codex: 'gpt-5' }, githubAccount: 'octo' }),
+        'utf-8',
+      )
+      new SettingsStore().setLanguage('es')
+      const reloaded = new SettingsStore()
+      expect(reloaded.getLanguage()).toBe('es')
+      expect(reloaded.getGithubAccount()).toBe('octo')
+      expect(reloaded.getPersistedModel('codex')).toBe('gpt-5')
+      // Other setters keep the language (they spread `baseSettings()`).
+      reloaded.setAiProvider('claude-code')
+      expect(new SettingsStore().getLanguage()).toBe('es')
+    })
+
+    it('drops an invalid language (falls back to English) without discarding the rest', () => {
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({ aiProvider: 'codex', models: { codex: 'gpt-5' }, language: 'klingon' }),
+        'utf-8',
+      )
+      const store = new SettingsStore()
+      expect(store.getLanguage()).toBe('en')
+      expect(store.getPersistedModel('codex')).toBe('gpt-5')
+      expect(JSON.parse(readFileSync(settingsFilePath(), 'utf-8'))).not.toHaveProperty('language')
+    })
+  })
 })

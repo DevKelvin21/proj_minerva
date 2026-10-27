@@ -16,6 +16,7 @@
  */
 import { isAiProviderId } from '../../shared/ai-providers'
 import type { IpcChannel } from '../../shared/ipc'
+import { isAppLocale } from '../../shared/locale'
 import { SETTABLE_THREAD_STATUSES, type ThreadStatus } from '../../shared/scm'
 import {
   isAzureOrganizationName,
@@ -263,6 +264,13 @@ function isSetGithubAccountPayload(value: unknown): boolean {
   return isNonEmptyString(value.login, MAX_GH_LOGIN_LEN) && !/\s/.test(value.login)
 }
 
+/** `settings:setLanguage`: one of the known locales, no extra keys. */
+function isSetLanguagePayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['language'])) return false
+  return isAppLocale(value.language)
+}
+
 /** `window:openDidactic` (T14): mismo `repo`/`number` que `isRepoAndNumberPayload`, más el título humano del PR. */
 function isOpenDidacticWindowPayload(value: unknown): boolean {
   if (!isPlainObject(value)) return false
@@ -306,6 +314,8 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'settings:setAiProvider': isSetAiProviderPayload,
   'settings:setProviderModel': isSetProviderModelPayload,
   'settings:setModelOption': isSetModelOptionPayload,
+  'settings:getLanguage': isVoidPayload,
+  'settings:setLanguage': isSetLanguagePayload,
   'window:openDidactic': isOpenDidacticWindowPayload,
   // Auto-updater (T90, F17): los 5 canales son `req: void` — mismo guard que
   // `minerva:ping`/`scm:getAuthStatus`, rechaza cualquier cosa distinta de `undefined`.

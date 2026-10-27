@@ -4,6 +4,7 @@ import App from './App'
 import { DidacticWindowApp } from './DidacticWindowApp'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { parseDidacticHash } from '../../shared/didactic-route'
+import { bootI18n } from './i18n'
 import './styles.css'
 
 const container = document.getElementById('root')
@@ -38,10 +39,14 @@ function Root(): React.JSX.Element {
   return didacticTarget ? <DidacticWindowApp key={hash} target={didacticTarget} /> : <App />
 }
 
-createRoot(container).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <Root />
-    </ErrorBoundary>
-  </StrictMode>,
-)
+// The saved language is read before the first render so no window flashes
+// English before switching to Spanish (`bootI18n` never throws).
+void bootI18n().then(() => {
+  createRoot(container).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <Root />
+      </ErrorBoundary>
+    </StrictMode>,
+  )
+})

@@ -16,13 +16,15 @@ import { nativeConfirm } from '../scm/confirm'
 import { getAuthStatusMap, listAcrossProviders } from '../scm/registry'
 import { retargetPullRequest } from '../scm/retarget'
 import { seenStore } from '../scm/seen-store'
-import { openDidacticWindow } from '../windows/didactic-window'
+import { openDidacticWindow, refreshDidacticWindowTitle } from '../windows/didactic-window'
+import { getMainLocale, setMainLocale } from '../i18n'
 import * as updaterService from '../updater/updater'
 import {
   MINERVA_EVENTS,
   type AnalysisActivityItem,
   type AnalysisProgressEvent,
   type DraftDidacticSection,
+  type LanguageChangedEvent,
   type PrListChangedEvent,
 } from '../../shared/events'
 import type { IpcResponse } from '../../shared/ipc'
@@ -43,6 +45,15 @@ function broadcastPrListChanged(payload: PrListChangedEvent): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
       win.webContents.send(MINERVA_EVENTS.prListChanged, payload)
+    }
+  }
+}
+
+/** Pushes the new UI language to every open window (main + detached didactic). */
+function broadcastLanguageChanged(payload: LanguageChangedEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(MINERVA_EVENTS.languageChanged, payload)
     }
   }
 }
@@ -78,6 +89,10 @@ function getScmSettings(root: DefaultScm): ScmSettingsInfo {
  * Returns `stopPrWatcher` so `../index.ts` can stop the watcher on quit.
  */
 export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void }> {
+  // Main's own text (dialogs, error messages, window titles, the AI prompt)
+  // follows the saved UI language from the first call on.
+  setMainLocale(settingsStore.getLanguage())
+
   handle('minerva:ping', () => 'pong from main @ electron ' + process.versions.electron)
   handle('minerva:getVersion', () => app.getVersion())
 
@@ -256,6 +271,9 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
         const providerToWarm = providerNeedingCatalogWarmup()
         if (providerToWarm) await warmProviderModels(providerToWarm)
         const selectionAtStart = getEffectiveAiSelection()
+        // Same capture-at-start rule for the language: a switch mid-analysis
+        // must not relabel what the model is already writing.
+        const languageAtStart = getMainLocale()
         const aiService = await createAiService(prContext)
         const generated = await aiService.analyzePullRequest(req, {
           onProgress: (sections, meta) => {
@@ -293,6 +311,7 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
           ...generatedContent,
           headSha,
           generatedWith: selectionAtStart,
+          language: languageAtStart,
         }
 
         analysisCache.set(req.repo, req.number, result)
@@ -394,6 +413,17 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
   handle('settings:setModelOption', (req) => {
     settingsStore.setModelOption(req.provider, req.optionId, req.value)
     return getAiSettingsInfo()
+  })
+
+  handle('settings:getLanguage', () => settingsStore.getLanguage())
+  // Persist, apply to main, retitle the detached window, then tell every
+  // window (the one that asked included) so they all switch together.
+  handle('settings:setLanguage', (req) => {
+    settingsStore.setLanguage(req.language)
+    setMainLocale(req.language)
+    refreshDidacticWindowTitle()
+    broadcastLanguageChanged({ language: req.language })
+    return req.language
   })
 
   // Ventana didáctica desacoplada (T14, `../windows/didactic-window.ts`): una

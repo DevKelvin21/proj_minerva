@@ -4,6 +4,7 @@ import {
   MINERVA_EVENTS,
   type AnalysisActivityItem,
   type AnalysisProgressEvent,
+  type LanguageChangedEvent,
   type PrChange,
   type PrListChangedEvent,
   type UpdaterStatusChangedEvent,
@@ -171,6 +172,24 @@ function onUpdaterStatus(callback: (payload: UpdaterStatusChangedEvent) => void)
   return () => ipcRenderer.removeListener(MINERVA_EVENTS.updaterStatusChanged, listener)
 }
 
+/** `languageChanged` carries one of the two known locales; anything else is dropped. */
+function isLanguageChangedPayload(value: unknown): value is LanguageChangedEvent {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return v.language === 'en' || v.language === 'es'
+}
+
+/** UI language changes (`settings:setLanguage` from any window). Hardcoded channel, payload guard. */
+function onLanguageChanged(callback: (payload: LanguageChangedEvent) => void): () => void {
+  const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+    if (isLanguageChangedPayload(payload)) {
+      callback(payload)
+    }
+  }
+  ipcRenderer.on(MINERVA_EVENTS.languageChanged, listener)
+  return () => ipcRenderer.removeListener(MINERVA_EVENTS.languageChanged, listener)
+}
+
 const minervaApi = {
   system: {
     ping: invoke('minerva:ping'),
@@ -207,6 +226,8 @@ const minervaApi = {
     setAiProvider: invoke('settings:setAiProvider'),
     setProviderModel: invoke('settings:setProviderModel'),
     setModelOption: invoke('settings:setModelOption'),
+    getLanguage: invoke('settings:getLanguage'),
+    setLanguage: invoke('settings:setLanguage'),
   },
   window: {
     openDidactic: invoke('window:openDidactic'),
@@ -222,6 +243,7 @@ const minervaApi = {
     onAnalysisProgress,
     onPrListChanged,
     onUpdaterStatus,
+    onLanguageChanged,
   },
 } satisfies MinervaApi
 

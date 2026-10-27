@@ -403,6 +403,31 @@ describe('payloadValidators', () => {
     })
   })
 
+  describe('settings:setLanguage', () => {
+    const validate = payloadValidators['settings:setLanguage']
+
+    it('accepts the known locales', () => {
+      expect(validate({ language: 'en' })).toBe(true)
+      expect(validate({ language: 'es' })).toBe(true)
+    })
+
+    it('rejects unknown locales, wrong types and extra keys', () => {
+      expect(validate({ language: 'fr' })).toBe(false)
+      expect(validate({ language: 'EN' })).toBe(false)
+      expect(validate({ language: 1 })).toBe(false)
+      expect(validate({ language: 'en', extra: true })).toBe(false)
+      expect(validate(undefined)).toBe(false)
+      expect(validate('en')).toBe(false)
+    })
+  })
+
+  describe('settings:getLanguage', () => {
+    it('only accepts a void payload', () => {
+      expect(payloadValidators['settings:getLanguage'](undefined)).toBe(true)
+      expect(payloadValidators['settings:getLanguage']({})).toBe(false)
+    })
+  })
+
   describe('settings:setModelOption', () => {
     const validate = payloadValidators['settings:setModelOption']
 

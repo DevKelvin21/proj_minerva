@@ -7,6 +7,7 @@ import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { providerOfWebUrl, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { formatAbsoluteTime, formatRelativeTime } from '../../lib/relative-time'
+import { currentLocale } from '../../i18n'
 import { hasSuggestion } from '../../lib/suggestions'
 import { threadLineRange } from '../../lib/line-threads'
 import { settableStatusesFor } from '../../lib/thread-groups'
@@ -229,10 +230,10 @@ export function ThreadCard({
                     </span>
                     <time
                       dateTime={comment.createdAt}
-                      title={formatAbsoluteTime(comment.createdAt)}
+                      title={formatAbsoluteTime(comment.createdAt, currentLocale())}
                       className="shrink-0"
                     >
-                      {formatRelativeTime(comment.createdAt)}
+                      {formatRelativeTime(comment.createdAt, currentLocale())}
                     </time>
                     {comment.htmlUrl && (
                       <button
