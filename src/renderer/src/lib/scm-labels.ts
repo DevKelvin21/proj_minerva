@@ -28,7 +28,7 @@ export function noPatchMessage(reason: 'too_large' | 'diff_budget' | undefined):
   if (reason === 'diff_budget') {
     return 'Diff not shown: this pull request is too large to diff every file. Open it on the provider to see this one.'
   }
-  return 'Sin vista previa disponible.'
+  return 'No preview available.'
 }
 
 export type ScmTone = 'neutral' | 'accent' | 'success' | 'danger' | 'warning'
@@ -41,23 +41,42 @@ export const REVIEWER_VOTE_DISPLAY: Record<ReviewerVote, { label: string; tone: 
   rejected: { label: 'Rejected', tone: 'danger' },
 }
 
-/**
- * Badge for a thread status, or `null` for `active` (the default state needs
- * no badge). `resolved` keeps its existing Spanish label until the i18n pass.
- */
+export const THREAD_STATUS_LABEL: Record<ThreadStatus, string> = {
+  active: 'Active',
+  pending: 'Pending',
+  resolved: 'Resolved',
+  wont_fix: "Won't fix",
+  closed: 'Closed',
+  by_design: 'By design',
+}
+
+export const THREAD_STATUS_TONE: Record<ThreadStatus, ScmTone> = {
+  active: 'accent',
+  pending: 'warning',
+  resolved: 'success',
+  wont_fix: 'neutral',
+  closed: 'neutral',
+  by_design: 'neutral',
+}
+
+/** Badge for a thread status, or `null` for `active` (the default state needs no badge). */
 export function threadStatusBadge(status: ThreadStatus): { label: string; tone: ScmTone } | null {
-  switch (status) {
-    case 'active':
-      return null
-    case 'pending':
-      return { label: 'Pending', tone: 'warning' }
-    case 'resolved':
-      return { label: 'Resuelto', tone: 'success' }
-    case 'wont_fix':
-      return { label: "Won't fix", tone: 'neutral' }
-    case 'closed':
-      return { label: 'Closed', tone: 'neutral' }
-    case 'by_design':
-      return { label: 'By design', tone: 'neutral' }
+  if (status === 'active') return null
+  return { label: THREAD_STATUS_LABEL[status], tone: THREAD_STATUS_TONE[status] }
+}
+
+/**
+ * Banner of a Files tab whose list the provider capped (`filesTruncated`).
+ * `total` is the true file count when the provider knows it.
+ */
+export function truncatedFilesMessage(
+  shown: number,
+  total: number | null,
+  provider: ScmProviderId,
+): string {
+  const where = 'Open the pull request in ' + SCM_PROVIDER_LABEL[provider] + ' to see the rest.'
+  if (total !== null && total > shown) {
+    return 'Showing ' + shown + ' of ' + total + ' files: the provider capped the list. ' + where
   }
+  return 'Showing the first ' + shown + ' files: the provider capped the list. ' + where
 }
