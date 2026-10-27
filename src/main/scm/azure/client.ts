@@ -101,19 +101,33 @@ export function statusToErrorCode(status: number): ScmErrorCode {
   return 'UNKNOWN'
 }
 
+/**
+ * One encoded path segment. `encodeURIComponent` leaves `.` alone, and the
+ * URL parser resolves `.`/`..` segments, so `project: '..'` would silently
+ * move the request (and the credential) to another path: refused, like empty
+ * segments.
+ */
+function encodeSegment(segment: string | number): string {
+  const text = String(segment)
+  if (text === '' || text === '.' || text === '..') {
+    throw new AzureScmError('NOT_FOUND', 'Invalid Azure DevOps URL segment.')
+  }
+  return encodeURIComponent(text)
+}
+
 function encodeSegments(segments: (string | number)[]): string {
-  return segments.map((segment) => encodeURIComponent(String(segment))).join('/')
+  return segments.map(encodeSegment).join('/')
 }
 
 /** `https://dev.azure.com/{org}/{...segments}` with every segment encoded. */
 export function orgApiUrl(org: string, ...segments: (string | number)[]): string {
-  const base = 'https://dev.azure.com/' + encodeURIComponent(org)
+  const base = 'https://dev.azure.com/' + encodeSegment(org)
   return segments.length ? base + '/' + encodeSegments(segments) : base
 }
 
 /** `https://vssps.dev.azure.com/{org}/{...segments}` (profiles, identities). */
 export function vsspsApiUrl(org: string, ...segments: (string | number)[]): string {
-  const base = 'https://vssps.dev.azure.com/' + encodeURIComponent(org)
+  const base = 'https://vssps.dev.azure.com/' + encodeSegment(org)
   return segments.length ? base + '/' + encodeSegments(segments) : base
 }
 

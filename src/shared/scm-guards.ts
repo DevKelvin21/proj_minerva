@@ -42,14 +42,29 @@ export function isGithubRepoRef(value: unknown): value is GithubRepoRef {
   )
 }
 
+/** Azure repository ids are GUIDs (`8-4-4-4-12` hex). */
+export const AZURE_GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * One URL path segment of an Azure REST URL (org, project, repo name): not
+ * `.`/`..` (a URL parser would resolve them and move the request elsewhere),
+ * no `/` `\\` or control characters.
+ */
+export function isSafeAzureSegment(value: unknown, maxLen = MAX_REPO_FIELD_LEN): value is string {
+  if (!isBoundedString(value, maxLen) || value === '.' || value === '..') return false
+  // eslint-disable-next-line no-control-regex
+  return !/[\x00-\x1f\x7f/\\]/.test(value)
+}
+
 export function isAzureRepoRef(value: unknown): value is AzureRepoRef {
   if (!isPlainObject(value) || value.provider !== 'azure') return false
   if (!hasExactKeys(value, AZURE_KEYS)) return false
   return (
-    isBoundedString(value.organization, MAX_REPO_FIELD_LEN) &&
-    isBoundedString(value.project, MAX_REPO_FIELD_LEN) &&
-    isBoundedString(value.name, MAX_REPO_FIELD_LEN) &&
-    isBoundedString(value.repositoryId, MAX_REPO_FIELD_LEN) &&
+    isSafeAzureSegment(value.organization) &&
+    isSafeAzureSegment(value.project) &&
+    isSafeAzureSegment(value.name) &&
+    typeof value.repositoryId === 'string' &&
+    AZURE_GUID_RE.test(value.repositoryId) &&
     isBoundedString(value.fullName, MAX_REPO_FULL_NAME_LEN)
   )
 }
@@ -102,5 +117,5 @@ export function isAzureProjectName(value: unknown): value is string {
   return !/[\x00-\x1f\x7f\\/:*?"<>|;#${},+=[\]]/.test(value)
 }
 
-export const MAX_AZURE_ORGANIZATIONS = 10
-export const MAX_AZURE_PROJECTS_PER_ORG = 50
+export const MAX_AZURE_ORGANIZATIONS = 5
+export const MAX_AZURE_PROJECTS_PER_ORG = 30

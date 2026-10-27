@@ -215,6 +215,17 @@ describe('payloadValidators', () => {
           { ...validRepo, provider: 'azure' },
           { ...validAzureRepo, owner: 'x' },
           { ...validAzureRepo, repositoryId: '' },
+          { ...validAzureRepo, repositoryId: 'orders-api' },
+          { ...validAzureRepo, repositoryId: '..' },
+          { ...validAzureRepo, repositoryId: '3f2c1a9e-0000-4000-8000-00000000000g' },
+          { ...validAzureRepo, repositoryId: '3f2c1a9e-0000-4000-8000-000000000001/x' },
+          { ...validAzureRepo, organization: '..' },
+          { ...validAzureRepo, organization: '.' },
+          { ...validAzureRepo, project: '..' },
+          { ...validAzureRepo, project: 'a/b' },
+          { ...validAzureRepo, name: '..' },
+          { ...validAzureRepo, name: 'x\\y' },
+          { ...validAzureRepo, name: 'x\ny' },
           { ...validAzureRepo, project: 'p'.repeat(201) },
           { ...validAzureRepo, provider: 'github' },
         ]
@@ -276,6 +287,13 @@ describe('payloadValidators', () => {
       expect(validate({ ...base, line: 0 })).toBe(false)
       expect(validate({ ...base, line: -5 })).toBe(false)
       expect(validate({ ...base, line: 1.5 })).toBe(false)
+    })
+
+    it('caps line at 1,000,000', () => {
+      expect(validate({ ...base, path: 'a.ts', line: 1_000_000 })).toBe(true)
+      expect(validate({ ...base, path: 'a.ts', line: 1_000_001 })).toBe(false)
+      expect(validate({ ...base, path: 'a.ts', line: Number.MAX_SAFE_INTEGER })).toBe(false)
+      expect(validate({ ...base, path: 'a.ts', line: Infinity })).toBe(false)
     })
 
     it('rechaza side inválido', () => {
@@ -641,6 +659,21 @@ describe('payloadValidators', () => {
       expect(validate(org('ok', ['a/b']))).toBe(false)
       expect(validate(org('ok', ['_hidden']))).toBe(false)
       expect(validate(org('ok', ['A', 'a']))).toBe(false)
+    })
+
+    it('caps Azure settings at 5 organizations x 30 projects', () => {
+      const orgs = (count: number, projects = 0) => ({
+        azure: {
+          enabled: true,
+          organizations: Array.from({ length: count }, (_, i) => ({
+            organization: 'org' + i,
+            projects: Array.from({ length: projects }, (_, j) => 'p' + j),
+          })),
+        },
+      })
+      expect(validate(orgs(5, 30))).toBe(true)
+      expect(validate(orgs(6))).toBe(false)
+      expect(validate(orgs(1, 31))).toBe(false)
       expect(
         validate({
           azure: {
