@@ -12,13 +12,16 @@ import {
   resolveLayerFiles,
   stepLayer,
   type LayerRef,
+  layerVerdictKey,
 } from '../../lib/walkthrough'
-import { useAppStore } from '../../stores/app-store'
+import { useAppStore, type LayerVerdict } from '../../stores/app-store'
+import { prKey } from '../../../../shared/scm'
 import type { CommentThread, DiffFile, RepoRef } from '../../../../shared/types'
 import { FileTree } from './FileTree'
 import { DiffView } from './DiffView'
 import { LayerNavigator } from './LayerNavigator'
 import { LayerContextBar } from './LayerContextBar'
+import { WalkthroughFocusBar } from './WalkthroughFocusBar'
 
 interface FilesTabProps {
   repo: RepoRef
@@ -89,6 +92,12 @@ export function FilesTab({
   const toggleWordWrap = useAppStore((s) => s.toggleWordWrap)
   const activeLayer = useAppStore((s) => s.activeLayer)
   const setActiveLayer = useAppStore((s) => s.setActiveLayer)
+  const focusMode = useAppStore((s) => s.walkthroughFocus)
+  const closeFocus = useAppStore((s) => s.closeWalkthroughFocus)
+  const setCenterTab = useAppStore((s) => s.setCenterTab)
+  const reviewKey = prKey(repo, number)
+  const verdicts = useAppStore((s) => s.layerVerdicts[reviewKey])
+  const setLayerVerdict = useAppStore((s) => s.setLayerVerdict)
 
   const walkthrough = useWalkthrough(repo, number)
   const layersMode = fileTreeMode === 'layers'
@@ -140,6 +149,32 @@ export function FilesTab({
     return () => window.removeEventListener('keydown', onKeyDown)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `selectLayer` reads the same `flat`/`files` these deps track.
   }, [layersMode, flat, activeLayer, files])
+
+  // Full-screen walkthrough keys: Esc leaves it, 1 / 2 / 3 judge the layer on
+  // screen (again = clear). Not while typing, and not when a dialog (the
+  // palette, a card's own Esc) already claimed the key.
+  useEffect(() => {
+    if (!focusMode) return
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.defaultPrevented || isTypingTarget(event.target)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const state = useAppStore.getState()
+      if (state.settingsOpen || state.commandPaletteOpen || state.mainView !== 'review') return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeFocus()
+        return
+      }
+      const verdict = VERDICT_KEYS[event.key]
+      if (!verdict || !state.activeLayer) return
+      event.preventDefault()
+      const layerKey = layerVerdictKey(state.activeLayer)
+      const current = state.layerVerdicts[reviewKey]?.[layerKey]
+      setLayerVerdict(reviewKey, layerKey, current === verdict ? null : verdict)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [focusMode, closeFocus, reviewKey, setLayerVerdict])
 
   // `width === null` = todavía sin medir: se asume el layout ancho para no
   // parpadear al drawer durante el primer frame.
@@ -197,6 +232,7 @@ export function FilesTab({
             setTreeOpen(false)
           }}
           onAnalyze={walkthrough.analyze}
+          verdicts={verdicts}
         />
       }
     />
@@ -267,6 +303,31 @@ export function FilesTab({
           }
         />
       </div>
+      {focusMode && (
+        <WalkthroughFocusBar
+          verdict={activeEntry ? (verdicts?.[layerVerdictKey(activeEntry.ref)] ?? null) : null}
+          onVerdict={
+            activeEntry
+              ? (verdict) => setLayerVerdict(reviewKey, layerVerdictKey(activeEntry.ref), verdict)
+              : null
+          }
+          onPrevious={previous ? () => selectLayer(previous) : null}
+          onNext={next ? () => selectLayer(next) : null}
+          judged={flat.filter((entry) => verdicts?.[layerVerdictKey(entry.ref)]).length}
+          total={flat.length}
+          onFinish={() => {
+            closeFocus()
+            setCenterTab('conversation')
+          }}
+        />
+      )}
     </div>
   )
+}
+
+/** Keys of the full-screen walkthrough's verdict buttons. */
+const VERDICT_KEYS: Record<string, LayerVerdict | undefined> = {
+  '1': 'good',
+  '2': 'changes',
+  '3': 'question',
 }

@@ -9,6 +9,8 @@ interface LineCommentComposerProps {
   lineContent: string
   onSubmit: (bodyMarkdown: string) => Promise<void>
   onCancel: () => void
+  /** Starting text (an AI answer to edit before posting). */
+  initialValue?: string
 }
 
 /**
@@ -21,6 +23,7 @@ export function LineCommentComposer({
   lineContent,
   onSubmit,
   onCancel,
+  initialValue,
 }: LineCommentComposerProps): React.JSX.Element {
   const { t } = useTranslation()
   const suggestion: SuggestionSource =
@@ -44,6 +47,7 @@ export function LineCommentComposer({
         suggestion={suggestion}
         onSubmit={onSubmit}
         onCancel={onCancel}
+        initialValue={initialValue}
       />
     </div>
   )

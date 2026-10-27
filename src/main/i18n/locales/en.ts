@@ -9,6 +9,9 @@
 
 export const en = {
   ai: {
+    lineQuestion: {
+      empty: 'The AI finished without an answer to your question. Try asking it again.',
+    },
     errors: {
       inactivityTimeout:
         '{{provider}} stopped sending data: no new chunk for more than {{seconds}}s (inactivity timeout).',

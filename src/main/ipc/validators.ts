@@ -24,6 +24,7 @@ import {
   OPEN_VSX_SORTS,
 } from '../../shared/theme/open-vsx'
 import { SETTABLE_THREAD_STATUSES, type ThreadStatus } from '../../shared/scm'
+import { MAX_LINE_QUESTION_LEN, MAX_LINE_QUESTION_SPAN } from '../../shared/types'
 import {
   isAzureOrganizationName,
   isAzureProjectName,
@@ -149,6 +150,28 @@ function isGetFileContentPayload(value: unknown): boolean {
   if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
   if (!isRepoFilePath(value.path)) return false
   return value.side === 'base' || value.side === 'head'
+}
+
+/**
+ * `ai:askAboutLines`: a repo file path, a side, a 1-based line range no wider
+ * than `MAX_LINE_QUESTION_SPAN`, and a non-empty question up to
+ * `MAX_LINE_QUESTION_LEN` characters (it goes into a prompt, fenced there).
+ */
+function isAskAboutLinesPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['repo', 'number', 'path', 'side', 'startLine', 'endLine', 'question']))
+    return false
+  if (!isRepoRef(value.repo)) return false
+  if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
+  if (!isRepoFilePath(value.path)) return false
+  if (value.side !== 'old' && value.side !== 'new') return false
+  if (!isIntInRange(value.startLine, 1, MAX_LINE)) return false
+  if (!isIntInRange(value.endLine, 1, MAX_LINE)) return false
+  const start = value.startLine as number
+  const end = value.endLine as number
+  if (end < start || end - start + 1 > MAX_LINE_QUESTION_SPAN) return false
+  if (typeof value.question !== 'string' || value.question.trim().length === 0) return false
+  return value.question.length <= MAX_LINE_QUESTION_LEN
 }
 
 /** `scm:retarget`: two valid, different short branch names. The rest is re-checked in main. */
@@ -346,6 +369,7 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:getStacks': isGetStacksPayload,
   'scm:getDashboard': isGetDashboardPayload,
   'ai:analyzePullRequest': isRepoAndNumberPayload,
+  'ai:askAboutLines': isAskAboutLinesPayload,
   'ai:getCachedAnalysis': isRepoAndNumberPayload,
   'ai:invalidateAnalysis': isRepoAndNumberPayload,
   'ai:getAnalysisState': isRepoAndNumberPayload,

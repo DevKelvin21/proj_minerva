@@ -247,6 +247,7 @@ const minervaApi = {
   },
   ai: {
     analyzePullRequest: invoke('ai:analyzePullRequest'),
+    askAboutLines: invoke('ai:askAboutLines'),
     getCachedAnalysis: invoke('ai:getCachedAnalysis'),
     invalidateAnalysis: invoke('ai:invalidateAnalysis'),
     getAnalysisState: invoke('ai:getAnalysisState'),

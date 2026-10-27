@@ -84,9 +84,9 @@ import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from '../ser
 import type { PrContextSource } from '../pr-context'
 import type { IpcRequest } from '../../../shared/ipc'
 import { getEffectiveAiSelection } from '../env'
-import { buildAnalyzeSystemPrompt } from '../prompts/analyze-pr'
+import { agenticPrompts } from '../task-prompts'
 import { getMainLocale, mt } from '../../i18n'
-import { buildAgenticUserMessage, prId } from '../analysis-prompt'
+import { prId } from '../analysis-prompt'
 import { StreamSectionParser } from '../stream-parser'
 import { createThrottle } from '../throttle'
 import { createActivityTracker } from '../activity-tracker'
@@ -233,7 +233,9 @@ export class CodexAiService implements AiService {
     // Dedupeado/cacheado en disco por `ensureSnapshot` (T54).
     const snapshotDir = await this.context.ensureSnapshot(req.repo, detail.headSha)
 
-    const userMessage = buildAgenticUserMessage(detail, files)
+    // The full analysis, or a reviewer's question about some lines (`ai:askAboutLines`).
+    const prompts = agenticPrompts(detail, files, language, options?.question)
+    const userMessage = prompts.userMessage
 
     const controller = new AbortController()
     const timeouts = createAnalysisTimeouts(controller, {
@@ -306,7 +308,7 @@ export class CodexAiService implements AiService {
 
       const threadResult = await client.request('thread/start', {
         model,
-        baseInstructions: buildAnalyzeSystemPrompt(language),
+        baseInstructions: prompts.systemPrompt,
         // AGÉNTICO (F11/T58): apunta el thread al snapshot local del PR.
         // Nombre de param VERIFICADO contra `ThreadStartParams` del esquema
         // real (`codex app-server generate-json-schema`, T58): `cwd: string

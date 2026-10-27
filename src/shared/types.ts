@@ -654,3 +654,32 @@ export type UpdaterStatus =
   | { phase: 'downloading'; info: UpdateInfoLite; percent: number }
   | { phase: 'downloaded'; info: UpdateInfoLite }
   | { phase: 'error'; message: string; lastCheckedAt?: string }
+
+/** Longest question the reviewer can ask about some lines (validated in main). */
+export const MAX_LINE_QUESTION_LEN = 2000
+/** Widest line range one question can cover. */
+export const MAX_LINE_QUESTION_SPAN = 400
+
+/**
+ * A reviewer's question about some lines of one file of a PR (`ai:askAboutLines`).
+ * `side` says which file the numbers count in: `new` = the head version
+ * (added and context lines), `old` = the base version (removed lines).
+ */
+export interface LineQuestion {
+  path: string
+  side: 'old' | 'new'
+  startLine: number
+  endLine: number
+  question: string
+}
+
+/**
+ * The AI's answer to a `LineQuestion`: Markdown, rendered without raw HTML
+ * like every analysis section. Never cached and never posted by itself: the
+ * reviewer decides whether it becomes a review comment.
+ */
+export interface LineAnswer {
+  markdown: string
+  generatedWith: AnalysisGenerationInfo
+  language: AppLocale
+}

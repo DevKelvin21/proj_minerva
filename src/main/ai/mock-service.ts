@@ -209,7 +209,8 @@ export class MockAiService implements AiService {
     options?: AnalyzePullRequestOptions,
   ): Promise<AnalyzeResult> {
     const language = options?.language ?? getMainLocale()
-    const { genericSummarySection, richDidacticSections } = language === 'es' ? fixturesEs : fixturesEn
+    const { genericSummarySection, lineAnswerSection, richDidacticSections } =
+      language === 'es' ? fixturesEs : fixturesEn
     const prId = prKey(req.repo, req.number)
     const rich = richDidacticSections[prId]
     const fixture = prFixtures.find(
@@ -217,6 +218,16 @@ export class MockAiService implements AiService {
     )
     // Same head commit the mock SCM reports, so staleness checks line up.
     const headSha = fixture?.detail.headSha ?? ''
+
+    // A reviewer's question about some lines: one canned answer, any PR.
+    if (options?.question) {
+      const sections = await streamFixture(
+        [lineAnswerSection(options.question)],
+        language,
+        options.onProgress,
+      )
+      return { prId, headSha, sections, generatedAt: new Date().toISOString() }
+    }
 
     if (rich) {
       const sections = await streamFixture(rich, language, options?.onProgress)

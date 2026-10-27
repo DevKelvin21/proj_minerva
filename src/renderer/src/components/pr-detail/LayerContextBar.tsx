@@ -84,7 +84,7 @@ export function LayerContextBar({
 
       {layer.markdown.trim().length > 0 && (
         <div className="text-xs text-muted" aria-label={t('prDetail.layers.summaryLabel')}>
-          <Markdown content={layer.markdown} />
+          <Markdown content={layer.markdown} images={false} />
         </div>
       )}
 

@@ -96,9 +96,9 @@ import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from '../ser
 import type { PrContextSource } from '../pr-context'
 import type { IpcRequest } from '../../../shared/ipc'
 import { getEffectiveAiSelection } from '../env'
-import { buildAnalyzeSystemPrompt } from '../prompts/analyze-pr'
+import { agenticPrompts } from '../task-prompts'
 import { getMainLocale, mt } from '../../i18n'
-import { buildAgenticUserMessage, prId } from '../analysis-prompt'
+import { prId } from '../analysis-prompt'
 import { StreamSectionParser } from '../stream-parser'
 import { createThrottle } from '../throttle'
 import { createActivityTracker } from '../activity-tracker'
@@ -227,7 +227,9 @@ export class ClaudeCodeAiService implements AiService {
     // segundo análisis del mismo repo+sha no vuelve a pagar la descarga.
     const snapshotDir = await this.context.ensureSnapshot(req.repo, detail.headSha)
 
-    const userMessage = buildAgenticUserMessage(detail, files)
+    // The full analysis, or a reviewer's question about some lines (`ai:askAboutLines`).
+    const prompts = agenticPrompts(detail, files, language, options?.question)
+    const userMessage = prompts.userMessage
 
     const controller = new AbortController()
     const timeouts = createAnalysisTimeouts(controller, {
@@ -308,7 +310,7 @@ export class ClaudeCodeAiService implements AiService {
           // Claude Code, no lo extiende (ver el comentario de arriba —
           // nunca usar el preset `claude_code` con `append` acá, eso sería
           // "aparentar" ser el cliente oficial).
-          systemPrompt: buildAnalyzeSystemPrompt(language),
+          systemPrompt: prompts.systemPrompt,
           // Solo lectura: `Read`/`Grep`/`Glob` (ver el comentario del módulo
           // y `READ_ONLY_TOOLS` arriba) — NADA de Write/Edit/Bash/WebFetch/
           // WebSearch/Task. `allowedTools` + `permissionMode: 'dontAsk'`

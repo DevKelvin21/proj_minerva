@@ -282,6 +282,18 @@ export function DiffView({
       onExpand: handleExpand,
     },
     onCreateThread: handleCreateThread,
+    // "Ask AI" on a line: the old side asks about the file as it was (its
+    // previous path when renamed), the new side about the PR head.
+    askAi: (line: number, side: LineSide, question: string) =>
+      window.minerva.ai.askAboutLines({
+        repo,
+        number,
+        path: side === 'LEFT' ? (file.previousPath ?? file.path) : file.path,
+        side: side === 'LEFT' ? 'old' : 'new',
+        startLine: line,
+        endLine: line,
+        question,
+      }),
   }
 
   return (

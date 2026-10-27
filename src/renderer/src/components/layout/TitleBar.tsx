@@ -1,4 +1,13 @@
-import { GraduationCap, Home, PanelLeft, PanelLeftClose, Search, Settings } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  GraduationCap,
+  Home,
+  PanelLeft,
+  PanelLeftClose,
+  Search,
+  Settings,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
@@ -10,6 +19,10 @@ import { Kbd } from '../ui/Kbd'
 import { AccountsMenu, ScmAttentionChips, type AuthChipDensity } from './ScmAuthChips'
 import { AiStatusChip } from './AiStatusChip'
 import { TitleBarLocation } from './TitleBarLocation'
+import { WalkthroughProgress } from './WalkthroughProgress'
+
+/** Key names read the same in every language. */
+const ESC_KEY = 'Esc'
 
 /**
  * Settings gear, with a discreet dot when an update is available or
@@ -97,6 +110,11 @@ export function TitleBar(): React.JSX.Element {
   const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
   const mainView = useAppStore((s) => s.mainView)
   const goHome = useAppStore((s) => s.goHome)
+  const selectedPr = useAppStore((s) => s.selectedPr)
+  const focusPr = useAppStore((s) =>
+    s.walkthroughFocus && s.mainView === 'review' ? s.selectedPr : null,
+  )
+  const closeFocus = useAppStore((s) => s.closeWalkthroughFocus)
   const tier = useLayoutTier()
 
   const showDrawerToggle = sidebarIsDrawer(tier.w)
@@ -114,9 +132,21 @@ export function TitleBar(): React.JSX.Element {
           'max(8px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)))',
       }}
     >
-      {/* PR list toggle: the drawer on narrow tiers (its label is what the
-          e2e suite looks for), the hideable docked column on wide ones. */}
-      {showDrawerToggle ? (
+      {/* Full-screen walkthrough: one way out (Esc too) instead of the navigation. */}
+      {focusPr ? (
+        <button
+          type="button"
+          onClick={closeFocus}
+          data-testid="walkthrough-exit"
+          className="flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-text transition-colors duration-150 hover:bg-border/60"
+        >
+          <ChevronLeft size={16} aria-hidden />
+          {tier.w !== 'sm' && t('prDetail.focus.exit')}
+          <Kbd>{ESC_KEY}</Kbd>
+        </button>
+      ) : /* PR list toggle: the drawer on narrow tiers (its label is what the
+          e2e suite looks for), the hideable docked column on wide ones. */
+      showDrawerToggle ? (
         <IconButton
           icon={<PanelLeft size={16} />}
           label={t('layout.titleBar.prListToggle')}
@@ -138,23 +168,31 @@ export function TitleBar(): React.JSX.Element {
         />
       )}
 
-      <IconButton
-        icon={<Home size={16} />}
-        label={t('layout.titleBar.home')}
-        active={mainView === 'home'}
-        onClick={goHome}
-        data-testid="home-button"
-      />
+      {!focusPr && (
+        <IconButton
+          icon={<Home size={16} />}
+          label={t('layout.titleBar.home')}
+          active={mainView === 'home'}
+          onClick={goHome}
+          data-testid="home-button"
+        />
+      )}
 
       <span className="mx-1.5 h-5 w-px shrink-0 bg-border" aria-hidden />
 
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <TitleBarLocation compact={compact} />
+        <TitleBarLocation compact={compact || focusPr !== null} />
+        {focusPr && (
+          <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-text">
+            <ChevronRight size={14} className="text-muted/60" aria-hidden />
+            {t('prDetail.focus.title')}
+          </span>
+        )}
         {/* Centered in the free band on wide windows, inline when it would collide. */}
         <div
           className={`flex min-w-0 shrink justify-end ${commandSize === 'wide' ? 'mx-auto' : 'ml-auto'}`}
         >
-          <CommandBarButton size={commandSize} />
+          {focusPr ? <WalkthroughProgress pr={focusPr} /> : <CommandBarButton size={commandSize} />}
         </div>
       </div>
 
@@ -162,7 +200,7 @@ export function TitleBar(): React.JSX.Element {
         <ScmAttentionChips density={authDensity} />
         <AiStatusChip compact={tier.w !== 'xl'} />
         {/* The didactic panel only exists in the review view. */}
-        {mainView === 'review' && (
+        {mainView === 'review' && !focusPr && selectedPr && (
           <IconButton
             icon={<GraduationCap size={16} />}
             label={t('layout.titleBar.didacticPanel')}

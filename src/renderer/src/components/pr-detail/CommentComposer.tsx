@@ -19,6 +19,8 @@ interface CommentComposerProps {
   autoFocus?: boolean
   /** Clear the draft after a successful submit (replies); a new-thread composer is unmounted instead. */
   clearOnSubmit?: boolean
+  /** Starting text (an AI answer the reviewer turns into a comment). */
+  initialValue?: string
   className?: string
 }
 
@@ -42,9 +44,10 @@ export function CommentComposer({
   autoFocus = false,
   clearOnSubmit = false,
   className = '',
+  initialValue = '',
 }: CommentComposerProps): React.JSX.Element {
   const { t } = useTranslation()
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useState(initialValue)
   const [posting, setPosting] = useState(false)
   const [inserting, setInserting] = useState(false)
   const [error, setError] = useState<string | null>(null)

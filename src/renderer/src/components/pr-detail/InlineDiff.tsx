@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
+import { Plus, Sparkles } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
 import { buildInlineRows, type DiffLineKind, type InlineRow } from '../../lib/diff-parser'
 import { linePositions } from '../../lib/diff-threads'
@@ -10,6 +10,7 @@ import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
+import { AskAiCard } from './AskAiCard'
 import {
   asHunk,
   KIND_BG,
@@ -40,6 +41,7 @@ export function InlineDiff({
   layerKeys,
   expander,
   onCreateThread,
+  askAi,
 }: DiffBodyProps): React.JSX.Element {
   const { t } = useTranslation()
   const [openComposer, setOpenComposer] = useState<OpenComposer | null>(null)
@@ -93,7 +95,9 @@ export function InlineDiff({
             ) : position ? (
               <button
                 type="button"
-                onClick={() => setOpenComposer({ key: rowKey, content: row.content, ...position })}
+                onClick={() =>
+                  setOpenComposer({ key: rowKey, content: row.content, kind: 'comment', ...position })
+                }
                 aria-label={t('comments.line.addComment')}
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
               >
@@ -101,6 +105,21 @@ export function InlineDiff({
               </button>
             ) : (
               <span className="inline-block h-4 w-4 shrink-0" />
+            )}
+            {askAi && position ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenComposer({ key: rowKey, content: row.content, kind: 'ask', ...position })
+                }
+                aria-label={t('comments.askAi.button', { line: position.line })}
+                title={t('comments.askAi.buttonTitle')}
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
+              >
+                <Sparkles size={11} />
+              </button>
+            ) : (
+              askAi && <span className="inline-block h-4 w-4 shrink-0" />
             )}
             <span className="select-none">{row.newNumber ?? ''}</span>
           </span>
@@ -145,16 +164,29 @@ export function InlineDiff({
         )}
         {composerHere && (
           <div style={{ gridColumn: '1 / -1' }} className="min-w-0">
-            <LineCommentComposer
-              line={composerHere.line}
-              side={composerHere.side}
-              lineContent={composerHere.content}
-              onCancel={() => setOpenComposer(null)}
-              onSubmit={async (bodyMarkdown) => {
-                await onCreateThread(composerHere.line, composerHere.side, bodyMarkdown)
-                setOpenComposer(null)
-              }}
-            />
+            {composerHere.kind === 'ask' && askAi ? (
+              <AskAiCard
+                line={composerHere.line}
+                side={composerHere.side}
+                onAsk={(question) => askAi(composerHere.line, composerHere.side, question)}
+                onUseAsComment={(markdown) =>
+                  setOpenComposer({ ...composerHere, kind: 'comment', draft: markdown })
+                }
+                onClose={() => setOpenComposer(null)}
+              />
+            ) : (
+              <LineCommentComposer
+                line={composerHere.line}
+                side={composerHere.side}
+                lineContent={composerHere.content}
+                initialValue={composerHere.draft}
+                onCancel={() => setOpenComposer(null)}
+                onSubmit={async (bodyMarkdown) => {
+                  await onCreateThread(composerHere.line, composerHere.side, bodyMarkdown)
+                  setOpenComposer(null)
+                }}
+              />
+            )}
           </div>
         )}
       </Fragment>

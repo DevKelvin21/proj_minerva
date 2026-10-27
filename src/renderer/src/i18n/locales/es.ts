@@ -122,6 +122,8 @@ export const es: MessageShape<typeof en> = {
         showDidactic: 'Mostrar el panel didáctico',
         hideDidactic: 'Ocultar el panel didáctico',
         didacticKeywords: 'ia análisis resumen',
+        walkthrough: 'Empezar el recorrido (pantalla completa)',
+        walkthroughKeywords: 'capas guiado foco revisión',
       },
     },
     sidebar: {
@@ -212,6 +214,19 @@ export const es: MessageShape<typeof en> = {
     },
   },
   prDetail: {
+    focus: {
+      title: 'Recorrido',
+      exit: 'Salir del recorrido',
+      previous: 'Anterior',
+      next: 'Siguiente capa',
+      thisLayer: 'Esta capa',
+      verdictsLabel: 'Tu veredicto sobre esta capa',
+      judged_one: '{{count}} de {{total}} capas evaluadas',
+      judged_other: '{{count}} de {{total}} capas evaluadas',
+      finish: 'Listo',
+      progress: 'Capa {{current}} de {{total}}',
+      progressNone: '{{total}} capas',
+    },
     header: {
       walkthrough: 'Recorrido',
       summary: {
@@ -280,6 +295,11 @@ export const es: MessageShape<typeof en> = {
       layersView: 'Vista por capas (recorrido guiado)',
     },
     layers: {
+      verdict: {
+        good: 'Se ve bien',
+        changes: 'Necesita cambios',
+        question: 'Pregunta',
+      },
       title: 'Capas',
       placeholderTitle: 'Recorrido guiado',
       placeholderHint:
@@ -366,6 +386,25 @@ export const es: MessageShape<typeof en> = {
     },
   },
   comments: {
+    askAi: {
+      button: 'Preguntar a la IA sobre la línea {{line}}',
+      buttonTitle: 'Preguntar a la IA sobre esta línea',
+      title: 'Pregúntale a la IA sobre la línea {{line}}',
+      titleOld: 'Pregúntale a la IA sobre la línea eliminada {{line}}',
+      close: 'Cerrar',
+      inputLabel: 'Tu pregunta sobre la línea {{line}}',
+      placeholder: '¿Qué quieres saber de esta línea?',
+      followUpPlaceholder: 'Haz otra pregunta…',
+      ask: 'Preguntar',
+      submitHint: '{{shortcut}} para preguntar',
+      thinking: 'Leyendo el código en el commit del PR…',
+      youAsked: 'Preguntaste:',
+      useAsComment: 'Usar como comentario',
+      private: 'Solo tú lo ves hasta que lo publiques.',
+      failed: 'No se pudo obtener una respuesta: {{error}}',
+      followUpContext:
+        'Antes pregunté: {{question}}\nRespondiste: {{answer}}\nSeguimiento: {{followUp}}',
+    },
     threadStatus: {
       active: 'Activo',
       pending: 'Pendiente',

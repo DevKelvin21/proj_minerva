@@ -71,6 +71,13 @@ function useCommandItems(): PaletteItem[] {
     if (hasPr && mainView === 'review') {
       items.push(
         {
+          id: 'cmd:walkthrough',
+          group: 'commands',
+          label: t('layout.palette.command.walkthrough'),
+          keywords: t('layout.palette.command.walkthroughKeywords'),
+          run: () => store().openWalkthroughFocus(),
+        },
+        {
           id: 'cmd:conversation',
           group: 'commands',
           label: t('layout.palette.command.conversation'),

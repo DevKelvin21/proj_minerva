@@ -35,7 +35,7 @@
  */
 import type { IpcRequest } from '../../shared/ipc'
 import type { AppLocale } from '../../shared/locale'
-import type { GeneratedAnalysis } from '../../shared/types'
+import type { GeneratedAnalysis, LineQuestion } from '../../shared/types'
 import type { AnalysisActivityItem, DraftDidacticSection } from '../../shared/events'
 
 export interface AnalyzeProgressMeta {
@@ -78,6 +78,13 @@ export interface AnalyzePullRequestOptions {
    * current main locale (`getMainLocale()`).
    */
   language?: AppLocale
+  /**
+   * Set by `ai:askAboutLines`: answer this reviewer question about some
+   * lines instead of writing the full analysis (`../task-prompts.ts`). The
+   * run is the same (snapshot, read-only tools, timeouts); the result holds
+   * one `summary` section with the answer.
+   */
+  question?: LineQuestion
 }
 
 /**

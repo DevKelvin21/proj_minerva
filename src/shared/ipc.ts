@@ -29,6 +29,8 @@ import type {
   SetProviderSettingsRequest,
   SetThreadStatusRequest,
   UpdaterStatus,
+  LineAnswer,
+  LineQuestion,
 } from './types'
 import type { FileContent, ScmAuthStatus, ScmProviderId } from './scm'
 import type { AiModelOption, AiProviderId } from './ai-providers'
@@ -155,6 +157,13 @@ export interface IpcContract {
   'scm:getDashboard': { req: { refresh?: boolean } | void; res: DashboardResult }
 
   'ai:analyzePullRequest': { req: { repo: RepoRef; number: number }; res: DidacticAnalysis }
+  /**
+   * The reviewer asks about some lines of one file. Same jailed, read-only
+   * agent as the analysis (snapshot at the PR commit, `Read`/`Grep`/`Glob`
+   * only), with its own prompt; the answer is one Markdown block. Not
+   * streamed and not cached: each question is its own short run.
+   */
+  'ai:askAboutLines': { req: { repo: RepoRef; number: number } & LineQuestion; res: LineAnswer }
   /**
    * Lectura pura del cache de análisis en main (T14, `../main/ai/analysis-cache.ts`):
    * a diferencia de `ai:analyzePullRequest`, NUNCA dispara un análisis nuevo ni
@@ -347,6 +356,7 @@ export const IPC_CHANNELS = [
   'scm:getStacks',
   'scm:getDashboard',
   'ai:analyzePullRequest',
+  'ai:askAboutLines',
   'ai:getCachedAnalysis',
   'ai:invalidateAnalysis',
   'ai:getAnalysisState',

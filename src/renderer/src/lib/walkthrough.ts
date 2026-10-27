@@ -23,6 +23,11 @@ export interface LayerRef {
   layer: number
 }
 
+/** Stable key of a layer for per-layer state (verdicts). */
+export function layerVerdictKey(ref: LayerRef): string {
+  return ref.cohort + ':' + ref.layer
+}
+
 export interface FlatLayer {
   ref: LayerRef
   /** 0-based position in reading order across every cohort. */

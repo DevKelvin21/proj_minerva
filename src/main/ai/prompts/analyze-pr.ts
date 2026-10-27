@@ -34,7 +34,7 @@
 import type { AppLocale } from '../../../shared/locale'
 
 /** Language name used in the output-language rule of the prompt. */
-const OUTPUT_LANGUAGE_NAME: Record<AppLocale, string> = {
+export const OUTPUT_LANGUAGE_NAME: Record<AppLocale, string> = {
   en: 'English',
   es: 'Spanish',
 }

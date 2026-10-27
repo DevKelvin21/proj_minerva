@@ -79,7 +79,7 @@ export function ResourceViewer({ resource, onClose }: ResourceViewerProps): Reac
           {resource.kind === 'markdown' && (
             <div className="h-full overflow-y-auto p-4">
               <div className="mx-auto max-w-4xl">
-                <Markdown content={resource.markdown} />
+                <Markdown content={resource.markdown} images={false} />
               </div>
             </div>
           )}

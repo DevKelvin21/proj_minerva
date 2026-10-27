@@ -18,7 +18,25 @@
  */
 import { prKey } from '../../shared/scm'
 import { githubRepo } from '../../shared/scm-guards'
-import type { DidacticSection, PullRequestDetail } from '../../shared/types'
+import type { DidacticSection, LineQuestion, PullRequestDetail } from '../../shared/types'
+
+/** Respuesta mock a la pregunta del revisor sobre unas líneas (`ai:askAboutLines`). */
+export function lineAnswerSection(question: LineQuestion): DidacticSection {
+  const where =
+    question.startLine === question.endLine
+      ? question.path + ':' + question.startLine
+      : question.path + ':' + question.startLine + '-' + question.endLine
+  return {
+    kind: 'summary',
+    markdown:
+      'Respuesta mock para `' +
+      where +
+      '`: estas líneas son parte del cambio que hace este PR. Con un proveedor de IA real, el ' +
+      'agente lee el archivo en el commit del PR antes de responder tu pregunta.\n\n' +
+      'Siguiente paso: compáralas con el código que las llama y decide si necesitan un ' +
+      'comentario.',
+  }
+}
 
 /** Resumen genérico para PRs sin sección enriquecida en esta demo mock. */
 export function genericSummarySection(detail: PullRequestDetail): DidacticSection {
