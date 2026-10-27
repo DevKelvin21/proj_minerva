@@ -23,9 +23,12 @@ import type { DidacticSection, LineQuestion, PullRequestDetail } from '../../sha
 /** Respuesta mock a la pregunta del revisor sobre unas líneas (`ai:askAboutLines`). */
 export function lineAnswerSection(question: LineQuestion): DidacticSection {
   const where =
-    question.startLine === question.endLine
-      ? question.path + ':' + question.startLine
-      : question.path + ':' + question.startLine + '-' + question.endLine
+    question.startLine === undefined
+      ? question.path
+      : question.startLine === question.endLine
+        ? question.path + ':' + question.startLine
+        : question.path + ':' + question.startLine + '-' + question.endLine
+  const turn = (question.history?.length ?? 0) + 1
   return {
     kind: 'summary',
     markdown:
@@ -33,6 +36,16 @@ export function lineAnswerSection(question: LineQuestion): DidacticSection {
       where +
       '`: estas líneas son parte del cambio que hace este PR. Con un proveedor de IA real, el ' +
       'agente lee el archivo en el commit del PR antes de responder tu pregunta.\n\n' +
+      (question.thread
+        ? 'Preguntaste desde un hilo de ' +
+          question.thread.comments.length +
+          ' comentario(s); el primero es de ' +
+          question.thread.comments[0].author +
+          '.\n\n'
+        : '') +
+      (turn > 1
+        ? 'Seguimiento ' + turn + ': las respuestas anteriores llegaron como contexto.\n\n'
+        : '') +
       'Siguiente paso: compáralas con el código que las llama y decide si necesitan un ' +
       'comentario.',
   }

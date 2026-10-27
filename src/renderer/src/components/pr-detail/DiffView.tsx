@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageSquareWarning } from 'lucide-react'
+import { prKey } from '../../../../shared/scm'
 import type { CommentThread, DiffFile, RepoRef } from '../../../../shared/types'
 import type { DiffViewMode } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
 import { parsePatch } from '../../lib/diff-parser'
-import { indexLineThreads, threadSide, type LineSide } from '../../lib/line-threads'
+import { indexLineThreads, lineThreadKey, threadSide, type LineSide } from '../../lib/line-threads'
+import { askContext, threadContext, threadQuestionLines } from '../../lib/ask-ai'
+import { isLiveConversation, useAskAiStore } from '../../stores/ask-ai-store'
 import {
   autoRevealRanges,
   buildDiffSections,
@@ -30,7 +33,8 @@ import type { LayerFocus } from '../../lib/walkthrough'
 import { DiffToolbar } from './DiffToolbar'
 import { SplitDiff } from './SplitDiff'
 import { InlineDiff } from './InlineDiff'
-import { ThreadCard } from './ThreadCard'
+import { InlineThreadCard } from './InlineThreadCard'
+import type { AskAiBinding } from './diff-body'
 
 const EMPTY_KEYS: ReadonlySet<string> = new Set()
 
@@ -182,6 +186,55 @@ export function DiffView({
     }
   }, [byPosition, hiddenKeys, toggleHidden, expandedThreadId, lineThreads])
 
+  // "Ask AI": the old side asks about the file as it was (its previous path
+  // when renamed), the new side about the PR head. Conversations live in
+  // `ask-ai-store` for the session; a follow-up carries the earlier ones.
+  const pr = prKey(repo, number)
+  const oldPath = file.previousPath ?? file.path
+  const conversations = useAskAiStore((s) => s.conversations)
+  const askAi: AskAiBinding = useMemo(() => {
+    const pathOf = (side: LineSide): string => (side === 'LEFT' ? oldPath : file.path)
+    const askedLines = new Set<string>()
+    for (const conversation of conversations.values()) {
+      const { subject } = conversation
+      if (subject.kind !== 'line' || subject.pr !== pr || subject.path !== pathOf(subject.side)) {
+        continue
+      }
+      if (isLiveConversation(conversation))
+        askedLines.add(lineThreadKey(subject.line, subject.side))
+    }
+    return {
+      askedLines,
+      lineSubject: (line, side) => ({ kind: 'line', pr, path: pathOf(side), side, line }),
+      runLine: (line, side) => (question, history) =>
+        window.minerva.ai.askAboutLines({
+          repo,
+          number,
+          path: pathOf(side),
+          side: side === 'LEFT' ? 'old' : 'new',
+          startLine: line,
+          endLine: line,
+          question,
+          ...askContext(history),
+        }),
+      thread: {
+        subject: (thread) => ({ kind: 'thread', pr, threadId: thread.id }),
+        run: (thread) => (question, history) => {
+          const side = threadSide(thread)
+          return window.minerva.ai.askAboutLines({
+            repo,
+            number,
+            path: pathOf(side),
+            side: side === 'LEFT' ? 'old' : 'new',
+            ...threadQuestionLines(thread),
+            question,
+            ...askContext(history, threadContext(thread)),
+          })
+        },
+      },
+    }
+  }, [conversations, pr, repo, number, oldPath, file.path])
+
   // Arriving from the Comments view or a `path:line` chip: scroll to the
   // thread once its row exists. While the file is still being fetched to
   // reveal hidden lines, wait (the effect re-runs when it lands).
@@ -252,14 +305,13 @@ export function DiffView({
         </p>
         {!placingThreads &&
           unplaced.map((thread) => (
-            <div key={thread.id} id={`thread-${thread.id}`}>
-              <ThreadCard
-                thread={thread}
-                showPath={false}
-                showExcerpt
-                highlighted={thread.id === expandedThreadId}
-              />
-            </div>
+            <InlineThreadCard
+              key={thread.id}
+              thread={thread}
+              placement="above"
+              highlighted={thread.id === expandedThreadId}
+              ask={askAi.thread}
+            />
           ))}
       </div>
     ) : null
@@ -282,18 +334,7 @@ export function DiffView({
       onExpand: handleExpand,
     },
     onCreateThread: handleCreateThread,
-    // "Ask AI" on a line: the old side asks about the file as it was (its
-    // previous path when renamed), the new side about the PR head.
-    askAi: (line: number, side: LineSide, question: string) =>
-      window.minerva.ai.askAboutLines({
-        repo,
-        number,
-        path: side === 'LEFT' ? (file.previousPath ?? file.path) : file.path,
-        side: side === 'LEFT' ? 'old' : 'new',
-        startLine: line,
-        endLine: line,
-        question,
-      }),
+    askAi,
   }
 
   return (

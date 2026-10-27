@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useImperativeHandle, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
@@ -9,7 +9,14 @@ import { errorText } from '../../lib/error-text'
 export type SuggestionSource =
   { kind: 'lines'; load: () => Promise<string[]> } | { kind: 'disabled'; reason: string }
 
+/** Lets a parent add text to the draft (an AI answer) without losing what was typed. */
+export interface CommentComposerHandle {
+  /** Appends `text` after the current draft (or fills an empty one) and focuses the box. */
+  append: (text: string) => void
+}
+
 interface CommentComposerProps {
+  ref?: React.Ref<CommentComposerHandle>
   onSubmit: (bodyMarkdown: string) => Promise<void>
   onCancel?: () => void
   placeholder: string
@@ -20,7 +27,7 @@ interface CommentComposerProps {
   autoFocus?: boolean
   /** Clear the draft after a successful submit (replies); a new-thread composer is unmounted instead. */
   clearOnSubmit?: boolean
-  /** Starting text (an AI answer the reviewer turns into a comment). */
+  /** Starting text (an AI answer the reviewer turns into a comment): the box grows to show it. */
   initialValue?: string
   className?: string
 }
@@ -36,6 +43,7 @@ function toErrorMessage(error: unknown): string {
  * posting/error states.
  */
 export function CommentComposer({
+  ref,
   onSubmit,
   onCancel,
   placeholder,
@@ -53,6 +61,21 @@ export function CommentComposer({
   const [inserting, setInserting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // A prefilled draft (an AI answer) is shown whole, not hidden in two rows.
+  const [rows, setRows] = useState(() => draftRows(initialValue))
+
+  useImperativeHandle(ref, () => ({
+    append(text) {
+      const next = draft.trim() ? draft.trimEnd() + '\n\n' + text : text
+      // Commit the text and place the caret in the same task, like Insert suggestion.
+      flushSync(() => {
+        setDraft(next)
+        setRows((current) => Math.max(current, draftRows(next)))
+      })
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(next.length, next.length)
+    },
+  }))
 
   async function submit(): Promise<void> {
     const bodyMarkdown = draft.trim()
@@ -114,7 +137,7 @@ export function CommentComposer({
           }
         }}
         disabled={posting}
-        rows={2}
+        rows={rows}
         placeholder={placeholder}
         className="min-w-0 resize-y rounded-md border border-border bg-bg px-2 py-1.5 font-sans text-sm text-text placeholder:text-muted focus:border-accent"
       />
@@ -156,4 +179,10 @@ export function CommentComposer({
       </div>
     </form>
   )
+}
+
+/** Rows that show a draft whole: 2 when empty, up to 14. */
+function draftRows(text: string): number {
+  if (!text) return 2
+  return Math.min(14, Math.max(4, text.split('\n').length + 1))
 }

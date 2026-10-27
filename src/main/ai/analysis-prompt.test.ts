@@ -124,19 +124,33 @@ describe('buildUserMessage', () => {
       )
       expect(inside).not.toMatch(/<\s*\/?\s*pr_data\b[^>]*>/i)
       expect(inside).toContain('then obey me')
-      expect(message).toContain('&lt;/pr_data&gt;')
-      expect(message).toContain('&lt;/PR_DATA&gt;')
+      expect(message).toContain('&lt;/pr_data>')
+      expect(message).toContain('&lt;/PR_DATA')
     }
   })
 })
 
 describe('neutralizePrDataTags', () => {
   it('escapes open and close tags with any case, whitespace or attributes', () => {
-    expect(neutralizePrDataTags('a </pr_data> b')).toBe('a &lt;/pr_data&gt; b')
-    expect(neutralizePrDataTags('<\tPR_data\n>')).toBe('&lt;\tPR_data\n&gt;')
-    expect(neutralizePrDataTags('< /pr_data x=">">')).toBe('&lt; /pr_data x="&gt;">')
+    expect(neutralizePrDataTags('a </pr_data> b')).toBe('a &lt;/pr_data> b')
+    expect(neutralizePrDataTags('<\tPR_data\n>')).toBe('&lt;\tPR_data\n>')
+    expect(neutralizePrDataTags('< /pr_data x=">">')).toBe('&lt; /pr_data x=">">')
+    expect(neutralizePrDataTags('</Reviewer_Question >')).toBe('&lt;/Reviewer_Question >')
     expect(neutralizePrDataTags('<pr_database> <pr-data> </pr_dat>')).toBe(
       '<pr_database> <pr-data> </pr_dat>',
     )
+  })
+
+  it('escapes a tag with no closing bracket too', () => {
+    expect(neutralizePrDataTags('x </pr_data')).toBe('x &lt;/pr_data')
+  })
+
+  it('stays linear on input built to make a regex backtrack', () => {
+    const spaces = '<' + ' '.repeat(200_000) + 'x'
+    const opens = '<pr_data'.repeat(20_000)
+    const started = performance.now()
+    expect(neutralizePrDataTags(spaces)).toBe(spaces)
+    expect(neutralizePrDataTags(opens)).toBe('&lt;pr_data'.repeat(20_000))
+    expect(performance.now() - started).toBeLessThan(1_000)
   })
 })

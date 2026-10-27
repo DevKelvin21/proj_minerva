@@ -4,13 +4,13 @@ import { Plus, Sparkles } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
 import { buildInlineRows, type DiffLineKind, type InlineRow } from '../../lib/diff-parser'
 import { linePositions } from '../../lib/diff-threads'
-import { resolveNewThreadPosition } from '../../lib/line-threads'
+import { lineThreadKey, resolveNewThreadPosition } from '../../lib/line-threads'
 import { DiffLineContent } from './DiffLineContent'
 import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
-import { AskAiCard } from './AskAiCard'
+import { LineAskAiCard } from './LineAskAiCard'
 import {
   asHunk,
   KIND_BG,
@@ -76,6 +76,9 @@ export function InlineDiff({
       0,
     )
     const composerHere = openComposer?.key === rowKey ? openComposer : null
+    const asked = position
+      ? askAi?.askedLines.has(lineThreadKey(position.line, position.side))
+      : false
 
     return (
       <Fragment key={rowKey}>
@@ -96,7 +99,12 @@ export function InlineDiff({
               <button
                 type="button"
                 onClick={() =>
-                  setOpenComposer({ key: rowKey, content: row.content, kind: 'comment', ...position })
+                  setOpenComposer({
+                    key: rowKey,
+                    content: row.content,
+                    kind: 'comment',
+                    ...position,
+                  })
                 }
                 aria-label={t('comments.line.addComment')}
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
@@ -113,8 +121,15 @@ export function InlineDiff({
                   setOpenComposer({ key: rowKey, content: row.content, kind: 'ask', ...position })
                 }
                 aria-label={t('comments.askAi.button', { line: position.line })}
-                title={t('comments.askAi.buttonTitle')}
-                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
+                title={
+                  asked ? t('comments.askAi.buttonTitleActive') : t('comments.askAi.buttonTitle')
+                }
+                data-asked={asked || undefined}
+                className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded hover:text-accent ${
+                  asked
+                    ? 'text-accent'
+                    : 'text-muted opacity-0 focus:opacity-100 group-hover/row:opacity-100'
+                }`}
               >
                 <Sparkles size={11} />
               </button>
@@ -158,6 +173,7 @@ export function InlineDiff({
                     thread={thread}
                     highlighted={thread.id === model.focusedThreadId}
                     onHide={() => model.toggleHidden(key)}
+                    ask={askAi?.thread}
                   />
                 </div>
               )),
@@ -165,10 +181,10 @@ export function InlineDiff({
         {composerHere && (
           <div style={{ gridColumn: '1 / -1' }} className="min-w-0">
             {composerHere.kind === 'ask' && askAi ? (
-              <AskAiCard
+              <LineAskAiCard
+                askAi={askAi}
                 line={composerHere.line}
                 side={composerHere.side}
-                onAsk={(question) => askAi(composerHere.line, composerHere.side, question)}
                 onUseAsComment={(markdown) =>
                   setOpenComposer({ ...composerHere, kind: 'comment', draft: markdown })
                 }
