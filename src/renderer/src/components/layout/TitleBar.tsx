@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { GraduationCap, PanelLeft, Search, Settings, X } from 'lucide-react'
+import { GraduationCap, Home, PanelLeft, PanelLeftClose, Search, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
@@ -133,6 +133,10 @@ export function TitleBar(): React.JSX.Element {
   const toggleDidacticPanel = useAppStore((s) => s.toggleDidacticPanel)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
+  const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
+  const mainView = useAppStore((s) => s.mainView)
+  const goHome = useAppStore((s) => s.goHome)
   const tier = useLayoutTier()
   const [searchExpanded, setSearchExpanded] = useState(false)
 
@@ -161,14 +165,37 @@ export function TitleBar(): React.JSX.Element {
         tier.h === 'tall' ? 'h-12' : 'h-9'
       } shrink-0 items-center gap-2 border-b border-border bg-panel px-3`}
     >
-      {showDrawerToggle && (
+      {/* PR list toggle: the drawer on narrow tiers (its label is what the
+          e2e suite looks for), the hideable docked column on wide ones. */}
+      {showDrawerToggle ? (
         <IconButton
           icon={<PanelLeft size={16} />}
           label={t('layout.titleBar.prListToggle')}
           active={sidebarOpen}
           onClick={toggleSidebar}
+          aria-expanded={sidebarOpen}
+          data-testid="sidebar-toggle"
+        />
+      ) : (
+        <IconButton
+          icon={sidebarCollapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+          label={
+            sidebarCollapsed ? t('layout.titleBar.sidebarShow') : t('layout.titleBar.sidebarHide')
+          }
+          active={!sidebarCollapsed}
+          onClick={toggleSidebarCollapsed}
+          aria-expanded={!sidebarCollapsed}
+          data-testid="sidebar-toggle"
         />
       )}
+
+      <IconButton
+        icon={<Home size={16} />}
+        label={t('layout.titleBar.home')}
+        active={mainView === 'home'}
+        onClick={goHome}
+        data-testid="home-button"
+      />
 
       <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-text">
         <span aria-hidden>🦉</span>
@@ -218,12 +245,15 @@ export function TitleBar(): React.JSX.Element {
 
         <ScmConnectionIndicator showLabel={showConnectionLabel} />
 
-        <IconButton
-          icon={<GraduationCap size={16} />}
-          label={t('layout.titleBar.didacticPanel')}
-          active={didacticPanelOpen}
-          onClick={toggleDidacticPanel}
-        />
+        {/* The didactic panel only exists in the review view. */}
+        {mainView === 'review' && (
+          <IconButton
+            icon={<GraduationCap size={16} />}
+            label={t('layout.titleBar.didacticPanel')}
+            active={didacticPanelOpen}
+            onClick={toggleDidacticPanel}
+          />
+        )}
       </div>
     </header>
   )

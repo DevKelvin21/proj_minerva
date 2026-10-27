@@ -131,7 +131,7 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     await azureOrgs.saveSettings(req, nativeConfirm(event.sender), {
       save: (next) => scmRoot.settings.save(next),
       invalidateAzure: (options) => scmRoot.azure.invalidate(options),
-      invalidateStacks: () => scmRoot.stacks.invalidate(),
+      invalidateStacks: () => scmRoot.invalidateListCaches(),
     })
     return getScmSettings(scmRoot)
   })
@@ -146,6 +146,8 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
   handle('scm:setGithubAccount', async (req) => {
     settingsStore.setGithubAccount(req.login)
     ghCliAuth.invalidate()
+    // Another account sees other PRs, and `viewer` is computed against it.
+    scmRoot.invalidateListCaches()
     await ghCliAuth.getStatus()
     return getScmSettings(scmRoot)
   })
@@ -187,16 +189,31 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
       req,
       nativeConfirm(event.sender),
     )
-    if (result.outcome === 'retargeted') scmRoot.stacks.invalidate()
+    if (result.outcome === 'retargeted') scmRoot.invalidateListCaches()
     return result
   })
   handle('scm:getStacks', (req) => scmRoot.stacks.get({ refresh: req?.refresh === true }))
+  // Same `unread` decoration as `scm:listPullRequests`, applied on every call
+  // (the service caches provider data, never read state).
+  handle('scm:getDashboard', async (req) => {
+    const result = await scmRoot.dashboard.get({ refresh: req?.refresh === true })
+    return {
+      ...result,
+      pullRequests: result.pullRequests.map((pr) => ({
+        ...pr,
+        unread: seenStore.computeUnread(pr),
+      })),
+    }
+  })
 
   // Background PR watcher: lists `{ state: 'all' }` across providers on an
   // interval and pushes `prListChanged` when something changed. Not decorated
   // with `unread` (it only diffs state/updatedAt/commentCount).
   const prWatcher: PrWatcher = createPrWatcher({
     list: () => listAcrossProviders(scm, { state: 'all' }),
+    // The renderer refetches on `prListChanged`: drop the 60 s list caches
+    // first, or the dashboard/stacks would answer with the pre-change data.
+    onChanges: () => scmRoot.invalidateListCaches(),
     broadcast: broadcastPrListChanged,
     intervalMs: resolveWatchIntervalMs(),
   })

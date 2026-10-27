@@ -3,7 +3,8 @@
  * detection that does NOT depend on a capped "recent completed PRs" list.
  *
  * Per provider:
- * 1. `listStackCandidates()`: every open PR of the provider's scope.
+ * 1. `listScopePullRequests()`: every open PR of the provider's scope, read
+ *    through the scope cache shared with the dashboard (`./scope-cache.ts`).
  * 2. Candidate roots: open PRs whose base is not another open PR's head in
  *    the same repo, and not a long-lived branch (`main`, `develop`, ...).
  * 3. For each distinct (repo, base) of those: `listMergedBySourceBranch` asks
@@ -16,7 +17,8 @@
  * provider; the result says so in `orphanLookupsCapped`); a failed lookup only
  * loses that orphan hint. One failing provider lands in `errors`, the others
  * still answer. Results are cached briefly (`ttlMs`, default 60 s) and
- * dropped by `invalidate()` after a retarget or a settings change.
+ * dropped by `invalidate()` after a retarget or a settings change (which also
+ * drops the scope cache: the PRs themselves changed).
  *
  * `refresh: true` is single-flight (joins a computation in flight) and is
  * served from the cache when the last result is younger than
@@ -25,11 +27,14 @@
 import { repoKey, shortRef, type PrStack, type RepoRef } from '../../shared/scm'
 import type { GetStacksResult, ScmListError } from '../../shared/types'
 import { toScmError } from './errors'
-import type { ScmProvider } from './provider'
+import type { ScmProvider, ScopePullRequest } from './provider'
 import type { ScmRegistry } from './registry'
+import { createScopeCache, type ScopeCache } from './scope-cache'
 import { buildStacks, isDefaultLongLivedBranch, type StackInputPr } from './stacks'
 
 export interface StacksServiceOptions {
+  /** Scope listing cache; pass the one shared with the dashboard. Default: a private one. */
+  scope?: ScopeCache
   ttlMs?: number
   minRefreshMs?: number
   concurrency?: number
@@ -43,6 +48,8 @@ export interface StacksForProviderOptions {
   maxLookups?: number
   /** Called when lookups were capped. */
   onCapped?: (checked: number, total: number) => void
+  /** Where the open scope PRs come from. Default: `provider.listScopePullRequests()`. */
+  listScope?: () => Promise<ScopePullRequest[]>
 }
 
 export interface StacksService {
@@ -67,14 +74,34 @@ async function eachWithConcurrency<T>(
   await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker))
 }
 
+/** The stack-detection view of a scope PR. */
+export function scopeToStackInput({ summary, headIsFork }: ScopePullRequest): StackInputPr {
+  const input: StackInputPr = {
+    repo: summary.repo,
+    number: summary.number,
+    title: summary.title,
+    headRef: summary.headRef,
+    baseRef: summary.baseRef,
+    state: summary.state,
+    isDraft: summary.isDraft,
+    createdAt: summary.createdAt,
+  }
+  if (headIsFork) input.headIsFork = true
+  return input
+}
+
 /** Stacks of one provider (exported for tests). */
 export async function stacksForProvider(
-  provider: Pick<ScmProvider, 'listStackCandidates' | 'listMergedBySourceBranch' | 'branchExists'>,
+  provider: Pick<
+    ScmProvider,
+    'listScopePullRequests' | 'listMergedBySourceBranch' | 'branchExists'
+  >,
   options: StacksForProviderOptions = {},
 ): Promise<PrStack[]> {
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY
   const maxLookups = options.maxLookups ?? DEFAULT_MAX_ORPHAN_LOOKUPS
-  const open = (await provider.listStackCandidates()).filter((pr) => pr.state === 'open')
+  const scope = await (options.listScope ?? (() => provider.listScopePullRequests()))()
+  const open = scope.map(scopeToStackInput).filter((pr) => pr.state === 'open')
 
   const openHeads = new Set(open.map((pr) => repoKey(pr.repo) + '\n' + shortRef(pr.headRef)))
   const lookups = new Map<string, { repo: RepoRef; branch: string }>()
@@ -120,11 +147,12 @@ export function createStacksService(
   const now = options.now ?? Date.now
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY
   const maxLookups = options.maxLookups ?? DEFAULT_MAX_ORPHAN_LOOKUPS
+  const scope = options.scope ?? createScopeCache({ ttlMs, minRefreshMs, now })
   let cached: { at: number; result: GetStacksResult } | null = null
   let inFlight: Promise<GetStacksResult> | null = null
   let generation = 0
 
-  const compute = async (): Promise<GetStacksResult> => {
+  const compute = async (refresh: boolean): Promise<GetStacksResult> => {
     const providers = registry.enabled()
     let capped: { checked: number; total: number } | null = null
     const onCapped = (checked: number, total: number): void => {
@@ -135,7 +163,12 @@ export function createStacksService(
     }
     const settled = await Promise.allSettled(
       providers.map((provider) =>
-        stacksForProvider(provider, { concurrency, maxLookups, onCapped }),
+        stacksForProvider(provider, {
+          concurrency,
+          maxLookups,
+          onCapped,
+          listScope: () => scope.get(provider, { refresh }),
+        }),
       ),
     )
     const stacks: PrStack[] = []
@@ -159,7 +192,7 @@ export function createStacksService(
       // Refresh or not, join the computation in flight (invalidate() drops it).
       if (inFlight) return inFlight
       const started = generation
-      const promise = compute()
+      const promise = compute(opts.refresh === true)
         .then((result) => {
           // An invalidate() while computing means the result may predate a retarget.
           if (generation === started) cached = { at: now(), result }
@@ -175,6 +208,7 @@ export function createStacksService(
       generation++
       cached = null
       inFlight = null
+      scope.invalidate()
     },
   }
 }

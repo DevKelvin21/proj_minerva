@@ -1,12 +1,17 @@
-import { ChevronRight, Layers } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Layers } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import { prKey, shortRef, type StackNode } from '../../../../shared/scm'
 import type { PullRequestDetail } from '../../../../shared/types'
 import type { AppLocale } from '../../../../shared/locale'
 import { useLocale } from '../../i18n/use-locale'
 import { useOpenPr } from '../../hooks/use-open-pr'
+import { useHomeOpenPr } from '../../hooks/use-home-open-pr'
 import { useStacks } from '../../hooks/use-stacks'
-import { descendantsOf, locatePrInStacks } from '../../lib/stacks'
+import { descendantsOf, flattenStackNodes as flattenStack, locatePrInStacks } from '../../lib/stacks'
+import { stackPosition } from '../../lib/dashboard'
+import { useAppStore } from '../../stores/app-store'
+import { useDashboardStore } from '../../stores/dashboard-store'
+import { IconButton } from '../ui/IconButton'
 import { OrphanBadge, OrphanNotice, StackStateIcon } from './StackTree'
 
 function NodeChip({
@@ -78,7 +83,15 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
   const { t } = useTranslation()
   const { locale } = useLocale()
   const { stacks } = useStacks()
-  const { open, pendingKey, error } = useOpenPr()
+  // Chips open like the sidebar does; Previous/Next go through the dashboard's
+  // open path (marks seen in the cached answer, re-arms the navigator from the
+  // live stack).
+  const known = useDashboardStore((s) => s.result?.pullRequests)
+  const { open, pendingKey: chipPending, error: chipError } = useOpenPr(known)
+  const { openNode, pendingKey: navPending, error: navError } = useHomeOpenPr()
+  const pendingKey = chipPending ?? navPending
+  const error = chipError ?? navError
+  const stackNav = useAppStore((s) => s.stackNav)
   if (!stacks) return null
 
   const key = prKey(pr.repo, pr.number)
@@ -86,6 +99,13 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
   if (!location) return null
 
   const { stack, path, node } = location
+  // Opened from the dashboard's stack board ("Review stack" / a card): walk
+  // the stack root-first, depth-first with Previous / Next.
+  const nav = stackNav?.rootKey === stack.root.prKey ? stackPosition(stack, key) : null
+  const openKey = (target: string | null): void => {
+    const targetNode = target ? flattenStack(stack.root).find((n) => n.prKey === target) : undefined
+    if (targetNode) openNode(targetNode, stack)
+  }
   const ancestors = path.slice(0, -1)
   const descendants = descendantsOf(node)
   const directChildren = node.children
@@ -115,6 +135,35 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
           </span>
         </span>
         {orphanIsCurrent && <OrphanBadge />}
+        {nav && (
+          <span
+            role="group"
+            aria-label={t('stacks.context.navAriaLabel')}
+            data-testid="stack-nav"
+            title={t('stacks.context.reviewOrder')}
+            className="ml-auto inline-flex items-center gap-0.5 rounded-md border border-border bg-panel px-1 text-[11px] text-muted"
+          >
+            <IconButton
+              icon={<ChevronLeft size={14} />}
+              label={t('stacks.context.previous')}
+              onClick={() => openKey(nav.previous)}
+              disabled={nav.previous === null || pendingKey !== null}
+              data-testid="stack-nav-prev"
+              className="h-6 w-6"
+            />
+            <span className="px-1 font-medium tabular-nums text-text/80" data-testid="stack-nav-position">
+              {t('stacks.context.navPosition', { index: nav.index, total: nav.total })}
+            </span>
+            <IconButton
+              icon={<ChevronRight size={14} />}
+              label={t('stacks.context.next')}
+              onClick={() => openKey(nav.next)}
+              disabled={nav.next === null || pendingKey !== null}
+              data-testid="stack-nav-next"
+              className="h-6 w-6"
+            />
+          </span>
+        )}
       </div>
       <ol aria-label={t('stacks.context.mapAriaLabel')} className="flex min-w-0 flex-wrap items-center gap-1">
         {ancestors.map((ancestor) => (

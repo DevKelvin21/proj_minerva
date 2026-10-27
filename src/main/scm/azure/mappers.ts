@@ -21,7 +21,9 @@ import type {
   PrCheck,
   PrMergeStatus,
   PrComment,
+  PrLabel,
   PrReviewer,
+  PrViewerRelation,
   PullRequestState,
   PullRequestSummary,
   ReviewDecision,
@@ -182,6 +184,30 @@ export function latestDate(dates: (string | undefined | null)[]): string {
   return Number.isFinite(bestTime) ? new Date(bestTime).toISOString() : ''
 }
 
+/** Tags of a PR (Azure sends them as `labels`); inactive ones are dropped. No color on Azure. */
+export function mapLabels(pr: AzPullRequest): PrLabel[] {
+  return (pr.labels ?? [])
+    .filter((label) => label.active !== false && typeof label.name === 'string')
+    .map((label) => ({ name: label.name }))
+}
+
+/**
+ * The signed-in user's relation to a PR, by identity id (GUIDs, compared
+ * case-insensitively). Reviewer role from the user's OWN reviewer entry:
+ * `isRequired` -> `required`, else `optional`. Group/team entries never match
+ * a user id, so a required group the user belongs to does not count (the
+ * list response doesn't say who is in it).
+ */
+export function azureViewerRelation(pr: AzPullRequest, viewerId: string): PrViewerRelation {
+  const me = viewerId.toLowerCase()
+  const entry = (pr.reviewers ?? []).find((reviewer) => reviewer.id?.toLowerCase() === me)
+  return {
+    isAuthor: pr.createdBy?.id?.toLowerCase() === me,
+    reviewer: entry ? (entry.isRequired === true ? 'required' : 'optional') : null,
+    ...(entry ? { vote: mapVote(entry.vote) } : {}),
+  }
+}
+
 /**
  * @param activityDates extra timestamps known to the caller (latest
  *   iteration `createdDate`, the time a change was observed): Azure's PR
@@ -192,10 +218,12 @@ export function mapPullRequestSummary(
   pr: AzPullRequest,
   organization: string,
   activityDates: (string | undefined | null)[] = [],
+  /** The signed-in identity's id in `organization`; without it `viewer` is omitted. */
+  viewerId?: string | null,
 ): PullRequestSummary {
   const repo = mapRepo(pr.repository, organization)
   const createdAt = latestDate([pr.creationDate]) || pr.creationDate
-  return {
+  const summary: PullRequestSummary = {
     // `prKey`: globally unique even across organizations (a bare number is not).
     id: prKey(repo, pr.pullRequestId),
     number: pr.pullRequestId,
@@ -216,7 +244,11 @@ export function mapPullRequestSummary(
     additions: null,
     deletions: null,
     changedFiles: null,
+    labels: mapLabels(pr),
+    reviewers: (pr.reviewers ?? []).map(mapReviewer),
   }
+  if (viewerId) summary.viewer = azureViewerRelation(pr, viewerId)
+  return summary
 }
 
 /** PR statuses keep their history: only the latest entry per context counts. */

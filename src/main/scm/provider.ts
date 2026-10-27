@@ -33,6 +33,21 @@ export interface ListPullRequestsQuery {
   state?: PrStateFilter
 }
 
+/**
+ * One OPEN PR of a provider's scope (see `ScmProvider.listScopePullRequests`):
+ * the full summary (with `labels`, `reviewers`, `viewer` when known) plus what
+ * only stack detection needs. `headIsFork` stays in main (it never reaches the
+ * renderer: the dashboard sends `summary` only).
+ */
+export interface ScopePullRequest {
+  summary: PullRequestSummary
+  /**
+   * The head branch lives in another repository (GitHub cross-repository
+   * PR): its name says nothing about this repo's branches.
+   */
+  headIsFork?: boolean
+}
+
 export interface SnapshotRequest {
   repo: RepoRef
   headSha: string
@@ -67,11 +82,13 @@ export interface ScmProvider {
   updatePullRequestBase(repo: RepoRef, number: number, newBase: string): Promise<PullRequestSummary>
 
   /**
-   * Open PRs stacks are built from: every open PR of the configured scope
-   * (Azure: configured projects; GitHub: repos the user has PRs in), not only
-   * the ones that involve the user, so a whole chain shows up.
+   * Every OPEN PR of the configured scope (Azure: configured projects;
+   * GitHub: repos the user has open PRs in), not only the ones that involve
+   * the user, as full summaries. Feeds both stack detection (a whole chain
+   * shows up) and the home dashboard; both read it through the shared
+   * short-lived cache in `./scope-cache.ts`, so a cold scope fetch is paid once.
    */
-  listStackCandidates(): Promise<StackInputPr[]>
+  listScopePullRequests(): Promise<ScopePullRequest[]>
   /**
    * Merged PRs of `repo` whose SOURCE branch is exactly `branch` (exact
    * server-side filter, never a capped "recent" list). Feeds orphan detection.

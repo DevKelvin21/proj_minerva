@@ -11,8 +11,8 @@
  * `MINERVA_MOCK_GH_AUTH` forces a state (mock mode only, see `mockAuthOverride`).
  */
 
-/** Login the mock reports when `MINERVA_MOCK_GH_AUTH=signed_in`. */
-const MOCK_GH_LOGIN = 'mgarcia'
+/** Login the mock reports when `MINERVA_MOCK_GH_AUTH=signed_in` (the mock data's "me"). */
+const MOCK_GH_LOGIN = MOCK_GITHUB_LOGIN
 
 function mockGhStatus(override: MockAuthOverride): ScmAuthStatus {
   if (override === 'signed_in') {
@@ -38,6 +38,7 @@ import { isMockScmMode, mockAuthOverride, type MockAuthOverride } from '../mock-
 import type { ScmDataSource, ScmProvider } from '../provider'
 import { ghCliAuth } from './gh-cli-auth'
 import { withGhCliTokenRetry } from './gh-retry'
+import { MOCK_GITHUB_LOGIN } from './fixtures'
 import { MockGithubService } from './mock-service'
 import { RealGithubService } from './real-service'
 
@@ -62,7 +63,9 @@ export function createGithubProvider(): ScmProvider {
     branchExists: (repo, branch) => data.branchExists(repo, branch),
     updatePullRequestBase: (repo, number, newBase) =>
       data.updatePullRequestBase(repo, number, newBase),
-    listStackCandidates: () => data.listStackCandidates(),
+    // A forced signed-out mock lists nothing here either (stacks, dashboard).
+    listScopePullRequests: () =>
+      listError ? Promise.reject(listError) : data.listScopePullRequests(),
     listMergedBySourceBranch: (repo, branch) => data.listMergedBySourceBranch(repo, branch),
   }
 }

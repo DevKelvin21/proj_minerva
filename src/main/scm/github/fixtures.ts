@@ -2,6 +2,12 @@
  * Fixtures del universo mock "shopwave": 8 PRs repartidos en 3 repos, con
  * archivos (`DiffFile`, patches unified válidos) e hilos de comentarios.
  *
+ * The mock's signed-in user is `mgarcia` (`MOCK_GITHUB_LOGIN`, also what
+ * `MINERVA_MOCK_GH_AUTH=signed_in` reports). Open PRs by relation (home
+ * dashboard): author of api#482, api#470, checkout-service#74; review
+ * requested on api#479, checkout-service#77, web#201; uninvolved in web#198,
+ * web#190. Label `endpoint` spans api + checkout-service (both open).
+ *
  * Migrado desde `src/renderer/src/mocks/pull-requests.ts` (T3) a `main` (T4):
  * la fuente de verdad de datos de PRs ahora vive en el proceso principal y se
  * sirve al renderer vía IPC (`MockGithubService` en `./mock-service.ts`).
@@ -24,6 +30,9 @@ const mgarcia: UserRef = {
   login: 'mgarcia',
   avatarUrl: 'https://avatars.githubusercontent.com/u/1001?v=4',
 }
+
+/** The mock universe's signed-in user ("me"). */
+export const MOCK_GITHUB_LOGIN = mgarcia.login
 const jrivas: UserRef = {
   login: 'jrivas',
   avatarUrl: 'https://avatars.githubusercontent.com/u/1002?v=4',
@@ -355,7 +364,7 @@ export const prFixtures: PrFixture[] = [
       bodyMarkdown:
         '## Qué hace\n\nReemplaza la máquina de estados ad-hoc de checkout por un reducer puro + `useReducer`. Sin cambios de comportamiento visible, solo refactor interno para poder testear las transiciones sin montar la UI. También se renombra `checkout-types.ts` a `checkout-state.ts` y se convierte `CheckoutValidator` (clase con estado mutable) en funciones puras de validación.',
       labels: [{ name: 'refactor', color: '64748b' }],
-      reviewers: [reviewer(sfontaine, 'approved')],
+      reviewers: [reviewer(sfontaine, 'approved'), reviewer(mgarcia)],
       commits: 6,
     },
     files: [

@@ -44,6 +44,12 @@ export interface PrWatcherDeps {
   list: () => Promise<WatcherListResult>
   /** Pushes `prListChanged` to every window; no-op when there are none. */
   broadcast: (event: PrListChangedEvent) => void
+  /**
+   * Called with the changes right BEFORE `broadcast`, so caches the
+   * renderer's refetch would hit (dashboard, scope, stacks) are dropped first.
+   * A throw here never blocks the broadcast.
+   */
+  onChanges?: (event: PrListChangedEvent) => void
   /** Nominal interval between successful ticks (ms). Default 60s. */
   intervalMs?: number
 }
@@ -169,7 +175,15 @@ export function createPrWatcher(deps: PrWatcherDeps): PrWatcher {
         for (const [key, pr] of snapshot) {
           if (failed.has(pr.repo.provider) && !nextSnapshot.has(key)) nextSnapshot.set(key, pr)
         }
-        if (changes.length > 0) deps.broadcast({ changes })
+        if (changes.length > 0) {
+          const event = { changes }
+          try {
+            deps.onChanges?.(event)
+          } catch (error) {
+            console.warn('[pr-watcher] onChanges failed:', error)
+          }
+          deps.broadcast(event)
+        }
       }
       // First tick establishes the baseline silently (no broadcast).
       if (snapshot || result.okProviders.length > 0) snapshot = nextSnapshot

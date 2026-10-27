@@ -661,6 +661,26 @@ describe('payloadValidators', () => {
     })
   })
 
+  describe('scm:getDashboard', () => {
+    const validate = payloadValidators['scm:getDashboard']
+    it('accepts nothing or { refresh: boolean }', () => {
+      expect(validate(undefined)).toBe(true)
+      expect(validate({})).toBe(true)
+      expect(validate({ refresh: true })).toBe(true)
+      expect(validate({ refresh: false })).toBe(true)
+    })
+
+    it('rejects anything else', () => {
+      expect(validate(null)).toBe(false)
+      expect(validate('refresh')).toBe(false)
+      expect(validate([])).toBe(false)
+      expect(validate({ refresh: 'yes' })).toBe(false)
+      expect(validate({ refresh: 1 })).toBe(false)
+      expect(validate({ refresh: true, provider: 'github' })).toBe(false)
+      expect(validate(Object.create({ refresh: true }))).toBe(false)
+    })
+  })
+
   describe('scm:setProviderSettings', () => {
     const validate = payloadValidators['scm:setProviderSettings']
     const azure = {
@@ -757,7 +777,9 @@ describe('payloadValidators', () => {
         colors,
       }))
       expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, customThemes: many })).toBe(false)
-      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, customThemes: many.slice(0, 64) })).toBe(true)
+      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, customThemes: many.slice(0, 64) })).toBe(
+        true,
+      )
     })
   })
 

@@ -101,6 +101,58 @@ describe('createPrWatcher', () => {
     watcher.stop()
   })
 
+  it('calls onChanges right before broadcast, only when something changed', async () => {
+    const prA = makeSummary({ id: 'shopwave/api#1', number: 1 })
+    const prB = makeSummary({ id: 'shopwave/api#2', number: 2, title: 'PR nuevo' })
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce(ok([prA]))
+      .mockResolvedValueOnce(ok([prA]))
+      .mockResolvedValueOnce(ok([prA, prB]))
+    const order: string[] = []
+    const onChanges = vi.fn(() => order.push('invalidate'))
+    const broadcast = vi.fn(() => order.push('broadcast'))
+    const watcher = createPrWatcher({ list, broadcast, onChanges, intervalMs: 1000 })
+
+    watcher.start()
+    await vi.advanceTimersByTimeAsync(0) // baseline: nothing
+    await vi.advanceTimersByTimeAsync(1000) // no change: nothing
+    expect(onChanges).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1000) // new PR
+    expect(order).toEqual(['invalidate', 'broadcast'])
+    const event = {
+      changes: [
+        { type: 'new_pr', prKey: key(prB), number: prB.number, title: prB.title, repo: prB.repo },
+      ],
+    }
+    expect(onChanges).toHaveBeenCalledWith(event)
+    expect(broadcast).toHaveBeenCalledWith(event)
+
+    watcher.stop()
+  })
+
+  it('a failing onChanges never blocks the broadcast', async () => {
+    const prA = makeSummary({ id: 'shopwave/api#1', number: 1 })
+    const prB = makeSummary({ id: 'shopwave/api#2', number: 2 })
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce(ok([prA]))
+      .mockResolvedValueOnce(ok([prA, prB]))
+    const broadcast = vi.fn()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const onChanges = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const watcher = createPrWatcher({ list, broadcast, onChanges, intervalMs: 1000 })
+
+    watcher.start()
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(broadcast).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+    watcher.stop()
+  })
+
   it('detecta cierre (open -> closed): pr_closed', async () => {
     const open = makeSummary({ state: 'open' })
     const closed = makeSummary({ state: 'closed' })

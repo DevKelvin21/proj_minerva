@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AzureRepoRef } from '../../../shared/scm'
 import type { AzChangeEntry, AzPullRequest, AzThread } from './api-types'
 import {
+  azureViewerRelation,
   isThreadOutdated,
   mapChangeEntry,
   mapChangeStatus,
@@ -91,7 +92,99 @@ describe('mapPullRequestSummary', () => {
       additions: null,
       deletions: null,
       changedFiles: null,
+      labels: [],
+      reviewers: [
+        {
+          user: { login: 'grace@contoso.example', displayName: 'Grace' },
+          vote: 'changes_requested',
+          isRequired: true,
+        },
+        { user: { login: 'Team', displayName: 'Team' }, vote: 'none', isRequired: false },
+      ],
     })
+  })
+
+  it('maps active tags to labels (no color on Azure)', () => {
+    const pr = mapPullRequestSummary(
+      rawPr({
+        labels: [
+          { id: 'l1', name: 'checkout-v2' },
+          { id: 'l2', name: 'old', active: false },
+          { id: 'l3', name: 'api', active: true },
+        ],
+      }),
+      'Contoso',
+    )
+    expect(pr.labels).toEqual([{ name: 'checkout-v2' }, { name: 'api' }])
+  })
+
+  it('omits viewer without an identity, and computes it with one', () => {
+    expect(mapPullRequestSummary(rawPr(), 'Contoso').viewer).toBeUndefined()
+    expect(mapPullRequestSummary(rawPr(), 'Contoso', [], null).viewer).toBeUndefined()
+    // Author (GUIDs compare case-insensitively).
+    expect(mapPullRequestSummary(rawPr(), 'Contoso', [], 'U1').viewer).toEqual({
+      isAuthor: true,
+      reviewer: null,
+    })
+    // Required reviewer.
+    expect(mapPullRequestSummary(rawPr(), 'Contoso', [], 'u2').viewer).toEqual({
+      isAuthor: false,
+      reviewer: 'required',
+      vote: 'changes_requested',
+    })
+    // Uninvolved.
+    expect(mapPullRequestSummary(rawPr(), 'Contoso', [], 'u9').viewer).toEqual({
+      isAuthor: false,
+      reviewer: null,
+    })
+  })
+})
+
+describe('azureViewerRelation', () => {
+  it('optional reviewer, author reviewing their own PR, and groups', () => {
+    const optional = rawPr({
+      reviewers: [{ id: 'u3', displayName: 'Linus', vote: 0 }],
+    })
+    expect(azureViewerRelation(optional, 'u3')).toEqual({
+      isAuthor: false,
+      reviewer: 'optional',
+      vote: 'none',
+    })
+    const explicit = rawPr({
+      reviewers: [{ id: 'u3', displayName: 'Linus', vote: 0, isRequired: false }],
+    })
+    expect(azureViewerRelation(explicit, 'u3').reviewer).toBe('optional')
+    const selfReview = rawPr({
+      reviewers: [{ id: 'u1', displayName: 'Ada', vote: 10, isRequired: true }],
+    })
+    expect(azureViewerRelation(selfReview, 'u1')).toEqual({
+      isAuthor: true,
+      reviewer: 'required',
+      vote: 'approved',
+    })
+    // A required GROUP the user may belong to does not make them a reviewer.
+    expect(azureViewerRelation(rawPr(), 'u9').reviewer).toBeNull()
+    // ...unless the id is theirs.
+    expect(azureViewerRelation(rawPr(), 't1')).toEqual({
+      isAuthor: false,
+      reviewer: 'optional',
+      vote: 'none',
+    })
+    // Uninvolved: no vote field at all.
+    expect(azureViewerRelation(rawPr(), 'u9')).toEqual({ isAuthor: false, reviewer: null })
+  })
+
+  it('carries the user own vote: required with vote 10 reads approved', () => {
+    const approved = rawPr({
+      reviewers: [{ id: 'u3', displayName: 'Linus', vote: 10, isRequired: true }],
+    })
+    expect(azureViewerRelation(approved, 'u3')).toEqual({
+      isAuthor: false,
+      reviewer: 'required',
+      vote: 'approved',
+    })
+    const rejected = rawPr({ reviewers: [{ id: 'u3', displayName: 'Linus', vote: -10 }] })
+    expect(azureViewerRelation(rejected, 'u3').vote).toBe('rejected')
   })
 
   it('maps reviewers to the neutral shape (no avatar URL: Azure avatars need the credential)', () => {

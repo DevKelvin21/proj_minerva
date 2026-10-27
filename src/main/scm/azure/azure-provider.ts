@@ -29,7 +29,13 @@
  * So a push is dated exactly (even if it happened while the app was closed),
  * and votes/edits are dated when the list first reflects them.
  * `commentCount` is `null` in the list (counting would cost a threads call
- * per PR on every poll).
+ * per PR on every poll). Scope listings (`listScopePullRequests`, every active
+ * PR of the configured projects) do NOT look up the last push: that would be
+ * one iterations call per PR. Their `updatedAt` uses what the tracker already
+ * knows, else the creation date.
+ *
+ * Summaries carry `labels` (tags), `reviewers` (with `isRequired`) and
+ * `viewer`, computed against the org's `connectionData` identity id.
  */
 import { randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -59,7 +65,12 @@ import type {
 import { AZURE_GUID_RE, isAzureRepoRef } from '../../../shared/scm-guards'
 import { ScmError, toScmError } from '../errors'
 import { mt } from '../../i18n'
-import type { ListPullRequestsQuery, ScmProvider, SnapshotRequest } from '../provider'
+import type {
+  ListPullRequestsQuery,
+  ScmProvider,
+  ScopePullRequest,
+  SnapshotRequest,
+} from '../provider'
 import type { StackInputPr } from '../stacks'
 import type {
   AzComment,
@@ -581,13 +592,13 @@ export class AzureScmProvider implements ScmProvider {
     }
     const prs = [...byKey.values()]
     await this.observeActivity(org, prs)
-    return prs.map((pr) => this.summarize(pr, org))
+    return prs.map((pr) => this.summarize(pr, org, me.id))
   }
 
-  /** Summary with the derived `updatedAt` (see the file header). */
-  private summarize(pr: AzPullRequest, org: string): PullRequestSummary {
+  /** Summary with the derived `updatedAt` (see the file header) and the viewer relation. */
+  private summarize(pr: AzPullRequest, org: string, viewerId: string | null): PullRequestSummary {
     const entry = this.activity.get(keyOf(pr, org))
-    return mapPullRequestSummary(pr, org, [entry?.iterationDate, entry?.changedAt])
+    return mapPullRequestSummary(pr, org, [entry?.iterationDate, entry?.changedAt], viewerId)
   }
 
   /** Updates the activity tracker; fetches the last push date of open PRs whose head is new to us. */
@@ -1130,16 +1141,24 @@ export class AzureScmProvider implements ScmProvider {
       this.repoUrl(repo, 'pullrequests', number),
       { method: 'PATCH', body: { targetRefName: 'refs/heads/' + shortRef(newBase) } },
     )
-    return this.summarize(updated, repo.organization)
+    const me = await this.identity(repo.organization).catch(() => null)
+    return this.summarize(updated, repo.organization, me?.id ?? null)
   }
 
   // -------------------------------------------------------------------------
   // Stacks
   // -------------------------------------------------------------------------
 
-  async listStackCandidates(): Promise<StackInputPr[]> {
-    const out: StackInputPr[] = []
+  /**
+   * Every active PR of every configured project (capped per project at
+   * `STACK_CANDIDATES_MAX`), as full summaries. Orgs in sequence; a failing
+   * org fails the listing (the caller reports it per provider).
+   */
+  async listScopePullRequests(): Promise<ScopePullRequest[]> {
+    const out: ScopePullRequest[] = []
     for (const entry of this.organizations()) {
+      // Best-effort: without the identity, summaries just carry no `viewer`.
+      const me = await this.identity(entry.organization).catch(() => null)
       const lists = await Promise.all(
         entry.projects.map((project) =>
           this.listLimit(() =>
@@ -1155,7 +1174,9 @@ export class AzureScmProvider implements ScmProvider {
           ),
         ),
       )
-      for (const pr of lists.flat()) out.push(toStackInput(pr, entry.organization))
+      for (const pr of lists.flat()) {
+        out.push({ summary: this.summarize(pr, entry.organization, me?.id ?? null) })
+      }
     }
     return out
   }

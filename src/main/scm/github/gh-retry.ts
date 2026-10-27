@@ -55,7 +55,7 @@ export function withGhCliTokenRetry(inner: ScmDataSource): ScmDataSource {
     branchExists: (repo, branch) => guarded(() => inner.branchExists(repo, branch)),
     updatePullRequestBase: (repo, number, newBase) =>
       guarded(() => inner.updatePullRequestBase(repo, number, newBase)),
-    listStackCandidates: () => guarded(() => inner.listStackCandidates()),
+    listScopePullRequests: () => guarded(() => inner.listScopePullRequests()),
     listMergedBySourceBranch: (repo, branch) =>
       guarded(() => inner.listMergedBySourceBranch(repo, branch)),
   }

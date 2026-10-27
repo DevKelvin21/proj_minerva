@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
+import { ChevronRight, Home } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { usePullRequestDetail } from '../../hooks/use-pull-request-detail'
@@ -10,8 +11,12 @@ import { ConversationTab } from '../pr-detail/ConversationTab'
 import { FilesTab } from '../pr-detail/FilesTab'
 import { CommentsTab } from '../pr-detail/CommentsTab'
 import { EmptyState } from '../ui/EmptyState'
-import { isThreadOpen, prKey, type RepoRef } from '../../../../shared/scm'
-import type { PullRequestDetail } from '../../../../shared/types'
+import { ScmProviderIcon } from '../ui/ScmProviderIcon'
+import { isThreadOpen, prKey, repoKey, type RepoRef } from '../../../../shared/scm'
+import type { PullRequestDetail, PullRequestSummary } from '../../../../shared/types'
+import { useDashboardStore } from '../../stores/dashboard-store'
+import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
+import { buildFeatureGroups } from '../../lib/dashboard'
 
 function TabButton({
   active,
@@ -36,6 +41,83 @@ function TabButton({
   )
 }
 
+/**
+ * Slim "Home › repo/feature › #n" trail above the PR: the way back to the
+ * dashboard page the PR was opened from (`homeRoute` is kept while the
+ * review is on screen). The crumb for the page is only shown when the PR
+ * belongs to it, so a PR picked from the sidebar does not claim a repo page
+ * it never came from.
+ */
+function ReviewBreadcrumb({ pr }: { pr: PullRequestSummary }): React.JSX.Element {
+  const { t } = useTranslation()
+  const route = useAppStore((s) => s.homeRoute)
+  const goHome = useAppStore((s) => s.goHome)
+  const navigateHome = useAppStore((s) => s.navigateHome)
+  const { pullRequests } = useDashboard()
+  const featureNames = useDashboardStore((s) => s.featureNames)
+  const identity = useViewerIdentity()
+
+  let pageCrumb: { label: ReactNode; text: string; onClick: () => void } | null = null
+  if (route.kind === 'repo' && route.repoKey === repoKey(pr.repo)) {
+    pageCrumb = {
+      label: (
+        <span className="inline-flex min-w-0 items-center gap-1">
+          <ScmProviderIcon provider={pr.repo.provider} size={11} />
+          <span className="truncate">{pr.repo.fullName}</span>
+        </span>
+      ),
+      text: pr.repo.fullName,
+      onClick: () => navigateHome(route),
+    }
+  } else if (route.kind === 'feature') {
+    const key = prKey(pr.repo, pr.number)
+    const group = buildFeatureGroups(pullRequests ?? [], featureNames, identity).find(
+      (item) =>
+        item.key === route.featureKey &&
+        item.repos.some((repo) => repo.pullRequests.some((p) => prKey(p.repo, p.number) === key)),
+    )
+    if (group) {
+      const text = t('review.feature', { name: group.name })
+      pageCrumb = { label: text, text, onClick: () => navigateHome(route) }
+    }
+  }
+
+  return (
+    <nav
+      aria-label={t('review.breadcrumbAriaLabel')}
+      data-testid="review-breadcrumb"
+      className="flex min-w-0 shrink-0 items-center gap-1 border-b border-border bg-panel/60 px-3 py-1 text-xs"
+    >
+      <button
+        type="button"
+        onClick={goHome}
+        title={t('review.backToHome')}
+        className="inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-muted transition-colors duration-150 hover:text-text"
+      >
+        <Home size={12} aria-hidden />
+        {t('review.home')}
+      </button>
+      {pageCrumb && (
+        <>
+          <ChevronRight size={11} className="shrink-0 text-muted/60" aria-hidden />
+          <button
+            type="button"
+            onClick={pageCrumb.onClick}
+            title={pageCrumb.text}
+            className="min-w-0 truncate rounded px-1 py-0.5 text-muted transition-colors duration-150 hover:text-text"
+          >
+            {pageCrumb.label}
+          </button>
+        </>
+      )}
+      <ChevronRight size={11} className="shrink-0 text-muted/60" aria-hidden />
+      <span className="shrink-0 font-mono text-text/80" aria-current="page">
+        #{pr.number}
+      </span>
+    </nav>
+  )
+}
+
 export function CenterPane(): React.JSX.Element {
   const { t } = useTranslation()
   const selectedPr = useAppStore((s) => s.selectedPr)
@@ -54,11 +136,14 @@ export function CenterPane(): React.JSX.Element {
   // Remounted per PR: every per-PR hook starts clean, and nothing is asked of
   // main until there IS a PR (no placeholder repo, no "invalid payload").
   return (
-    <PrDetailPane
-      key={prKey(selectedPr.repo, selectedPr.number)}
-      repo={selectedPr.repo}
-      number={selectedPr.number}
-    />
+    <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-bg">
+      <ReviewBreadcrumb pr={selectedPr} />
+      <PrDetailPane
+        key={prKey(selectedPr.repo, selectedPr.number)}
+        repo={selectedPr.repo}
+        number={selectedPr.number}
+      />
+    </section>
   )
 }
 
@@ -68,9 +153,9 @@ function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): Reac
 
   if (error) {
     return (
-      <section className="flex flex-1 flex-col bg-bg">
+      <div className="flex min-h-0 flex-1 flex-col">
         <EmptyState title={t('layout.center.loadFailed')} hint={error} />
-      </section>
+      </div>
     )
   }
 
@@ -80,9 +165,9 @@ function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): Reac
     detail !== null && prKey(detail.repo, detail.number) === prKey(repo, number)
   if (!detail || !detailIsCurrent) {
     return (
-      <section className="flex flex-1 flex-col bg-bg">
+      <div className="flex min-h-0 flex-1 flex-col">
         <EmptyState title={t('layout.center.loading')} hint={`${repo.fullName}#${number}`} />
-      </section>
+      </div>
     )
   }
 
@@ -134,7 +219,7 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
 
   return (
     <ThreadActionsContext.Provider value={actions}>
-      <section className="flex min-w-0 flex-1 flex-col overflow-hidden bg-bg">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <PrHeader pr={detail} />
         <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-3">
           <TabButton
@@ -186,7 +271,7 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
             />
           )}
         </div>
-      </section>
+      </div>
     </ThreadActionsContext.Provider>
   )
 }

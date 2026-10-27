@@ -29,7 +29,7 @@ function fakeProvider(id: ScmProviderId, overrides: Partial<ScmProvider> = {}): 
     getFileContent: notUsed,
     branchExists: notUsed,
     updatePullRequestBase: notUsed,
-    listStackCandidates: notUsed,
+    listScopePullRequests: notUsed,
     listMergedBySourceBranch: notUsed,
     ...overrides,
   }

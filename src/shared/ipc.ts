@@ -14,6 +14,7 @@ import type {
   DidacticAnalysis,
   DiffFile,
   FileContentRequest,
+  DashboardResult,
   GetStacksResult,
   GhAccount,
   ListPullRequestsResult,
@@ -146,6 +147,12 @@ export interface IpcContract {
    * the PRs that involve you.
    */
   'scm:getStacks': { req: { refresh?: boolean } | void; res: GetStacksResult }
+  /**
+   * Home dashboard data (see `DashboardResult`). Cached briefly in main and
+   * shares the scope fetch with `scm:getStacks`; `{ refresh: true }` skips the
+   * cache (throttled like `scm:getStacks`).
+   */
+  'scm:getDashboard': { req: { refresh?: boolean } | void; res: DashboardResult }
 
   'ai:analyzePullRequest': { req: { repo: RepoRef; number: number }; res: DidacticAnalysis }
   /**
@@ -338,6 +345,7 @@ export const IPC_CHANNELS = [
   'scm:getFileContent',
   'scm:retarget',
   'scm:getStacks',
+  'scm:getDashboard',
   'ai:analyzePullRequest',
   'ai:getCachedAnalysis',
   'ai:invalidateAnalysis',
