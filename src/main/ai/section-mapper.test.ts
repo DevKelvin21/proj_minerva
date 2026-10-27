@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mapRawSection, mapSnippet } from './section-mapper'
+import { mapRawSection, mapSnippet, parseFileRefs } from './section-mapper'
 
 describe('mapRawSection', () => {
   it('mapea una sección summary válida', () => {
@@ -159,5 +159,58 @@ describe('mapRawSection', () => {
     expect(mapRawSection('x')).toBeNull()
     expect(mapRawSection([1, 2])).toBeNull()
     expect(mapRawSection(42)).toBeNull()
+  })
+})
+
+describe('parseFileRefs', () => {
+  it('parses paths with and without ranges, merging a repeated path', () => {
+    expect(parseFileRefs('src/a.ts:12-40,55; src/b.ts ;src/a.ts:60')).toEqual([
+      { path: 'src/a.ts', ranges: [{ start: 12, end: 40 }, { start: 55, end: 55 }, { start: 60, end: 60 }] },
+      { path: 'src/b.ts', ranges: [] },
+    ])
+  })
+
+  it('keeps a colon that is not followed by ranges as part of the path, and fixes reversed ranges', () => {
+    expect(parseFileRefs('C:/weird/path.ts;x.ts:9-3')).toEqual([
+      { path: 'C:/weird/path.ts', ranges: [] },
+      { path: 'x.ts', ranges: [{ start: 3, end: 9 }] },
+    ])
+  })
+
+  it('skips empty entries and zero/negative lines', () => {
+    expect(parseFileRefs(';;a.ts:0-5,2')).toEqual([{ path: 'a.ts', ranges: [{ start: 2, end: 2 }] }])
+  })
+})
+
+describe('mapRawSection · walkthrough', () => {
+  it('maps valid layers into cohorts and tolerates an empty intro', () => {
+    const section = mapRawSection({
+      kind: 'walkthrough',
+      markdown: '',
+      layers: [
+        { cohort: 'A', title: 'one', files: [{ path: 'a.ts', ranges: [] }], markdown: 'm', mermaid: 'flowchart TD\n' },
+        { cohort: 'A', title: 'two', files: [{ path: 'b.ts', ranges: [{ start: 1, end: 2 }] }], markdown: '' },
+        { cohort: '', title: 'three', files: [{ path: 'c.ts', ranges: [] }], markdown: '' },
+      ],
+    })
+    expect(section).toEqual({
+      kind: 'walkthrough',
+      markdown: '',
+      cohorts: [
+        {
+          title: 'A',
+          layers: [
+            { title: 'one', markdown: 'm', files: [{ path: 'a.ts', ranges: [] }], mermaid: 'flowchart TD\n' },
+            { title: 'two', markdown: '', files: [{ path: 'b.ts', ranges: [{ start: 1, end: 2 }] }] },
+          ],
+        },
+        { title: '', layers: [{ title: 'three', markdown: '', files: [{ path: 'c.ts', ranges: [] }] }] },
+      ],
+    })
+  })
+
+  it('rejects a walkthrough without layers array or with no valid layer', () => {
+    expect(mapRawSection({ kind: 'walkthrough', markdown: 'x' })).toBeNull()
+    expect(mapRawSection({ kind: 'walkthrough', markdown: 'x', layers: [{ title: 'no files', files: [] }] })).toBeNull()
   })
 })

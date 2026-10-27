@@ -318,8 +318,52 @@ export interface DidacticSnippet {
   code: string
 }
 
+/** Inclusive line range of a layer inside one file (see `WalkthroughFileRef`). */
+export interface WalkthroughLineRange {
+  start: number
+  end: number
+}
+
+/**
+ * One file a walkthrough layer anchors to. `ranges` are line numbers on the
+ * side the reviewer reads: the NEW file (RIGHT side of the diff) for added,
+ * modified and renamed files, the OLD file (LEFT side) for removed files.
+ * An empty `ranges` means "the whole file" (the model referenced it without
+ * lines, or the file is binary/renamed).
+ */
+export interface WalkthroughFileRef {
+  path: string
+  ranges: WalkthroughLineRange[]
+}
+
+/**
+ * One step of the guided walkthrough: a title, the files (and line ranges)
+ * it covers, a short AI summary and, only when the structure warrants it, a
+ * Mermaid diagram (sequence, state, ER, flowchart). Always has at least one
+ * file after validation (`main/ai/section-mapper.ts`).
+ */
+export interface WalkthroughLayer {
+  title: string
+  markdown: string
+  files: WalkthroughFileRef[]
+  mermaid?: string
+}
+
+/** An independent group of related layers, in reading order. */
+export interface WalkthroughCohort {
+  title: string
+  layers: WalkthroughLayer[]
+}
+
 export type DidacticSection =
   | ({ kind: 'summary' } & DidacticSectionCommon)
+  /**
+   * Guided walkthrough (Change Stack): the PR reorganized from a flat file
+   * list into cohorts of ordered layers, each anchored to line ranges of the
+   * diff. `markdown` is an optional intro (may be empty, unlike the other
+   * kinds). The Files tab renders it as the "Layers" navigator.
+   */
+  | ({ kind: 'walkthrough'; cohorts: WalkthroughCohort[] } & DidacticSectionCommon)
   | ({ kind: 'setup'; snippets: DidacticSnippet[] } & DidacticSectionCommon)
   | ({ kind: 'architecture'; mermaid: string } & DidacticSectionCommon)
   | ({ kind: 'endpoint'; snippets: DidacticSnippet[] } & DidacticSectionCommon)

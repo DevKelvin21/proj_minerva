@@ -67,6 +67,45 @@ const pr482Sections: DidacticSection[] = [
       '- Que toda la validación viva en `CouponService` y no se duplique en el handler de la ruta.',
   },
   {
+    kind: 'walkthrough',
+    markdown:
+      'Leé primero el servicio nuevo (es dueño de las reglas de negocio), después la ruta que lo expone y por último el test que fija el caso del cupón vencido.',
+    cohorts: [
+      {
+        title: 'Endpoint apply-coupon',
+        layers: [
+          {
+            title: 'Servicio de validación de cupones',
+            markdown:
+              '`CouponService.apply` es el núcleo del PR: busca el cupón, rechaza los vencidos o ya aplicados con un `reason`, y recalcula el total con `discountRate`. El resto del PR solo cablea esta función.',
+            files: [{ path: 'src/services/coupon-service.ts', ranges: [{ start: 3, end: 7 }, { start: 9, end: 21 }] }],
+          },
+          {
+            title: 'Cableado de la ruta y mapeo HTTP',
+            markdown:
+              '`registerCartRoutes` suma `POST /carts/:id/apply-coupon`; el handler carga el carrito, delega en el servicio y mapea `result.ok` a 200 o 409. Ojo: todavía no hay validación de entrada sobre `req.body.code`.',
+            files: [{ path: 'src/routes/carts.ts', ranges: [{ start: 13, end: 13 }, { start: 20, end: 27 }] }],
+            mermaid:
+              'sequenceDiagram\n' +
+              '  participant C as Cliente\n' +
+              '  participant R as router de carts\n' +
+              '  participant S as CouponService\n' +
+              '  C->>R: POST /carts/:id/apply-coupon\n' +
+              '  R->>S: apply(cart, code)\n' +
+              '  S-->>R: { ok, total, reason? }\n' +
+              '  R-->>C: 200 o 409\n',
+          },
+          {
+            title: 'Test unitario del caso vencido',
+            markdown:
+              'Un caso de Vitest cubre el cupón vencido. La rama `already_applied` y el camino feliz todavía no tienen test: vale la pena pedirlos antes de mergear.',
+            files: [{ path: 'src/services/coupon-service.test.ts', ranges: [{ start: 4, end: 9 }] }],
+          },
+        ],
+      },
+    ],
+  },
+  {
     kind: 'setup',
     markdown:
       '## Cómo probar este PR\n\n' +
@@ -175,6 +214,35 @@ const pr479Sections: DidacticSection[] = [
       '— confirmar que todo camino que crea un `Refund` pasa por ese recálculo.',
   },
   {
+    kind: 'walkthrough',
+    markdown: '',
+    cohorts: [
+      {
+        title: 'Modelo de datos de reembolsos',
+        layers: [
+          {
+            title: 'Migración: la tabla refunds',
+            markdown:
+              'Migración aditiva: `refunds` referencia `orders` y `order_lines`, con un CHECK de monto positivo y un índice por `order_id`. No altera nada existente, así que se puede desplegar antes del feature flag.',
+            files: [{ path: 'migrations/2026070401_create_refunds.sql', ranges: [{ start: 1, end: 10 }] }],
+          },
+          {
+            title: 'Modelo de dominio Refund',
+            markdown:
+              'El espejo TypeScript de la tabla. `amountCents` es entero; conviene verificar que en la práctica no pase `Number.MAX_SAFE_INTEGER`.',
+            files: [{ path: 'src/models/refund.ts', ranges: [{ start: 1, end: 8 }] }],
+          },
+          {
+            title: 'Order aprende su monto reembolsado',
+            markdown:
+              '`Order.refundedAmount` es un campo desnormalizado que recalcula el mismo servicio que crea un `Refund` (sin trigger de base de datos). Todo camino que cree un reembolso tiene que pasar por ese recálculo.',
+            files: [{ path: 'src/models/order.ts', ranges: [{ start: 24, end: 25 }] }],
+          },
+        ],
+      },
+    ],
+  },
+  {
     kind: 'setup',
     markdown:
       '## Cómo probar este PR\n\n' +
@@ -250,6 +318,62 @@ const pr201Sections: DidacticSection[] = [
       '`CheckoutValidator.validateCart/validateShipping/validatePayment` por separado.',
   },
   {
+    kind: 'walkthrough',
+    markdown:
+      'Dos hilos de trabajo independientes: la máquina de estados pasa a ser un reducer, y la clase validadora pasa a funciones puras. Cada uno se puede revisar por separado.',
+    cohorts: [
+      {
+        title: 'De máquina de estados a reducer',
+        layers: [
+          {
+            title: 'El reducer puro de checkout',
+            markdown:
+              '`checkoutReducer` codifica las transiciones como un `switch` sobre el estado actual. Compará contra la clase vieja: la transición `payment -> confirmation` no aparece en el diff.',
+            files: [{ path: 'src/features/checkout/checkout-reducer.ts', ranges: [{ start: 1, end: 12 }] }],
+            mermaid:
+              'stateDiagram-v2\n' +
+              '  [*] --> cart\n' +
+              '  cart --> shipping: CONTINUE\n' +
+              '  shipping --> payment: CONTINUE\n' +
+              '  shipping --> cart: otro evento\n' +
+              '  payment --> confirmation: falta en el diff\n',
+          },
+          {
+            title: 'CheckoutPage pasa a useReducer',
+            markdown:
+              'La página reemplaza la instancia memoizada de `CheckoutMachine` por `useReducer(checkoutReducer, \'cart\')`; `dispatch` baja por prop por ahora.',
+            files: [{ path: 'src/features/checkout/CheckoutPage.tsx', ranges: [{ start: 1, end: 6 }] }],
+          },
+          {
+            title: 'Máquina vieja y módulo de tipos',
+            markdown:
+              '`checkout-machine.ts` se borra entero y `checkout-types.ts` se renombra a `checkout-state.ts` sin cambios de contenido.',
+            files: [
+              { path: 'src/features/checkout/checkout-machine.ts', ranges: [{ start: 1, end: 7 }] },
+              { path: 'src/features/checkout/checkout-state.ts', ranges: [] },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Validación como funciones puras',
+        layers: [
+          {
+            title: 'Los validadores devuelven un objeto resultado',
+            markdown:
+              '`CheckoutValidator` (estado mutable `errors`) pasa a `validateCart` / `validateShipping` / `validatePayment` devolviendo `{ valid, errors }`, más un `validateCheckout` compuesto. Cambio de comportamiento escondido en el refactor: `bank_transfer` entra a los métodos de pago permitidos.',
+            files: [
+              {
+                path: 'src/features/checkout/checkout-validation.ts',
+                ranges: [{ start: 4, end: 12 }, { start: 13, end: 20 }, { start: 21, end: 37 }],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
     kind: 'architecture',
     markdown:
       'El componente `CheckoutPage` pasa de orquestar una instancia de clase (`CheckoutMachine`) a ' +
@@ -289,6 +413,38 @@ const pr77Sections: DidacticSection[] = [
       'bloquean entre sí.\n' +
       '- El job de CI falla intermitentemente (ver descripción del PR) — confirmar si es el fix o ' +
       'un flake del entorno de test antes de aprobar.',
+  },
+  {
+    kind: 'walkthrough',
+    markdown: '',
+    cohorts: [
+      {
+        title: 'Idempotencia del webhook',
+        layers: [
+          {
+            title: 'Lock alrededor de la transición a pagada',
+            markdown:
+              'La secuencia leer-chequear-escribir ahora corre dentro de `acquireOrderLock(orderId)` con liberación en `finally`. Preguntá si el lock es por proceso o distribuido: con varias instancias un lock en memoria no cierra la carrera.',
+            files: [{ path: 'src/webhooks/payment-webhook-handler.ts', ranges: [{ start: 14, end: 22 }] }],
+            mermaid:
+              'sequenceDiagram\n' +
+              '  participant W as Webhook\n' +
+              '  participant L as OrderLock\n' +
+              '  participant O as OrderRepository\n' +
+              '  W->>L: acquire(orderId)\n' +
+              '  W->>O: findById\n' +
+              '  W->>O: markPaid\n' +
+              '  W->>L: release\n',
+          },
+          {
+            title: 'Test de regresión de concurrencia',
+            markdown:
+              'Dispara el mismo webhook dos veces con `Promise.all` y asegura que `markPaid` corre una sola vez. Como la CI está inestable, verificá que el test falle sin el lock.',
+            files: [{ path: 'src/webhooks/payment-webhook-handler.test.ts', ranges: [{ start: 41, end: 44 }] }],
+          },
+        ],
+      },
+    ],
   },
   {
     kind: 'setup',

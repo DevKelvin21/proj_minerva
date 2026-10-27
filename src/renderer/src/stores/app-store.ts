@@ -23,10 +23,12 @@ import type {
   ScmSettingsInfo,
 } from '../../../shared/types'
 import { prKey, type ScmAuthStatus, type ScmProviderId } from '../../../shared/scm'
+import type { LayerRef } from '../lib/walkthrough'
 
 export type CenterTab = 'conversation' | 'files' | 'comments'
 export type DiffViewMode = 'split' | 'inline'
-export type FileTreeMode = 'tree' | 'list'
+/** Left column of the Files tab: folder tree, flat list, or the AI walkthrough's layers. */
+export type FileTreeMode = 'tree' | 'list' | 'layers'
 /** What the left column shows: the PR list or the stacked-PR view. */
 export type SidebarView = 'list' | 'stacks'
 
@@ -94,6 +96,13 @@ interface AppState {
   diffViewMode: DiffViewMode
   fileTreeMode: FileTreeMode
   wordWrap: boolean
+  /**
+   * Layer of the guided walkthrough the reviewer is following (Files tab in
+   * `layers` mode): its ranges are highlighted in the diff and its summary
+   * shows above it. Reset per PR; `null` = no layer picked (or a file outside
+   * every layer was chosen).
+   */
+  activeLayer: LayerRef | null
 
   /**
    * Thread focused in the diff (jumped to from the Comments view, a `path:line`
@@ -155,6 +164,10 @@ interface AppState {
   setDiffViewMode: (mode: DiffViewMode) => void
   setFileTreeMode: (mode: FileTreeMode) => void
   toggleWordWrap: () => void
+  /** Picks a layer (and the file to show with it); `null` clears the selection. */
+  setActiveLayer: (ref: LayerRef | null, path?: string) => void
+  /** From the didactic panel: jump to the Files tab in layers mode on `ref`. */
+  openLayer: (ref: LayerRef, path: string | null) => void
   setExpandedThreadId: (threadId: string | null) => void
   /** Navega al tab Archivos, selecciona `path` y deja el hilo `threadId` expandido/enfocado. */
   openLineThread: (path: string, line: number, threadId: string) => void
@@ -181,6 +194,7 @@ export const useAppStore = create<AppState>((set) => ({
   // Wrap activado por defecto (T49): sin wrap las líneas largas obligan a
   // scroll horizontal y en split el lado nuevo arranca fuera de la vista.
   wordWrap: true,
+  activeLayer: null,
 
   expandedThreadId: null,
   pendingThreadFocus: null,
@@ -199,6 +213,7 @@ export const useAppStore = create<AppState>((set) => ({
       selectedPr: pr,
       centerTab: 'conversation',
       selectedFilePath: null,
+      activeLayer: null,
       expandedThreadId: null,
       pendingThreadFocus: null,
       // Elegir un PR cierra el drawer de la lista (F16/T82): en `md`/`sm` la
@@ -235,6 +250,21 @@ export const useAppStore = create<AppState>((set) => ({
   setDiffViewMode: (mode) => set({ diffViewMode: mode }),
   setFileTreeMode: (mode) => set({ fileTreeMode: mode }),
   toggleWordWrap: () => set((state) => ({ wordWrap: !state.wordWrap })),
+  setActiveLayer: (ref, path) =>
+    set((state) => ({
+      activeLayer: ref,
+      selectedFilePath: path ?? state.selectedFilePath,
+    })),
+  openLayer: (ref, path) =>
+    set((state) => ({
+      centerTab: 'files',
+      fileTreeMode: 'layers',
+      activeLayer: ref,
+      selectedFilePath: path ?? state.selectedFilePath,
+      // Jumping to a layer is a different intent than following a thread.
+      expandedThreadId: null,
+      pendingThreadFocus: null,
+    })),
   setExpandedThreadId: (threadId) => set({ expandedThreadId: threadId }),
   openLineThread: (path, line, threadId) =>
     set({

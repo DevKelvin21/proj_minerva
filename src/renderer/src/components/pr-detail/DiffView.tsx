@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageSquareWarning } from 'lucide-react'
 import type { CommentThread, DiffFile, RepoRef } from '../../../../shared/types'
@@ -26,10 +26,13 @@ import { useThreadActions } from '../../hooks/thread-actions'
 import { SPLIT_DIFF_MIN_WIDTH } from '../../lib/layout'
 import { noPatchMessage } from '../../lib/scm-labels'
 import { useLineHighlights } from '../../hooks/use-line-highlights'
+import type { LayerFocus } from '../../lib/walkthrough'
 import { DiffToolbar } from './DiffToolbar'
 import { SplitDiff } from './SplitDiff'
 import { InlineDiff } from './InlineDiff'
 import { ThreadCard } from './ThreadCard'
+
+const EMPTY_KEYS: ReadonlySet<string> = new Set()
 
 interface DiffViewProps {
   file: DiffFile
@@ -44,6 +47,15 @@ interface DiffViewProps {
   reloadThreads: () => Promise<CommentThread[]>
   /** Only when the file tree is a drawer (F16/T85): "N files" button in the toolbar. */
   fileTreeToggle?: { open: boolean; count: number; onToggle: () => void }
+  /**
+   * Active walkthrough layer in THIS file (Files tab in layers mode): its
+   * lines get a marker and the diff scrolls to the first one. `token` bumps
+   * every time the reviewer picks a layer or file again, so re-picking the
+   * same layer scrolls again.
+   */
+  layerFocus?: LayerFocus & { token: number }
+  /** Rendered between the toolbar and the diff (the layer context bar). */
+  banner?: React.ReactNode
 }
 
 /**
@@ -74,10 +86,13 @@ export function DiffView({
   threads,
   reloadThreads,
   fileTreeToggle,
+  layerFocus,
+  banner,
 }: DiffViewProps): React.JSX.Element {
   const { t } = useTranslation()
   const actions = useThreadActions()
   const { ref, width } = useElementWidth<HTMLElement>()
+  const scrollRef = useRef<HTMLDivElement>(null)
   const splitTooNarrow = width !== null && width < SPLIT_DIFF_MIN_WIDTH
   const effectiveMode: DiffViewMode = mode === 'split' && splitTooNarrow ? 'inline' : mode
   const hunks = useMemo(() => parsePatch(file.patch ?? ''), [file.patch])
@@ -178,6 +193,20 @@ export function DiffView({
     clearPendingThreadFocus()
   }, [pendingThreadFocus, file.path, head.status, sections, clearPendingThreadFocus])
 
+  // Scroll to the first line of the active layer's range in this file (its
+  // row carries `data-new-line`/`data-old-line`). A line hidden in a collapsed
+  // gap has no row yet: nothing to scroll to, the marker shows once expanded.
+  const layerFirst = layerFocus?.first ?? null
+  const layerToken = layerFocus?.token ?? 0
+  useEffect(() => {
+    if (!layerFirst || !scrollRef.current) return
+    const attr = layerFirst.side === 'LEFT' ? 'data-old-line' : 'data-new-line'
+    const el = scrollRef.current.querySelector(`[${attr}="${layerFirst.line}"]`)
+    el?.scrollIntoView({ block: 'center' })
+    // `layerToken` is the "scroll again" signal, not a value this effect reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layerFirst?.side, layerFirst?.line, layerToken, sections])
+
   function handleExpand(gap: HiddenGap, direction: 'up' | 'down' | 'all'): void {
     setUserRanges((prev) => [...prev, expandRange(gap, direction)])
     setWantContent(true)
@@ -241,6 +270,7 @@ export function DiffView({
     wordWrap,
     getTokens,
     threads: model,
+    layerKeys: layerFocus?.keys ?? EMPTY_KEYS,
     expander: {
       loading: head.status === 'loading',
       error:
@@ -266,8 +296,9 @@ export function DiffView({
         fileTreeToggle={fileTreeToggle}
         compact={width !== null && width < 520}
       />
+      {banner}
 
-      <div className="flex-1 overflow-auto" data-testid="diff-scroll">
+      <div ref={scrollRef} className="flex-1 overflow-auto" data-testid="diff-scroll">
         {!hasDiff ? (
           <>
             <p className="p-4 text-sm text-muted" data-patch-omitted={file.patchOmitted}>

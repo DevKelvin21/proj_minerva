@@ -45,6 +45,7 @@ export function DidacticPanel(): React.JSX.Element {
   const selectedPr = useAppStore((s) => s.selectedPr)
   const preferredWidth = useAppStore((s) => s.didacticPanelWidth)
   const setPanelWidth = useAppStore((s) => s.setDidacticPanelWidth)
+  const openLayer = useAppStore((s) => s.openLayer)
   const tier = useLayoutTier()
   const asideRef = useRef<HTMLElement>(null)
 
@@ -146,6 +147,7 @@ export function DidacticPanel(): React.JSX.Element {
             repo={selectedPr.repo}
             number={selectedPr.number}
             currentHeadSha={selectedPr.headSha}
+            onOpenLayer={openLayer}
           />
         ) : (
           <DidacticPlaceholder />

@@ -70,6 +70,10 @@ ejemplo corto):
 ```
 @@@SECTION kind=summary
 ...markdown...
+@@@SECTION kind=walkthrough
+...intro opcional...
+@@@LAYER cohort="Apply-coupon endpoint" title="Route wiring" files="src/routes/carts.ts:13,20-27;src/a.ts"
+...markdown de ESA capa (y un @@@MERMAID opcional, también de la capa)...
 @@@SECTION kind=architecture
 ...markdown...
 @@@MERMAID
@@ -85,9 +89,11 @@ curl -X POST ...
 ```
 
 Reglas: los marcadores van solos en su línea y empiezan con `@@@`; `kind` es uno de
-`summary|architecture|endpoint|schema`; `@@@MERMAID`/`@@@SNIPPET` pertenecen siempre a la
-sección abierta en ese momento; todo lo demás es Markdown de esa sección; nada puede
-quedar fuera de una sección.
+`summary|walkthrough|setup|architecture|endpoint|schema|cloud`; `@@@MERMAID`/`@@@SNIPPET`
+pertenecen siempre a la sección abierta en ese momento; `@@@LAYER` solo vale dentro de
+`walkthrough` (abre una capa: el markdown y el mermaid siguientes son de esa capa; `files`
+usa líneas del archivo NUEVO, del viejo si el archivo se borró); todo lo demás es Markdown
+de esa sección; nada puede quedar fuera de una sección.
 
 `../stream-parser.ts` (`StreamSectionParser`) es el parser incremental que consume este
 protocolo delta a delta según llegan los chunks SSE de OpenRouter (`../openrouter-service.ts`):
