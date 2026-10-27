@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { prKey } from '../../../shared/scm'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../shared/types'
 import { useAppStore } from '../stores/app-store'
+import { errorText } from '../lib/error-text'
 
 const SEARCH_DEBOUNCE_MS = 250
 
@@ -24,7 +25,7 @@ interface UsePullRequestsResult {
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 /**

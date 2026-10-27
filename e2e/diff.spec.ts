@@ -7,7 +7,7 @@ import { test, expect, attachScreenshot } from './fixtures'
 
 test('vista de diff del PR #201: árbol, hunks, toggles y renamed', async ({ window }, testInfo) => {
   await window.getByText('Refactor checkout state machine').first().click()
-  await window.getByText('Archivos').first().click()
+  await window.getByText('Files').first().click()
 
   // Archivos del PR listados y diff con separadores de hunk.
   await expect(window.getByText(/checkout-validation|checkout-state/).first()).toBeVisible()

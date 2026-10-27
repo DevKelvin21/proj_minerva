@@ -24,7 +24,7 @@ import type { Page } from './fixtures'
  */
 
 /** The left column (the didactic panel is an `<aside>` too). */
-const aside = (page: Page) => page.getByRole('complementary', { name: 'Lista de pull requests' })
+const aside = (page: Page) => page.getByRole('complementary', { name: 'Pull request list' })
 const node = (page: Page, number: number) => aside(page).locator(`[data-stack-node="${number}"]`)
 const nodeRow = (page: Page, number: number) => node(page, number).locator('> button')
 const header = (page: Page) => page.locator('header:has(h1)')
@@ -108,7 +108,13 @@ test('stacks view: the 101→102→103 chain, the cross-repo group and the orpha
   // Tiled sizes: still reachable and readable, no horizontal overflow.
   for (const viewport of VIEWPORTS) {
     await setViewport(window, viewport.w, viewport.h)
-    const drawerToggle = window.getByRole('button', { name: 'Lista de PRs' })
+    // React re-renders the new layout tier after the resize event: let it
+    // commit, or the checks below can pass on the old (docked) layout and
+    // then lose it when the drawer layout replaces it.
+    await window.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    )
+    const drawerToggle = window.getByRole('button', { name: 'PR list' })
     if ((await drawerToggle.count()) > 0 && (await aside(window).count()) === 0) {
       await drawerToggle.click()
     }
@@ -117,7 +123,7 @@ test('stacks view: the 101→102→103 chain, the cross-repo group and the orpha
     await node(window, 105).scrollIntoViewIfNeeded()
     await expect(node(window, 105)).toContainText(ORPHAN_TEXT)
     const overflow = await window.evaluate(() => {
-      const sidebar = document.querySelector('aside[aria-label="Lista de pull requests"]')
+      const sidebar = document.querySelector('aside[aria-label="Pull request list"]')
       return {
         page: document.documentElement.scrollWidth - window.innerWidth,
         sidebar: sidebar ? sidebar.scrollWidth - sidebar.clientWidth : 0,
@@ -155,13 +161,13 @@ test('PR detail of #102 shows its stack map; chips navigate; target branch form 
 
   // Short window (horizontal half): one-line header, the map lives behind "Detalles".
   await setViewport(window, 1920, 540)
-  await header(window).getByText('Detalles').click()
+  await header(window).getByText('Details').click()
   const shortStack = window.getByRole('region', { name: 'Stack', exact: true })
   await expect(shortStack).toBeVisible()
   await expect(shortStack.locator('[aria-current="true"]')).toContainText('This PR')
   await shortStack.scrollIntoViewIfNeeded()
   await attachScreenshot(window, testInfo, 'pr-detail-stack-map-short')
-  await header(window).getByText('Detalles').click()
+  await header(window).getByText('Details').click()
   await setViewport(window, 1920, 1080)
 
   // "Change target branch…": validated, explains the consequence, writes nothing here.

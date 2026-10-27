@@ -6,6 +6,7 @@ import type { CommentThread, PullRequestDetail } from '../../../../shared/types'
 import { Avatar } from '../ui/Avatar'
 import { Markdown } from '../ui/Markdown'
 import { ThreadCard } from './ThreadCard'
+import { errorText } from '../../lib/error-text'
 
 interface ConversationTabProps {
   pr: PullRequestDetail
@@ -47,7 +48,7 @@ export function ConversationTab({
       setDraft('')
       await reload()
     } catch (err: unknown) {
-      setPostError(err instanceof Error ? err.message : String(err))
+      setPostError(errorText(err))
     } finally {
       setPosting(false)
     }

@@ -44,6 +44,8 @@ maintained by Kelvin Rojas ([DevKelvin21](https://github.com/DevKelvin21))._
   it uses the session you already authenticated with each provider's CLI.
 - 🪟 **Detachable window** with a **Re-analyze** button to compare models, and a lightbox
   with zoom/pan for diagrams.
+- 🌐 **English or Spanish**: the interface, native dialogs and new AI analyses follow the
+  language picked in Settings (English by default).
 
 ---
 
@@ -122,7 +124,7 @@ filters/watcher/unread, GitKraken-style diff, comments (read/write, Markdown), t
 didactic panel (summary, C4, endpoints, schema + ER, run-it-locally, cloud infra), streaming,
 detachable window with analysis cache, three AI providers with dynamic model catalogs,
 agentic read-only analysis over a repo snapshot, tiled-window layout, auto-updater,
-multi-OS releases.
+multi-OS releases, English UI with a Spanish translation (i18n).
 
 Next (see [`docs/plan-azure-devops.md`](docs/plan-azure-devops.md)):
 
@@ -133,7 +135,6 @@ Next (see [`docs/plan-azure-devops.md`](docs/plan-azure-devops.md)):
       completes, one-click retarget with confirmation (GitHub and Azure DevOps).
 - [ ] **Comment review workflow**: work through threads, mark resolved, reply in place.
 - [ ] **AI chat about a PR**: multi-turn sessions in the didactic panel, with interrupt and model switch.
-- [ ] **English UI / i18n**: the UI strings are still Spanish.
 
 ---
 

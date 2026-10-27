@@ -31,13 +31,13 @@ const VIEWPORTS = [
  * la toolbar (`.last()` — el `CenterPane` es otra `section` que también los
  * contiene por herencia y rompería el modo estricto de Playwright).
  */
-const diffPane = (page: Page) => page.locator('section:has([aria-label="Vista inline"])').last()
+const diffPane = (page: Page) => page.locator('section:has([aria-label="Inline view"])').last()
 
 test('el shell sobrevive a los 4 tilings: diff usable y sin desborde horizontal', async ({
   window,
 }, testInfo) => {
   await window.getByText('apply-coupon').first().click()
-  await window.getByText('Archivos').first().click()
+  await window.getByText('Files').first().click()
   await expect(window.getByText('@@').first()).toBeVisible()
 
   for (const viewport of VIEWPORTS) {
@@ -90,12 +90,12 @@ test('con la ventana angosta la lista de PRs pasa a drawer y se abre desde el Ti
   // A 1920 la lista es una columna acoplada: se ve sin tocar nada.
   await setViewport(window, 1920, 1080)
   await expect(window.getByText(prTitle).first()).toBeVisible()
-  await expect(window.getByRole('button', { name: 'Lista de PRs' })).toHaveCount(0)
+  await expect(window.getByRole('button', { name: 'PR list' })).toHaveCount(0)
 
   // A 960 (mitad de un monitor 1080p) la columna cede el ancho al centro y la
   // lista pasa a drawer: deja de estar en el DOM hasta que se la pide.
   await setViewport(window, 960, 1080)
-  const toggle = window.getByRole('button', { name: 'Lista de PRs' })
+  const toggle = window.getByRole('button', { name: 'PR list' })
   await expect(toggle).toBeVisible()
   await expect(window.getByText(prTitle)).toHaveCount(0)
 

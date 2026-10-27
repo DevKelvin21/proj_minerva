@@ -10,8 +10,8 @@ import type { Page } from './fixtures'
 
 async function analyze(window: Page, prTitle: string): Promise<void> {
   await window.getByText(prTitle).first().click()
-  await window.getByRole('button', { name: 'Analizar PR' }).click()
-  await expect(window.getByRole('button', { name: /Re-?analizar/i })).toBeEnabled({
+  await window.getByRole('button', { name: 'Analyze PR' }).click()
+  await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,
   })
 }
@@ -19,7 +19,7 @@ async function analyze(window: Page, prTitle: string): Promise<void> {
 const cloudCard = (window: Page) =>
   window
     .locator('section')
-    .filter({ has: window.locator('header', { hasText: 'Infraestructura cloud' }) })
+    .filter({ has: window.locator('header', { hasText: 'Cloud infrastructure' }) })
 
 test('PR #77 con IaC: card cloud con dos architecture-beta e iconos locales', async ({
   window,
@@ -30,8 +30,8 @@ test('PR #77 con IaC: card cloud con dos architecture-beta e iconos locales', as
   await expect(card).toBeVisible()
 
   // Subtítulos big picture + zoom.
-  await expect(card.getByText('Sistema completo').first()).toBeVisible()
-  await expect(card.getByText('Dónde incide este PR').first()).toBeVisible()
+  await expect(card.getByText('Full system').first()).toBeVisible()
+  await expect(card.getByText('Where this PR lands').first()).toBeVisible()
 
   // Dos diagramas renderizados como SVG mermaid, con contenido y VISIBLES
   // (render lazy + chunk de icon packs ~7MB la primera vez ⇒ poll amplio).

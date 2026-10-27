@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
 import { buildSuggestionBlock, insertSuggestion } from '../../lib/suggestions'
+import { errorText } from '../../lib/error-text'
 
 /** How the composer gets the lines a suggestion starts from, or why it can't. */
 export type SuggestionSource =
@@ -22,7 +23,7 @@ interface CommentComposerProps {
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 /**

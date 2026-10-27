@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { decodeScmErrorMessage } from '../../../shared/scm-errors'
+import { errorText } from '../lib/error-text'
 
 interface UseAzureProjectsResult {
   /** `null` until a load succeeded for the current organization. */
@@ -26,7 +26,7 @@ export function useAzureProjects(): UseAzureProjectsResult {
       setProjects(result.projects)
     } catch (err) {
       setProjects(null)
-      setError(decodeScmErrorMessage(err instanceof Error ? err.message : String(err)).message)
+      setError(errorText(err))
     } finally {
       setLoading(false)
     }

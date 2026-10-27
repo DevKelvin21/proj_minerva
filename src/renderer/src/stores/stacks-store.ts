@@ -12,6 +12,7 @@
 import { create } from 'zustand'
 import type { GetStacksResult, PullRequestSummary } from '../../../shared/types'
 import type { RetargetFailure } from '../lib/retarget'
+import { errorText } from '../lib/error-text'
 
 /**
  * Outcome of the last retarget that changed (or found changed) the data. It
@@ -50,7 +51,7 @@ let inFlightVersion = 0
 let lastForcedAt = 0
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 export const useStacksStore = create<StacksState>((set, get) => ({

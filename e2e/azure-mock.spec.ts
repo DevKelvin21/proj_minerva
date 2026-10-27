@@ -89,7 +89,7 @@ test('Azure repos listed with the Azure icon; detail, diff and thread statuses',
 
   // Files: the patch was built in main from blobs.
   await window
-    .getByText(/^Archivos/)
+    .getByText(/^Files/)
     .first()
     .click()
   await expect(window.getByText('@@').first()).toBeVisible()
@@ -102,7 +102,7 @@ test('Azure repos listed with the Azure icon; detail, diff and thread statuses',
 test('Azure: renamed + binary files, and an outdated thread', async ({ window }, testInfo) => {
   await aside(window).getByText('Rename network module').first().click()
   await window
-    .getByText(/^Archivos/)
+    .getByText(/^Files/)
     .first()
     .click()
   await expect(window.getByText('virtual-network').first()).toBeVisible()

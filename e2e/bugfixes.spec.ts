@@ -12,7 +12,7 @@ import { test, expect, attachScreenshot } from './fixtures'
 
 test('descripción y comentarios del PR renderizan Markdown (no crudo)', async ({ window }) => {
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
-  await window.getByText('Conversación').first().click()
+  await window.getByText('Conversation').first().click()
 
   // Descripción: h2 reales dentro del article, sin "##" crudos.
   const article = window.locator('article').first()
@@ -46,19 +46,19 @@ test('snippet: Copiar y Expandir separados y cliqueables; CSP img-src sana', asy
   })
 
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
-  await window.getByRole('button', { name: 'Analizar PR' }).click()
-  await expect(window.getByRole('button', { name: /Re-?analizar/i })).toBeEnabled({
+  await window.getByRole('button', { name: 'Analyze PR' }).click()
+  await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,
   })
 
   // Bug 1: los botones del header del snippet no se superponen y el centro de
   // cada uno responde a su propio botón (elementFromPoint).
-  const expand = window.locator('button[aria-label="Expandir snippet"]').first()
+  const expand = window.locator('button[aria-label="Expand snippet"]').first()
   await expand.scrollIntoViewIfNeeded()
   const buttons = await expand.evaluate((expandEl) => {
     const header = expandEl.closest('div.flex')?.parentElement
     const copy = Array.from((header ?? document).querySelectorAll('button')).find((b) =>
-      /Copiar|Copiado/.test(b.textContent ?? ''),
+      /Copy|Copied/.test(b.textContent ?? ''),
     )
     if (!copy)
       return { err: 'sin botón copiar', overlap: null, copyClickable: null, expandClickable: null }

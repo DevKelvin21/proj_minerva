@@ -19,7 +19,7 @@ const aside = (page: Page) => page.locator('aside')
 const filterButton = (page: Page, label: string) =>
   aside(page).getByRole('button', { name: label, exact: true })
 const refreshButton = (page: Page) =>
-  page.locator('aside button[aria-label="Actualizar"], aside button[title="Actualizar"]')
+  page.locator('aside button[aria-label="Refresh"], aside button[title="Refresh"]')
 
 /** Datos de dots/contador del item de la lista cuyo texto contiene `title`. */
 const itemInfo = (page: Page, title: string) =>
@@ -35,8 +35,8 @@ const itemInfo = (page: Page, title: string) =>
       (s) => s.querySelector('svg') && /^\d+$/.test((s as HTMLElement).innerText.trim()),
     ) as HTMLElement | undefined
     return {
-      unseenDot: Boolean(item.querySelector('span[title="Cambios sin ver"]')),
-      commentsDot: Boolean(item.querySelector('span[title="Comentarios nuevos"]')),
+      unseenDot: Boolean(item.querySelector('span[title="Unseen changes"]')),
+      commentsDot: Boolean(item.querySelector('span[title="New comments"]')),
       commentCount: counter ? counter.innerText.trim() : null,
     }
   }, title)
@@ -50,7 +50,7 @@ test('filtros de estado: Abiertos (default), Cerrados con badges, Todos', async 
   await expect(aside(window).getByText(MERGED_PR_A)).toHaveCount(0)
 
   // (2) "Cerrados": solo closed+merged, con badges de estado.
-  await filterButton(window, 'Cerrados').click()
+  await filterButton(window, 'Closed').click()
   await expect(aside(window).getByText(CLOSED_PR).first()).toBeVisible()
   await expect(aside(window).getByText(MERGED_PR_A).first()).toBeVisible()
   await expect(aside(window).getByText(MERGED_PR_B).first()).toBeVisible()
@@ -67,7 +67,7 @@ test('filtros de estado: Abiertos (default), Cerrados con badges, Todos', async 
   await attachScreenshot(window, testInfo, 'pr-list-cerrados')
 
   // (3) "Todos": open y closed conviven.
-  await filterButton(window, 'Todos').click()
+  await filterButton(window, 'All').click()
   await expect(aside(window).getByText(OPEN_PR).first()).toBeVisible()
   await expect(aside(window).getByText(CLOSED_PR).first()).toBeVisible()
 })
@@ -76,7 +76,7 @@ test('refresh manual y dots de no-visto con markPrSeen', async ({ window }, test
   // (4) Refresh manual: re-fetchea sin error.
   await refreshButton(window).click()
   await expect(aside(window).getByText(OPEN_PR).first()).toBeVisible()
-  await expect(window.getByText('No se pudo cargar')).toHaveCount(0)
+  await expect(window.getByText('Could not load')).toHaveCount(0)
 
   // (5) Sellar "visto" con valores VIEJOS fuerza un estado unread
   // determinístico (updatedAt actual > sellado ⇒ hasUpdates; commentCount

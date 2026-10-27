@@ -64,10 +64,10 @@ test('los eventos de progreso llevan el buffer activity y la UI lo pinta', async
       }
       const panel = document.body.innerText
       uiSamples.push({
-        hasLabel: /Leyó src\/api\/routes\.ts|Buscó "router"|Listó la estructura|Pensando…/.test(
+        hasLabel: /Read src\/api\/routes\.ts|Searched "router"|Listed the structure|Thinking…/.test(
           panel,
         ),
-        hasSection: panel.includes('Resumen'),
+        hasSection: panel.includes('Summary'),
       })
     }
 
@@ -110,7 +110,7 @@ test('los eventos de progreso llevan el buffer activity y la UI lo pinta', async
       collapsed,
       duplicated,
       labelSample: allLabels.slice(0, 8),
-      hasSpanishLabel: allLabels.some((l) => /Leyó|Buscó|Listó|Pensando/.test(l)),
+      hasSpanishLabel: allLabels.some((l) => /Read |Searched|Listed|Thinking/.test(l)),
       terminalHasActivity: terminal ? terminal.activity !== null : null,
       terminalDone: terminal?.done ?? null,
       midState,
@@ -130,7 +130,7 @@ test('los eventos de progreso llevan el buffer activity y la UI lo pinta', async
   expect(result.duplicated, 'ningún buffer trae un id duplicado').toBe(false)
   expect(
     result.hasSpanishLabel,
-    'labels en español derivados en main: ' + JSON.stringify(result.labelSample),
+    'labels derived in main: ' + JSON.stringify(result.labelSample),
   ).toBe(true)
   expect(result.terminalDone, 'hubo evento terminal').toBe(true)
   expect(result.terminalHasActivity, 'el evento TERMINAL no trae activity (efímero)').toBe(false)

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ScmSettingsInfo, SetProviderSettingsRequest } from '../../../shared/types'
 import { useAppStore } from '../stores/app-store'
+import { errorText } from '../lib/error-text'
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 interface UseScmSettingsResult {

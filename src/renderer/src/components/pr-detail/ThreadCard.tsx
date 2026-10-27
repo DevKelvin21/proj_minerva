@@ -22,6 +22,7 @@ import { CommentBody } from './CommentBody'
 import { CommentComposer } from './CommentComposer'
 import { ThreadCodeExcerpt } from './CodeExcerpt'
 import { ThreadStatusPicker } from './ThreadStatusPicker'
+import { errorText } from '../../lib/error-text'
 
 interface ThreadCardProps {
   thread: CommentThread
@@ -40,7 +41,7 @@ interface ThreadCardProps {
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 function positionLabel(thread: CommentThread, showPath: boolean, t: TFunction): string | null {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { loadFileContent, type FileContentKey } from '../lib/file-content-cache'
 import { splitFileLines } from '../lib/expand-context'
 import { prKey } from '../../../shared/scm'
+import { errorText } from '../lib/error-text'
 
 /** Why a file has no lines to show; the component translates it (`prDetail.fileContent.*`). */
 export type FileUnavailableReason = 'binary' | 'tooLarge' | 'noContent'
@@ -15,7 +16,7 @@ export type FileLinesState =
   | { status: 'error'; error: string }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 /**

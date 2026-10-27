@@ -24,7 +24,7 @@ export const en = {
   },
   layout: {
     titleBar: {
-      prListToggle: 'Pull request list',
+      prListToggle: 'PR list',
       searchPrs: 'Search pull requests',
       searchPlaceholder: 'Search by title, repo, branch or #number',
       closeSearch: 'Close search',

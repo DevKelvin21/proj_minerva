@@ -19,9 +19,9 @@ import type { Page } from './fixtures'
  */
 
 const PR_482 = { repo: { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
-const EXPECTED_BANNER = 'vía OpenCode · opencode/big-pickle'
+const EXPECTED_BANNER = 'via OpenCode · opencode/big-pickle'
 
-const banner = (page: Page) => page.locator('span[title*="Proveedor y modelo activos"]')
+const banner = (page: Page) => page.locator('span[title*="Active provider and model"]')
 
 test('el banner del panel sella la config de generación (no la vigente)', async ({
   window,
@@ -37,8 +37,8 @@ test('el banner del panel sella la config de generación (no la vigente)', async
   await expect(window.getByText('apply-coupon').first()).toBeVisible({ timeout: 20_000 })
 
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
-  await window.getByRole('button', { name: 'Analizar PR' }).click()
-  await expect(window.getByRole('button', { name: /Re-?analizar/i })).toBeEnabled({
+  await window.getByRole('button', { name: 'Analyze PR' }).click()
+  await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,
   })
   await expect(banner(window), 'banner tras generar').toHaveText(EXPECTED_BANNER)
@@ -53,7 +53,7 @@ test('el banner del panel sella la config de generación (no la vigente)', async
   await window.reload()
   await expect(window.getByText('apply-coupon').first()).toBeVisible({ timeout: 20_000 })
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
-  await expect(window.getByRole('button', { name: /Re-?analizar/i })).toBeVisible()
+  await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeVisible()
   await expect(banner(window), 'banner SIGUE sellado con opencode').toHaveText(EXPECTED_BANNER)
 
   await attachScreenshot(window, testInfo, 'f9-banner-sellado')
@@ -88,20 +88,20 @@ test('análisis con headSha viejo muestra la barra de staleness y "Actualizar" l
   try {
     const win2 = await mainWindow(app2)
     await win2.getByText('Add POST /carts/:id/apply-coupon').first().click()
-    await expect(win2.getByText(/commits nuevos/).first()).toBeVisible()
+    await expect(win2.getByText(/new commits/).first()).toBeVisible()
     // Escopado a la barra: el refresh de la lista (aside) también se llama
     // "Actualizar". El div más interno con el texto de aviso ES la barra.
-    const staleBar = win2.locator('div').filter({ hasText: /commits nuevos/ }).last()
-    const update = staleBar.getByRole('button', { name: 'Actualizar' })
+    const staleBar = win2.locator('div').filter({ hasText: /new commits/ }).last()
+    const update = staleBar.getByRole('button', { name: 'Update' })
     await expect(update).toBeVisible()
     await attachScreenshot(win2, testInfo, 'f9-staleness-visible')
 
     // "Actualizar" re-analiza (mock) y sella el headSha actual ⇒ la barra se va.
     await update.click()
-    await expect(win2.getByRole('button', { name: /Re-?analizar/i })).toBeEnabled({
+    await expect(win2.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
       timeout: 90_000,
     })
-    await expect(win2.getByText(/commits nuevos/)).toHaveCount(0)
+    await expect(win2.getByText(/new commits/)).toHaveCount(0)
     await attachScreenshot(win2, testInfo, 'f9-staleness-limpia')
   } finally {
     await closeMinerva(app2)
