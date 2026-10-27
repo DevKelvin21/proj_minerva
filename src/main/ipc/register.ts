@@ -1,11 +1,13 @@
-import { ipcMain } from 'electron'
+import { ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS, type IpcChannel, type IpcRequest, type IpcResponse } from '../../shared/ipc'
 import { encodeScmErrorMessage } from '../../shared/scm-errors'
 import { isScmError } from '../scm/errors'
 import { payloadValidators } from './validators'
 
+/** `event` is for handlers that need the calling window (native dialogs); most ignore it. */
 type Handler<C extends IpcChannel> = (
   req: IpcRequest<C>,
+  event: IpcMainInvokeEvent,
 ) => Promise<IpcResponse<C>> | IpcResponse<C>
 
 const registeredChannels = new Set<IpcChannel>()
@@ -28,7 +30,7 @@ export function handle<C extends IpcChannel>(channel: C, handler: Handler<C>): v
   }
   registeredChannels.add(channel)
 
-  ipcMain.handle(channel, async (_event, payload: unknown) => {
+  ipcMain.handle(channel, async (event, payload: unknown) => {
     // Validación profunda por canal (`./validators.ts`): forma exacta del
     // payload esperado por ese canal en particular, no solo "es un objeto".
     // El mensaje de error es genérico a propósito — nunca describe qué campo
@@ -37,7 +39,7 @@ export function handle<C extends IpcChannel>(channel: C, handler: Handler<C>): v
       throw new Error(`Payload inválido para el canal "${channel}"`)
     }
     try {
-      return await handler(payload as IpcRequest<C>)
+      return await handler(payload as IpcRequest<C>, event)
     } catch (error) {
       const raw = error instanceof Error ? error.message : String(error)
       const message = isScmError(error) ? encodeScmErrorMessage(error.code, raw) : raw

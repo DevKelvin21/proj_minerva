@@ -1,11 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { handle } from './register'
 import { createAiService } from '../ai'
-import {
-  getAiSettingsInfo,
-  getEffectiveAiSelection,
-  providerNeedingCatalogWarmup,
-} from '../ai/env'
+import { getAiSettingsInfo, getEffectiveAiSelection, providerNeedingCatalogWarmup } from '../ai/env'
 import { getAiProviderStatusMap } from '../ai/providers/provider-status'
 import { getProviderModels, warmProviderModels } from '../ai/providers/provider-models'
 import { analysisCache } from '../ai/analysis-cache'
@@ -15,6 +11,8 @@ import { isMockScmMode } from '../scm/mock-mode'
 import { createDefaultScm, type DefaultScm } from '../scm/default-scm'
 import { createPrContextSource } from '../scm/pr-context-source'
 import { createPrWatcher, type PrWatcher } from '../scm/pr-watcher'
+import { createAzureOrgAccess } from '../scm/azure-org-access'
+import { nativeConfirm } from '../scm/confirm'
 import { getAuthStatusMap, listAcrossProviders } from '../scm/registry'
 import { retargetPullRequest } from '../scm/retarget'
 import { seenStore } from '../scm/seen-store'
@@ -91,17 +89,28 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
   // `gh` accounts for the Settings picker. Read-only, cached 5s; logins only.
   handle('scm:listGhAccounts', () => ghCliAuth.listAccounts())
   handle('scm:getSettings', () => getScmSettings(scmRoot))
-  // Enabled flags + Azure orgs/projects. Drops what depended on the old
-  // values: Azure identity/auth caches and the stacks cache.
-  handle('scm:setProviderSettings', (req) => {
-    scmRoot.settings.save(req)
-    scmRoot.azure.invalidate()
-    scmRoot.stacks.invalidate()
+  // Which Azure orgs main may use the credential with when the renderer names
+  // one (Settings): configured / known to az, or confirmed in a native dialog.
+  const azureOrgs = createAzureOrgAccess({
+    current: () => scmRoot.settings.current().providers,
+    knownOrganizations: () => scmRoot.settings.knownAzureOrganizations(),
+  })
+  // Enabled flags + Azure orgs/projects. A new org is confirmed natively
+  // first (declined = nothing saved, current settings answered). Drops what
+  // depended on the old values; the credential cache only when the org set
+  // changed (rate-limited).
+  handle('scm:setProviderSettings', async (req, event) => {
+    await azureOrgs.saveSettings(req, nativeConfirm(event.sender), {
+      save: (next) => scmRoot.settings.save(next),
+      invalidateAzure: (options) => scmRoot.azure.invalidate(options),
+      invalidateStacks: () => scmRoot.stacks.invalidate(),
+    })
     return getScmSettings(scmRoot)
   })
-  handle('scm:listAzureProjects', async (req) => ({
-    projects: await scmRoot.azure.listProjects(req.organization),
-  }))
+  handle('scm:listAzureProjects', async (req, event) => {
+    await azureOrgs.ensureProjectsLookupAllowed(req.organization, nativeConfirm(event.sender))
+    return { projects: await scmRoot.azure.listProjects(req.organization) }
+  })
   // Persists the chosen `gh` login (`null` = follow gh's active account) and
   // DROPS the token-bridge caches — otherwise the next status would serve
   // the previous account's probe for up to 5s and, worse, `getToken()` would
@@ -141,13 +150,17 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
   handle('scm:postComment', (req) => scm.forRepo(req.repo).postComment(req))
   handle('scm:setThreadStatus', (req) => scm.forRepo(req.repo).setThreadStatus(req))
   handle('scm:getFileContent', (req) => scm.forRepo(req.repo).getFileContent(req))
-  // Re-validated in `retargetPullRequest` right before the write (open, base
-  // unchanged, new base exists); a stale UI gets `[SCM:CONFLICT]`.
-  handle('scm:retarget', async (req) => {
-    // TODO(hardening): native confirmation dialog in main before the write.
-    const updated = await retargetPullRequest(scm.forRepo(req.repo), req)
-    scmRoot.stacks.invalidate()
-    return { outcome: 'retargeted' as const, pr: updated }
+  // Validated in `retargetPullRequest` (open, base unchanged, new base
+  // exists; a stale UI gets `[SCM:CONFLICT]`), then confirmed in a native
+  // dialog on the caller's window, re-checked, and only then written.
+  handle('scm:retarget', async (req, event) => {
+    const result = await retargetPullRequest(
+      scm.forRepo(req.repo),
+      req,
+      nativeConfirm(event.sender),
+    )
+    if (result.outcome === 'retargeted') scmRoot.stacks.invalidate()
+    return result
   })
   handle('scm:getStacks', (req) => scmRoot.stacks.get({ refresh: req?.refresh === true }))
 
