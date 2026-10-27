@@ -21,6 +21,13 @@ export const HEIGHT_BREAKPOINTS = { tall: 700, short: 560 } as const
 /** Ancho de la sidebar acoplada por tier; en `md`/`sm` no está acoplada (drawer). */
 export const SIDEBAR_WIDTH: Record<WidthTier, number> = { xl: 280, lg: 240, md: 0, sm: 0 }
 
+/** Docked sidebar drag limits (px). The rail it folds to is 56px (`SidebarRail`, `w-14`). */
+export const SIDEBAR_MIN_WIDTH = 220
+const SIDEBAR_MAX_WIDTH = 480
+/** Most of the viewport a dragged sidebar may take. */
+const SIDEBAR_MAX_FRACTION = 0.32
+export const SIDEBAR_RAIL_WIDTH = 56
+
 /**
  * Ancho mínimo que se le respeta al panel CENTRAL al clampear el didáctico: por
  * debajo de esto el diff vuelve a ser la astilla de 40px que motivó F16.
@@ -64,10 +71,47 @@ export function sidebarIsDrawer(tier: WidthTier): boolean {
  * pero tampoco se pierde: el valor guardado sigue siendo el preferido y vuelve
  * solo al ensanchar.
  */
-export function clampDidacticWidth(preferred: number, viewportWidth: number): number {
+export function clampDidacticWidth(
+  preferred: number,
+  viewportWidth: number,
+  sidebarWidth: number = SIDEBAR_WIDTH[widthTier(viewportWidth)],
+): number {
   const tier = widthTier(viewportWidth)
   const byFraction = viewportWidth * DIDACTIC_MAX_FRACTION[tier]
-  const byCenter = viewportWidth - SIDEBAR_WIDTH[tier] - MIN_CENTER_WIDTH
+  const byCenter = viewportWidth - sidebarWidth - MIN_CENTER_WIDTH
   const max = Math.max(DIDACTIC_PANEL_MIN_WIDTH, Math.round(Math.min(byFraction, byCenter)))
   return Math.min(Math.max(Math.round(preferred), DIDACTIC_PANEL_MIN_WIDTH), max)
+}
+
+/** A dragged sidebar width, clamped against the viewport it is painted in. */
+export function clampSidebarWidth(preferred: number, viewportWidth: number): number {
+  const max = Math.max(
+    SIDEBAR_MIN_WIDTH,
+    Math.round(Math.min(SIDEBAR_MAX_WIDTH, viewportWidth * SIDEBAR_MAX_FRACTION)),
+  )
+  return Math.min(Math.max(Math.round(preferred), SIDEBAR_MIN_WIDTH), max)
+}
+
+/**
+ * Width the docked sidebar is painted at: the tier's default until the user
+ * drags it (`preferred === null`), then their width clamped against the
+ * CURRENT viewport. Like the didactic panel, the stored value is the
+ * preference: tiling the window shrinks the column, widening it brings the
+ * preference back. 0 on drawer tiers (the sidebar is an overlay there).
+ */
+export function dockedSidebarWidth(preferred: number | null, viewportWidth: number): number {
+  const tier = widthTier(viewportWidth)
+  if (sidebarIsDrawer(tier)) return 0
+  if (preferred === null) return SIDEBAR_WIDTH[tier]
+  return clampSidebarWidth(preferred, viewportWidth)
+}
+
+/** Room the left column takes from the center: the rail when folded, 0 as a drawer. */
+export function sidebarFootprint(
+  preferred: number | null,
+  collapsed: boolean,
+  viewportWidth: number,
+): number {
+  if (sidebarIsDrawer(widthTier(viewportWidth))) return 0
+  return collapsed ? SIDEBAR_RAIL_WIDTH : dockedSidebarWidth(preferred, viewportWidth)
 }

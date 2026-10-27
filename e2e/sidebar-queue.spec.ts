@@ -91,3 +91,63 @@ test('Rail: Cmd/Ctrl+B folds the sidebar to view buttons and recent PRs', async 
       .getByRole('button', { name: /^Stacks/ }),
   ).toHaveAttribute('aria-pressed', 'true')
 })
+
+test('Resize: drag the sidebar edge, the width is remembered, double-click restores it', async ({
+  window,
+}, testInfo) => {
+  await setViewport(window, 1600, 1000)
+  await expect(queue(window)).toBeVisible({ timeout: 20_000 })
+  const handle = window.getByRole('separator', { name: 'Resize sidebar' })
+  const widthOf = async (): Promise<number> =>
+    Math.round((await aside(window).boundingBox())?.width ?? 0)
+  // Default xl width until the user drags.
+  expect(await widthOf()).toBe(280)
+  await expect(handle).toHaveAttribute('aria-valuenow', '280')
+
+  const box = await handle.boundingBox()
+  if (!box) throw new Error('resize handle has no box')
+  const y = box.y + box.height / 2
+  await window.mouse.move(box.x + box.width / 2, y)
+  await window.mouse.down()
+  await window.mouse.move(box.x + 120, y, { steps: 6 })
+  await window.mouse.up()
+  const dragged = await widthOf()
+  expect(dragged).toBeGreaterThan(380)
+  await expect(handle).toHaveAttribute('aria-valuenow', String(dragged))
+  // Wider rows still show the queue (and the review keeps its room).
+  await expect(section(window, 'mine')).toBeVisible()
+  await attachScreenshot(window, testInfo, 'sidebar-resized')
+
+  // Clamped: it never grows past 32% of the window (480px max).
+  await handle.focus()
+  for (let i = 0; i < 12; i++) await window.keyboard.press('ArrowRight')
+  expect(await widthOf()).toBe(480)
+
+  await window.reload()
+  await expect(queue(window)).toBeVisible({ timeout: 20_000 })
+  expect(await widthOf()).toBe(480)
+
+  await handle.dblclick()
+  expect(await widthOf()).toBe(280)
+})
+
+test('Didactic panel closed takes no room: no folded strip on the right', async ({ window }) => {
+  await setViewport(window, 1600, 1000)
+  await queue(window)
+    .getByRole('button', { name: /Fix cart rounding/ })
+    .first()
+    .click()
+  await expect(window.locator('header:has(h1)')).toContainText('#108')
+  const toggle = window.locator('header button[aria-label="Didactic panel"]')
+  await expect(window.getByRole('button', { name: 'Close didactic panel' })).toBeVisible()
+  await window.getByRole('button', { name: 'Close didactic panel' }).click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  // The review fills the window up to its right edge.
+  const review = window.getByTestId('review-view').locator('> *').first()
+  await expect(review).toBeVisible()
+  const viewport = window.viewportSize()?.width ?? (await window.evaluate(() => innerWidth))
+  const box = await review.boundingBox()
+  expect(Math.round((box?.x ?? 0) + (box?.width ?? 0))).toBe(viewport)
+  await toggle.click()
+  await expect(window.getByRole('button', { name: 'Close didactic panel' })).toBeVisible()
+})
