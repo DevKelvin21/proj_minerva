@@ -6,7 +6,10 @@
  *
  * Plain quoted strings only (no backtick-delimited strings, gotcha 3).
  */
+import ai from './parts/ai.en'
+
 export const en = {
+  ai,
   common: {
     cancel: 'Cancel',
   },
