@@ -5,11 +5,13 @@ import {
   GitPullRequestDraft,
   MessageSquare,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PullRequestState, PullRequestSummary, ReviewDecision } from '../../../../shared/types'
 import { useAppStore } from '../../stores/app-store'
 import { Avatar } from '../ui/Avatar'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
+import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { prKey } from '../../../../shared/scm'
 import { reviewDecisionLabelKey } from '../../lib/scm-labels'
 
@@ -17,6 +19,10 @@ interface PrListItemProps {
   pr: PullRequestSummary
   /** Selección (T52, F10): además de marcar el item activo, sella "visto" (`markSeen`). */
   onSelect: (pr: PullRequestSummary) => void
+  /** Rows outside a repo group (the Queue view) name their repo (and drop the +/- counts). */
+  showRepo?: boolean
+  /** One short status on the right (the Queue view's "Required", "Approved"…); replaces +/-. */
+  badge?: ReactNode
 }
 
 function reviewDecisionTone(decision: ReviewDecision): string {
@@ -98,7 +104,12 @@ function StateBadge({ state }: { state: PullRequestState }): React.JSX.Element |
   return null
 }
 
-export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element {
+export function PrListItem({
+  pr,
+  onSelect,
+  showRepo = false,
+  badge,
+}: PrListItemProps): React.JSX.Element {
   const { t } = useTranslation()
   const selectedPrKey = useAppStore((s) =>
     s.selectedPr ? prKey(s.selectedPr.repo, s.selectedPr.number) : null,
@@ -138,6 +149,14 @@ export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element
       </div>
       <div className="flex items-center gap-2 pl-[20px] text-xs text-muted">
         <Avatar user={pr.author} size={16} />
+        {showRepo && (
+          <span className="flex min-w-0 items-center gap-1" title={pr.repo.fullName}>
+            <ScmProviderIcon provider={pr.repo.provider} size={11} />
+            <span className="max-w-[110px] truncate">
+              {pr.repo.fullName.slice(pr.repo.fullName.lastIndexOf('/') + 1)}
+            </span>
+          </span>
+        )}
         <span>#{pr.number}</span>
         <StateBadge state={pr.state} />
         <CiStatusIcon status={pr.ciStatus} size={12} />
@@ -164,11 +183,18 @@ export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element
             )}
           </span>
         )}
-        {pr.additions !== null && pr.deletions !== null && (
-          <span className="ml-auto flex items-center gap-1.5 font-mono text-[11px]">
-            <span className="text-success">+{pr.additions}</span>
-            <span className="text-danger">-{pr.deletions}</span>
-          </span>
+        {badge ? (
+          <span className="ml-auto shrink-0">{badge}</span>
+        ) : (
+          // Queue rows name their repo instead: the +/- would crowd it out.
+          !showRepo &&
+          pr.additions !== null &&
+          pr.deletions !== null && (
+            <span className="ml-auto flex items-center gap-1.5 font-mono text-[11px]">
+              <span className="text-success">+{pr.additions}</span>
+              <span className="text-danger">-{pr.deletions}</span>
+            </span>
+          )
         )}
       </div>
     </button>

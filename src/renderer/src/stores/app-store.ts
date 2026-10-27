@@ -30,8 +30,11 @@ export type CenterTab = 'conversation' | 'files' | 'comments'
 export type DiffViewMode = 'split' | 'inline'
 /** Left column of the Files tab: folder tree, flat list, or the AI walkthrough's layers. */
 export type FileTreeMode = 'tree' | 'list' | 'layers'
-/** What the left column shows: the PR list or the stacked-PR view. */
-export type SidebarView = 'list' | 'stacks'
+/** What the left column shows: the review queue, the PR list by repo, or the stacked-PR view. */
+/** How many recently opened PRs the collapsed sidebar rail keeps. */
+const MAX_RECENT_PRS = 5
+
+export type SidebarView = 'queue' | 'list' | 'stacks'
 /** The reviewer's call on one walkthrough layer (full-screen walkthrough footer). */
 export type LayerVerdict = 'good' | 'changes' | 'question'
 
@@ -188,6 +191,8 @@ interface AppState {
    * verdict bar. Cleared whenever the review is left. Session only.
    */
   walkthroughFocus: boolean
+  /** The last PRs opened this session, newest first (the collapsed sidebar rail). */
+  recentPrs: PullRequestSummary[]
   /** Verdicts per PR (`prKey`) and layer (`layerVerdictKey`). Session only, never sent anywhere. */
   layerVerdicts: Record<string, Record<string, LayerVerdict>>
   aiModelInfo: AiSettingsInfo | null
@@ -296,10 +301,11 @@ export const useAppStore = create<AppState>((set) => ({
   settingsOpen: false,
   commandPaletteOpen: false,
   walkthroughFocus: false,
+  recentPrs: [],
   layerVerdicts: {},
   aiModelInfo: null,
 
-  sidebarView: 'list',
+  sidebarView: 'queue',
   sidebarCollapsed: readInitialSidebarCollapsed(),
   scmDataVersion: 0,
 
@@ -322,6 +328,14 @@ export const useAppStore = create<AppState>((set) => ({
       selectedFilePath: null,
       activeLayer: null,
       walkthroughFocus: false,
+      recentPrs: pr
+        ? [
+            pr,
+            ...state.recentPrs.filter(
+              (recent) => prKey(recent.repo, recent.number) !== prKey(pr.repo, pr.number),
+            ),
+          ].slice(0, MAX_RECENT_PRS)
+        : state.recentPrs,
       expandedThreadId: null,
       pendingThreadFocus: null,
       // Elegir un PR cierra el drawer de la lista (F16/T82): en `md`/`sm` la

@@ -4,6 +4,7 @@ import {
   attachScreenshot,
   closeMinerva,
   openPrDetails,
+  openReposView,
   launchMinerva,
   type MinervaApp,
 } from './fixtures'
@@ -61,7 +62,8 @@ test('Azure repos listed with the Azure icon; detail, diff and thread statuses',
   })
   expect(JSON.stringify(auth)).not.toMatch(/Basic |Bearer /)
 
-  // List: one group per Azure repo, each with the Azure provider icon.
+  // Repos view: one group per Azure repo, each with the Azure provider icon.
+  await openReposView(window)
   for (const fullName of AZURE_REPOS) {
     const header = aside(window).getByRole('button', { name: new RegExp(fullName) })
     await expect(header).toBeVisible()
