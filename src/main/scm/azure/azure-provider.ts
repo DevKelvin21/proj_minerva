@@ -4,8 +4,19 @@
  *
  * Scope: the organizations + projects saved in Settings (`scm.azure`, see
  * `../scm-settings.ts`). Every per-repo call checks that the repo's
- * organization is one of them, so a forged `RepoRef` can't make main look up
- * (and send) a credential for an organization the user never configured.
+ * organization AND project are configured and that `repositoryId` is a GUID,
+ * so a forged `RepoRef` can't make main look up (and send) a credential for
+ * an organization the user never configured, or reach outside its projects.
+ *
+ * Big PRs: only the first `maxFiles` (300) changes get a diff, but every
+ * change entry is still COUNTED (up to `MAX_CHANGES_COUNTED`), so the detail
+ * reports the true `changedFiles` + `filesTruncated`, threads on files past
+ * the cap are not mislabeled outdated, and commenting on one gives an
+ * accurate error. Iteration changes and built files are single-flight per
+ * `prKey@iteration` and cached under a count AND a memory budget.
+ *
+ * Fan-out: list queries (PR lists, stack candidates) share one limiter of
+ * `LIST_CONCURRENCY` requests in flight.
  *
  * `updatedAt`: Azure's PR object has no "last updated" field. It is derived
  * as the max of
@@ -45,11 +56,11 @@ import type {
   PullRequestSummary,
   SetThreadStatusRequest,
 } from '../../../shared/types'
+import { AZURE_GUID_RE, isAzureRepoRef } from '../../../shared/scm-guards'
 import { ScmError, toScmError } from '../errors'
 import type { ListPullRequestsQuery, ScmProvider, SnapshotRequest } from '../provider'
 import type { StackInputPr } from '../stacks'
 import type {
-  AzChangeEntry,
   AzComment,
   AzConnectionData,
   AzGitRef,
@@ -108,6 +119,8 @@ export interface AzureScmProviderOptions {
   diffBudget?: Partial<DiffBudget>
   /** Where repo zips are downloaded before extraction. Default: the OS temp dir. */
   tmpRoot?: () => string
+  /** Memory budget of the iteration cache. Default `FILES_CACHE_MAX_BYTES`. */
+  filesCacheMaxBytes?: number
 }
 
 /** Open PRs per role query; the active list of a whole project was ~120 in the real org. */
@@ -116,9 +129,23 @@ const LIST_TOP_COMPLETED = 100
 const LIST_TOP_ABANDONED = 50
 const STACK_CANDIDATES_MAX = 2000
 const CHANGES_PAGE = 2000
+/** Change entries counted past the diff cap (true `changedFiles`); a bound, not a budget. */
+export const MAX_CHANGES_COUNTED = 20_000
+const MAX_CHANGE_PAGES = Math.ceil(MAX_CHANGES_COUNTED / CHANGES_PAGE) + 1
 const FILES_CACHE_SIZE = 20
+/** Memory budget of the iteration cache (paths + patches, UTF-16 bytes). */
+export const FILES_CACHE_MAX_BYTES = 64 * 1024 * 1024
 const AUTH_STATUS_TTL_MS = 10_000
 const ITERATION_LOOKUP_CONCURRENCY = 4
+/** Requests in flight for list queries (PR lists, stack candidates), across orgs. */
+const LIST_CONCURRENCY = 6
+/** Retry delay of a failed "last push" lookup (403/404 are not retried for that head). */
+const ITERATION_RETRY_MS = 5 * 60_000
+/** PRs the activity tracker remembers (oldest dropped first). */
+const MAX_ACTIVITY_ENTRIES = 5000
+const PROJECTS_TTL_MS = 60_000
+const PROJECTS_FAILURE_TTL_MS = 10_000
+const MAX_PROJECT_LISTS = 20
 const MAX_WORK_ITEMS = 50
 const MAX_COMMITS_COUNTED = 1000
 const POLICY_API_VERSION = '7.1-preview.1'
@@ -137,11 +164,52 @@ interface ActivityEntry {
   /** Latest iteration date for `iterationHead`. */
   iterationDate: string | null
   iterationHead: string | null
+  /** Head whose lookup failed, and when to try it again (`Infinity` = not for this head). */
+  failedHead: string | null
+  retryAt: number
 }
 
 interface IterationFiles {
+  /** The first `maxFiles` changes: the ones that get a diff. */
   changes: AzureChange[]
+  /** Path of EVERY change counted, also past the cap. */
+  allPaths: ReadonlySet<string>
+  /** Changes counted: the true total unless `countCapped`. */
+  total: number
+  /** `total > changes.length`: some files have no diff. */
+  truncated: boolean
+  /** Counting stopped at `MAX_CHANGES_COUNTED`: `allPaths` is incomplete. */
+  countCapped: boolean
   files: DiffFile[] | null
+  /** Approximate memory (bytes) for the cache budget. */
+  bytes: number
+}
+
+/** UTF-16 bytes of a string, plus a flat overhead per object. */
+const approxBytes = (text: string | undefined): number => 64 + 2 * (text?.length ?? 0)
+
+function filesBytes(files: DiffFile[]): number {
+  return files.reduce(
+    (sum, file) =>
+      sum + approxBytes(file.patch) + approxBytes(file.path) + approxBytes(file.previousPath),
+    0,
+  )
+}
+
+/** At most `limit` calls of the returned runner in flight; the rest wait in order. */
+export function createLimiter(limit: number): <T>(fn: () => Promise<T>) => Promise<T> {
+  let active = 0
+  const queue: (() => void)[] = []
+  return async (fn) => {
+    while (active >= limit) await new Promise<void>((resolve) => queue.push(resolve))
+    active++
+    try {
+      return await fn()
+    } finally {
+      active--
+      queue.shift()?.()
+    }
+  }
 }
 
 function asAzureRepo(repo: RepoRef): AzureRepoRef {
@@ -243,11 +311,20 @@ export class AzureScmProvider implements ScmProvider {
   private readonly now: () => number
   private readonly diffBudget: Partial<DiffBudget>
   private readonly tmpRoot: () => string
+  private readonly filesCacheMaxBytes: number
 
   private readonly identities = new Map<string, Promise<Identity>>()
   private readonly activity = new Map<string, ActivityEntry>()
-  /** `prKey@iteration` -> changes (+ built files). Iterations are immutable. */
+  /** `prKey@iteration` -> changes (+ built files), LRU. Iterations are immutable. */
   private readonly iterationFiles = new Map<string, IterationFiles>()
+  private iterationBytes = 0
+  private readonly changesInFlight = new Map<string, Promise<IterationFiles>>()
+  private readonly filesInFlight = new Map<string, Promise<DiffFile[]>>()
+  private readonly projectLists = new Map<
+    string,
+    { at: number; failed: boolean; promise: Promise<string[]> }
+  >()
+  private readonly listLimit = createLimiter(LIST_CONCURRENCY)
   private authStatus: { at: number; promise: Promise<ScmAuthStatus> } | null = null
 
   constructor(options: AzureScmProviderOptions) {
@@ -257,13 +334,23 @@ export class AzureScmProvider implements ScmProvider {
     this.now = options.now ?? Date.now
     this.diffBudget = options.diffBudget ?? {}
     this.tmpRoot = options.tmpRoot ?? tmpdir
+    this.filesCacheMaxBytes = options.filesCacheMaxBytes ?? FILES_CACHE_MAX_BYTES
   }
 
-  /** Drops identity and auth caches (settings changed, or the user re-ran `az devops login`). */
-  invalidate(): void {
+  /**
+   * Drops identity, auth and activity caches (settings changed). With
+   * `credentials` (default) also the credential and project-list caches (the
+   * user may have re-run `az devops login`): the next call re-reads the az
+   * keyring, so callers rate-limit that part (`../azure-org-access.ts`).
+   */
+  invalidate(options: { credentials?: boolean } = {}): void {
     this.identities.clear()
+    this.activity.clear()
     this.authStatus = null
-    this.credentials.invalidate()
+    if (options.credentials ?? true) {
+      this.projectLists.clear()
+      this.credentials.invalidate()
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -275,14 +362,32 @@ export class AzureScmProvider implements ScmProvider {
     return config.enabled ? config.organizations : []
   }
 
-  /** Throws unless `repo` belongs to a configured organization. */
-  private scoped(repoRef: RepoRef): AzureRepoRef {
+  /**
+   * Throws unless `repo` is well-formed (GUID id, no `.`/`..` segments) and
+   * belongs to a configured organization AND one of its configured projects.
+   */
+  protected scoped(repoRef: RepoRef): AzureRepoRef {
     const repo = asAzureRepo(repoRef)
+    if (!isAzureRepoRef(repo) || !AZURE_GUID_RE.test(repo.repositoryId)) {
+      throw new ScmError('NOT_FOUND', 'Not a valid Azure DevOps repository: ' + repo.fullName)
+    }
     const org = repo.organization.toLowerCase()
-    if (!this.organizations().some((entry) => entry.organization.toLowerCase() === org)) {
+    const entry = this.organizations().find((item) => item.organization.toLowerCase() === org)
+    if (!entry) {
       throw new ScmError(
         'FORBIDDEN',
         'Azure DevOps organization ' + repo.organization + ' is not configured in Settings.',
+      )
+    }
+    const project = repo.project.toLowerCase()
+    if (!entry.projects.some((name) => name.toLowerCase() === project)) {
+      throw new ScmError(
+        'FORBIDDEN',
+        'Azure DevOps project ' +
+          repo.project +
+          ' is not configured for ' +
+          repo.organization +
+          ' in Settings.',
       )
     }
     return repo
@@ -358,20 +463,42 @@ export class AzureScmProvider implements ScmProvider {
 
   /**
    * Project names of `organization`, for the Settings picker. NOT scoped to
-   * the configured orgs on purpose (the user is configuring one); the name
-   * is validated by the IPC layer and the client only ever sends that org's
-   * own credential to that org's URLs.
+   * the configured orgs on purpose (the user is configuring one): the IPC
+   * handler gates the org first (`../azure-org-access.ts`), and the client
+   * only ever sends that org's own credential to that org's URLs. Cached per
+   * org (`PROJECTS_TTL_MS`, failures `PROJECTS_FAILURE_TTL_MS`).
    */
-  async listProjects(organization: string): Promise<string[]> {
-    const projects = await this.client.listContinuation<{ name: string; state?: string }>(
-      organization,
-      orgApiUrl(organization, '_apis', 'projects'),
-      { query: { $top: 500, stateFilter: 'wellFormed' }, maxItems: 2000 },
-    )
-    return projects
-      .map((project) => project.name)
-      .filter((name) => typeof name === 'string' && name.length > 0)
-      .sort((a, b) => a.localeCompare(b))
+  listProjects(organization: string): Promise<string[]> {
+    const key = organization.toLowerCase()
+    const hit = this.projectLists.get(key)
+    const at = this.now()
+    if (hit && at - hit.at < (hit.failed ? PROJECTS_FAILURE_TTL_MS : PROJECTS_TTL_MS)) {
+      return hit.promise
+    }
+    const promise = this.client
+      .listContinuation<{ name: string; state?: string }>(
+        organization,
+        orgApiUrl(organization, '_apis', 'projects'),
+        { query: { $top: 500, stateFilter: 'wellFormed' }, maxItems: 2000 },
+      )
+      .then((projects) =>
+        projects
+          .map((project) => project.name)
+          .filter((name) => typeof name === 'string' && name.length > 0)
+          .sort((a, b) => a.localeCompare(b)),
+      )
+    const entry = { at, failed: false, promise }
+    promise.catch(() => {
+      entry.failed = true
+    })
+    this.projectLists.delete(key)
+    this.projectLists.set(key, entry)
+    while (this.projectLists.size > MAX_PROJECT_LISTS) {
+      const oldest = this.projectLists.keys().next().value
+      if (oldest === undefined) break
+      this.projectLists.delete(oldest)
+    }
+    return promise
   }
 
   // -------------------------------------------------------------------------
@@ -381,6 +508,7 @@ export class AzureScmProvider implements ScmProvider {
   async listPullRequests(q: ListPullRequestsQuery): Promise<PullRequestSummary[]> {
     const orgs = this.organizations()
     if (orgs.length === 0) return []
+    // Orgs in parallel; their requests share `listLimit`.
     const settled = await Promise.allSettled(orgs.map((org) => this.listForOrg(org, q)))
     const fulfilled = settled.filter(
       (outcome): outcome is PromiseFulfilledResult<PullRequestSummary[]> =>
@@ -425,8 +553,8 @@ export class AzureScmProvider implements ScmProvider {
       for (const role of ['creatorId', 'reviewerId']) {
         for (const [status, top] of statuses) {
           queries.push(
-            this.client
-              .json<AzListResponse<AzPullRequest>>(
+            this.listLimit(() =>
+              this.client.json<AzListResponse<AzPullRequest>>(
                 org,
                 orgApiUrl(org, project, '_apis', 'git', 'pullrequests'),
                 {
@@ -436,8 +564,8 @@ export class AzureScmProvider implements ScmProvider {
                     $top: top,
                   },
                 },
-              )
-              .then((data) => data.value ?? []),
+              ),
+            ).then((data) => data.value ?? []),
           )
         }
       }
@@ -467,22 +595,32 @@ export class AzureScmProvider implements ScmProvider {
       const key = keyOf(pr, org)
       const print = fingerprint(pr)
       const head = pr.lastMergeSourceCommit?.commitId ?? ''
-      const entry = this.activity.get(key)
+      let entry = this.activity.get(key)
       if (!entry) {
-        this.activity.set(key, {
+        entry = {
           fingerprint: print,
           changedAt: null,
           iterationDate: null,
           iterationHead: null,
-        })
+          failedHead: null,
+          retryAt: 0,
+        }
       } else if (entry.fingerprint !== print) {
         entry.fingerprint = print
         entry.changedAt = nowIso
       }
-      const current = this.activity.get(key) as ActivityEntry
-      if (pr.status === 'active' && head && current.iterationHead !== head) {
+      // Re-insert: Map order is the LRU order the cap below trims.
+      this.activity.delete(key)
+      this.activity.set(key, entry)
+      const failedRecently = entry.failedHead === head && this.now() < entry.retryAt
+      if (pr.status === 'active' && head && entry.iterationHead !== head && !failedRecently) {
         needIteration.push({ key, pr, head })
       }
+    }
+    while (this.activity.size > MAX_ACTIVITY_ENTRIES) {
+      const oldest = this.activity.keys().next().value
+      if (oldest === undefined) break
+      this.activity.delete(oldest)
     }
     await mapWithConcurrency(needIteration, ITERATION_LOOKUP_CONCURRENCY, async (item) => {
       try {
@@ -493,9 +631,20 @@ export class AzureScmProvider implements ScmProvider {
           entry.iterationHead = item.head
           entry.iterationDate =
             latestDate(iterations.map((iteration) => iteration.createdDate)) || null
+          entry.failedHead = null
         }
-      } catch {
+      } catch (error) {
         // Best-effort: without it, `updatedAt` falls back to the other dates.
+        // Negative cache per head commit, so a 403/404 isn't retried every poll.
+        const entry = this.activity.get(item.key)
+        if (entry) {
+          const code = toScmError(error).code
+          entry.failedHead = item.head
+          entry.retryAt =
+            code === 'FORBIDDEN' || code === 'NOT_FOUND'
+              ? Number.POSITIVE_INFINITY
+              : this.now() + ITERATION_RETRY_MS
+        }
       }
     })
   }
@@ -536,8 +685,17 @@ export class AzureScmProvider implements ScmProvider {
     const org = repo.organization
     const pr = await this.rawPullRequest(repo, number)
     const projectId = pr.repository.project.id
-    const [iterations, statuses, evaluations, workItems, commits] = await Promise.all([
-      this.iterations(repo, number).catch(() => [] as AzIteration[]),
+    const [{ iterations, changes }, statuses, evaluations, workItems, commits] = await Promise.all([
+      // The changes give the true file count (cheap: counted, not diffed; cached).
+      this.iterations(repo, number)
+        .catch(() => [] as AzIteration[])
+        .then(async (list) => {
+          const last = latestIteration(list)
+          const counted = last
+            ? await this.iterationChanges(repo, number, last.id).catch(() => null)
+            : null
+          return { iterations: list, changes: counted }
+        }),
       this.client
         .json<AzListResponse<AzPullRequestStatusEntry>>(
           org,
@@ -574,7 +732,6 @@ export class AzureScmProvider implements ScmProvider {
       entry?.changedAt,
       entry?.iterationDate,
     ])
-    const cachedFiles = latest ? this.iterationFiles.get(key + '@' + latest.id)?.files : null
     const detail: PullRequestDetail = {
       ...summary,
       ciStatus: mapCiStatus(statuses, evaluations),
@@ -586,10 +743,14 @@ export class AzureScmProvider implements ScmProvider {
       commits,
       workItems,
     }
-    if (cachedFiles) {
-      detail.changedFiles = cachedFiles.length
-      detail.additions = cachedFiles.reduce((sum, file) => sum + file.additions, 0)
-      detail.deletions = cachedFiles.reduce((sum, file) => sum + file.deletions, 0)
+    if (changes) {
+      detail.changedFiles = changes.total
+      if (changes.truncated) detail.filesTruncated = true
+      // Line totals only when every file was diffed (a partial sum would lie).
+      if (changes.files && !changes.truncated) {
+        detail.additions = changes.files.reduce((sum, file) => sum + file.additions, 0)
+        detail.deletions = changes.files.reduce((sum, file) => sum + file.deletions, 0)
+      }
     }
     return detail
   }
@@ -634,49 +795,126 @@ export class AzureScmProvider implements ScmProvider {
       })
   }
 
-  /** Changes of `iteration` vs. the merge base (`$compareTo=0`), folders dropped, capped. */
-  private async iterationChanges(
+  private cacheGet(key: string): IterationFiles | undefined {
+    const hit = this.iterationFiles.get(key)
+    if (hit) {
+      this.iterationFiles.delete(key)
+      this.iterationFiles.set(key, hit)
+    }
+    return hit
+  }
+
+  /** (Re)inserts `value` as the newest entry, then trims by count and bytes (never the newest). */
+  private cachePut(key: string, value: IterationFiles): void {
+    const previous = this.iterationFiles.get(key)
+    if (previous) {
+      this.iterationBytes -= previous.bytes
+      this.iterationFiles.delete(key)
+    }
+    this.iterationFiles.set(key, value)
+    this.iterationBytes += value.bytes
+    while (
+      this.iterationFiles.size > 1 &&
+      (this.iterationFiles.size > FILES_CACHE_SIZE || this.iterationBytes > this.filesCacheMaxBytes)
+    ) {
+      const oldest = this.iterationFiles.keys().next().value
+      if (oldest === undefined || oldest === key) break
+      this.iterationBytes -= this.iterationFiles.get(oldest)?.bytes ?? 0
+      this.iterationFiles.delete(oldest)
+    }
+  }
+
+  /** Entries and bytes held by the iteration cache (for tests). */
+  iterationCacheStats(): { entries: number; bytes: number } {
+    return { entries: this.iterationFiles.size, bytes: this.iterationBytes }
+  }
+
+  /**
+   * Changes of `iteration` vs. the merge base (`$compareTo=0`), folders
+   * dropped: the first `maxFiles` kept, the rest only counted. Single-flight.
+   */
+  private iterationChanges(
     repo: AzureRepoRef,
     number: number,
     iteration: number,
   ): Promise<IterationFiles> {
     const cacheKey = prKey(repo, number) + '@' + iteration
-    const cached = this.iterationFiles.get(cacheKey)
-    if (cached) return cached
+    const cached = this.cacheGet(cacheKey)
+    if (cached) return Promise.resolve(cached)
+    const pending = this.changesInFlight.get(cacheKey)
+    if (pending) return pending
+    const promise = this.fetchIterationChanges(repo, number, iteration)
+      .then((result) => {
+        this.cachePut(cacheKey, result)
+        return result
+      })
+      .finally(() => this.changesInFlight.delete(cacheKey))
+    this.changesInFlight.set(cacheKey, promise)
+    return promise
+  }
+
+  private async fetchIterationChanges(
+    repo: AzureRepoRef,
+    number: number,
+    iteration: number,
+  ): Promise<IterationFiles> {
     const maxFiles = this.diffBudget.maxFiles ?? DEFAULT_DIFF_BUDGET.maxFiles
-    const entries: AzChangeEntry[] = []
     const changes: AzureChange[] = []
+    const allPaths = new Set<string>()
+    let total = 0
+    let bytes = 0
+    let more = false
     let skip = 0
-    for (let page = 0; page < 50 && changes.length < maxFiles; page++) {
+    for (let page = 0; page < MAX_CHANGE_PAGES; page++) {
       const data = await this.client.json<AzIterationChanges>(
         repo.organization,
         this.repoUrl(repo, 'pullRequests', number, 'iterations', iteration, 'changes'),
         { query: { $compareTo: 0, $top: CHANGES_PAGE, $skip: skip } },
       )
-      entries.push(...(data.changeEntries ?? []))
       for (const entry of data.changeEntries ?? []) {
         const change = mapChangeEntry(entry)
-        if (change) changes.push(change)
+        if (!change) continue
+        if (total >= MAX_CHANGES_COUNTED) {
+          more = true
+          break
+        }
+        total++
+        allPaths.add(change.path)
+        bytes += approxBytes(change.path)
+        if (changes.length < maxFiles) changes.push(change)
       }
-      if (!data.nextSkip || data.nextSkip <= skip) break
+      more = more || Boolean(data.nextSkip && data.nextSkip > skip)
+      if (!data.nextSkip || data.nextSkip <= skip || total >= MAX_CHANGES_COUNTED) break
       skip = data.nextSkip
     }
-    const result: IterationFiles = { changes: changes.slice(0, maxFiles), files: null }
-    this.iterationFiles.set(cacheKey, result)
-    while (this.iterationFiles.size > FILES_CACHE_SIZE) {
-      const oldest = this.iterationFiles.keys().next().value
-      if (oldest === undefined) break
-      this.iterationFiles.delete(oldest)
+    const countCapped = more && total >= MAX_CHANGES_COUNTED
+    return {
+      changes,
+      allPaths,
+      total,
+      truncated: total > changes.length || countCapped,
+      countCapped,
+      files: null,
+      bytes,
     }
-    return result
+  }
+
+  /** Paths to judge "file left the PR" by; `null` when the count was capped (unknown). */
+  private static knownPaths(
+    iteration: IterationFiles | null | undefined,
+  ): ReadonlySet<string> | null {
+    return iteration && !iteration.countCapped ? iteration.allPaths : null
   }
 
   async getPullRequestFiles(repoRef: RepoRef, number: number): Promise<DiffFile[]> {
     const repo = this.scoped(repoRef)
     const latest = await this.requireLatestIteration(repo, number)
+    const cacheKey = prKey(repo, number) + '@' + latest.id
     const iteration = await this.iterationChanges(repo, number, latest.id)
     if (iteration.files) return iteration.files
-    const files = await buildDiffFiles(
+    const pending = this.filesInFlight.get(cacheKey)
+    if (pending) return pending
+    const promise = buildDiffFiles(
       iteration.changes,
       (objectId, maxBytes) =>
         this.client.binary(repo.organization, this.repoUrl(repo, 'blobs', objectId), {
@@ -685,8 +923,15 @@ export class AzureScmProvider implements ScmProvider {
         }),
       this.diffBudget,
     )
-    iteration.files = files
-    return files
+      .then((files) => {
+        iteration.files = files
+        // Re-put (also if it was evicted meanwhile) so the bytes are counted.
+        this.cachePut(cacheKey, { ...iteration, bytes: iteration.bytes + filesBytes(files) })
+        return files
+      })
+      .finally(() => this.filesInFlight.delete(cacheKey))
+    this.filesInFlight.set(cacheKey, promise)
+    return promise
   }
 
   private async threadsAt(
@@ -722,7 +967,7 @@ export class AzureScmProvider implements ScmProvider {
       this.threadsAt(repo, number, latest.id),
       this.iterationChanges(repo, number, latest.id).catch(() => null),
     ])
-    const paths = iteration ? new Set(iteration.changes.map((change) => change.path)) : null
+    const paths = AzureScmProvider.knownPaths(iteration)
     return threads
       .map((thread) => this.finishThread(thread, repo, number, latest.id, paths))
       .filter((thread): thread is CommentThread => thread !== null)
@@ -760,13 +1005,23 @@ export class AzureScmProvider implements ScmProvider {
     }
     if (req.path && req.line !== undefined) {
       const latest = await this.requireLatestIteration(repo, req.number)
-      const { changes } = await this.iterationChanges(repo, req.number, latest.id)
+      const iteration = await this.iterationChanges(repo, req.number, latest.id)
       const path = toRepoPath(req.path)
-      const change = changes.find((entry) => entry.path === path)
+      const change = iteration.changes.find((entry) => entry.path === path)
       if (!change) {
+        const pastCap = iteration.allPaths.has(path) || iteration.countCapped
         throw new ScmError(
           'NOT_FOUND',
-          'Cannot comment on ' + path + ': the file is not part of the latest iteration.',
+          pastCap
+            ? 'Cannot comment on ' +
+                path +
+                ' from Minerva: the pull request changes ' +
+                (iteration.countCapped ? 'more than ' : '') +
+                iteration.total +
+                ' files and only the first ' +
+                iteration.changes.length +
+                ' are loaded. Comment on it in Azure DevOps.'
+            : 'Cannot comment on ' + path + ': the file is not part of the latest iteration.',
         )
       }
       const position = { line: req.line, offset: 1 }
@@ -804,7 +1059,7 @@ export class AzureScmProvider implements ScmProvider {
     const cached = latest
       ? this.iterationFiles.get(prKey(repo, req.number) + '@' + latest.id)
       : undefined
-    const paths = cached ? new Set(cached.changes.map((change) => change.path)) : null
+    const paths = AzureScmProvider.knownPaths(cached)
     const mapped = this.finishThread(thread, repo, req.number, latest?.id ?? null, paths)
     if (!mapped) throw new ScmError('NOT_FOUND', 'Comment thread not found: ' + req.threadId)
     return mapped
@@ -877,14 +1132,16 @@ export class AzureScmProvider implements ScmProvider {
     for (const entry of this.organizations()) {
       const lists = await Promise.all(
         entry.projects.map((project) =>
-          this.client.listTopSkip<AzPullRequest>(
-            entry.organization,
-            orgApiUrl(entry.organization, project, '_apis', 'git', 'pullrequests'),
-            {
-              query: { 'searchCriteria.status': 'active' },
-              pageSize: 500,
-              maxItems: STACK_CANDIDATES_MAX,
-            },
+          this.listLimit(() =>
+            this.client.listTopSkip<AzPullRequest>(
+              entry.organization,
+              orgApiUrl(entry.organization, project, '_apis', 'git', 'pullrequests'),
+              {
+                query: { 'searchCriteria.status': 'active' },
+                pageSize: 500,
+                maxItems: STACK_CANDIDATES_MAX,
+              },
+            ),
           ),
         ),
       )

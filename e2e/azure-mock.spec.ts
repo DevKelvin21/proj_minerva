@@ -1,4 +1,11 @@
-import { test, expect, attachScreenshot } from './fixtures'
+import {
+  test as base,
+  expect,
+  attachScreenshot,
+  closeMinerva,
+  launchMinerva,
+  type MinervaApp,
+} from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -8,7 +15,22 @@ import type { Page } from './fixtures'
  * Azure-only status, and the new channels through the preload API
  * (stacks with the orphan, file content, thread status, retarget). Every
  * write lands in the fake's memory only.
+ *
+ * Main confirms retargets (and new Azure orgs) with a native dialog. Tests
+ * can't click it, so the app runs with `MINERVA_TEST_CONFIRM` (honored only
+ * with `MINERVA_MOCK=1`): `accept` by default, `decline` in its own suite.
  */
+
+const test = base.extend<{ confirmAnswer: 'accept' | 'decline'; minerva: MinervaApp }>({
+  confirmAnswer: ['accept', { option: true }],
+  minerva: async ({ confirmAnswer }, use, testInfo) => {
+    const app = await launchMinerva(testInfo.outputPath('user-data'), {
+      env: { MINERVA_TEST_CONFIRM: confirmAnswer },
+    })
+    await use(app)
+    await closeMinerva(app)
+  },
+})
 
 const aside = (page: Page) => page.locator('aside')
 const AZURE_REPOS = [
@@ -189,7 +211,7 @@ test('Azure channels via the preload: stacks + orphan, file content, status, ret
       }),
     azureRepo,
   )
-  expect(retargeted).toMatchObject({ number: 105, baseRef: 'main' })
+  expect(retargeted).toMatchObject({ outcome: 'retargeted', pr: { number: 105, baseRef: 'main' } })
 
   const after = await window.evaluate(() => window.minerva.scm.getStacks())
   expect(
@@ -256,4 +278,58 @@ test('AI (MINERVA_MOCK_AI=1) analyzes an Azure PR through the real context pipel
   await expect(window.getByText('repository snapshot ready').first()).toBeVisible()
   await expect(window.getByText('Open in Azure DevOps').first()).toBeVisible()
   await attachScreenshot(window, testInfo, 'azure-ai-summary')
+})
+
+test.describe('when the user declines the native confirmation', () => {
+  test.use({ confirmAnswer: 'decline' })
+
+  test('retarget answers cancelled and writes nothing', async ({ window }) => {
+    const result = await window.evaluate(
+      (repo) =>
+        window.minerva.scm.retarget({
+          repo,
+          number: 105,
+          expectedCurrentBase: 'feature/refund-schema',
+          newBase: 'main',
+        }),
+      azureRepo,
+    )
+    expect(result).toEqual({ outcome: 'cancelled' })
+
+    const detail = await window.evaluate(
+      (repo) => window.minerva.scm.getPullRequestDetail({ repo, number: 105 }),
+      azureRepo,
+    )
+    expect(detail.baseRef).toBe('feature/refund-schema')
+    const stacks = await window.evaluate(() => window.minerva.scm.getStacks({ refresh: true }))
+    expect(
+      stacks.stacks.find((stack: { root: { number: number } }) => stack.root.number === 105)?.root
+        .orphan?.suggestedBase,
+    ).toBe('main')
+  })
+
+  test('a new Azure organization is not saved, and its projects are not loaded', async ({
+    window,
+  }) => {
+    const before = await window.evaluate(() => window.minerva.scm.getSettings())
+    const after = await window.evaluate(() =>
+      window.minerva.scm.setProviderSettings({
+        azure: { enabled: true, organizations: [{ organization: 'fabrikam', projects: ['Web'] }] },
+      }),
+    )
+    expect(after).toEqual(before)
+    expect(after.azureSettingsSource).toBe('none')
+
+    const projects = await window.evaluate(() =>
+      window.minerva.scm.listAzureProjects({ organization: 'fabrikam' }).then(
+        () => 'loaded',
+        (error: Error) => error.message,
+      ),
+    )
+    expect(projects).toContain('[SCM:FORBIDDEN]')
+    // The configured mock org needs no confirmation.
+    await expect(
+      window.evaluate(() => window.minerva.scm.listAzureProjects({ organization: 'contoso' })),
+    ).resolves.toEqual({ projects: ['Platform'] })
+  })
 })

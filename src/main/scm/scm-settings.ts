@@ -45,6 +45,11 @@ export interface ScmSettingsService {
   /** Reads the az defaults (once). Safe to call again; later calls are no-ops. */
   load(): Promise<void>
   current(): EffectiveScmSettings
+  /**
+   * Organizations `az` knows (default + stored `az devops login`s). Mock mode:
+   * the mock organizations only, so a real config never leaks into the demo.
+   */
+  knownAzureOrganizations(): string[]
   /** Validates, persists and answers the new effective settings. */
   save(req: SetProviderSettingsRequest): EffectiveScmSettings
 }
@@ -105,6 +110,10 @@ export function createScmSettings(deps: ScmSettingsDeps): ScmSettingsService {
       return loading
     },
     current,
+    knownAzureOrganizations() {
+      if (deps.isMock()) return deps.mockAzureOrganizations.map((entry) => entry.organization)
+      return [...(defaults?.knownOrganizations ?? [])]
+    },
     save(req) {
       const saved = deps.store.getScmSettings()
       const next: PersistedScmSettings = { ...saved }

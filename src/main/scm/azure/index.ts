@@ -10,7 +10,6 @@
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve, sep } from 'node:path'
-import { ScmError } from '../errors'
 import type { SnapshotRequest } from '../provider'
 import { AzureScmProvider, type AzureProviderConfig } from './azure-provider'
 import { AzureDevOpsClient, type CredentialProvider } from './client'
@@ -63,11 +62,9 @@ export class MockAzureScmProvider extends AzureScmProvider {
 
   /** Cheap snapshot: the fixture files at that head commit, written straight to `destDir`. */
   override async writeSnapshot(req: SnapshotRequest, destDir: string): Promise<void> {
-    if (req.repo.provider !== 'azure') {
-      throw new ScmError('NOT_FOUND', 'Not an Azure DevOps repository: ' + req.repo.fullName)
-    }
+    const repo = this.scoped(req.repo)
     const root = resolve(destDir)
-    for (const file of this.server.snapshotFiles(req.repo.repositoryId, req.headSha)) {
+    for (const file of this.server.snapshotFiles(repo.repositoryId, req.headSha)) {
       const target = resolve(root, file.path.split('/').join(sep))
       if (!target.startsWith(root + sep)) continue
       await mkdir(dirname(target), { recursive: true })

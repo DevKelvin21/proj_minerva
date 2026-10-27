@@ -54,6 +54,18 @@ function sentUrl(fetchMock: FetchMock, call = 0): URL {
 }
 
 describe('URL helpers', () => {
+  it('refuses dot and empty segments instead of letting the URL parser resolve them', () => {
+    for (const bad of ['.', '..', '']) {
+      expect(() => orgApiUrl(bad)).toThrow(/Invalid Azure DevOps URL segment/)
+      expect(() => orgApiUrl('Contoso', bad, '_apis')).toThrow(/Invalid Azure DevOps URL segment/)
+      expect(() => gitRepoUrl('Contoso', 'Platform', bad, 'pullRequests')).toThrow(
+        /Invalid Azure DevOps URL segment/,
+      )
+    }
+    // Dots inside a name are fine (and never resolved: they are not whole segments).
+    expect(new URL(orgApiUrl('Contoso', 'my..project')).pathname).toBe('/Contoso/my..project')
+  })
+
   it('encodes segments and adds api-version', async () => {
     const f = fetchSeq(json({ ok: 1 }))
     const client = new AzureDevOpsClient({ credentials: creds(), fetch: f })

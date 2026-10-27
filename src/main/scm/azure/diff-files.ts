@@ -7,7 +7,8 @@
  * not enough: 300 files x 1 MB x 2 sides is 600 MB of downloads and minutes of
  * diffing. The budget:
  *
- * - `maxFiles` (300, same as the GitHub path): later entries are dropped.
+ * - `maxFiles` (300, same as the GitHub path): later entries are dropped here;
+ *   the provider still counts them and flags the PR `filesTruncated`.
  * - `maxTotalBytes`: blob bytes downloaded for the PR. Once spent, the
  *   remaining files are listed with `patchOmitted: 'diff_budget'` and no
  *   download. Fetches already in flight may overshoot by at most

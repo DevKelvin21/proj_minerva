@@ -31,6 +31,8 @@ const MAX_BODY_LEN = 65536
 const MAX_THREAD_ID_LEN = 200
 const MAX_PATH_LEN = 500
 const MAX_PR_NUMBER = 1_000_000
+/** Highest diff line a comment can anchor to. */
+const MAX_LINE = 1_000_000
 const MAX_AI_MODEL_LEN = 100
 const MAX_PR_TITLE_LEN = 300
 const MAX_OPTION_ID_LEN = 50
@@ -58,12 +60,6 @@ function isOptionalString(value: unknown, maxLen: number): boolean {
 
 function isIntInRange(value: unknown, min: number, max: number): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
-}
-
-function isOptionalIntGte(value: unknown, min: number): boolean {
-  return (
-    value === undefined || (typeof value === 'number' && Number.isInteger(value) && value >= min)
-  )
 }
 
 /** Forma común a `getPullRequestDetail/Files/getCommentThreads` y `ai:analyzePullRequest`. */
@@ -112,7 +108,7 @@ function isPostCommentPayload(value: unknown): boolean {
   if (!isNonEmptyString(value.bodyMarkdown, MAX_BODY_LEN)) return false
   if (!isOptionalString(value.threadId, MAX_THREAD_ID_LEN)) return false
   if (!isOptionalString(value.path, MAX_PATH_LEN)) return false
-  if (!isOptionalIntGte(value.line, 1)) return false
+  if (value.line !== undefined && !isIntInRange(value.line, 1, MAX_LINE)) return false
   if (value.side !== undefined && value.side !== 'LEFT' && value.side !== 'RIGHT') return false
   return true
 }

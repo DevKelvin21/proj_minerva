@@ -312,6 +312,54 @@ interface ReviewThreadMutationResponse {
   unresolveReviewThread?: { thread: ReviewThreadNode }
 }
 
+/**
+ * The PR a review thread node belongs to. Thread node ids are GLOBAL, so a
+ * write must first check the thread is in `repo#number` (what the user is
+ * looking at), or a forged id could resolve/reply on any PR the token reaches.
+ */
+const REVIEW_THREAD_OWNER_QUERY =
+  'query ReviewThreadOwner($threadId: ID!) {' +
+  '  node(id: $threadId) {' +
+  '    __typename' +
+  '    ... on PullRequestReviewThread {' +
+  '      pullRequest { number repository { nameWithOwner } }' +
+  '    }' +
+  '  }' +
+  '}'
+
+interface ReviewThreadOwnerResponse {
+  node: {
+    __typename: string
+    pullRequest?: { number: number; repository: { nameWithOwner: string } }
+  } | null
+}
+
+/** Throws `NOT_FOUND` unless `threadId` is a review thread of `repo#number`. */
+export async function assertReviewThreadOf(
+  client: Pick<Octokit, 'graphql'>,
+  threadId: string,
+  repo: GithubRepoRef,
+  number: number,
+): Promise<void> {
+  const data = await client.graphql<ReviewThreadOwnerResponse>(REVIEW_THREAD_OWNER_QUERY, {
+    threadId,
+  })
+  const owner = data.node?.__typename === 'PullRequestReviewThread' ? data.node.pullRequest : null
+  if (
+    !owner ||
+    owner.number !== number ||
+    owner.repository.nameWithOwner.toLowerCase() !== repo.fullName.toLowerCase()
+  ) {
+    throw new ScmError(
+      'NOT_FOUND',
+      'Comment thread not found in ' + repo.fullName + '#' + number + ': ' + threadId.slice(0, 80),
+    )
+  }
+}
+
+/** Files the PR files API is paged to (GitHub itself stops at 3000). */
+export const MAX_PR_FILES = 300
+
 /** Repos per stack-candidate search query (GitHub search caps query length). */
 const STACK_REPOS_PER_QUERY = 10
 /** Repos considered for stacks at most (the ones with the most recent PRs win). */
@@ -460,6 +508,8 @@ function mapDetailNode(pr: PullRequestDetailNode, repo: GithubRepoRef): PullRequ
     labels: (pr.labels?.nodes ?? []).map((label) => ({ name: label.name, color: label.color })),
     reviewers: mapReviewers(pr),
     commits: pr.commitCount?.totalCount ?? 0,
+    // `getPullRequestFiles` stops at MAX_PR_FILES; `changedFiles` stays the true total.
+    ...((pr.changedFiles ?? 0) > MAX_PR_FILES ? { filesTruncated: true } : {}),
   }
 }
 
@@ -622,8 +672,14 @@ export function mapGithubError(error: unknown, repoFullName?: string): ScmError 
 // Servicio real.
 // ---------------------------------------------------------------------------
 
+/** The Octokit surface the service uses (a fake in unit tests). */
+export type GithubClient = Pick<Octokit, 'graphql' | 'rest' | 'request'>
+
 export class RealGithubService implements ScmDataSource {
-  constructor(private readonly getToken: () => string | null) {}
+  constructor(
+    private readonly getToken: () => string | null,
+    private readonly createClient?: (token: string) => GithubClient,
+  ) {}
 
   private requireToken(): string {
     const token = this.getToken()
@@ -636,7 +692,8 @@ export class RealGithubService implements ScmDataSource {
     return token
   }
 
-  private client(token: string): Octokit {
+  private client(token: string): GithubClient {
+    if (this.createClient) return this.createClient(token)
     return new Octokit({
       auth: token,
       throttle: {
@@ -710,7 +767,7 @@ export class RealGithubService implements ScmDataSource {
     try {
       const client = this.client(token)
       const perPage = 100
-      const maxFiles = 300
+      const maxFiles = MAX_PR_FILES
       const files: Awaited<ReturnType<Octokit['rest']['pulls']['listFiles']>>['data'] = []
 
       for (let page = 1; files.length < maxFiles; page++) {
@@ -774,6 +831,7 @@ export class RealGithubService implements ScmDataSource {
       // hilo real para GitHub — una "respuesta" a uno de esos cae al caso
       // general (caso 3), como cualquier otro comentario del PR.
       if (req.threadId && !req.threadId.startsWith(ISSUE_THREAD_PREFIX)) {
+        await assertReviewThreadOf(client, req.threadId, repo, req.number)
         const data = await client.graphql<AddReviewThreadReplyResponse>(
           ADD_REVIEW_THREAD_REPLY_MUTATION,
           { threadId: req.threadId, body: req.bodyMarkdown },
@@ -827,6 +885,7 @@ export class RealGithubService implements ScmDataSource {
     const token = this.requireToken()
     try {
       const client = this.client(token)
+      await assertReviewThreadOf(client, req.threadId, repo, req.number)
       const resolve = req.status === 'resolved'
       const data = await client.graphql<ReviewThreadMutationResponse>(
         resolve ? RESOLVE_REVIEW_THREAD_MUTATION : UNRESOLVE_REVIEW_THREAD_MUTATION,

@@ -12,10 +12,15 @@
  *    one exists, `branchExists` for the stale target.
  * 4. `buildStacks` (pure, `./stacks.ts`) does the rest.
  *
- * Lookups run with bounded concurrency; a failed lookup only loses that
- * orphan hint. One failing provider lands in `errors`, the others still
- * answer. Results are cached briefly (`ttlMs`, default 60 s) and dropped by
- * `invalidate()` after a retarget or a settings change.
+ * Lookups run with bounded concurrency and are capped (`maxLookups`, 100 per
+ * provider; the result says so in `orphanLookupsCapped`); a failed lookup only
+ * loses that orphan hint. One failing provider lands in `errors`, the others
+ * still answer. Results are cached briefly (`ttlMs`, default 60 s) and
+ * dropped by `invalidate()` after a retarget or a settings change.
+ *
+ * `refresh: true` is single-flight (joins a computation in flight) and is
+ * served from the cache when the last result is younger than
+ * `minRefreshMs` (10 s), so a renderer loop can't fan out requests.
  */
 import { repoKey, shortRef, type PrStack, type RepoRef } from '../../shared/scm'
 import type { GetStacksResult, ScmListError } from '../../shared/types'
@@ -26,8 +31,18 @@ import { buildStacks, isDefaultLongLivedBranch, type StackInputPr } from './stac
 
 export interface StacksServiceOptions {
   ttlMs?: number
+  minRefreshMs?: number
   concurrency?: number
+  maxLookups?: number
   now?: () => number
+}
+
+export interface StacksForProviderOptions {
+  concurrency?: number
+  /** Orphan lookups (distinct candidate base branches) per provider. */
+  maxLookups?: number
+  /** Called when lookups were capped. */
+  onCapped?: (checked: number, total: number) => void
 }
 
 export interface StacksService {
@@ -36,7 +51,9 @@ export interface StacksService {
 }
 
 const DEFAULT_TTL_MS = 60_000
+const DEFAULT_MIN_REFRESH_MS = 10_000
 const DEFAULT_CONCURRENCY = 6
+export const DEFAULT_MAX_ORPHAN_LOOKUPS = 100
 
 async function eachWithConcurrency<T>(
   items: T[],
@@ -53,8 +70,10 @@ async function eachWithConcurrency<T>(
 /** Stacks of one provider (exported for tests). */
 export async function stacksForProvider(
   provider: Pick<ScmProvider, 'listStackCandidates' | 'listMergedBySourceBranch' | 'branchExists'>,
-  concurrency = DEFAULT_CONCURRENCY,
+  options: StacksForProviderOptions = {},
 ): Promise<PrStack[]> {
+  const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY
+  const maxLookups = options.maxLookups ?? DEFAULT_MAX_ORPHAN_LOOKUPS
   const open = (await provider.listStackCandidates()).filter((pr) => pr.state === 'open')
 
   const openHeads = new Set(open.map((pr) => repoKey(pr.repo) + '\n' + shortRef(pr.headRef)))
@@ -66,9 +85,16 @@ export async function stacksForProvider(
     lookups.set(key, { repo: pr.repo, branch })
   }
 
+  const all = [...lookups.entries()]
+  const selected = all.slice(0, maxLookups)
+  if (selected.length < all.length) {
+    console.warn('[stacks] orphan lookups capped:', selected.length, 'of', all.length)
+    options.onCapped?.(selected.length, all.length)
+  }
+
   const merged: StackInputPr[] = []
   const exists = new Map<string, boolean>()
-  await eachWithConcurrency([...lookups.entries()], concurrency, async ([key, lookup]) => {
+  await eachWithConcurrency(selected, concurrency, async ([key, lookup]) => {
     try {
       const parents = await provider.listMergedBySourceBranch(lookup.repo, lookup.branch)
       merged.push(...parents)
@@ -90,16 +116,27 @@ export function createStacksService(
   options: StacksServiceOptions = {},
 ): StacksService {
   const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS
+  const minRefreshMs = options.minRefreshMs ?? DEFAULT_MIN_REFRESH_MS
   const now = options.now ?? Date.now
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY
+  const maxLookups = options.maxLookups ?? DEFAULT_MAX_ORPHAN_LOOKUPS
   let cached: { at: number; result: GetStacksResult } | null = null
   let inFlight: Promise<GetStacksResult> | null = null
   let generation = 0
 
   const compute = async (): Promise<GetStacksResult> => {
     const providers = registry.enabled()
+    let capped: { checked: number; total: number } | null = null
+    const onCapped = (checked: number, total: number): void => {
+      capped = {
+        checked: (capped?.checked ?? 0) + checked,
+        total: (capped?.total ?? 0) + total,
+      }
+    }
     const settled = await Promise.allSettled(
-      providers.map((provider) => stacksForProvider(provider, concurrency)),
+      providers.map((provider) =>
+        stacksForProvider(provider, { concurrency, maxLookups, onCapped }),
+      ),
     )
     const stacks: PrStack[] = []
     const errors: ScmListError[] = []
@@ -110,15 +147,17 @@ export function createStacksService(
         errors.push({ provider: providers[index].id, code: error.code, message: error.message })
       }
     })
-    return { stacks, errors }
+    const result: GetStacksResult = { stacks, errors }
+    if (capped) result.orphanLookupsCapped = capped
+    return result
   }
 
   return {
     get(opts = {}) {
-      if (!opts.refresh && cached && now() - cached.at < ttlMs) {
-        return Promise.resolve(cached.result)
-      }
-      if (inFlight && !opts.refresh) return inFlight
+      const maxAge = opts.refresh ? minRefreshMs : ttlMs
+      if (cached && now() - cached.at < maxAge) return Promise.resolve(cached.result)
+      // Refresh or not, join the computation in flight (invalidate() drops it).
+      if (inFlight) return inFlight
       const started = generation
       const promise = compute()
         .then((result) => {

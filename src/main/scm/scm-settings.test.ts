@@ -6,7 +6,7 @@ const MOCK_ORGS = [{ organization: 'contoso', projects: ['Platform'] }]
 
 function deps(
   saved: PersistedScmSettings = {},
-  azDefaults: { organization?: string; project?: string } = {},
+  azDefaults: { organization?: string; project?: string; knownOrganizations?: string[] } = {},
   mock = false,
 ): ScmSettingsDeps & { saved: () => PersistedScmSettings } {
   let current = saved
@@ -17,7 +17,7 @@ function deps(
         current = next
       },
     },
-    readAzDefaults: async () => ({ ...azDefaults, knownOrganizations: [] }),
+    readAzDefaults: async () => ({ knownOrganizations: [], ...azDefaults }),
     isMock: () => mock,
     mockAzureOrganizations: MOCK_ORGS,
     saved: () => current,
@@ -93,5 +93,14 @@ describe('scm settings', () => {
     const fresh = createScmSettings(deps({}, { organization: 'Skyllful' }, true))
     await fresh.load()
     expect(fresh.current().providers.azure).toEqual({ enabled: true, organizations: MOCK_ORGS })
+  })
+
+  it('knownAzureOrganizations: the az ones for real, only the mock ones in mock mode', async () => {
+    const real = createScmSettings(deps({}, { knownOrganizations: ['Skyllful', 'Other'] }))
+    await real.load()
+    expect(real.knownAzureOrganizations()).toEqual(['Skyllful', 'Other'])
+    const mock = createScmSettings(deps({}, { knownOrganizations: ['Skyllful'] }, true))
+    await mock.load()
+    expect(mock.knownAzureOrganizations()).toEqual(['contoso'])
   })
 })

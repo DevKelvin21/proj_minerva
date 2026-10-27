@@ -49,23 +49,31 @@ describe('MockAzureScmProvider', () => {
       'main',
     )
 
-    await retargetPullRequest(provider, {
-      repo: apiRepo,
-      number: 105,
-      expectedCurrentBase: 'feature/refund-schema',
-      newBase: 'main',
-    })
+    await retargetPullRequest(
+      provider,
+      {
+        repo: apiRepo,
+        number: 105,
+        expectedCurrentBase: 'feature/refund-schema',
+        newBase: 'main',
+      },
+      async () => true,
+    )
     const after = await stacksForProvider(provider)
     expect(after.find((stack) => stack.root.number === 105)).toBeUndefined()
 
     // A second, stale retarget is a CONFLICT (its base is no longer the expected one).
     await expect(
-      retargetPullRequest(provider, {
-        repo: apiRepo,
-        number: 105,
-        expectedCurrentBase: 'feature/refund-schema',
-        newBase: 'main',
-      }),
+      retargetPullRequest(
+        provider,
+        {
+          repo: apiRepo,
+          number: 105,
+          expectedCurrentBase: 'feature/refund-schema',
+          newBase: 'main',
+        },
+        async () => true,
+      ),
     ).rejects.toMatchObject({ code: 'CONFLICT' })
   })
 })
