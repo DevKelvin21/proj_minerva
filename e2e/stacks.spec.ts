@@ -8,6 +8,7 @@ import {
   mainWindow,
   setViewport,
   attachScreenshot,
+  openPrDetails,
 } from './fixtures'
 import type { Page } from './fixtures'
 
@@ -159,18 +160,17 @@ test('PR detail of #102 shows its stack map; chips navigate; target branch form 
   await expect(nodeRow(window, 102)).toHaveAttribute('aria-pressed', 'true')
   await attachScreenshot(window, testInfo, 'pr-detail-stack-map')
 
-  // Short window (horizontal half): one-line header, the map lives behind "Detalles".
+  // Short window (horizontal half): the map stays visible under the PR bar.
   await setViewport(window, 1920, 540)
-  await header(window).getByText('Details').click()
   const shortStack = window.getByRole('region', { name: 'Stack', exact: true })
   await expect(shortStack).toBeVisible()
   await expect(shortStack.locator('[aria-current="true"]')).toContainText('This PR')
   await shortStack.scrollIntoViewIfNeeded()
   await attachScreenshot(window, testInfo, 'pr-detail-stack-map-short')
-  await header(window).getByText('Details').click()
   await setViewport(window, 1920, 1080)
 
   // "Change target branch…": validated, explains the consequence, writes nothing here.
+  await openPrDetails(window)
   await header(window).getByRole('button', { name: 'Change target branch…' }).click()
   const form = window.getByRole('form', { name: 'Change target branch' })
   const input = form.getByRole('textbox')

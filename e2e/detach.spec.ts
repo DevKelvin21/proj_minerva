@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot } from './fixtures'
+import { test, expect, attachScreenshot, openInsightTab } from './fixtures'
 import { buildDidacticHash } from '../src/shared/didactic-route'
 import type { RepoRef } from '../src/shared/scm'
 
@@ -54,6 +54,7 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci�
   // Visor de recursos: el análisis mock del #482 trae diagrama ⇒ expandir
   // debe abrir el overlay con zoom y el SVG visible dentro (el gotcha del
   // visor colapsado a 0px que pasaba los checks geométricos).
+  await openInsightTab(detached, 'Architecture')
   await detached.locator('button[aria-label="Expand diagram"]').first().click()
   const overlay = detached.locator('.fixed.inset-0')
   await expect(overlay).toBeVisible()

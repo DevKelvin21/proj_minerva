@@ -14,6 +14,10 @@ interface InlineThreadCardProps {
  * A line thread under the diff row it belongs to (`SplitDiff`/`InlineDiff`).
  * Carries the `thread-<id>` anchor `DiffView` scrolls to when the user jumps
  * here from the Comments view or a `path:line` chip.
+ *
+ * Every thread starts folded to its one-line header (author, first words,
+ * status) so the code reads as code; one click opens it. The focused thread
+ * (jumped to, or just created) opens by itself (`highlighted`).
  */
 export function InlineThreadCard({
   thread,
@@ -22,9 +26,10 @@ export function InlineThreadCard({
 }: InlineThreadCardProps): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <div id={`thread-${thread.id}`} className="border-y border-border bg-bg px-2 py-2 font-sans">
+    <div id={`thread-${thread.id}`} className="bg-bg px-2 py-1 font-sans">
       <ThreadCard
         thread={thread}
+        collapsedByDefault
         showPath={false}
         highlighted={highlighted}
         extraHeaderContent={

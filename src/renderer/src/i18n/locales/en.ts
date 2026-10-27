@@ -167,6 +167,7 @@ export const en = {
       openSettings: 'Open settings',
     },
     center: {
+      tabsLabel: 'Pull request views',
       choosePrTitle: 'Choose a pull request',
       choosePrHint: 'Select a PR from the list on the left to see its conversation and files.',
       loadFailed: 'Could not load the PR',
@@ -210,6 +211,17 @@ export const en = {
   },
   prDetail: {
     header: {
+      walkthrough: 'Walkthrough',
+      summary: {
+        approvals_one: '{{approved}} of {{count}} approved',
+        approvals_other: '{{approved}} of {{count}} approved',
+        checksPassed_one: '{{count}} check passed',
+        checksPassed_other: '{{count}} checks passed',
+        checksFailing_one: '{{count}} check failing',
+        checksFailing_other: '{{count}} checks failing',
+        checksPending_one: '{{count}} check pending',
+        checksPending_other: '{{count}} checks pending',
+      },
       changeTargetBranch: 'Change target branch…',
       commitCount_one: '{{count}} commit',
       commitCount_other: '{{count}} commits',
@@ -710,6 +722,13 @@ export const en = {
     },
   },
   didactic: {
+    tabs: {
+      ariaLabel: 'Analysis topics',
+      overview: 'Overview',
+      architecture: 'Architecture',
+      endpoints: 'Endpoints',
+      data: 'Data',
+    },
     panel: {
       title: 'Didactic panel',
       open: 'Open didactic panel',

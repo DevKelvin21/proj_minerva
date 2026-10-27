@@ -1,4 +1,4 @@
-import { test, expect, setViewport, attachScreenshot } from './fixtures'
+import { test, expect, setViewport, attachScreenshot, expandThread } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -115,6 +115,8 @@ test('#102: a comment outside every hunk shows next to its line; outdated badge;
   const line12 = window.locator('[data-new-line="12"]').first()
   await expect(line12).toContainText('// Line 12: kept as context.')
   const thread = window.locator('#thread-1')
+  // Threads start folded to one line; open this one to read and reply.
+  await expandThread(thread)
   await expect(thread).toContainText('Unrelated to the change, but this comment block is stale.')
   // The card sits right under line 12 (above line 13).
   const line13 = window.locator('[data-new-line="13"]').first()
@@ -132,6 +134,7 @@ test('#102: a comment outside every hunk shows next to its line; outdated badge;
   // The outdated thread (left on the first push): badge, note and code excerpt.
   const outdated = window.locator('#thread-2')
   await expect(outdated.getByTestId('outdated-badge')).toHaveText('Outdated')
+  await expandThread(outdated)
   await expect(outdated.getByTestId('outdated-note')).toContainText('may have changed')
   await expect(outdated.getByTestId('code-excerpt')).toContainText('OrderStatus.Draft')
   await attachScreenshot(window, testInfo, 'comments-102-files')
@@ -156,6 +159,7 @@ test('suggestions: insert from the head file, post, and render as a mini-diff', 
   await tab(window, /^Files/).click()
   const thread = window.locator('#thread-1')
   await expect(thread).toBeVisible()
+  await expandThread(thread)
 
   // Reply composer: prefilled with line 12 of the head file.
   const reply = thread.getByLabel('Reply to this thread')

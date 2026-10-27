@@ -33,6 +33,12 @@ import { ResourceViewer, type ViewerResource } from './ResourceViewer'
 import type { DidacticSection, RepoRef, WalkthroughCohort } from '../../../../shared/types'
 import type { DraftDidacticSection } from '../../../../shared/events'
 import { flattenLayers, type LayerRef } from '../../lib/walkthrough'
+import {
+  availableInsightTabs,
+  insightTabOf,
+  resolveInsightTab,
+  type InsightTab,
+} from '../../lib/insight-tabs'
 
 const SECTION_ICON: Record<DidacticSection['kind'], React.JSX.Element> = {
   summary: <BookOpen size={16} />,
@@ -42,6 +48,46 @@ const SECTION_ICON: Record<DidacticSection['kind'], React.JSX.Element> = {
   endpoint: <Globe size={16} />,
   schema: <Database size={16} />,
   cloud: <Cloud size={16} />,
+}
+
+/**
+ * Overview / Architecture / Endpoints / Data. Hidden when the analysis only
+ * fills one of them: a single tab is just noise.
+ */
+function InsightTabStrip({
+  tabs,
+  active,
+  onPick,
+}: {
+  tabs: readonly InsightTab[]
+  active: InsightTab
+  onPick: (tab: InsightTab) => void
+}): React.JSX.Element | null {
+  const { t } = useTranslation()
+  if (tabs.length < 2) return null
+  return (
+    <div
+      role="tablist"
+      aria-label={t('didactic.tabs.ariaLabel')}
+      data-testid="insight-tabs"
+      className="flex shrink-0 gap-1 overflow-x-auto border-b border-border"
+    >
+      {tabs.map((tab) => (
+        <button
+          key={tab}
+          type="button"
+          role="tab"
+          aria-selected={tab === active}
+          onClick={() => onPick(tab)}
+          className={`-mb-px whitespace-nowrap border-b-2 px-2.5 py-1.5 text-xs font-medium transition-colors duration-150 ${
+            tab === active ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text'
+          }`}
+        >
+          {t(`didactic.tabs.${tab}`)}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 /** Icon + translated title of a section kind (`didactic.sections.*`). */
@@ -403,6 +449,7 @@ export function DidacticAnalysisArea({
   const { t } = useTranslation()
   const { locale } = useLocale()
   const [viewerResource, setViewerResource] = useState<ViewerResource | null>(null)
+  const [pickedTab, setPickedTab] = useState<InsightTab>('overview')
   const providerStatus = useProviderStatus()
   const scmSettings = useScmSettings().info
 
@@ -452,10 +499,15 @@ export function DidacticAnalysisArea({
       </div>
     )
   } else if (analysis) {
+    const tabs = availableInsightTabs(analysis.sections.map((section) => section.kind))
+    const tab = resolveInsightTab(pickedTab, tabs)
     body = (
       <>
+        <InsightTabStrip tabs={tabs} active={tab} onPick={setPickedTab} />
         {analysis.sections.map((section, i) =>
-          renderSection(section, i, setViewerResource, t, onOpenLayer),
+          insightTabOf(section.kind) === tab
+            ? renderSection(section, i, setViewerResource, t, onOpenLayer)
+            : null,
         )}
       </>
     )
@@ -472,9 +524,20 @@ export function DidacticAnalysisArea({
             <HarnessActivityLog items={activity} />
           </div>
         )}
-        {streamingSections.map((section, i) =>
-          renderDraftSection(section, i, setViewerResource, t, onOpenLayer),
-        )}
+        {(() => {
+          const tabs = availableInsightTabs(streamingSections.map((section) => section.kind))
+          const tab = resolveInsightTab(pickedTab, tabs)
+          return (
+            <>
+              <InsightTabStrip tabs={tabs} active={tab} onPick={setPickedTab} />
+              {streamingSections.map((section, i) =>
+                insightTabOf(section.kind) === tab
+                  ? renderDraftSection(section, i, setViewerResource, t, onOpenLayer)
+                  : null,
+              )}
+            </>
+          )
+        })()}
       </>
     )
   } else if (checkingCache || loading || isExploringEmpty) {

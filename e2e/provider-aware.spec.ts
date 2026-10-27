@@ -6,6 +6,7 @@ import {
   attachScreenshot,
   closeMinerva,
   launchMinerva,
+  openPrDetails,
   setViewport,
   type MinervaApp,
   type Page,
@@ -113,6 +114,7 @@ test('Azure only: Azure identity in the header, no GitHub text, Azure parity in 
 
     // Detail #101: tags, auto-complete, branch policies (required + optional).
     await aside(page).getByText('Checkout v2: order status and currency').first().click()
+    await openPrDetails(page)
     await expect(page.getByText('Open in Azure DevOps').first()).toBeVisible()
     await expect(page.getByRole('list', { name: 'Tags' })).toContainText('checkout-v2')
     await expect(page.locator('[data-auto-complete]')).toContainText(
@@ -131,8 +133,10 @@ test('Azure only: Azure identity in the header, no GitHub text, Azure parity in 
 
     // #102: a -5 vote reads "Waiting for author"; #105: conflicts + "Rejected".
     await aside(page).getByText('Checkout v2: submit validation').first().click()
+    await openPrDetails(page)
     await expect(page.getByRole('list', { name: 'Reviewers' })).toContainText('Waiting for author')
     await aside(page).getByText('Refund ledger').first().click()
+    await openPrDetails(page)
     await expect(page.locator('[data-merge-status="conflicts"]')).toHaveText('Merge conflicts')
     await expect(page.getByRole('list', { name: 'Reviewers' })).toContainText('Rejected')
     await attachScreenshot(page, testInfo, 'azure-only-conflicts-en')
@@ -152,9 +156,11 @@ test('Azure only: Azure identity in the header, no GitHub text, Azure parity in 
     await openAccounts(page)
     await expect(chip(page, 'azure')).toContainText('vía PAT de az devops')
     await expect(indicator(page)).toHaveText('Conectado')
+    await openPrDetails(page)
     await expect(page.getByRole('list', { name: 'Revisores' })).toContainText('Rechazado')
     await expect(page.locator('[data-merge-status="conflicts"]')).toHaveText('Conflictos de merge')
     await aside(page).getByText('Checkout v2: order status and currency').first().click()
+    await openPrDetails(page)
     await expect(page.getByRole('list', { name: 'Directivas de rama' })).toContainText('opcional')
     expect(await visibleText(page)).not.toMatch(/GitHub|gh auth/)
     await attachScreenshot(page, testInfo, 'azure-only-header-detail-es')

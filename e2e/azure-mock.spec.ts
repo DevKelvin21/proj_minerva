@@ -3,6 +3,7 @@ import {
   expect,
   attachScreenshot,
   closeMinerva,
+  openPrDetails,
   launchMinerva,
   type MinervaApp,
 } from './fixtures'
@@ -71,6 +72,7 @@ test('Azure repos listed with the Azure icon; detail, diff and thread statuses',
 
   // Detail of #108.
   await aside(window).getByText('Fix cart rounding').first().click()
+  await openPrDetails(window)
   await expect(window.getByText('Open in Azure DevOps').first()).toBeVisible()
   await expect(window.getByRole('list', { name: 'Reviewers' })).toContainText('Ada Lovelace')
   await expect(window.getByRole('list', { name: 'Work items' })).toContainText(
@@ -276,6 +278,7 @@ test('AI (MINERVA_MOCK_AI=1) analyzes an Azure PR through the real context pipel
   // And the panel shows it for the PR.
   await aside(window).getByText('Fix cart rounding').first().click()
   await expect(window.getByText('repository snapshot ready').first()).toBeVisible()
+  await openPrDetails(window)
   await expect(window.getByText('Open in Azure DevOps').first()).toBeVisible()
   await attachScreenshot(window, testInfo, 'azure-ai-summary')
 })

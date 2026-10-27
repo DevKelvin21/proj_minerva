@@ -168,6 +168,7 @@ export const es: MessageShape<typeof en> = {
       openSettings: 'Abrir configuración',
     },
     center: {
+      tabsLabel: 'Vistas del pull request',
       choosePrTitle: 'Elige un Pull Request',
       choosePrHint:
         'Selecciona un PR de la lista de la izquierda para ver su conversación y sus archivos.',
@@ -212,6 +213,17 @@ export const es: MessageShape<typeof en> = {
   },
   prDetail: {
     header: {
+      walkthrough: 'Recorrido',
+      summary: {
+        approvals_one: 'Aprobado por {{approved}} de {{count}}',
+        approvals_other: 'Aprobado por {{approved}} de {{count}}',
+        checksPassed_one: '{{count}} check pasó',
+        checksPassed_other: '{{count}} checks pasaron',
+        checksFailing_one: '{{count}} check falla',
+        checksFailing_other: '{{count}} checks fallan',
+        checksPending_one: '{{count}} check pendiente',
+        checksPending_other: '{{count}} checks pendientes',
+      },
       changeTargetBranch: 'Cambiar rama destino…',
       commitCount_one: '{{count}} commit',
       commitCount_other: '{{count}} commits',
@@ -722,6 +734,13 @@ export const es: MessageShape<typeof en> = {
     },
   },
   didactic: {
+    tabs: {
+      ariaLabel: 'Temas del análisis',
+      overview: 'Resumen',
+      architecture: 'Arquitectura',
+      endpoints: 'Endpoints',
+      data: 'Datos',
+    },
     panel: {
       title: 'Panel didáctico',
       open: 'Abrir panel didáctico',

@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot } from './fixtures'
+import { test, expect, attachScreenshot, openInsightTab } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -26,6 +26,8 @@ test('PR #77 con IaC: card cloud con dos architecture-beta e iconos locales', as
 }, testInfo) => {
   await analyze(window, 'Fix race condition in payment webhook')
 
+  // The cloud card is under Architecture.
+  await openInsightTab(window, 'Architecture')
   const card = cloudCard(window)
   await expect(card).toBeVisible()
 
