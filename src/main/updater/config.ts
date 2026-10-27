@@ -29,6 +29,11 @@ export const RELEASE_REPO = 'proj_minerva'
  */
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 
+/** `true` if `version` has the classic semver shape above (shared with `./release-feed.ts`, which validates GitHub tag names with the same gate). */
+export function isSemver(version: string): boolean {
+  return SEMVER_RE.test(version)
+}
+
 /**
  * Construye la URL de la release en GitHub para `version` — **siempre**
  * desde esta plantilla hardcodeada con `RELEASE_OWNER`/`RELEASE_REPO`, jamás
@@ -40,6 +45,6 @@ const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
  * preferible fallar visible antes que ofrecer un link roto.
  */
 export function buildReleaseUrl(version: string): string | undefined {
-  if (!SEMVER_RE.test(version)) return undefined
+  if (!isSemver(version)) return undefined
   return `https://github.com/${RELEASE_OWNER}/${RELEASE_REPO}/releases/tag/v${version}`
 }

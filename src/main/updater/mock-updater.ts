@@ -1,6 +1,6 @@
 import type { UpdaterStatus, UpdateInfoLite } from '../../shared/types'
 import { buildReleaseUrl } from './config'
-import { mt } from '../i18n'
+import { updaterErrorMessage } from './error-message'
 
 /**
  * Guion determinista del auto-updater bajo `MINERVA_MOCK_UPDATER` (T92, F17).
@@ -30,8 +30,13 @@ import { mt } from '../i18n'
  *   `'mac-unsigned'` y un `available` poblado (el caso mac/AppImageLauncher:
  *   SÍ hay una versión más nueva, pero esta instalación no puede bajarla
  *   sola). `download()` es no-op — nunca debe transicionar a `downloading`.
- * - `'error'`: al `checkNow()` → `checking` → `error` con un mensaje de
- *   exhibición.
+ * - `'error'`: al `checkNow()` → `checking` → `error`. El mensaje nace como
+ *   el MISMO volcado crudo que produce `electron-updater` cuando a la release
+ *   le falta `latest-mac.yml` (código + headers + stack, ver
+ *   `MOCK_RAW_FEED_ERROR`) y pasa por `updaterErrorMessage`
+ *   (`./error-message.ts`), igual que en el motor real: así la suite e2e
+ *   afirma sobre el texto que ve el usuario de verdad, no sobre un string
+ *   inventado para el mock.
  *
  * El guion completo (checking→downloaded del camino feliz) dura ≤2s a
  * propósito (pasos de `downloading` con delays cortos, `STEP_MS`): si no, el
@@ -47,6 +52,27 @@ export function parseMockUpdaterMode(raw: string): MockUpdaterMode {
 }
 
 const STEP_MS = 120
+
+/**
+ * Reproducción fiel del error visto en v0.8.1 (macOS, notify-only) con el
+ * feed del fork sin releases: `electron-updater` envuelve el `HttpError` de
+ * `builder-util-runtime` (status + headers) y le pega el stack. Los headers
+ * son inventados — solo importa que el sanitizador NO deje pasar nada de esto.
+ */
+export const MOCK_RAW_FEED_ERROR: Error & { code: string } = Object.assign(
+  new Error(
+    'Cannot find latest-mac.yml in the latest release artifacts ' +
+      '(https://github.com/DevKelvin21/proj_minerva/releases/download/v0.2.1/latest-mac.yml): ' +
+      'HttpError: 404 Not Found\n' +
+      '"method: GET url: https://github.com/DevKelvin21/proj_minerva/releases/download/v0.2.1/latest-mac.yml\n\n' +
+      'Please double check that your authentication token is correct. Due to security reasons, ' +
+      'actual status maybe not reported, but 404.\n"\n' +
+      'Headers: {\n  "server": "GitHub.com",\n  "x-github-request-id": "ABCD:1234"\n}\n' +
+      '    at createHttpError (/Applications/Minerva.app/Contents/Resources/app.asar/node_modules/builder-util-runtime/out/httpExecutor.js:53:12)\n' +
+      '    at ElectronHttpExecutor.handleResponse (/Applications/Minerva.app/Contents/Resources/app.asar/node_modules/builder-util-runtime/out/httpExecutor.js:178:38)',
+  ),
+  { code: 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' },
+)
 
 /** Versión = la actual con el minor +1 (patch a 0; ignora prerelease/build de `currentVersion`, no aplica acá). */
 export function nextMinorVersion(currentVersion: string): string {
@@ -117,7 +143,7 @@ export function createMockUpdaterEngine(mode: MockUpdaterMode, currentVersion: s
       if (mode === 'error') {
         setStatus({
           phase: 'error',
-          message: mt('updater.mockFeedError'),
+          message: updaterErrorMessage(MOCK_RAW_FEED_ERROR),
           lastCheckedAt: new Date().toISOString(),
         })
         return

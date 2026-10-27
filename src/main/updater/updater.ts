@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, net, shell, BrowserWindow } from 'electron'
 import { accessSync, constants as fsConstants } from 'node:fs'
 import type { Logger, ProgressInfo, UpdateInfo } from 'electron-updater'
 import { MINERVA_EVENTS } from '../../shared/events'
@@ -6,7 +6,9 @@ import { mt } from '../i18n'
 import type { UpdaterStatus, UpdateInfoLite } from '../../shared/types'
 import { resolveUpdaterCapability, type UpdaterCapability } from './capability'
 import { ALLOW_PRERELEASE, CHECK_INTERVAL_MS, STARTUP_DELAY_MS, buildReleaseUrl } from './config'
+import { updaterErrorMessage } from './error-message'
 import { createMockUpdaterEngine, parseMockUpdaterMode, type MockUpdaterEngine } from './mock-updater'
+import { fetchLatestRelease, newerRelease } from './release-feed'
 
 /**
  * Singleton del auto-updater (T91, F17): cablea `electron-updater`, mantiene
@@ -18,11 +20,24 @@ import { createMockUpdaterEngine, parseMockUpdaterMode, type MockUpdaterEngine }
  * tras `app.whenReady()` + `stop()` en `before-quit` (mismo lugar que
  * `stopPrWatcher`).
  *
+ * **Dos motores reales según la capacidad** (`./capability.ts`):
+ * - `auto` (Windows, AppImage escribible): `electron-updater` completo —
+ *   feed + `latest-<platform>.yml` + descarga + instalación.
+ * - `notify` (macOS sin firmar, Linux sin AppImage escribible): SOLO se
+ *   compara la versión instalada contra la release más alta publicada en
+ *   GitHub, vía la API REST de releases (`./release-feed.ts`,
+ *   `notifyCheckNow`). `electron-updater` NO participa: su proveedor de GitHub
+ *   exige `latest-<platform>.yml` aun para comparar versiones, y cuando el
+ *   repo no tiene releases (el fork recién creado) su `releases.atom` cae a
+ *   listar tags, con lo que el chequeo moría con un `HttpError` 404 crudo en
+ *   Settings (v0.8.1). En notify nunca se descarga nada, así que el
+ *   manifiesto no aporta: la API dice qué releases existen y basta.
+ *
  * **Import perezoso de `electron-updater`**: el módulo real (`ensureRealAutoUpdater`)
- * solo se importa la PRIMERA VEZ que hace falta un chequeo real contra el
+ * solo se importa la PRIMERA VEZ que hace falta un chequeo `auto` contra el
  * feed — es decir, nunca si la capacidad es `disabled` (dev y TODA la suite
- * e2e). Arranque más rápido y cero riesgo de que el paquete haga algo por su
- * cuenta cuando no corresponde. `import type` de arriba (`Logger`,
+ * e2e) ni `notify`. Arranque más rápido y cero riesgo de que el paquete haga
+ * algo por su cuenta cuando no corresponde. `import type` de arriba (`Logger`,
  * `ProgressInfo`, `UpdateInfo`) se borra en compilación — no cuenta como el
  * import perezoso, son solo tipos.
  *
@@ -41,11 +56,12 @@ import { createMockUpdaterEngine, parseMockUpdaterMode, type MockUpdaterEngine }
  * estado pasa a `error` (decisión documentada en `./config.ts`) en vez de
  * `available` con una URL rota o ausente.
  *
- * **Errores nunca silenciosos**: cualquier fallo de `electron-updater` llega
- * acá por su evento `error` (`AppUpdater` SIEMPRE lo emite antes de
- * rechazar la promesa de `checkForUpdates`/`downloadUpdate`, verificado
- * contra su fuente) y se traduce a `{ phase: 'error', message }` con
- * `displayMessage` — nunca el stack interno de main. Por eso `realCheckNow`/
+ * **Errores nunca silenciosos, nunca crudos**: cualquier fallo de
+ * `electron-updater` llega acá por su evento `error` (`AppUpdater` SIEMPRE lo
+ * emite antes de rechazar la promesa de `checkForUpdates`/`downloadUpdate`,
+ * verificado contra su fuente) y se traduce a `{ phase: 'error', message }`
+ * con `updaterErrorMessage` (`./error-message.ts`): una sola línea traducida
+ * o recortada — nunca headers HTTP, stack ni el XML del feed. Por eso `realCheckNow`/
  * `realDownload` atrapan el rechazo y no hacen nada más: el listener
  * `error` ya dejó el estado correcto antes de que la promesa rechace.
  */
@@ -91,12 +107,6 @@ function setStatus(next: UpdaterStatus): void {
       win.webContents.send(MINERVA_EVENTS.updaterStatusChanged, { status: next })
     }
   }
-}
-
-/** Mensaje de exhibición sin stack interno (frontera IPC, ver `CLAUDE.md`). */
-function displayMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message
-  return mt('updater.unknownError')
 }
 
 function toUpdateInfoLite(info: UpdateInfo): UpdateInfoLite | undefined {
@@ -150,6 +160,9 @@ async function ensureRealAutoUpdater(): Promise<AppUpdaterInstance> {
     setStatus({ phase: 'checking' })
   })
 
+  // Las ramas `cap.mode === 'notify'` de abajo son defensivas: hoy `notify`
+  // nunca llega a `electron-updater` (`notifyCheckNow`), pero si alguien lo
+  // volviera a enrutar por acá, jamás debe aparecer el botón de descarga.
   instance.on('update-available', (info: UpdateInfo) => {
     lastCheckedAt = new Date().toISOString()
     const infoLite = toUpdateInfoLite(info)
@@ -189,15 +202,43 @@ async function ensureRealAutoUpdater(): Promise<AppUpdaterInstance> {
   })
 
   instance.on('error', (error: Error) => {
-    setStatus({ phase: 'error', message: displayMessage(error), lastCheckedAt })
+    setStatus({ phase: 'error', message: updaterErrorMessage(error), lastCheckedAt })
   })
 
   realAutoUpdater = instance
   return instance
 }
 
+/**
+ * Chequeo de `notify`: GitHub releases API → `unsupported` con `available`
+ * si hay una versión más alta que la instalada, `unsupported` a secas si no
+ * (o si el repo todavía no tiene releases), `error` con mensaje corto si la
+ * consulta falla. `net.fetch` (Chromium) y no el `fetch` de Node, para
+ * respetar el proxy del sistema igual que lo hace `electron-updater`.
+ */
+async function notifyCheckNow(reason: Extract<UpdaterCapability, { mode: 'notify' }>['reason']): Promise<void> {
+  setStatus({ phase: 'checking' })
+  try {
+    const latest = await fetchLatestRelease({
+      fetchImpl: (url, init) => net.fetch(url, init),
+      allowPrerelease: ALLOW_PRERELEASE,
+    })
+    lastCheckedAt = new Date().toISOString()
+    const available = newerRelease(app.getVersion(), latest)
+    currentInfo = available
+    setStatus(available ? { phase: 'unsupported', reason, available } : { phase: 'unsupported', reason })
+  } catch (error) {
+    currentInfo = undefined
+    setStatus({ phase: 'error', message: updaterErrorMessage(error), lastCheckedAt })
+  }
+}
+
 async function realCheckNow(): Promise<void> {
   if (capability.mode === 'disabled') return
+  if (capability.mode === 'notify') {
+    await notifyCheckNow(capability.reason)
+    return
+  }
   let instance: AppUpdaterInstance
   try {
     instance = await ensureRealAutoUpdater()
@@ -206,7 +247,7 @@ async function realCheckNow(): Promise<void> {
     // interop ESM/CJS, wiring). Nadie más va a transicionar el estado, así que
     // se hace acá: tragárselo dejaba el updater mudo para siempre — fue
     // exactamente el bug de v0.7.0 (ver `resolveAutoUpdaterExport`).
-    setStatus({ phase: 'error', message: displayMessage(error), lastCheckedAt })
+    setStatus({ phase: 'error', message: updaterErrorMessage(error), lastCheckedAt })
     return
   }
   try {
@@ -232,7 +273,7 @@ async function realDownload(): Promise<void> {
   } catch (error) {
     // Idem `realCheckNow`: si el setup falla no hay listener 'error' que
     // pueda reportarlo, así que el estado se transiciona acá.
-    setStatus({ phase: 'error', message: displayMessage(error), lastCheckedAt })
+    setStatus({ phase: 'error', message: updaterErrorMessage(error), lastCheckedAt })
     return
   }
   try {

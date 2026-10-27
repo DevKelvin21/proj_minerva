@@ -119,6 +119,42 @@ test('notify (MINERVA_MOCK_UPDATER=notify): nunca ofrece descargar', async ({}, 
 })
 
 // eslint-disable-next-line no-empty-pattern
+test('error (MINERVA_MOCK_UPDATER=error): el volcado crudo de electron-updater llega como UNA línea corta', async ({}, testInfo) => {
+  const app = await launchMinerva(testInfo.outputPath('user-data'), {
+    env: { MINERVA_MOCK_UPDATER: 'error' },
+  })
+  try {
+    const window = await mainWindow(app)
+    await openSettings(window)
+
+    await expect(window.getByRole('heading', { name: 'Updates' })).toBeVisible()
+    await window.getByRole('button', { name: 'Check for updates' }).click()
+
+    // El guion `error` arranca del MISMO HttpError que mostró v0.8.1 en macOS
+    // (status + headers + stack, `MOCK_RAW_FEED_ERROR` en `mock-updater.ts`)
+    // y lo pasa por `updaterErrorMessage` — así se afirma sobre el texto real.
+    const message = window.getByText(/has no update manifest for this platform \(latest-mac\.yml\)/)
+    await expect(message).toBeVisible()
+    const text = await message.innerText()
+    expect(text, 'sin headers HTTP').not.toContain('Headers')
+    expect(text, 'sin stack trace').not.toMatch(/\bat \w+ \(/)
+    expect(text, 'sin saltos de línea').not.toContain('\n')
+    expect(text, 'sin el consejo sobre tokens de electron-updater').not.toContain('authentication token')
+
+    // En error el botón pasa a "Reintentar" y nunca hay descarga ni badge.
+    await expect(window.getByRole('button', { name: 'Retry' })).toBeVisible()
+    await expect(window.getByRole('button', { name: /^Download/ })).toHaveCount(0)
+    await expect(updateBadge(window)).toHaveCount(0)
+    // El mensaje ocupa 3 líneas y el botón va centrado a su lado: scrollear
+    // el botón deja la última línea fuera de vista; scrollear el párrafo no.
+    await message.scrollIntoViewIfNeeded()
+    await attachScreenshot(window, testInfo, 'updater-error')
+  } finally {
+    await closeMinerva(app)
+  }
+})
+
+// eslint-disable-next-line no-empty-pattern
 test('ventana tileada (960x540): la sección de Actualizaciones se alcanza por scroll', async ({}, testInfo) => {
   const app = await launchMinerva(testInfo.outputPath('user-data'), {
     env: { MINERVA_MOCK_UPDATER: '1' },
