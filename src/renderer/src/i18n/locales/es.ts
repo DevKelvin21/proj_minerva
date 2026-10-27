@@ -170,6 +170,8 @@ export const es: MessageShape<typeof en> = {
       ariaLabel: 'Lista de pull requests',
       search: 'Buscar pull requests',
       searchPlaceholder: 'Buscar por título, repo, rama o #número',
+      resize: 'Redimensionar barra lateral',
+      resizeHint: 'Arrastra para redimensionar; doble clic restaura el ancho por defecto',
       viewSwitch: 'Vista de la columna izquierda',
       views: {
         queue: 'Cola',
@@ -823,7 +825,6 @@ export const es: MessageShape<typeof en> = {
     },
     panel: {
       title: 'Panel didáctico',
-      open: 'Abrir panel didáctico',
       close: 'Cerrar panel didáctico',
       openInWindow: 'Abrir en ventana',
       resize: 'Redimensionar panel didáctico',

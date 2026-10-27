@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { RefreshCw, Search } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
@@ -9,7 +9,12 @@ import { groupByRepo } from '../../lib/pr-filters'
 import { usePullRequests } from '../../hooks/use-pull-requests'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
-import { SIDEBAR_WIDTH, sidebarIsDrawer } from '../../lib/layout'
+import {
+  clampSidebarWidth,
+  dockedSidebarWidth,
+  SIDEBAR_MIN_WIDTH,
+  sidebarIsDrawer,
+} from '../../lib/layout'
 import { useAppStore, type SidebarView } from '../../stores/app-store'
 import { useStacksStore } from '../../stores/stacks-store'
 import { countOrphans } from '../../lib/stacks'
@@ -182,6 +187,9 @@ export function Sidebar(): React.JSX.Element | null {
   const closeSidebar = useAppStore((s) => s.closeSidebar)
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
   const walkthroughFocus = useAppStore((s) => s.walkthroughFocus)
+  const preferredWidth = useAppStore((s) => s.sidebarWidth)
+  const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
+  const columnRef = useRef<HTMLDivElement>(null)
 
   // Esc cierra el drawer (solo cuando está abierto y no hay un modal encima:
   // `SettingsModal` monta su propio listener y también cierra con Esc).
@@ -221,147 +229,187 @@ export function Sidebar(): React.JSX.Element | null {
 
   const asideClass = isDrawer
     ? 'absolute inset-y-0 left-0 z-40 flex w-[300px] max-w-[85%] flex-col overflow-y-auto border-r border-border bg-panel shadow-2xl'
-    : 'flex shrink-0 flex-col overflow-y-auto border-r border-border bg-panel'
+    : 'flex w-full min-w-0 flex-col overflow-y-auto border-r border-border bg-panel'
+  const width = dockedSidebarWidth(preferredWidth, tier.width)
+  const maxWidth = clampSidebarWidth(Number.POSITIVE_INFINITY, tier.width)
 
-  return (
-    <>
-      {isDrawer && (
-        <div className="absolute inset-0 z-30 bg-black/50" onClick={closeSidebar} aria-hidden />
-      )}
-      <aside
-        aria-label={t('layout.sidebar.ariaLabel')}
-        style={isDrawer ? undefined : { width: SIDEBAR_WIDTH[tier.w] }}
-        className={asideClass}
-      >
-        <div className="shrink-0 px-2 pt-2">
-          <SidebarViewSwitch value={sidebarView} onChange={setSidebarView} />
-        </div>
-        {/* Filters both views: a provider-side search for the list (GitHub
-            qualifiers work), a text filter for the stacks. */}
-        <div className="relative shrink-0 px-2 pt-2">
-          <Search
-            size={14}
-            className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={t('layout.sidebar.searchPlaceholder')}
-            aria-label={t('layout.sidebar.search')}
-            title={t('layout.sidebar.searchPlaceholder')}
-            className="w-full rounded-md border border-border bg-bg py-1.5 pl-8 pr-2 text-sm text-text transition-colors duration-150 placeholder:text-muted focus:border-accent"
-          />
-        </div>
-        {sidebarView === 'stacks' ? (
-          <StacksView pullRequests={pullRequests} onSelectPr={handleSelectPr} />
-        ) : sidebarView === 'queue' && !noProviders && !needsLogin ? (
-          <QueueView />
-        ) : (
-          <>
-            {/* Open / Closed / All belongs to the Repos list; the queue is open PRs only. */}
-            {sidebarView === 'list' && (
-              <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
-                <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
-                <IconButton
-                  icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
-                  label={t('layout.sidebar.refresh')}
-                  onClick={refetch}
-                  disabled={loading}
-                  className="ml-auto"
+  const aside = (
+    <aside aria-label={t('layout.sidebar.ariaLabel')} className={asideClass}>
+      <div className="shrink-0 px-2 pt-2">
+        <SidebarViewSwitch value={sidebarView} onChange={setSidebarView} />
+      </div>
+      {/* Filters both views: a provider-side search for the list (GitHub
+          qualifiers work), a text filter for the stacks. */}
+      <div className="relative shrink-0 px-2 pt-2">
+        <Search
+          size={14}
+          className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted"
+          aria-hidden
+        />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder={t('layout.sidebar.searchPlaceholder')}
+          aria-label={t('layout.sidebar.search')}
+          title={t('layout.sidebar.searchPlaceholder')}
+          className="w-full rounded-md border border-border bg-bg py-1.5 pl-8 pr-2 text-sm text-text transition-colors duration-150 placeholder:text-muted focus:border-accent"
+        />
+      </div>
+      {sidebarView === 'stacks' ? (
+        <StacksView pullRequests={pullRequests} onSelectPr={handleSelectPr} />
+      ) : sidebarView === 'queue' && !noProviders && !needsLogin ? (
+        <QueueView />
+      ) : (
+        <>
+          {/* Open / Closed / All belongs to the Repos list; the queue is open PRs only. */}
+          {sidebarView === 'list' && (
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
+              <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
+              <IconButton
+                icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
+                label={t('layout.sidebar.refresh')}
+                onClick={refetch}
+                disabled={loading}
+                className="ml-auto"
+              />
+            </div>
+          )}
+          {noProviders ? (
+            <div
+              data-testid="no-providers"
+              className="flex flex-col items-center gap-3 p-6 text-center"
+            >
+              <p className="text-sm font-medium text-text">
+                {t('layout.sidebar.noProvidersTitle')}
+              </p>
+              <p className="text-xs text-muted">{t('layout.sidebar.noProvidersHint')}</p>
+              <button
+                type="button"
+                onClick={openSettings}
+                className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
+              >
+                {t('layout.sidebar.openSettings')}
+              </button>
+            </div>
+          ) : needsLogin ? (
+            <div
+              data-testid="sign-in-needed"
+              className="flex flex-col items-center gap-4 p-6 text-center"
+            >
+              <span className="text-3xl" aria-hidden>
+                🔒
+              </span>
+              {signInErrors.map((signInError) => (
+                <SignInHint
+                  key={signInError.provider}
+                  error={signInError}
+                  githubAccount={githubAccount}
+                  azureOrganization={azureOrganization}
                 />
-              </div>
-            )}
-            {noProviders ? (
-              <div
-                data-testid="no-providers"
-                className="flex flex-col items-center gap-3 p-6 text-center"
+              ))}
+              <button
+                type="button"
+                onClick={openSettings}
+                className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
               >
-                <p className="text-sm font-medium text-text">
-                  {t('layout.sidebar.noProvidersTitle')}
-                </p>
-                <p className="text-xs text-muted">{t('layout.sidebar.noProvidersHint')}</p>
-                <button
-                  type="button"
-                  onClick={openSettings}
-                  className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-                >
-                  {t('layout.sidebar.openSettings')}
-                </button>
-              </div>
-            ) : needsLogin ? (
-              <div
-                data-testid="sign-in-needed"
-                className="flex flex-col items-center gap-4 p-6 text-center"
-              >
-                <span className="text-3xl" aria-hidden>
-                  🔒
-                </span>
-                {signInErrors.map((signInError) => (
-                  <SignInHint
-                    key={signInError.provider}
-                    error={signInError}
-                    githubAccount={githubAccount}
-                    azureOrganization={azureOrganization}
-                  />
-                ))}
-                <button
-                  type="button"
-                  onClick={openSettings}
-                  className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-                >
-                  {t('layout.sidebar.openSettings')}
-                </button>
-                {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
-              </div>
-            ) : error ? (
-              <p className="p-4 text-sm text-danger">{t('layout.sidebar.loadFailed', { error })}</p>
-            ) : otherErrors.length > 0 && pullRequests.length === 0 ? (
-              <ProviderErrors errors={otherErrors} />
-            ) : loading && pullRequests.length === 0 ? (
-              <p className="p-4 text-sm text-muted">{t('layout.sidebar.loading')}</p>
-            ) : groups.length === 0 ? (
-              searchQuery.trim() ? (
-                <p className="p-4 text-sm text-muted">
-                  {t('layout.sidebar.noMatches', { query: searchQuery })}
-                </p>
-              ) : (
-                <div className="flex flex-col gap-2 p-4 text-sm text-muted">
-                  <p>{t(`layout.sidebar.empty.${prStateFilter}`)}</p>
-                  {azureNotConfigured && (
-                    <p className="text-xs text-warning">{t('layout.sidebar.azureNotConfigured')}</p>
-                  )}
-                  {/* Search help per enabled provider: GitHub qualifiers mean nothing to Azure. */}
-                  {enabled?.includes('github') && (
-                    <p className="text-xs" data-search-tip="github">
-                      <Trans
-                        i18nKey="layout.sidebar.searchTipGithub"
-                        components={{ code: <code className="rounded bg-bg px-1" /> }}
-                      />
-                    </p>
-                  )}
-                  {enabled?.includes('azure') && !azureNotConfigured && (
-                    <p className="text-xs" data-search-tip="azure">
-                      <Trans
-                        i18nKey="layout.sidebar.searchTipAzure"
-                        components={{ code: <code className="rounded bg-bg px-1" /> }}
-                      />
-                    </p>
-                  )}
-                </div>
-              )
+                {t('layout.sidebar.openSettings')}
+              </button>
+              {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
+            </div>
+          ) : error ? (
+            <p className="p-4 text-sm text-danger">{t('layout.sidebar.loadFailed', { error })}</p>
+          ) : otherErrors.length > 0 && pullRequests.length === 0 ? (
+            <ProviderErrors errors={otherErrors} />
+          ) : loading && pullRequests.length === 0 ? (
+            <p className="p-4 text-sm text-muted">{t('layout.sidebar.loading')}</p>
+          ) : groups.length === 0 ? (
+            searchQuery.trim() ? (
+              <p className="p-4 text-sm text-muted">
+                {t('layout.sidebar.noMatches', { query: searchQuery })}
+              </p>
             ) : (
-              <>
-                {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
-                {groups.map((group) => (
-                  <RepoGroup key={repoKey(group.repo)} group={group} onSelectPr={handleSelectPr} />
-                ))}
-              </>
-            )}
-          </>
-        )}
-      </aside>
-    </>
+              <div className="flex flex-col gap-2 p-4 text-sm text-muted">
+                <p>{t(`layout.sidebar.empty.${prStateFilter}`)}</p>
+                {azureNotConfigured && (
+                  <p className="text-xs text-warning">{t('layout.sidebar.azureNotConfigured')}</p>
+                )}
+                {/* Search help per enabled provider: GitHub qualifiers mean nothing to Azure. */}
+                {enabled?.includes('github') && (
+                  <p className="text-xs" data-search-tip="github">
+                    <Trans
+                      i18nKey="layout.sidebar.searchTipGithub"
+                      components={{ code: <code className="rounded bg-bg px-1" /> }}
+                    />
+                  </p>
+                )}
+                {enabled?.includes('azure') && !azureNotConfigured && (
+                  <p className="text-xs" data-search-tip="azure">
+                    <Trans
+                      i18nKey="layout.sidebar.searchTipAzure"
+                      components={{ code: <code className="rounded bg-bg px-1" /> }}
+                    />
+                  </p>
+                )}
+              </div>
+            )
+          ) : (
+            <>
+              {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
+              {groups.map((group) => (
+                <RepoGroup key={repoKey(group.repo)} group={group} onSelectPr={handleSelectPr} />
+              ))}
+            </>
+          )}
+        </>
+      )}
+    </aside>
+  )
+
+  if (isDrawer) {
+    return (
+      <>
+        <div className="absolute inset-0 z-30 bg-black/50" onClick={closeSidebar} aria-hidden />
+        {aside}
+      </>
+    )
+  }
+
+  // Docked: the column wraps the scrolling aside so the drag handle on its
+  // right edge neither scrolls away nor gets clipped. Pointer capture keeps
+  // the drag alive when the pointer leaves the 6px strip (as in
+  // `DidacticPanel`); arrows nudge it from the keyboard; double-click goes
+  // back to the tier's default width.
+  return (
+    <div ref={columnRef} style={{ width }} className="relative flex shrink-0">
+      {aside}
+      <div
+        role="separator"
+        tabIndex={0}
+        aria-orientation="vertical"
+        aria-label={t('layout.sidebar.resize')}
+        aria-valuenow={width}
+        aria-valuemin={SIDEBAR_MIN_WIDTH}
+        aria-valuemax={maxWidth}
+        title={t('layout.sidebar.resizeHint')}
+        data-testid="sidebar-resize"
+        className="absolute inset-y-0 -right-[3px] z-10 w-1.5 cursor-col-resize touch-none transition-colors duration-150 hover:bg-accent/50 focus-visible:bg-accent/70 focus-visible:outline-none active:bg-accent/70"
+        onPointerDown={(e) => {
+          e.preventDefault()
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+          const left = columnRef.current?.getBoundingClientRect().left ?? 0
+          setSidebarWidth(e.clientX - left)
+        }}
+        onDoubleClick={() => setSidebarWidth(null)}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+          e.preventDefault()
+          setSidebarWidth(width + (e.key === 'ArrowRight' ? 16 : -16))
+        }}
+      />
+    </div>
   )
 }

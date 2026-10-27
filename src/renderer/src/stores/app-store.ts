@@ -13,8 +13,11 @@
 import { create } from 'zustand'
 import {
   clampDidacticWidth,
+  clampSidebarWidth,
   DIDACTIC_PANEL_DEFAULT_WIDTH,
   DIDACTIC_PANEL_MIN_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  sidebarFootprint,
 } from '../lib/layout'
 import type {
   AiSettingsInfo,
@@ -48,9 +51,7 @@ export type MainView = 'home' | 'review'
 
 /** Page inside the home dashboard. `repoKey` / `featureKey` are opaque ids (see `lib/dashboard.ts`). */
 export type HomeRoute =
-  | { kind: 'overview' }
-  | { kind: 'repo'; repoKey: string }
-  | { kind: 'feature'; featureKey: string }
+  { kind: 'overview' } | { kind: 'repo'; repoKey: string } | { kind: 'feature'; featureKey: string }
 
 /**
  * Set when a PR was opened from a stack (board, "Review stack" button): the
@@ -66,6 +67,18 @@ export interface StackNavContext {
 
 const DIDACTIC_PANEL_WIDTH_KEY = 'minerva.didacticPanelWidth'
 const SIDEBAR_COLLAPSED_KEY = 'minerva.sidebarCollapsed'
+const SIDEBAR_WIDTH_KEY = 'minerva.sidebarWidth'
+
+/** Persisted dragged sidebar width; absent or invalid = the tier's default (`null`). */
+function readInitialSidebarWidth(): number | null {
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_WIDTH_KEY)
+    const parsed = raw === null ? Number.NaN : Number(raw)
+    return Number.isFinite(parsed) ? Math.max(Math.round(parsed), SIDEBAR_MIN_WIDTH) : null
+  } catch {
+    return null
+  }
+}
 
 /** Persisted "docked sidebar hidden" flag; anything but the literal 'true' = shown. */
 function readInitialSidebarCollapsed(): boolean {
@@ -94,8 +107,16 @@ function sameRoute(a: HomeRoute, b: HomeRoute): boolean {
  * vuelve solo al ensanchar. Por eso el clamp NO se aplica al leer de
  * `localStorage`, solo se sanea el número.
  */
-function clampDidacticPanelWidth(width: number): number {
-  return clampDidacticWidth(width, window.innerWidth)
+function clampDidacticPanelWidth(
+  width: number,
+  sidebar: { sidebarWidth: number | null; sidebarCollapsed: boolean },
+): number {
+  const viewport = window.innerWidth
+  return clampDidacticWidth(
+    width,
+    viewport,
+    sidebarFootprint(sidebar.sidebarWidth, sidebar.sidebarCollapsed, viewport),
+  )
 }
 
 /** Ancho persistido en `localStorage` (sobrevive reinicios del renderer); inválido o ausente → default. */
@@ -206,6 +227,12 @@ interface AppState {
    */
   sidebarCollapsed: boolean
   /**
+   * Docked sidebar width the user dragged to (px), persisted in
+   * `localStorage`; `null` = the tier's default (`SIDEBAR_WIDTH`). Painted
+   * through `dockedSidebarWidth`, which clamps it against the current window.
+   */
+  sidebarWidth: number | null
+  /**
    * Bumped after a write that changes PR data (a retarget): the PR list, the
    * open PR's detail and the stacks refetch when it changes.
    */
@@ -234,6 +261,8 @@ interface AppState {
    */
   setStackNav: (nav: StackNavContext | null) => void
   toggleSidebarCollapsed: () => void
+  /** Sets (clamped, persisted) or resets (`null`) the docked sidebar width. */
+  setSidebarWidth: (width: number | null) => void
   /**
    * Swaps in a fresher summary of the SELECTED PR (same `prKey`) without the
    * reset `selectPr` does (tab, file, threads). No-op for any other PR.
@@ -275,7 +304,7 @@ interface AppState {
   setAiModelInfo: (info: AiSettingsInfo) => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   selectedPr: null,
   searchQuery: '',
   prStateFilter: 'open',
@@ -307,6 +336,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   sidebarView: 'queue',
   sidebarCollapsed: readInitialSidebarCollapsed(),
+  sidebarWidth: readInitialSidebarWidth(),
   scmDataVersion: 0,
 
   mainView: 'home',
@@ -375,6 +405,16 @@ export const useAppStore = create<AppState>((set) => ({
       }
       return { sidebarCollapsed: collapsed }
     }),
+  setSidebarWidth: (width) => {
+    const next = width === null ? null : clampSidebarWidth(width, window.innerWidth)
+    try {
+      if (next === null) window.localStorage.removeItem(SIDEBAR_WIDTH_KEY)
+      else window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next))
+    } catch {
+      // Session-only when storage is unavailable.
+    }
+    set({ sidebarWidth: next })
+  },
   replaceSelectedPr: (pr) =>
     set((state) =>
       state.selectedPr &&
@@ -391,7 +431,7 @@ export const useAppStore = create<AppState>((set) => ({
   closeSidebar: () => set({ sidebarOpen: false }),
   toggleDidacticPanel: () => set((state) => ({ didacticPanelOpen: !state.didacticPanelOpen })),
   setDidacticPanelWidth: (width) => {
-    const clamped = clampDidacticPanelWidth(width)
+    const clamped = clampDidacticPanelWidth(width, get())
     // Best-effort: si `localStorage` fallara (cuota, modo raro), el resize
     // sigue funcionando dentro de la sesión.
     try {
