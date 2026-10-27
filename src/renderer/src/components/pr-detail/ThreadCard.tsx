@@ -4,7 +4,7 @@ import type { CommentThread } from '../../../../shared/types'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Markdown } from '../ui/Markdown'
-import { threadStatusBadge } from '../../lib/scm-labels'
+import { providerOfWebUrl, SCM_PROVIDER_LABEL, threadStatusBadge } from '../../lib/scm-labels'
 
 interface ThreadCardProps {
   thread: CommentThread
@@ -132,14 +132,22 @@ export function ThreadCard({
               <li key={comment.id} className="p-3">
                 <div className="mb-1 flex items-center gap-2 text-xs text-muted">
                   <Avatar user={comment.author} size={16} />
-                  <span className="font-medium text-text">{comment.author.login}</span>
+                  <span className="font-medium text-text">
+                    {comment.author.displayName ?? comment.author.login}
+                  </span>
                   <span>{formatShortDate(comment.createdAt)}</span>
                   {comment.htmlUrl && (
                     <button
                       type="button"
                       onClick={() => void handleCopyUrl(comment.id, comment.htmlUrl!)}
-                      title="Copiar URL del comentario en GitHub"
-                      aria-label="Copiar URL del comentario en GitHub"
+                      title={
+                        'Copiar URL del comentario en ' +
+                        SCM_PROVIDER_LABEL[providerOfWebUrl(comment.htmlUrl!)]
+                      }
+                      aria-label={
+                        'Copiar URL del comentario en ' +
+                        SCM_PROVIDER_LABEL[providerOfWebUrl(comment.htmlUrl!)]
+                      }
                       className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted transition-colors hover:bg-border/60 hover:text-text"
                     >
                       {copiedCommentId === comment.id ? (

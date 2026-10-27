@@ -6,6 +6,7 @@ import { parsePatch } from '../../lib/diff-parser'
 import { indexLineThreads, type LineSide } from '../../lib/line-threads'
 import { useElementWidth } from '../../hooks/use-element-width'
 import { SPLIT_DIFF_MIN_WIDTH } from '../../lib/layout'
+import { noPatchMessage } from '../../lib/scm-labels'
 import { useLineHighlights } from '../../hooks/use-line-highlights'
 import { DiffToolbar } from './DiffToolbar'
 import { SplitDiff } from './SplitDiff'
@@ -118,7 +119,9 @@ export function DiffView({
 
       <div className="flex-1 overflow-auto">
         {file.isBinary || !file.patch || hunks.length === 0 ? (
-          <p className="p-4 text-sm text-muted">Sin vista previa disponible.</p>
+          <p className="p-4 text-sm text-muted" data-patch-omitted={file.patchOmitted}>
+            {file.isBinary ? 'Sin vista previa disponible.' : noPatchMessage(file.patchOmitted)}
+          </p>
         ) : effectiveMode === 'split' ? (
           <SplitDiff
             hunks={hunks}
