@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderTree, List } from 'lucide-react'
+import { FolderTree, Layers, List } from 'lucide-react'
 import type { DiffFile } from '../../../../shared/types'
 import type { FileTreeMode } from '../../stores/app-store'
 import { buildFileTree } from '../../lib/file-tree'
@@ -16,6 +16,8 @@ interface FileTreeProps {
   onSelectFile: (path: string) => void
   /** Drawer sobre el diff en vez de columna (F16/T85, panel angosto). */
   overlay?: boolean
+  /** Body of the `layers` mode (the AI walkthrough navigator), rendered instead of the tree/list. */
+  layers: ReactNode
 }
 
 /**
@@ -30,6 +32,7 @@ export function FileTree({
   selectedPath,
   onSelectFile,
   overlay = false,
+  layers,
 }: FileTreeProps): React.JSX.Element {
   const { t } = useTranslation()
   const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set())
@@ -74,11 +77,19 @@ export function FileTree({
             active={mode === 'list'}
             onClick={() => onModeChange('list')}
           />
+          <IconButton
+            icon={<Layers size={15} />}
+            label={t('prDetail.fileTree.layersView')}
+            active={mode === 'layers'}
+            onClick={() => onModeChange('layers')}
+          />
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">
-        {mode === 'tree' ? (
+        {mode === 'layers' ? (
+          layers
+        ) : mode === 'tree' ? (
           <ul>
             {tree.map((node) => (
               <FileTreeNode

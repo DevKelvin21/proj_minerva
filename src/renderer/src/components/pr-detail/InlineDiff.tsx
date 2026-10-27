@@ -10,7 +10,14 @@ import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
-import { asHunk, KIND_BG, rangeClasses, type DiffBodyProps, type OpenComposer } from './diff-body'
+import {
+  asHunk,
+  KIND_BG,
+  LAYER_ROW_CLASS,
+  rangeClasses,
+  type DiffBodyProps,
+  type OpenComposer,
+} from './diff-body'
 
 const KIND_MARKER: Record<DiffLineKind, string> = {
   context: ' ',
@@ -30,6 +37,7 @@ export function InlineDiff({
   wordWrap,
   getTokens,
   threads: model,
+  layerKeys,
   expander,
   onCreateThread,
 }: DiffBodyProps): React.JSX.Element {
@@ -53,7 +61,9 @@ export function InlineDiff({
       .filter(([, list]) => list.length > 0)
     const inRange = keys.some((key) => model.rangeKeys.has(key))
     const focused = keys.some((key) => model.focusedKeys.has(key))
-    const marks = rangeClasses(inRange, focused)
+    const inLayer = keys.some((key) => layerKeys.has(key))
+    // A thread mark wins over the layer mark on the same gutter (both are inset shadows).
+    const marks = rangeClasses(inRange, focused) || (inLayer ? LAYER_ROW_CLASS : '')
 
     // A comment on a deletion uses the old line (LEFT); on context or an
     // addition, the new line (RIGHT).
@@ -109,6 +119,7 @@ export function InlineDiff({
             data-old-line={row.kind !== 'add' ? row.oldNumber : undefined}
             data-new-line={row.kind !== 'del' ? row.newNumber : undefined}
             data-focused={focused || undefined}
+            data-layer-line={inLayer || undefined}
             className={`px-2 ${contentClass} ${bg} ${focused ? 'bg-accent/20' : ''} text-text`}
           >
             <DiffLineContent content={row.content} tokens={getTokens(row.content)} />

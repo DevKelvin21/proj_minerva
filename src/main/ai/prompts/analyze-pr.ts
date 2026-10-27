@@ -82,9 +82,10 @@ const ANALYZE_PR_BASE_PROMPT =
   'Other providers (GCP, DigitalOcean, etc.) are out of scope: do not trigger `cloud` for them.\n' +
   '   - (everything else: refactors, styles, tests, config) does not trigger a section of its ' +
   'own — it is covered in the summary anyway.\n' +
-  '2. For each detected category, besides the summary and the startup guide (`setup`, see ' +
-  'below — those two are always present), generate the matching section (see "Exact output ' +
-  'format" below). If a category does not apply, do not generate that section.\n' +
+  '2. For each detected category, besides the summary, the guided walkthrough (`walkthrough`) ' +
+  'and the startup guide (`setup`, see below — those three are always present), generate the ' +
+  'matching section (see "Exact output format" below). If a category does not apply, do not ' +
+  'generate that section.\n' +
   '3. Be honest about uncertainty: if the diff does not give enough context for something, say ' +
   'so in the markdown of the section instead of making it up.\n\n' +
   '## Content rules\n' +
@@ -136,14 +137,23 @@ const ANALYZE_PR_BASE_PROMPT =
   '`@@@`. Do not emit a single character outside a section: the first thing in your answer must ' +
   'be a `@@@SECTION` marker, and nothing in your answer may be left outside a section.\n\n' +
   'Valid markers:\n' +
-  '- `@@@SECTION kind=<summary|setup|architecture|endpoint|schema|cloud>` opens a new section and ' +
-  'closes the previous one (if one was open). All the Markdown up to the next marker belongs to ' +
-  'this section.\n' +
+  '- `@@@SECTION kind=<summary|walkthrough|setup|architecture|endpoint|schema|cloud>` opens a new ' +
+  'section and closes the previous one (if one was open). All the Markdown up to the next marker ' +
+  'belongs to this section.\n' +
+  '- `@@@LAYER cohort="<cohort title>" title="<layer title>" files="<file refs>"` opens a layer of ' +
+  'the `walkthrough` section (only valid there). Every attribute value goes between double quotes ' +
+  'and must not contain double quotes. `files` lists the files of the layer separated by `;`, ' +
+  'each as the exact path of the diff optionally followed by `:` and comma-separated line ranges ' +
+  '`start-end` (NEW-file line numbers taken from the `+` side of the diff hunks; for a DELETED ' +
+  'file use the old-file numbers): `files="src/routes/carts.ts:13,20-27;src/services/coupon-service.ts:1-21"`. ' +
+  'A path without ranges means the whole file. The Markdown after the marker (until the next ' +
+  'marker) is the summary of THAT layer, and a `@@@MERMAID` block inside it is the diagram of ' +
+  'that layer.\n' +
   '- `@@@MERMAID` ... `@@@END_MERMAID` delimit the Mermaid diagram of the CURRENTLY open section ' +
-  '(only meaningful inside an `architecture`, `schema` or `cloud` section). In ' +
-  '`architecture`/`schema` there is ONE single block; in `cloud` you can repeat the pair up to ' +
-  'TWO times (big picture and zoom, in that order). After `@@@END_MERMAID` you can continue with ' +
-  'more Markdown of the same section if needed.\n' +
+  '(only meaningful inside an `architecture`, `schema` or `cloud` section, or inside a layer of ' +
+  'the `walkthrough`). In `architecture`/`schema` there is ONE single block; in `cloud` you can ' +
+  'repeat the pair up to TWO times (big picture and zoom, in that order); in a layer, at most ' +
+  'ONE. After `@@@END_MERMAID` you can continue with more Markdown of the same section if needed.\n' +
   '- `@@@SNIPPET label=<text without spaces> language=<curl|http|bash|env>` ... `@@@END_SNIPPET` ' +
   'delimit a copyable snippet of the currently open `endpoint` or `setup` section; you can repeat ' +
   'the pair for several examples. `curl`/`http` are for `endpoint` (trying the endpoint); ' +
@@ -151,8 +161,26 @@ const ANALYZE_PR_BASE_PROMPT =
   'Content of each section:\n' +
   '- `summary`: ALWAYS present, exactly once, first section of the answer. 3 to 6 bullets: what ' +
   'changed, why it matters, risks and what to review closely.\n' +
-  '- `setup`: ALWAYS present, exactly once, second section of the answer (right after ' +
-  '`summary`). It is the GUIDE FOR THE DEVELOPER who is going to try this PR on their machine. ' +
+  '- `walkthrough`: ALWAYS present, exactly once, second section of the answer (right after ' +
+  '`summary`). It is the GUIDED WALKTHROUGH of the change, the way a senior engineer would walk ' +
+  'a colleague through it: instead of the alphabetical file list, group the related work into a ' +
+  'small number of INDEPENDENT cohorts (1 to 4; one is fine for a focused PR) and break each ' +
+  'cohort into ORDERED layers (1 to 6) that follow the natural reading order of the change ' +
+  '(e.g. the data model first, then the service that uses it, then the route that exposes it, ' +
+  'then the tests). Optional one-paragraph intro in Markdown before the first layer. Then one ' +
+  '`@@@LAYER` marker per layer (see the marker rules): `cohort` is the cohort title (repeat it ' +
+  'verbatim for every layer of the same cohort, consecutive layers of a cohort stay together), ' +
+  '`title` is a short layer title (3 to 8 words, say what the layer DOES), `files` anchors the ' +
+  'layer to the EXACT paths of the diff and the line ranges of the relevant hunks. Rules: every ' +
+  'changed file appears in at least one layer (a file may appear in several); a layer has 1 to 6 ' +
+  'files; never invent a path that is not in the diff. After each marker write 1 to 3 sentences ' +
+  'of Markdown explaining what that layer changes and why it matters for the reviewer. Add a ' +
+  '`@@@MERMAID` block to a layer ONLY when a visual genuinely helps (a new call sequence across ' +
+  'modules or services -> `sequenceDiagram`; a state transition -> `stateDiagram-v2`; a data ' +
+  'model change -> `erDiagram`; a branching flow -> `flowchart`), at most one per layer and at ' +
+  'most 8 elements; most layers get none.\n' +
+  '- `setup`: ALWAYS present, exactly once, third section of the answer (right after ' +
+  '`walkthrough`). It is the GUIDE FOR THE DEVELOPER who is going to try this PR on their machine. ' +
   'Markdown with: (a) how to run the app with Docker, with the exact command, IF the diff or the ' +
   'metadata show a `Dockerfile`/`docker-compose`; (b) how to run it locally: install ' +
   'dependencies and start command, inferred from what can be seen in the diff or the metadata ' +
@@ -187,6 +215,18 @@ const ANALYZE_PR_BASE_PROMPT =
   '@@@SECTION kind=summary\n' +
   '- What changed: the apply-coupon endpoint is added.\n' +
   '- Why it matters: first point where a customer changes the cart total.\n' +
+  '@@@SECTION kind=walkthrough\n' +
+  'Read the service first, then the route that exposes it.\n' +
+  '@@@LAYER cohort="Apply-coupon endpoint" title="Coupon validation service" files="src/services/coupon-service.ts:1-21"\n' +
+  'New `CouponService.apply`: checks expiry and double application, then recalculates the total.\n' +
+  '@@@LAYER cohort="Apply-coupon endpoint" title="Route wiring and handler" files="src/routes/carts.ts:13,20-27"\n' +
+  'Registers `POST /carts/:id/apply-coupon` and maps the service result to 200/409.\n' +
+  '@@@MERMAID\n' +
+  'sequenceDiagram\n' +
+  '  Client->>Router: POST apply-coupon\n' +
+  '  Router->>CouponService: apply(cart, code)\n' +
+  '  CouponService-->>Router: result\n' +
+  '@@@END_MERMAID\n' +
   '@@@SECTION kind=setup\n' +
   'There is no Dockerfile in the diff, so it runs locally.\n' +
   '@@@SNIPPET label=local-start language=bash\n' +

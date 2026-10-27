@@ -38,12 +38,27 @@
  * - Un `@@@SECTION` que llega con un mermaid/snippet todavía sin cerrar:
  *   el bloque parcial se descarta (nunca se cuela a medio cerrar).
  */
-import type { DidacticSection, DidacticSnippet } from '../../shared/types'
+import type { DidacticSection, DidacticSnippet, WalkthroughFileRef } from '../../shared/types'
 import type { DraftDidacticSection } from '../../shared/events'
-import { mapRawSection, mapSnippet } from './section-mapper'
+import {
+  buildCohorts,
+  mapLayer,
+  mapRawSection,
+  mapSnippet,
+  parseFileRefs,
+  type RawWalkthroughLayer,
+} from './section-mapper'
 import { mt } from '../i18n'
 
-const KNOWN_KINDS = ['summary', 'setup', 'architecture', 'endpoint', 'schema', 'cloud'] as const
+const KNOWN_KINDS = [
+  'summary',
+  'walkthrough',
+  'setup',
+  'architecture',
+  'endpoint',
+  'schema',
+  'cloud',
+] as const
 type KnownKind = (typeof KNOWN_KINDS)[number]
 
 function isKnownKind(kind: string): kind is KnownKind {
@@ -58,11 +73,19 @@ interface SectionAcc {
   /** Solo para `kind: 'cloud'`: cada bloque `@@@MERMAID` ya cerrado, en orden de aparición (hasta 2). */
   mermaids: string[]
   snippets: DidacticSnippet[]
+  /**
+   * Solo para `kind: 'walkthrough'`: una entrada por `@@@LAYER` recibido, en
+   * orden. Mientras hay al menos una, el markdown y el mermaid de la sección
+   * van a la ÚLTIMA capa, no a la sección (su `markdown` es solo la intro
+   * previa a la primera capa).
+   */
+  layers: RawWalkthroughLayer[]
 }
 
 type Mode = 'idle' | 'section' | 'mermaid' | 'snippet'
 
 const SECTION_RE = /^@@@SECTION\s+kind=(\S+)\s*$/
+const LAYER_RE = /^@@@LAYER(?:\s+(.*))?$/
 const MERMAID_START_RE = /^@@@MERMAID\s*$/
 const MERMAID_END_RE = /^@@@END_MERMAID\s*$/
 const SNIPPET_START_RE = /^@@@SNIPPET(?:\s+(.*))?$/
@@ -78,12 +101,27 @@ function parseAttrs(raw: string | undefined): Record<string, string> {
   return attrs
 }
 
+/** Capas que pasan la validación de `mapLayer` (título + al menos un archivo), con su cohorte. */
+function validLayers(layers: readonly RawWalkthroughLayer[]): NonNullable<ReturnType<typeof mapLayer>>[] {
+  return layers
+    .map(mapLayer)
+    .filter((layer): layer is NonNullable<ReturnType<typeof mapLayer>> => layer !== null)
+}
+
 function toDraft(acc: SectionAcc, streaming: boolean): DraftDidacticSection | null {
   if (!isKnownKind(acc.kind)) return null
   const streamingFlag = streaming ? { streaming: true as const } : {}
 
   if (acc.kind === 'summary') {
     return { kind: 'summary', markdown: acc.markdown, ...streamingFlag }
+  }
+  if (acc.kind === 'walkthrough') {
+    return {
+      kind: 'walkthrough',
+      markdown: acc.markdown,
+      cohorts: buildCohorts(validLayers(acc.layers)),
+      ...streamingFlag,
+    }
   }
   if (acc.kind === 'architecture' || acc.kind === 'schema') {
     return {
@@ -175,6 +213,7 @@ export class StreamSectionParser {
         mermaid: acc.mermaid,
         mermaids: acc.mermaids,
         snippets: acc.snippets,
+        layers: acc.layers,
       })
       if (mapped) {
         sections.push(mapped)
@@ -198,8 +237,25 @@ export class StreamSectionParser {
         const kind = SECTION_RE.exec(clean)![1]
         this.discardOpenBlock()
         this.closeCurrentSection()
-        this.current = { kind, markdown: '', snippets: [], mermaids: [] }
+        this.current = { kind, markdown: '', snippets: [], mermaids: [], layers: [] }
         this.mode = 'section'
+        return
+      }
+      if (LAYER_RE.test(clean)) {
+        // Solo tiene sentido dentro de un `walkthrough`; en cualquier otra
+        // sección (o sin sección) se ignora la línea entera en vez de
+        // colarla como texto, porque es un marcador y no contenido.
+        if (this.current && this.current.kind === 'walkthrough') {
+          const attrs = parseAttrs(LAYER_RE.exec(clean)![1])
+          this.discardOpenBlock()
+          this.current.layers.push({
+            cohort: attrs.cohort ?? '',
+            title: attrs.title ?? '',
+            files: parseFileRefs(attrs.files ?? ''),
+            markdown: '',
+          })
+          this.mode = 'section'
+        }
         return
       }
       if (MERMAID_START_RE.test(clean)) {
@@ -216,9 +272,13 @@ export class StreamSectionParser {
           // fixtures (y el DSL típico que produce un modelo) suelen incluir
           // ese salto de línea de cierre, y `mermaid.render()` lo tolera sin
           // problema.
+          const lastLayer = this.current.layers[this.current.layers.length - 1]
           if (this.current.kind === 'cloud') {
             // Hasta DOS bloques por sección, acumulados en orden de cierre.
             this.current.mermaids.push(this.mermaidBuf)
+          } else if (this.current.kind === 'walkthrough' && lastLayer) {
+            // El diagrama pertenece a la capa abierta, no a la sección.
+            lastLayer.mermaid = this.mermaidBuf
           } else {
             this.current.mermaid = this.mermaidBuf
           }
@@ -267,6 +327,11 @@ export class StreamSectionParser {
       return
     }
     if (this.mode === 'section' && this.current) {
+      const lastLayer = this.current.layers[this.current.layers.length - 1]
+      if (this.current.kind === 'walkthrough' && lastLayer) {
+        lastLayer.markdown += (lastLayer.markdown.length > 0 ? '\n' : '') + line
+        return
+      }
       this.current.markdown += (this.current.markdown.length > 0 ? '\n' : '') + line
       return
     }
@@ -302,8 +367,44 @@ export function stringifySections(sections: DidacticSection[]): string {
   return sections.map(sectionToText).join('')
 }
 
+/** Serializa los archivos de una capa al formato del atributo `files` (inverso de `parseFileRefs`). */
+function fileRefsToAttr(files: readonly WalkthroughFileRef[]): string {
+  return files
+    .map((file) =>
+      file.ranges.length === 0
+        ? file.path
+        : file.path + ':' + file.ranges.map((r) => (r.start === r.end ? String(r.start) : r.start + '-' + r.end)).join(','),
+    )
+    .join(';')
+}
+
+/** Valor seguro para un atributo entre comillas: sin comillas dobles ni saltos de línea. */
+function attrValue(value: string): string {
+  return value.replace(/["\r\n]/g, ' ').trim()
+}
+
 function sectionToText(section: DidacticSection): string {
-  let out = '@@@SECTION kind=' + section.kind + '\n' + section.markdown.trimEnd() + '\n'
+  // El markdown de un walkthrough es una intro OPCIONAL: vacío ⇒ sin línea
+  // en blanco, para que el round-trip devuelva '' y no '\n'.
+  const intro = section.markdown.trimEnd()
+  let out = '@@@SECTION kind=' + section.kind + '\n' + (intro.length > 0 ? intro + '\n' : '')
+
+  if (section.kind === 'walkthrough') {
+    for (const cohort of section.cohorts) {
+      for (const layer of cohort.layers) {
+        out +=
+          '@@@LAYER cohort="' +
+          attrValue(cohort.title) +
+          '" title="' +
+          attrValue(layer.title) +
+          '" files="' +
+          fileRefsToAttr(layer.files) +
+          '"\n'
+        if (layer.markdown.trimEnd().length > 0) out += layer.markdown.trimEnd() + '\n'
+        if (layer.mermaid) out += '@@@MERMAID\n' + layer.mermaid.trimEnd() + '\n@@@END_MERMAID\n'
+      }
+    }
+  }
 
   if (section.kind === 'architecture' || section.kind === 'schema') {
     out += '@@@MERMAID\n' + section.mermaid.trimEnd() + '\n@@@END_MERMAID\n'

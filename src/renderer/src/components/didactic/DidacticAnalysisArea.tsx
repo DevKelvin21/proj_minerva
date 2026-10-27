@@ -9,9 +9,11 @@ import {
   Database,
   Globe,
   Languages,
+  Layers,
   Loader2,
   RefreshCw,
   Rocket,
+  Workflow,
 } from 'lucide-react'
 import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
 import { useProviderStatus } from '../../hooks/use-provider-status'
@@ -28,11 +30,13 @@ import { NoCliProvidersCard } from './NoCliProvidersCard'
 import { ActiveModelHint } from './ActiveModelHint'
 import { ExpandableResource } from './ExpandableResource'
 import { ResourceViewer, type ViewerResource } from './ResourceViewer'
-import type { DidacticSection, RepoRef } from '../../../../shared/types'
+import type { DidacticSection, RepoRef, WalkthroughCohort } from '../../../../shared/types'
 import type { DraftDidacticSection } from '../../../../shared/events'
+import { flattenLayers, type LayerRef } from '../../lib/walkthrough'
 
 const SECTION_ICON: Record<DidacticSection['kind'], React.JSX.Element> = {
   summary: <BookOpen size={16} />,
+  walkthrough: <Layers size={16} />,
   setup: <Rocket size={16} />,
   architecture: <Building2 size={16} />,
   endpoint: <Globe size={16} />,
@@ -72,6 +76,89 @@ function StreamingCursor(): React.JSX.Element {
     <span aria-hidden className="inline-block animate-pulse text-sm leading-none text-accent">
       {STREAMING_CURSOR_GLYPH}
     </span>
+  )
+}
+
+/** Opens a walkthrough layer in the Files tab (main window only; the detached window has no Files tab). */
+export type OpenLayerHandler = (ref: LayerRef, firstPath: string | null) => void
+
+/**
+ * Body of the `walkthrough` card: cohorts as headings, layers as a numbered
+ * list in reading order. With `onOpenLayer` (main window) each layer is a
+ * button that jumps to the Files tab in layers mode; without it (detached
+ * window) the list is plain text. Same shape for final and draft sections.
+ */
+function WalkthroughBody({
+  cohorts,
+  onOpenLayer,
+}: {
+  cohorts: WalkthroughCohort[]
+  onOpenLayer?: OpenLayerHandler
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const flat = flattenLayers(cohorts)
+  let index = 0
+  return (
+    <div className="flex flex-col gap-2" data-testid="walkthrough-card">
+      <p className="text-xs text-muted">{t('didactic.walkthrough.hint')}</p>
+      {cohorts.map((cohort, c) => (
+        <div key={c} className="flex flex-col gap-1">
+          <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+            {cohort.title || t('prDetail.layers.defaultCohort')}
+          </p>
+          <ol className="flex flex-col gap-1">
+            {cohort.layers.map((layer, l) => {
+              const number = ++index
+              const meta = (
+                <span className="flex items-center gap-2 text-[11px] text-muted">
+                  {t('didactic.walkthrough.fileCount', { count: layer.files.length })}
+                  {layer.mermaid && (
+                    <span className="flex items-center gap-0.5">
+                      <Workflow size={10} aria-hidden />
+                      {t('didactic.walkthrough.withDiagram')}
+                    </span>
+                  )}
+                </span>
+              )
+              const badge = (
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border text-[11px] font-semibold text-muted tabular-nums">
+                  {number}
+                </span>
+              )
+              const ref = { cohort: c, layer: l }
+              return (
+                <li key={l}>
+                  {onOpenLayer ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenLayer(ref, layer.files[0]?.path ?? null)}
+                      title={t('didactic.walkthrough.openLayer', { index: number })}
+                      data-testid="walkthrough-layer"
+                      className="flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-border/40"
+                    >
+                      {badge}
+                      <span className="flex min-w-0 flex-col">
+                        <span className="text-sm text-text">{layer.title}</span>
+                        {meta}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="flex items-start gap-2 px-1.5 py-1" data-testid="walkthrough-layer">
+                      {badge}
+                      <span className="flex min-w-0 flex-col">
+                        <span className="text-sm text-text">{layer.title}</span>
+                        {meta}
+                      </span>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      ))}
+      {flat.length === 0 && <StreamingCursor />}
+    </div>
   )
 }
 
@@ -122,6 +209,7 @@ function renderSection(
   key: number,
   onExpand: (resource: ViewerResource) => void,
   t: TFunction,
+  onOpenLayer?: OpenLayerHandler,
 ): React.JSX.Element {
   const meta = sectionMeta(section.kind, t)
 
@@ -130,15 +218,21 @@ function renderSection(
       key={key}
       icon={meta.icon}
       title={meta.title}
-      onExpandMarkdown={() =>
-        onExpand({
-          kind: 'markdown',
-          title: t('didactic.resources.wideViewTitle', { title: meta.title }),
-          markdown: section.markdown,
-        })
+      onExpandMarkdown={
+        section.kind === 'walkthrough'
+          ? undefined
+          : () =>
+              onExpand({
+                kind: 'markdown',
+                title: t('didactic.resources.wideViewTitle', { title: meta.title }),
+                markdown: section.markdown,
+              })
       }
     >
-      <Markdown content={section.markdown} />
+      {section.markdown.trim().length > 0 && <Markdown content={section.markdown} />}
+      {section.kind === 'walkthrough' && (
+        <WalkthroughBody cohorts={section.cohorts} onOpenLayer={onOpenLayer} />
+      )}
       {(section.kind === 'architecture' || section.kind === 'schema') && (
         <ExpandableResource
           label={t('didactic.resources.expandDiagram')}
@@ -179,6 +273,7 @@ function renderDraftSection(
   key: number,
   onExpand: (resource: ViewerResource) => void,
   t: TFunction,
+  onOpenLayer?: OpenLayerHandler,
 ): React.JSX.Element {
   const meta = sectionMeta(section.kind, t)
 
@@ -187,15 +282,21 @@ function renderDraftSection(
       key={key}
       icon={meta.icon}
       title={meta.title}
-      onExpandMarkdown={() =>
-        onExpand({
-          kind: 'markdown',
-          title: t('didactic.resources.wideViewTitle', { title: meta.title }),
-          markdown: section.markdown,
-        })
+      onExpandMarkdown={
+        section.kind === 'walkthrough'
+          ? undefined
+          : () =>
+              onExpand({
+                kind: 'markdown',
+                title: t('didactic.resources.wideViewTitle', { title: meta.title }),
+                markdown: section.markdown,
+              })
       }
     >
-      <Markdown content={section.markdown} />
+      {section.markdown.trim().length > 0 && <Markdown content={section.markdown} />}
+      {section.kind === 'walkthrough' && (
+        <WalkthroughBody cohorts={section.cohorts} onOpenLayer={onOpenLayer} />
+      )}
       {section.streaming && <StreamingCursor />}
       {(section.kind === 'architecture' || section.kind === 'schema') && section.mermaid && (
         <ExpandableResource
@@ -235,6 +336,12 @@ interface DidacticAnalysisAreaProps {
    * mientras no se sepa aún — la barra simplemente no aparece hasta entonces.
    */
   currentHeadSha?: string
+  /**
+   * Jump to a walkthrough layer in the Files tab. Only the main window
+   * passes it (`DidacticPanel`); the detached window has no Files tab, so its
+   * walkthrough card is read-only.
+   */
+  onOpenLayer?: OpenLayerHandler
 }
 
 /**
@@ -280,6 +387,7 @@ export function DidacticAnalysisArea({
   repo,
   number,
   currentHeadSha,
+  onOpenLayer,
 }: DidacticAnalysisAreaProps): React.JSX.Element {
   const {
     analysis,
@@ -345,7 +453,11 @@ export function DidacticAnalysisArea({
     )
   } else if (analysis) {
     body = (
-      <>{analysis.sections.map((section, i) => renderSection(section, i, setViewerResource, t))}</>
+      <>
+        {analysis.sections.map((section, i) =>
+          renderSection(section, i, setViewerResource, t, onOpenLayer),
+        )}
+      </>
     )
   } else if (hasStreamedContent && streamingSections) {
     body = (
@@ -360,7 +472,9 @@ export function DidacticAnalysisArea({
             <HarnessActivityLog items={activity} />
           </div>
         )}
-        {streamingSections.map((section, i) => renderDraftSection(section, i, setViewerResource, t))}
+        {streamingSections.map((section, i) =>
+          renderDraftSection(section, i, setViewerResource, t, onOpenLayer),
+        )}
       </>
     )
   } else if (checkingCache || loading || isExploringEmpty) {

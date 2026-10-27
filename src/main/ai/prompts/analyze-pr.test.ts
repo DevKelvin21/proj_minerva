@@ -13,7 +13,10 @@ describe('buildAnalyzeSystemPrompt', () => {
   it('keeps the tagged-section protocol the stream parser depends on', () => {
     const prompt = buildAnalyzeSystemPrompt('en')
     for (const token of [
-      '@@@SECTION kind=<summary|setup|architecture|endpoint|schema|cloud>',
+      '@@@SECTION kind=<summary|walkthrough|setup|architecture|endpoint|schema|cloud>',
+      '@@@LAYER cohort="<cohort title>" title="<layer title>" files="<file refs>"',
+      '@@@SECTION kind=walkthrough\n',
+      '@@@LAYER cohort="Apply-coupon endpoint" title="Route wiring and handler" files="src/routes/carts.ts:13,20-27"\n',
       '@@@MERMAID',
       '@@@END_MERMAID',
       '@@@SNIPPET label=<text without spaces> language=<curl|http|bash|env>',
@@ -38,5 +41,13 @@ describe('buildAnalyzeSystemPrompt', () => {
     expect(prompt).toContain('`a:R -- L:b`')
     expect(prompt).toContain('`cf:queues`')
     expect(prompt).toContain('at most 10 services')
+  })
+
+  it('asks for a guided walkthrough anchored to the diff', () => {
+    const prompt = buildAnalyzeSystemPrompt('en')
+    expect(prompt).toContain('every changed file appears in at least one layer')
+    expect(prompt).toContain('never invent a path that is not in the diff')
+    expect(prompt).toContain('NEW-file line numbers')
+    expect(prompt).toContain('most layers get none')
   })
 })

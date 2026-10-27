@@ -14,6 +14,12 @@ export interface DiffBodyProps {
   wordWrap: boolean
   getTokens: (content: string) => HighlightToken[] | undefined
   threads: DiffThreadsModel
+  /**
+   * Position keys (`lineThreadKey`) of the lines the active walkthrough layer
+   * covers in this file: those rows get a marker so the reviewer sees where
+   * the layer lands. Empty when no layer is active.
+   */
+  layerKeys: ReadonlySet<string>
   expander: {
     loading: boolean
     error: string | null
@@ -33,6 +39,9 @@ export function rangeClasses(inRange: boolean, focused: boolean): string {
   if (inRange) return 'shadow-[inset_2px_0_0_var(--color-accent)]'
   return ''
 }
+
+/** Marker of a row inside the active walkthrough layer (distinct from the thread marks: `info`, not accent). */
+export const LAYER_ROW_CLASS = 'shadow-[inset_3px_0_0_var(--color-info)]'
 
 export interface OpenComposer {
   key: string

@@ -14,7 +14,7 @@
  */
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
-import type { DidacticSnippet, RepoRef, UpdaterStatus } from './types'
+import type { DidacticSnippet, RepoRef, UpdaterStatus, WalkthroughCohort } from './types'
 
 interface DraftSectionCommon {
   markdown: string
@@ -43,6 +43,13 @@ interface DraftSectionCommon {
  */
 export type DraftDidacticSection =
   | ({ kind: 'summary' } & DraftSectionCommon)
+  /**
+   * `cohorts` only holds layers whose `@@@LAYER` marker already arrived (a
+   * layer appears as soon as it opens; its markdown keeps growing while the
+   * section streams). Same rule as `mermaid` above: a layer's diagram is only
+   * set once its `@@@END_MERMAID` closed.
+   */
+  | ({ kind: 'walkthrough'; cohorts: WalkthroughCohort[] } & DraftSectionCommon)
   | ({ kind: 'setup'; snippets: DidacticSnippet[] } & DraftSectionCommon)
   | ({ kind: 'architecture'; mermaid?: string } & DraftSectionCommon)
   | ({ kind: 'endpoint'; snippets: DidacticSnippet[] } & DraftSectionCommon)

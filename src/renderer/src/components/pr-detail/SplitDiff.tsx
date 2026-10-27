@@ -11,7 +11,14 @@ import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
-import { asHunk, KIND_BG, rangeClasses, type DiffBodyProps, type OpenComposer } from './diff-body'
+import {
+  asHunk,
+  KIND_BG,
+  LAYER_ROW_CLASS,
+  rangeClasses,
+  type DiffBodyProps,
+  type OpenComposer,
+} from './diff-body'
 
 const SIDES = ['left', 'right'] as const
 const WRAP_CONTENT = 'whitespace-pre-wrap break-words'
@@ -41,6 +48,7 @@ interface SideCellsProps {
   contentClass: string
   threadList: CommentThread[]
   model: DiffThreadsModel
+  inLayer: boolean
   onAdd?: () => void
   getTokens: (content: string) => HighlightToken[] | undefined
 }
@@ -57,13 +65,15 @@ function SideCells({
   contentClass,
   threadList,
   model,
+  inLayer,
   onAdd,
   getTokens,
 }: SideCellsProps): React.JSX.Element {
   const { t } = useTranslation()
   const inRange = positionKey ? model.rangeKeys.has(positionKey) : false
   const focused = positionKey ? model.focusedKeys.has(positionKey) : false
-  const marks = rangeClasses(inRange, focused)
+  // A thread mark wins over the layer mark on the same gutter (both are inset shadows).
+  const marks = rangeClasses(inRange, focused) || (inLayer ? LAYER_ROW_CLASS : '')
   const commentCount = threadList.reduce((sum, t) => sum + t.comments.length, 0)
   return (
     <>
@@ -92,6 +102,7 @@ function SideCells({
         data-old-line={side === 'LEFT' && cell ? cell.number : undefined}
         data-new-line={side === 'RIGHT' && cell ? cell.number : undefined}
         data-focused={focused || undefined}
+        data-layer-line={inLayer || undefined}
         className={`px-2 ${contentClass} ${bg} ${focused ? 'bg-accent/20' : ''} text-text`}
       >
         {cell && <DiffLineContent content={cell.content} tokens={getTokens(cell.content)} />}
@@ -119,6 +130,7 @@ export function SplitDiff({
   wordWrap,
   getTokens,
   threads: model,
+  layerKeys,
   expander,
   onCreateThread,
 }: DiffBodyProps): React.JSX.Element {
@@ -269,6 +281,11 @@ export function SplitDiff({
         contentClass={contentClass}
         threadList={side === 'left' ? meta.leftThreads : meta.rightThreads}
         model={model}
+        inLayer={
+          side === 'left'
+            ? meta.leftKey !== undefined && layerKeys.has(meta.leftKey)
+            : meta.rightKey !== undefined && layerKeys.has(meta.rightKey)
+        }
         onAdd={
           side === 'left'
             ? meta.leftThreads.length === 0

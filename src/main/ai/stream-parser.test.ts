@@ -406,3 +406,114 @@ describe('stringifySections + StreamSectionParser (round-trip)', () => {
     expect(final).toEqual(original)
   })
 })
+
+describe('StreamSectionParser · walkthrough layers', () => {
+  const text =
+    '@@@SECTION kind=walkthrough\n' +
+    'Read the service first.\n' +
+    '@@@LAYER cohort="Coupon endpoint" title="Coupon service" files="src/services/coupon-service.ts:1-21"\n' +
+    'New `CouponService.apply`.\n' +
+    '@@@MERMAID\n' +
+    'sequenceDiagram\n' +
+    '  A->>B: apply\n' +
+    '@@@END_MERMAID\n' +
+    '@@@LAYER cohort="Coupon endpoint" title="Route wiring" files="src/routes/carts.ts:13,20-27;src/routes/carts.ts:30"\n' +
+    'Registers the route.\n' +
+    '@@@LAYER cohort="Tests" title="Unit tests" files="src/services/coupon-service.test.ts"\n' +
+    'Covers the expired case.\n'
+
+  it('groups layers into cohorts, with per-layer markdown, files and mermaid', () => {
+    const parser = new StreamSectionParser()
+    pushInChunks(parser, text, 7)
+    const final = parser.finalize()
+    expect(final).toEqual([
+      {
+        kind: 'walkthrough',
+        markdown: 'Read the service first.',
+        cohorts: [
+          {
+            title: 'Coupon endpoint',
+            layers: [
+              {
+                title: 'Coupon service',
+                markdown: 'New `CouponService.apply`.',
+                files: [{ path: 'src/services/coupon-service.ts', ranges: [{ start: 1, end: 21 }] }],
+                mermaid: 'sequenceDiagram\n  A->>B: apply\n',
+              },
+              {
+                title: 'Route wiring',
+                markdown: 'Registers the route.',
+                files: [
+                  {
+                    path: 'src/routes/carts.ts',
+                    ranges: [
+                      { start: 13, end: 13 },
+                      { start: 20, end: 27 },
+                      { start: 30, end: 30 },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            title: 'Tests',
+            layers: [
+              {
+                title: 'Unit tests',
+                markdown: 'Covers the expired case.',
+                files: [{ path: 'src/services/coupon-service.test.ts', ranges: [] }],
+              },
+            ],
+          },
+        ],
+      },
+    ])
+  })
+
+  it('exposes a layer as soon as its marker arrives, and its mermaid only once closed', () => {
+    const parser = new StreamSectionParser()
+    parser.push(
+      '@@@SECTION kind=walkthrough\n@@@LAYER cohort="C" title="L1" files="a.ts:1-2"\nsummary\n@@@MERMAID\nflowchart TD\n',
+    )
+    const snap = parser.snapshot()
+    expect(snap).toHaveLength(1)
+    const section = snap[0]
+    if (section.kind !== 'walkthrough') throw new Error('expected walkthrough')
+    expect(section.streaming).toBe(true)
+    expect(section.cohorts).toEqual([
+      { title: 'C', layers: [{ title: 'L1', markdown: 'summary', files: [{ path: 'a.ts', ranges: [{ start: 1, end: 2 }] }] }] },
+    ])
+  })
+
+  it('drops layers without files or title but keeps the section, and ignores @@@LAYER outside a walkthrough', () => {
+    const parser = new StreamSectionParser()
+    parser.push(
+      '@@@SECTION kind=summary\nhello\n@@@LAYER cohort="x" title="y" files="a.ts"\nstill summary\n' +
+        '@@@SECTION kind=walkthrough\n@@@LAYER cohort="C" title="" files="a.ts"\nno title\n' +
+        '@@@LAYER cohort="C" title="No files"\nno files\n@@@LAYER cohort="C" title="Ok" files="b.ts:3"\nfine\n',
+    )
+    const final = parser.finalize()
+    expect(final[0]).toEqual({ kind: 'summary', markdown: 'hello\nstill summary' })
+    expect(final[1]).toEqual({
+      kind: 'walkthrough',
+      markdown: '',
+      cohorts: [{ title: 'C', layers: [{ title: 'Ok', markdown: 'fine', files: [{ path: 'b.ts', ranges: [{ start: 3, end: 3 }] }] }] }],
+    })
+  })
+
+  it('discards a walkthrough whose layers are all invalid', () => {
+    const parser = new StreamSectionParser()
+    parser.push('@@@SECTION kind=summary\nok\n@@@SECTION kind=walkthrough\nintro only\n')
+    expect(parser.finalize()).toEqual([{ kind: 'summary', markdown: 'ok' }])
+  })
+
+  it('round-trips a walkthrough through stringifySections', () => {
+    const parser = new StreamSectionParser()
+    pushInChunks(parser, text, 5)
+    const final = parser.finalize()
+    const again = new StreamSectionParser()
+    again.push(stringifySections(final))
+    expect(again.finalize()).toEqual(final)
+  })
+})

@@ -57,6 +57,15 @@ commit** and the model explores it with **read-only tools**. Jails: OpenCode
   cache in main; prompts in `src/main/ai/prompts/`.
 - Mermaid renders in the renderer (lazy, `securityLevel: 'strict'`); the AI writes
   Mermaid text, it does not draw.
+- **Guided walkthrough** (CodeRabbit "Change Stack" style): the mandatory `walkthrough`
+  section (2nd, after `summary`) groups the PR into cohorts of ordered layers via
+  `@@@LAYER cohort="…" title="…" files="path:12-40,55;other.ts"` markers; the markdown and an
+  optional `@@@MERMAID` after a marker belong to that layer. Ranges are NEW-file lines
+  (OLD-file for deleted files); `section-mapper.ts` drops layers without title/files. The
+  Files tab's third left-column mode (`fileTreeMode: 'layers'`, `LayerNavigator` +
+  `LayerContextBar`, J/K keys) consumes it through `useWalkthrough` (same analysis as the
+  didactic panel, no extra LLM call); unknown paths are listed as a warning, uncovered files
+  under "Not covered by any layer".
 - Detached didactic window: `#didactic/…` hash carrying the full `RepoRef` as validated
   base64url JSON (`shared/didactic-route.ts`); `main.tsx` reacts to `hashchange`.
 
