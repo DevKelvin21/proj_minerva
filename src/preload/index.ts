@@ -243,6 +243,7 @@ const minervaApi = {
     getFileContent: invoke('scm:getFileContent'),
     retarget: invoke('scm:retarget'),
     getStacks: invoke('scm:getStacks'),
+    getDashboard: invoke('scm:getDashboard'),
   },
   ai: {
     analyzePullRequest: invoke('ai:analyzePullRequest'),

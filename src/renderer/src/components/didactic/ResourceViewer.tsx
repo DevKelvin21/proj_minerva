@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { DidacticSnippet } from '../../../../shared/types'
@@ -31,8 +31,12 @@ interface ResourceViewerProps {
  */
 export function ResourceViewer({ resource, onClose }: ResourceViewerProps): React.JSX.Element {
   const { t } = useTranslation()
+  const overlayRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
+      // Not when an ancestor hides the viewer (the review tree stays mounted
+      // under the home dashboard): `display: none` leaves no client rects.
+      if (overlayRef.current && overlayRef.current.getClientRects().length === 0) return
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -41,6 +45,7 @@ export function ResourceViewer({ resource, onClose }: ResourceViewerProps): Reac
 
   return (
     <div
+      ref={overlayRef}
       // Padding del overlay reducido en ventanas chicas (F16/T87): `p-6` fijo
       // se comía 96px de una ventana tileada de 540px de alto.
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 backdrop-blur-sm sm:p-6"

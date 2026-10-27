@@ -172,6 +172,20 @@ function isGetStacksPayload(value: unknown): boolean {
   return value.refresh === undefined || typeof value.refresh === 'boolean'
 }
 
+/**
+ * `scm:getDashboard`: nothing, or a plain `{ refresh?: boolean }` (no other
+ * key, no inherited `refresh`).
+ */
+function isGetDashboardPayload(value: unknown): boolean {
+  if (value === undefined) return true
+  if (!isPlainObject(value)) return false
+  const proto: unknown = Object.getPrototypeOf(value)
+  if (proto !== Object.prototype && proto !== null) return false
+  if (!hasOnlyKeys(value, ['refresh'])) return false
+  const refresh = Object.hasOwn(value, 'refresh') ? value.refresh : undefined
+  return refresh === undefined || typeof refresh === 'boolean'
+}
+
 function isAzureOrganizationsPayload(value: unknown): boolean {
   if (!Array.isArray(value) || value.length > MAX_AZURE_ORGANIZATIONS) return false
   const seen = new Set<string>()
@@ -330,6 +344,7 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:getFileContent': isGetFileContentPayload,
   'scm:retarget': isRetargetPayload,
   'scm:getStacks': isGetStacksPayload,
+  'scm:getDashboard': isGetDashboardPayload,
   'ai:analyzePullRequest': isRepoAndNumberPayload,
   'ai:getCachedAnalysis': isRepoAndNumberPayload,
   'ai:invalidateAnalysis': isRepoAndNumberPayload,

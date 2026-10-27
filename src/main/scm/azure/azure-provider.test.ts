@@ -231,6 +231,74 @@ describe('listPullRequests', () => {
   })
 })
 
+describe('summaries for the home dashboard (labels, reviewers, viewer)', () => {
+  const relation = (prs: { number: number; viewer?: unknown }[]) =>
+    Object.fromEntries(prs.map((pr) => [pr.number, pr.viewer]))
+  const author = { isAuthor: true, reviewer: null }
+  const required = (vote: string) => ({ isAuthor: false, reviewer: 'required', vote })
+  const optional = (vote: string) => ({ isAuthor: false, reviewer: 'optional', vote })
+  const none = { isAuthor: false, reviewer: null }
+
+  it('lists every active PR of the scope, with the viewer relation against connectionData', async () => {
+    const scope = await provider().listScopePullRequests()
+    const summaries = scope.map((item) => item.summary)
+    expect(relation(summaries)).toEqual({
+      101: author,
+      102: author,
+      103: author,
+      104: optional('none'),
+      105: required('rejected'),
+      106: required('approved_with_suggestions'),
+      // Required, and already voted 10.
+      108: required('approved'),
+      110: optional('none'),
+      111: none,
+      112: none,
+      113: none,
+    })
+    expect(scope.every((item) => item.headIsFork === undefined)).toBe(true)
+    const pr106 = summaries.find((pr) => pr.number === 106)
+    expect(pr106?.reviewers?.map((r) => [r.user.displayName, r.vote, r.isRequired])).toEqual([
+      ['Ada Lovelace', 'approved_with_suggestions', true],
+      ['[Platform]\\Reviewers', 'none', true],
+    ])
+    // Only the identity and the per-project listing: no per-PR lookups.
+    expect(server.log.map((entry) => entry.path)).toEqual([
+      '/contoso/_apis/connectionData',
+      '/contoso/Platform/_apis/git/pullrequests',
+    ])
+  })
+
+  it('carries tags: checkout-v2 spans the 3 repos, bug spans 2', async () => {
+    const summaries = (await provider().listScopePullRequests()).map((item) => item.summary)
+    const reposWith = (tag: string): string[] =>
+      [
+        ...new Set(
+          summaries
+            .filter((pr) => pr.labels?.some((label) => label.name === tag))
+            .map((pr) => pr.repo.name),
+        ),
+      ].sort()
+    expect(reposWith('checkout-v2')).toEqual(['orders-api', 'platform-infra', 'storefront-web'])
+    expect(reposWith('bug')).toEqual(['orders-api', 'storefront-web'])
+    expect(summaries.find((pr) => pr.number === 113)?.labels).toEqual([])
+  })
+
+  it('the involved list carries the same relation', async () => {
+    const prs = await provider().listPullRequests({ state: 'open' })
+    expect(relation(prs)).toEqual({
+      101: author,
+      102: author,
+      103: author,
+      104: optional('none'),
+      105: required('rejected'),
+      106: required('approved_with_suggestions'),
+      108: required('approved'),
+      110: optional('none'),
+    })
+  })
+})
+
 describe('detail', () => {
   it('carries the description, reviewers, work items, CI and commit count', async () => {
     const detail = await provider().getPullRequestDetail(webRepo, 108)
@@ -239,7 +307,7 @@ describe('detail', () => {
       {
         user: { login: PEOPLE.ada.uniqueName, displayName: 'Ada Lovelace' },
         vote: 'approved',
-        isRequired: false,
+        isRequired: true,
       },
       {
         user: { login: PEOPLE.linus.uniqueName, displayName: 'Linus Pauling' },

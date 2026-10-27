@@ -36,8 +36,19 @@ unified patches built in main.
   `azure-provider.ts`).
 - Provider-neutral in `main/scm/`: `snapshot-store`, `seen-store`, `pr-watcher`,
   `scm-settings` (enabled flags), `retarget` (re-validation before the only PR write),
-  `stacks-service` (orphans via exact merged-by-source lookups). Composition root:
-  `default-scm.ts`.
+  `stacks-service` (orphans via exact merged-by-source lookups), `dashboard-service`
+  (`scm:getDashboard`: scope open PRs + the user's own, with `labels`/`reviewers`/`viewer`),
+  `scope-cache` (ONE single-flight 60 s scope fetch shared by stacks and dashboard; the
+  watcher's changes, retargets and settings drop it via `invalidateListCaches`). Composition
+  root: `default-scm.ts`. `viewer` (author / required / optional reviewer + own vote) is
+  matched by identity in main, never by display login in the renderer.
+- **Home dashboard** (`renderer/src/components/home/`): the app opens on `mainView: 'home'`
+  (overview → repo page with viewer filters + full-width `StackBoard` → feature page);
+  selecting a PR switches to `'review'`. The review subtree stays MOUNTED but `hidden` +
+  `inert` on home (drafts survive), so global key listeners in it must check
+  `mainView === 'review'`. Feature groups = a label/tag shared by open PRs in ≥ 2 repos of
+  the same provider + owner/org (key `provider:owner:tag`); custom names and hidden groups
+  live in localStorage (prototype-less maps). Sidebar collapses on every tier (Cmd/Ctrl+B).
 - `MINERVA_MOCK=1` = mock SCM: GitHub universe "shopwave" + Azure org "contoso" (the real
   `AzureScmProvider` over the in-memory `azure/fixtures/fake-server.ts`; writes stay in
   memory). It does not affect AI. NEVER test write paths against a real org.

@@ -122,10 +122,12 @@ export function FilesTab({
     setActiveLayer(entry.ref, resolveLayerFiles(entry.layer, files).known[0]?.path)
   }, [layersMode, flat, activeLayer, files, setActiveLayer])
 
-  // J / K: next / previous layer while following the walkthrough.
+  // J / K: next / previous layer while following the walkthrough. Not while
+  // the home dashboard is on screen (the review stays mounted, hidden).
   useEffect(() => {
     if (!layersMode || flat.length === 0) return
     function onKeyDown(event: KeyboardEvent): void {
+      if (useAppStore.getState().mainView !== 'review') return
       if (event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) return
       const key = event.key.toLowerCase()
       if (key !== 'j' && key !== 'k') return

@@ -35,6 +35,34 @@ export type ReviewDecision =
 
 export type CiStatus = 'success' | 'failure' | 'pending' | null
 
+/** A PR label (GitHub) or tag (Azure DevOps). `color` is 6-hex without `#`, when known. */
+export interface PrLabel {
+  name: string
+  color?: string
+}
+
+/**
+ * How the signed-in user relates to a PR as a reviewer:
+ * - `required`: Azure DevOps required reviewer; GitHub: review requested from
+ *   the user directly, or the user has a standing review (GitHub has no
+ *   optional reviewers).
+ * - `optional`: Azure DevOps optional reviewer.
+ * - `null`: not a reviewer.
+ */
+export type ViewerReviewRole = 'required' | 'optional' | null
+
+/** The signed-in user's relation to a PR, computed in main by the provider that knows the identity. */
+export interface PrViewerRelation {
+  isAuthor: boolean
+  reviewer: ViewerReviewRole
+  /**
+   * The user's own standing vote when `reviewer` is set (`none` = not voted
+   * yet, or GitHub re-requested the review). Matched by identity in main, so
+   * the renderer never has to guess it from a display login.
+   */
+  vote?: ReviewerVote
+}
+
 /**
  * State filter for `scm:listPullRequests`. `'open'` is the default; `'closed'`
  * includes both closed and merged PRs (the UI tells them apart with a badge);
@@ -82,6 +110,12 @@ export interface PullRequestSummary {
   additions: number | null
   deletions: number | null
   changedFiles: number | null
+  /** Labels (GitHub) / tags (Azure DevOps). Absent = the list call did not report them. */
+  labels?: PrLabel[]
+  /** Reviewers with vote and required flag. Absent = the list call did not report them. */
+  reviewers?: PrReviewer[]
+  /** The signed-in user's relation to the PR. Absent = unknown (identity not resolved). */
+  viewer?: PrViewerRelation
   /**
    * Optional on purpose: only the IPC handler (`scm:listPullRequests`)
    * decorates it against `seen-store.ts`; providers stay unaware of read state.
@@ -122,7 +156,7 @@ export interface PrCheck {
 
 export interface PullRequestDetail extends PullRequestSummary {
   bodyMarkdown: string
-  labels: { name: string; color?: string }[]
+  labels: PrLabel[]
   reviewers: PrReviewer[]
   commits: number
   workItems?: PrWorkItem[]
@@ -250,6 +284,23 @@ export interface ScmListError {
 export interface ListPullRequestsResult {
   items: PullRequestSummary[]
   errors: ScmListError[]
+}
+
+/**
+ * Response of `scm:getDashboard`: every OPEN PR of every enabled provider's
+ * scope (Azure: configured projects; GitHub: repos the user has open PRs in),
+ * merged with the open PRs that involve the user, deduplicated by `prKey`,
+ * each with `labels`, `reviewers`, `viewer` and `unread` when known. Feeds the
+ * home dashboard (repo cards, per-repo filters, cross-repo feature groups).
+ * Sorted by `updatedAt`, newest first. Azure PRs that do not involve the user
+ * carry an approximate `updatedAt` (creation date, or when main last saw them
+ * change): looking up each one's last push would cost a call per PR.
+ */
+export interface DashboardResult {
+  pullRequests: PullRequestSummary[]
+  errors: ScmListError[]
+  /** ISO time main built this answer (it may come from a short cache). */
+  fetchedAt: string
 }
 
 /** Response of `scm:getStacks`: stacks of every enabled provider; failures land in `errors`. */

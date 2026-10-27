@@ -4,7 +4,14 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { githubRepo } from '../../../shared/scm-guards'
-import { MAX_PR_FILES, RealGithubService, type GithubClient } from './real-service'
+import {
+  MAX_PR_FILES,
+  RealGithubService,
+  githubViewerRelation,
+  mapSearchNodeToSummary,
+  type GithubClient,
+  type SearchPullRequestNode,
+} from './real-service'
 
 const repo = githubRepo('acme', 'api')
 
@@ -140,5 +147,168 @@ describe('RealGithubService thread writes are scoped to repo#number', () => {
     const { client, ops } = fakeClient({ number: 7, nameWithOwner: 'acme/api' })
     await service(client).postComment({ repo, number: 7, threadId: 'PRRT_1', bodyMarkdown: 'hi' })
     expect(ops).toEqual(['ReviewThreadOwner', 'AddReviewThreadReply'])
+  })
+})
+
+function searchNode(
+  number: number,
+  repoName: string,
+  extra: Partial<SearchPullRequestNode> = {},
+): SearchPullRequestNode {
+  return {
+    __typename: 'PullRequest',
+    id: 'PR_' + number,
+    number,
+    title: 'PR ' + number,
+    state: 'OPEN',
+    isDraft: false,
+    url: 'https://github.com/acme/' + repoName + '/pull/' + number,
+    createdAt: '2026-10-01T00:00:00Z',
+    updatedAt: '2026-10-0' + (number % 9) + 'T00:00:00Z',
+    headRefName: 'feature/' + number,
+    baseRefName: 'main',
+    additions: 1,
+    deletions: 0,
+    changedFiles: 1,
+    reviewDecision: null,
+    author: { login: 'octo', avatarUrl: '' },
+    repository: { owner: { login: 'acme' }, name: repoName, nameWithOwner: 'acme/' + repoName },
+    comments: { totalCount: 0 },
+    lastCommit: { nodes: [] },
+    labels: { nodes: [] },
+    reviewRequests: { nodes: [] },
+    latestReviews: { nodes: [] },
+    ...extra,
+  }
+}
+
+describe('search node -> summary (labels, reviewers, viewer)', () => {
+  const node = searchNode(5, 'api', {
+    author: { login: 'Octo', avatarUrl: 'a' },
+    labels: { nodes: [{ name: 'checkout-v2', color: '14b8a6' }] },
+    reviewRequests: {
+      nodes: [
+        { requestedReviewer: { login: 'me', avatarUrl: 'm' } },
+        // A team request has no login (`... on User` only): skipped.
+        { requestedReviewer: {} },
+        { requestedReviewer: null },
+      ],
+    },
+    latestReviews: {
+      nodes: [
+        { state: 'APPROVED', author: { login: 'grace', avatarUrl: 'g' } },
+        { state: 'COMMENTED', author: { login: 'octo', avatarUrl: 'a' } },
+      ],
+    },
+  })
+
+  it('maps labels with color and reviewers like the detail does', () => {
+    const pr = mapSearchNodeToSummary(node, 'ME')
+    expect(pr.labels).toEqual([{ name: 'checkout-v2', color: '14b8a6' }])
+    expect(pr.reviewers).toEqual([
+      { user: { login: 'grace', avatarUrl: 'g' }, vote: 'approved', isRequired: false },
+      { user: { login: 'octo', avatarUrl: 'a' }, vote: 'none', isRequired: false },
+      { user: { login: 'me', avatarUrl: 'm' }, vote: 'none', isRequired: false },
+    ])
+    // A pending request: no standing vote.
+    expect(pr.viewer).toEqual({ isAuthor: false, reviewer: 'required', vote: 'none' })
+  })
+
+  it('omits viewer when the login is unknown', () => {
+    expect(mapSearchNodeToSummary(node).viewer).toBeUndefined()
+    expect(mapSearchNodeToSummary(node, null).viewer).toBeUndefined()
+    expect(mapSearchNodeToSummary(searchNode(6, 'api', { labels: undefined })).labels).toEqual([])
+  })
+
+  it('viewer: author, standing review, own review on own PR, uninvolved', () => {
+    // Author (case-insensitive); their own COMMENTED review does not make them a reviewer.
+    expect(githubViewerRelation('Octo', node, 'octo')).toEqual({ isAuthor: true, reviewer: null })
+    // A standing review (no pending request) counts as required, with its vote.
+    expect(githubViewerRelation('Octo', node, 'grace')).toEqual({
+      isAuthor: false,
+      reviewer: 'required',
+      vote: 'approved',
+    })
+    expect(githubViewerRelation('Octo', node, 'someone')).toEqual({
+      isAuthor: false,
+      reviewer: null,
+    })
+    expect(githubViewerRelation(undefined, {}, 'me')).toEqual({ isAuthor: false, reviewer: null })
+  })
+
+  it('viewer vote: re-requested after approval is none; standing CHANGES_REQUESTED stays', () => {
+    const rerequested = {
+      reviewRequests: { nodes: [{ requestedReviewer: { login: 'me' } }] },
+      latestReviews: { nodes: [{ state: 'APPROVED', author: { login: 'me', avatarUrl: '' } }] },
+    }
+    expect(githubViewerRelation('octo', rerequested, 'me')).toEqual({
+      isAuthor: false,
+      reviewer: 'required',
+      vote: 'none',
+    })
+    const changes = {
+      reviewRequests: { nodes: [] },
+      latestReviews: {
+        nodes: [{ state: 'CHANGES_REQUESTED', author: { login: 'ME', avatarUrl: '' } }],
+      },
+    }
+    expect(githubViewerRelation('octo', changes, 'me')).toEqual({
+      isAuthor: false,
+      reviewer: 'required',
+      vote: 'changes_requested',
+    })
+  })
+})
+
+describe('RealGithubService listings carry the viewer from the same query', () => {
+  function searchClient(viewer: { login?: string } | null) {
+    const queries: string[] = []
+    const graphql = vi.fn(async (query: string, vars: { searchQuery: string }) => {
+      expect(/query\s+(\w+)/.exec(query)?.[1]).toBe('SearchPullRequests')
+      expect(query).toContain('viewer { login }')
+      queries.push(vars.searchQuery)
+      const nodes = vars.searchQuery.includes('involves:@me')
+        ? [searchNode(1, 'api', { author: { login: 'me', avatarUrl: '' } })]
+        : [
+            searchNode(1, 'api', { author: { login: 'me', avatarUrl: '' } }),
+            searchNode(2, 'api', { isCrossRepository: true }),
+            searchNode(3, 'api', {
+              reviewRequests: { nodes: [{ requestedReviewer: { login: 'me' } }] },
+            }),
+          ]
+      return { viewer, search: { nodes: [...nodes, { __typename: 'Issue' }] } }
+    })
+    const client = { graphql, rest: {}, request: vi.fn() } as unknown as GithubClient
+    return { client, queries }
+  }
+
+  it('listPullRequests computes viewer against the token user', async () => {
+    const { client } = searchClient({ login: 'me' })
+    const prs = await service(client).listPullRequests({ state: 'open' })
+    expect(prs.map((pr) => [pr.number, pr.viewer])).toEqual([
+      [1, { isAuthor: true, reviewer: null }],
+    ])
+  })
+
+  it('listScopePullRequests returns full summaries of the repos the user has PRs in', async () => {
+    const { client, queries } = searchClient({ login: 'me' })
+    const scope = await service(client).listScopePullRequests()
+    expect(queries).toEqual([
+      'is:pr is:open involves:@me archived:false sort:updated-desc',
+      'is:pr is:open archived:false repo:acme/api sort:updated-desc',
+    ])
+    expect(
+      scope.map((item) => [item.summary.number, item.headIsFork, item.summary.viewer]),
+    ).toEqual([
+      [1, undefined, { isAuthor: true, reviewer: null }],
+      [2, true, { isAuthor: false, reviewer: null }],
+      [3, undefined, { isAuthor: false, reviewer: 'required', vote: 'none' }],
+    ])
+  })
+
+  it('no viewer login in the answer -> no viewer field', async () => {
+    const { client } = searchClient(null)
+    const scope = await service(client).listScopePullRequests()
+    expect(scope.every((item) => item.summary.viewer === undefined)).toBe(true)
   })
 })

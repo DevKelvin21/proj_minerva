@@ -24,6 +24,7 @@ import type {
 } from '../../../shared/types'
 import { prKey, type ScmAuthStatus, type ScmProviderId } from '../../../shared/scm'
 import type { LayerRef } from '../lib/walkthrough'
+import type { ViewerFilter } from '../lib/dashboard'
 
 export type CenterTab = 'conversation' | 'files' | 'comments'
 export type DiffViewMode = 'split' | 'inline'
@@ -32,7 +33,50 @@ export type FileTreeMode = 'tree' | 'list' | 'layers'
 /** What the left column shows: the PR list or the stacked-PR view. */
 export type SidebarView = 'list' | 'stacks'
 
+/**
+ * What the center shows: the home dashboard (repos, features, stacks) or the
+ * review of `selectedPr`. The app opens on `home`; picking a PR anywhere
+ * switches to `review`; "Home" goes back WITHOUT dropping `selectedPr`, so
+ * returning to the PR is a re-render, not a refetch.
+ */
+export type MainView = 'home' | 'review'
+
+/** Page inside the home dashboard. `repoKey` / `featureKey` are opaque ids (see `lib/dashboard.ts`). */
+export type HomeRoute =
+  | { kind: 'overview' }
+  | { kind: 'repo'; repoKey: string }
+  | { kind: 'feature'; featureKey: string }
+
+/**
+ * Set when a PR was opened from a stack (board, "Review stack" button): the
+ * review view then offers "i of n" with previous/next over `keys`, the
+ * stack's PRs root-first depth-first. Kept while the user moves between PRs
+ * of that same stack; dropped when a PR outside it is opened.
+ */
+export interface StackNavContext {
+  /** `prKey` of the stack's root (identifies the stack). */
+  rootKey: string
+  keys: string[]
+}
+
 const DIDACTIC_PANEL_WIDTH_KEY = 'minerva.didacticPanelWidth'
+const SIDEBAR_COLLAPSED_KEY = 'minerva.sidebarCollapsed'
+
+/** Persisted "docked sidebar hidden" flag; anything but the literal 'true' = shown. */
+function readInitialSidebarCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function sameRoute(a: HomeRoute, b: HomeRoute): boolean {
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'repo' && b.kind === 'repo') return a.repoKey === b.repoKey
+  if (a.kind === 'feature' && b.kind === 'feature') return a.featureKey === b.featureKey
+  return true
+}
 
 /**
  * Ancho del panel didáctico acoplado (T23, resize por arrastre): el clamp real
@@ -139,12 +183,40 @@ interface AppState {
   /** Left column: PR list or stacks. Session only. */
   sidebarView: SidebarView
   /**
+   * Docked sidebar (`xl`/`lg`) hidden by the user (TitleBar toggle or
+   * Cmd/Ctrl+B). Persisted in `localStorage`. Ignored on the drawer tiers,
+   * where `sidebarOpen` rules.
+   */
+  sidebarCollapsed: boolean
+  /**
    * Bumped after a write that changes PR data (a retarget): the PR list, the
    * open PR's detail and the stacks refetch when it changes.
    */
   scmDataVersion: number
 
+  mainView: MainView
+  homeRoute: HomeRoute
+  /** Viewer filter of the repo page. Session only (like `prStateFilter`). */
+  repoFilter: ViewerFilter
+  stackNav: StackNavContext | null
+
   selectPr: (pr: PullRequestSummary | null) => void
+  /**
+   * Back to the dashboard OVERVIEW (the Home buttons), keeping `selectedPr` for a
+   * cheap return. Breadcrumb crumbs use `navigateHome` for a specific page.
+   */
+  goHome: () => void
+  /** Shows a dashboard page (and the home view, if the review was on screen). */
+  navigateHome: (route: HomeRoute) => void
+  /** Back to the review of `selectedPr`; no-op without one. */
+  showReview: () => void
+  setRepoFilter: (filter: ViewerFilter) => void
+  /**
+   * Arms (or clears) the stack navigation BEFORE `selectPr`: `selectPr` keeps
+   * it only while the picked PR is one of `keys`.
+   */
+  setStackNav: (nav: StackNavContext | null) => void
+  toggleSidebarCollapsed: () => void
   /**
    * Swaps in a fresher summary of the SELECTED PR (same `prKey`) without the
    * reset `selectPr` does (tab, file, threads). No-op for any other PR.
@@ -206,11 +278,24 @@ export const useAppStore = create<AppState>((set) => ({
   aiModelInfo: null,
 
   sidebarView: 'list',
+  sidebarCollapsed: readInitialSidebarCollapsed(),
   scmDataVersion: 0,
 
+  mainView: 'home',
+  homeRoute: { kind: 'overview' },
+  repoFilter: 'all',
+  stackNav: null,
+
   selectPr: (pr) =>
-    set({
+    set((state) => ({
       selectedPr: pr,
+      // A PR opens the review; clearing the selection shows the dashboard.
+      mainView: pr ? 'review' : 'home',
+      // The stack context survives only while the PR is in that stack.
+      stackNav:
+        pr && state.stackNav && state.stackNav.keys.includes(prKey(pr.repo, pr.number))
+          ? state.stackNav
+          : null,
       centerTab: 'conversation',
       selectedFilePath: null,
       activeLayer: null,
@@ -219,6 +304,32 @@ export const useAppStore = create<AppState>((set) => ({
       // Elegir un PR cierra el drawer de la lista (F16/T82): en `md`/`sm` la
       // lista tapa el centro, y el gesto natural tras elegir es ver el PR.
       sidebarOpen: false,
+    })),
+  goHome: () => set({ mainView: 'home', homeRoute: { kind: 'overview' }, sidebarOpen: false }),
+  navigateHome: (route) =>
+    set((state) => ({
+      mainView: 'home',
+      homeRoute: sameRoute(state.homeRoute, route) ? state.homeRoute : route,
+      // The viewer filter belongs to a repo page: a new repo starts at "All".
+      repoFilter:
+        route.kind === 'repo' &&
+        !(state.homeRoute.kind === 'repo' && state.homeRoute.repoKey === route.repoKey)
+          ? 'all'
+          : state.repoFilter,
+      sidebarOpen: false,
+    })),
+  showReview: () => set((state) => (state.selectedPr ? { mainView: 'review' } : {})),
+  setRepoFilter: (filter) => set({ repoFilter: filter }),
+  setStackNav: (nav) => set({ stackNav: nav }),
+  toggleSidebarCollapsed: () =>
+    set((state) => {
+      const collapsed = !state.sidebarCollapsed
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed))
+      } catch {
+        // Session-only when storage is unavailable.
+      }
+      return { sidebarCollapsed: collapsed }
     }),
   replaceSelectedPr: (pr) =>
     set((state) =>

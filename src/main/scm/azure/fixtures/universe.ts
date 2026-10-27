@@ -1,15 +1,22 @@
 /**
  * Deterministic Azure DevOps mock universe (org "contoso", project
  * "Platform") behind the mock provider (`./fake-server.ts`) and e2e tests.
- * The signed-in user is Ada (`MOCK_ME`): she created or reviews every PR, so
- * the whole universe shows up in her list. Shapes are the
+ * The signed-in user is Ada (`MOCK_ME`): she created or reviews PRs #100-#110,
+ * so those show up in her list; #111-#113 do not involve her and only appear
+ * in scope listings (stacks candidates, home dashboard). Shapes are the
  * WIRE types (`../api-types.ts`), so the mock exercises the same mappers and
  * patch builder as the real provider.
  *
  * What it covers:
- * - 3 repos, 10 PRs: a 3-deep stack in orders-api, the same feature chain in
+ * - 3 repos, 13 PRs: a 3-deep stack in orders-api, the same feature chain in
  *   storefront-web starting one branch lower (cross-repo grouping), an
  *   orphaned PR whose parent completed, a completed parent, an abandoned PR.
+ * - Ada's relation to the OPEN PRs (home dashboard): author of #101, #102,
+ *   #103; REQUIRED reviewer of #105, #106, #108; OPTIONAL reviewer of #104,
+ *   #110; uninvolved in #111, #112, #113.
+ * - Tags: `checkout-v2` on open PRs of all 3 repos (#101 orders-api, #104 and
+ *   #110 storefront-web, #111 platform-infra); `bug` on #108 storefront-web
+ *   and #112 orders-api. The new PRs target `main`, so they form no stack.
  * - Threads with every status, a system thread, a deleted comment, replies,
  *   a PR-level thread, a LEFT-side comment and a comment on a context line
  *   outside every hunk.
@@ -260,6 +267,29 @@ const TF_NETWORK_HEAD = lines(
 
 const TF_README = lines('# Network module', '', 'Creates the shared virtual network.')
 
+const TF_PAYMENTS_QUEUE = lines(
+  'resource "azurerm_servicebus_queue" "payments" {',
+  '  name         = "checkout-payments"',
+  '  namespace_id = var.servicebus_namespace_id',
+  '}',
+)
+
+const REFUND_TAX = lines(
+  'namespace Contoso.Orders.Services;',
+  '',
+  'public static class RefundTax',
+  '{',
+  '    public static decimal Round(decimal amount) =>',
+  '        Math.Round(amount, 2, MidpointRounding.AwayFromZero);',
+  '}',
+)
+
+const PRODUCT_IMAGE = lines(
+  'export function ProductImage(props: { src: string; alt: string }) {',
+  '  return <img src={props.src} alt={props.alt} loading="lazy" />',
+  '}',
+)
+
 /** A 1x1 transparent PNG (binary on purpose). */
 const LOGO_PNG = Buffer.from(
   '89504e470d0a1a0a0000000d4948445200000001000000010806000000' +
@@ -391,7 +421,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     status: 'active',
     author: PEOPLE.grace,
     created: '2026-10-03T12:00:00Z',
-    reviewers: [reviewer(PEOPLE.ada, -10)],
+    reviewers: [reviewer(PEOPLE.ada, -10, true)],
     mergeStatus: 'conflicts',
   }),
   // storefront-web: same feature chain, starting one branch lower.
@@ -405,6 +435,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     author: PEOPLE.linus,
     created: '2026-10-10T11:00:00Z',
     reviewers: [reviewer(PEOPLE.ada, 0)],
+    tags: ['checkout-v2'],
   }),
   pullRequest({
     id: 104,
@@ -416,6 +447,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     author: PEOPLE.linus,
     created: '2026-10-11T11:00:00Z',
     reviewers: [reviewer(PEOPLE.ada, 0)],
+    tags: ['checkout-v2'],
   }),
   // storefront-web: standalone PR carrying every thread status.
   pullRequest({
@@ -427,7 +459,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     status: 'active',
     author: PEOPLE.grace,
     created: '2026-10-14T08:00:00Z',
-    reviewers: [reviewer(PEOPLE.ada, 10), reviewer(PEOPLE.linus, 0)],
+    reviewers: [reviewer(PEOPLE.ada, 10, true), reviewer(PEOPLE.linus, 0)],
     tags: ['bug'],
   }),
   // storefront-web: abandoned.
@@ -453,7 +485,45 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     status: 'active',
     author: PEOPLE.grace,
     created: '2026-10-15T08:00:00Z',
-    reviewers: [reviewer(PEOPLE.ada, 5), reviewer(PEOPLE.team, 0, true)],
+    reviewers: [reviewer(PEOPLE.ada, 5, true), reviewer(PEOPLE.team, 0, true)],
+  }),
+  // Not involving Ada (scope-only: stacks candidates and the home dashboard).
+  // platform-infra: the third repo of the `checkout-v2` feature.
+  pullRequest({
+    id: 111,
+    repo: REPOS.infra,
+    title: 'Checkout v2: payments queue',
+    source: 'feature/checkout-v2-queue',
+    target: 'main',
+    status: 'active',
+    author: PEOPLE.linus,
+    created: '2026-10-16T09:00:00Z',
+    reviewers: [reviewer(PEOPLE.grace, 0, true)],
+    tags: ['checkout-v2', 'infra'],
+  }),
+  // orders-api: a second `bug` (the other one is #108 in storefront-web).
+  pullRequest({
+    id: 112,
+    repo: REPOS.api,
+    title: 'Fix tax rounding on refunds',
+    source: 'fix/refund-tax-rounding',
+    target: 'main',
+    status: 'active',
+    author: PEOPLE.grace,
+    created: '2026-10-17T09:00:00Z',
+    reviewers: [reviewer(PEOPLE.linus, 5)],
+    tags: ['bug'],
+  }),
+  // storefront-web: untagged, nobody Ada knows reviews it yet.
+  pullRequest({
+    id: 113,
+    repo: REPOS.web,
+    title: 'Lazy-load product images',
+    source: 'perf/lazy-images',
+    target: 'main',
+    status: 'active',
+    author: PEOPLE.linus,
+    created: '2026-10-18T09:00:00Z',
   }),
 ]
 
@@ -556,6 +626,17 @@ export const CHANGES: Record<number, AzChangeEntry[]> = {
       changeType: 'delete',
       base: lines('# deprecated'),
     }),
+  ],
+  111: [
+    change({
+      path: '/modules/payments-queue/main.tf',
+      changeType: 'add',
+      head: TF_PAYMENTS_QUEUE,
+    }),
+  ],
+  112: [change({ path: '/src/Services/RefundTax.cs', changeType: 'add', head: REFUND_TAX })],
+  113: [
+    change({ path: '/src/components/ProductImage.tsx', changeType: 'add', head: PRODUCT_IMAGE }),
   ],
 }
 
@@ -799,12 +880,14 @@ export const BRANCHES: Record<string, string[]> = {
     'feature/checkout-v2-models',
     'feature/checkout-v2-service',
     'feature/checkout-v2-endpoints',
+    'fix/refund-tax-rounding',
   ],
   [REPOS.web.id]: [
     'main',
     'feature/checkout-v2-models',
     'feature/checkout-v2-ui',
     'fix/cart-rounding',
+    'perf/lazy-images',
   ],
-  [REPOS.infra.id]: ['main', 'chore/rename-network-module'],
+  [REPOS.infra.id]: ['main', 'chore/rename-network-module', 'feature/checkout-v2-queue'],
 }

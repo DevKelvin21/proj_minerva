@@ -4,7 +4,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
 import { repoKey } from '../../../../shared/scm'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
-import { azDevopsLoginCommand, enabledProviders, GH_LOGIN_COMMAND } from '../../lib/scm-connection'
+import { enabledProviders, isSignInError } from '../../lib/scm-connection'
 import { groupByRepo } from '../../lib/pr-filters'
 import { usePullRequests } from '../../hooks/use-pull-requests'
 import { useScmSettings } from '../../hooks/use-scm-settings'
@@ -16,75 +16,7 @@ import { countOrphans } from '../../lib/stacks'
 import { RepoGroup } from '../pr-list/RepoGroup'
 import { StacksView } from '../stacks/StacksView'
 import { IconButton } from '../ui/IconButton'
-import { ScmProviderIcon } from '../ui/ScmProviderIcon'
-
-/** A provider error that means "sign in first", not "something broke". */
-function isSignInError(error: ScmListError): boolean {
-  return error.code === 'UNAUTHENTICATED' || error.code === 'CLI_UNAVAILABLE'
-}
-
-const MONO = <span className="font-mono text-text" />
-/** A long command (Azure's names the org URL) on its own line, wrapping anywhere. */
-const CMD = (
-  <code className="my-1 block break-all rounded bg-bg px-1.5 py-1 font-mono text-xs text-text" />
-)
-
-/**
- * What to run for ONE provider that could not list because it needs a sign-in
- * (`UNAUTHENTICATED` / `CLI_UNAVAILABLE`). GitHub: `gh auth login`, or the
- * picked account by name (a bare "run gh auth login" would be wrong advice
- * when the CLI is fine and only the choice is broken). Azure: the
- * org-specific `az devops login`, or installing `az` first.
- */
-function SignInHint({
-  error,
-  githubAccount,
-  azureOrganization,
-}: {
-  error: ScmListError
-  githubAccount: string | null
-  azureOrganization: string | undefined
-}): React.JSX.Element {
-  const body =
-    error.provider === 'github' ? (
-      githubAccount !== null ? (
-        <Trans
-          i18nKey="layout.sidebar.accountNoSession"
-          values={{ account: githubAccount, command: GH_LOGIN_COMMAND }}
-          components={{ mono: MONO }}
-        />
-      ) : (
-        <Trans
-          i18nKey="layout.sidebar.signInWithGhCli"
-          values={{ command: GH_LOGIN_COMMAND }}
-          components={{ mono: MONO }}
-        />
-      )
-    ) : (
-      <Trans
-        i18nKey={
-          error.code === 'CLI_UNAVAILABLE'
-            ? 'layout.sidebar.installAz'
-            : 'layout.sidebar.signInWithAz'
-        }
-        values={{ command: azDevopsLoginCommand(azureOrganization) }}
-        components={{ mono: MONO, cmd: CMD }}
-      />
-    )
-  return (
-    <div
-      data-sign-in={error.provider}
-      data-error-code={error.code}
-      className="flex w-full flex-col items-center gap-1 text-sm text-muted"
-    >
-      <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-        <ScmProviderIcon provider={error.provider} size={12} />
-        {SCM_PROVIDER_LABEL[error.provider]}
-      </span>
-      <p className="break-words">{body}</p>
-    </div>
-  )
-}
+import { SignInHint } from './SignInHint'
 
 const STATE_FILTER_OPTIONS: readonly PrStateFilter[] = ['open', 'closed', 'all']
 
@@ -194,6 +126,10 @@ function SidebarViewSwitch({
  *
  * Los hooks de datos corren SIEMPRE, también con el drawer cerrado: la lista
  * (y su watcher) no debe depender de si el overlay está visible.
+ *
+ * On the docked tiers the column can also be hidden (`sidebarCollapsed`,
+ * TitleBar toggle or Cmd/Ctrl+B): the home dashboard is the main way to
+ * reach a PR, so the list is optional there.
  */
 export function Sidebar(): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -229,6 +165,7 @@ export function Sidebar(): React.JSX.Element | null {
   const isDrawer = sidebarIsDrawer(tier.w)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const closeSidebar = useAppStore((s) => s.closeSidebar)
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
 
   // Esc cierra el drawer (solo cuando está abierto y no hay un modal encima:
   // `SettingsModal` monta su propio listener y también cierra con Esc).
@@ -236,7 +173,10 @@ export function Sidebar(): React.JSX.Element | null {
   useEffect(() => {
     if (!isDrawer || !sidebarOpen || settingsOpen) return
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') closeSidebar()
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      // Claimed: a dashboard page's Esc (`useEscapeBack`) must not also go back.
+      event.preventDefault()
+      closeSidebar()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
@@ -258,6 +198,8 @@ export function Sidebar(): React.JSX.Element | null {
   }
 
   if (isDrawer && !sidebarOpen) return null
+  // Docked tiers: hidden by the TitleBar toggle / Cmd+B (persisted).
+  if (!isDrawer && sidebarCollapsed) return null
 
   const asideClass = isDrawer
     ? 'absolute inset-y-0 left-0 z-40 flex w-[300px] max-w-[85%] flex-col overflow-y-auto border-r border-border bg-panel shadow-2xl'

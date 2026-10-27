@@ -5,6 +5,10 @@
  *
  * Simula latencia de red (150-400ms, fija por método, no aleatoria) para que
  * la UI ejercite sus estados de carga de forma reproducible.
+ *
+ * Summaries carry `labels`, `reviewers` and `viewer`, computed against the
+ * mock "me" (`MOCK_GITHUB_LOGIN`) with the real provider's rule (a reviewer
+ * entry = `required`; GitHub has no optional reviewers).
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join, sep } from 'node:path'
@@ -14,6 +18,7 @@ import type {
   FileContentRequest,
   PostCommentRequest,
   PrComment,
+  PrViewerRelation,
   PullRequestDetail,
   PullRequestSummary,
   SetThreadStatusRequest,
@@ -29,9 +34,14 @@ import {
 } from '../../../shared/scm'
 import { ScmError } from '../errors'
 import { mt } from '../../i18n'
-import type { ListPullRequestsQuery, ScmDataSource, SnapshotRequest } from '../provider'
+import type {
+  ListPullRequestsQuery,
+  ScmDataSource,
+  ScopePullRequest,
+  SnapshotRequest,
+} from '../provider'
 import type { StackInputPr } from '../stacks'
-import { prFixtures } from './fixtures'
+import { MOCK_GITHUB_LOGIN, prFixtures } from './fixtures'
 import { genericSnapshotFixture, snapshotFixturesByRepo } from './fixtures-snapshot'
 import { asGithubRepo } from './repo'
 
@@ -73,6 +83,48 @@ function mockCommentUrl(
   return `https://github.com/${repo.fullName}/pull/${prNumber}#${anchor}`
 }
 
+function mockViewer(detail: PullRequestDetail): PrViewerRelation {
+  const me = MOCK_GITHUB_LOGIN.toLowerCase()
+  const isAuthor = detail.author.login.toLowerCase() === me
+  const entry = detail.reviewers.find((reviewer) => reviewer.user.login.toLowerCase() === me)
+  if (!entry || isAuthor) return { isAuthor, reviewer: null }
+  return { isAuthor, reviewer: 'required', vote: entry.vote }
+}
+
+/**
+ * A fresh summary of a record (detail-only fields dropped). Fresh on purpose:
+ * the real service builds new objects on every fetch, and consumers such as
+ * the watcher (`pr-watcher.ts`) keep what they get; if it were the SAME object
+ * `postComment` mutates (commentCount += 1), the diff between ticks would
+ * never see a thing.
+ */
+function toSummary(detail: PullRequestDetail): PullRequestSummary {
+  return {
+    id: detail.id,
+    number: detail.number,
+    title: detail.title,
+    author: detail.author,
+    repo: detail.repo,
+    state: detail.state,
+    isDraft: detail.isDraft,
+    createdAt: detail.createdAt,
+    updatedAt: detail.updatedAt,
+    headRef: detail.headRef,
+    baseRef: detail.baseRef,
+    headSha: detail.headSha,
+    webUrl: detail.webUrl,
+    commentCount: detail.commentCount,
+    reviewDecision: detail.reviewDecision,
+    ciStatus: detail.ciStatus,
+    additions: detail.additions,
+    deletions: detail.deletions,
+    changedFiles: detail.changedFiles,
+    labels: detail.labels.map((label) => ({ ...label })),
+    reviewers: detail.reviewers.map((entry) => ({ ...entry })),
+    viewer: mockViewer(detail),
+  }
+}
+
 export class MockGithubService implements ScmDataSource {
   private readonly records = new Map<string, PrRecord>()
   private nextCommentSeq = 1000
@@ -108,13 +160,9 @@ export class MockGithubService implements ScmDataSource {
 
   async listPullRequests(req: ListPullRequestsQuery): Promise<PullRequestSummary[]> {
     await delay(LATENCY_MS.listPullRequests)
-    // Copia shallow por PR: el servicio real construye objetos frescos en cada
-    // fetch, y consumidores como el watcher (`pr-watcher.ts`) dependen de eso —
-    // su snapshot guarda lo devuelto acá, y si fuera el MISMO objeto que muta
-    // `postComment` (commentCount += 1), el diff entre ticks nunca vería nada.
-    const all: PullRequestSummary[] = [...this.records.values()].map((record) => ({
-      ...record.detail,
-    }))
+    const all: PullRequestSummary[] = [...this.records.values()].map((record) =>
+      toSummary(record.detail),
+    )
     // Filtro de estado (T51, F10): default 'open' (comportamiento previo).
     // 'closed' incluye tanto `closed` como `merged` — la UI distingue con un
     // badge (ver `PrListItem.tsx`); 'all' no filtra por estado.
@@ -245,19 +293,12 @@ export class MockGithubService implements ScmDataSource {
     return { ...record.detail }
   }
 
-  async listStackCandidates(): Promise<StackInputPr[]> {
+  /** The mock scope is the whole universe: every open PR. */
+  async listScopePullRequests(): Promise<ScopePullRequest[]> {
+    await delay(LATENCY_MS.listPullRequests)
     return [...this.records.values()]
       .filter((record) => record.detail.state === 'open')
-      .map(({ detail }) => ({
-        repo: detail.repo,
-        number: detail.number,
-        title: detail.title,
-        headRef: detail.headRef,
-        baseRef: detail.baseRef,
-        state: detail.state,
-        isDraft: detail.isDraft,
-        createdAt: detail.createdAt,
-      }))
+      .map(({ detail }) => ({ summary: toSummary(detail) }))
   }
 
   async listMergedBySourceBranch(repo: RepoRef, branch: string): Promise<StackInputPr[]> {

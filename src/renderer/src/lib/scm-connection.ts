@@ -4,7 +4,7 @@
  * state for the "Connected" indicator. Pure, so every surface agrees.
  */
 import type { ScmAuthStatus, ScmProviderId } from '../../../shared/scm'
-import type { ScmSettingsInfo } from '../../../shared/types'
+import type { ScmListError, ScmSettingsInfo } from '../../../shared/types'
 import type { ConnectionState } from '../hooks/use-connection-status'
 
 /** Same order as main's registry (`ALL_SCM_PROVIDER_IDS`). */
@@ -103,3 +103,8 @@ export function azDevopsLoginCommand(organization: string | undefined): string {
 }
 
 export const GH_LOGIN_COMMAND = 'gh auth login'
+
+/** A provider list error that means "sign in first", not "something broke". */
+export function isSignInError(error: ScmListError): boolean {
+  return error.code === 'UNAUTHENTICATED' || error.code === 'CLI_UNAVAILABLE'
+}

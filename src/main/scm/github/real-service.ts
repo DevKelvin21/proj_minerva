@@ -18,7 +18,9 @@ import type {
   FileContentRequest,
   PostCommentRequest,
   PrComment,
+  PrLabel,
   PrReviewer,
+  PrViewerRelation,
   PullRequestDetail,
   PullRequestState,
   PullRequestSummary,
@@ -39,7 +41,12 @@ import {
 import { looksBinary } from '../azure/patch-builder'
 import { ScmError, isScmError } from '../errors'
 import { mt } from '../../i18n'
-import type { ListPullRequestsQuery, ScmDataSource, SnapshotRequest } from '../provider'
+import type {
+  ListPullRequestsQuery,
+  ScmDataSource,
+  ScopePullRequest,
+  SnapshotRequest,
+} from '../provider'
 import type { StackInputPr } from '../stacks'
 import { asGithubRepo } from './repo'
 
@@ -85,7 +92,7 @@ interface GraphqlCommentNode {
 type GraphqlReviewDecision = 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null
 type GraphqlPrState = 'OPEN' | 'CLOSED' | 'MERGED'
 
-interface SearchPullRequestNode {
+export interface SearchPullRequestNode {
   __typename: string
   id?: string
   number?: number
@@ -108,15 +115,30 @@ interface SearchPullRequestNode {
   lastCommit?: {
     nodes: { commit: { oid?: string; statusCheckRollup: { state: string } | null } }[]
   }
+  labels?: GraphqlLabels
+  reviewRequests?: GraphqlReviewRequests
+  latestReviews?: GraphqlLatestReviews
 }
 
 interface SearchPullRequestsResponse {
+  /** The token's user: who `viewer` relations are computed against. */
+  viewer?: { login?: string } | null
   search: { nodes: SearchPullRequestNode[] }
 }
 
 interface RequestedReviewer {
   login?: string
   avatarUrl?: string
+}
+
+type GraphqlLabels = { nodes: { name: string; color: string }[] } | null
+type GraphqlReviewRequests = { nodes: { requestedReviewer: RequestedReviewer | null }[] } | null
+type GraphqlLatestReviews = { nodes: { state: string; author: GraphqlAuthor | null }[] } | null
+
+/** What reviewer mapping reads; the detail and the search nodes both carry it. */
+interface GraphqlReviewSources {
+  reviewRequests?: GraphqlReviewRequests
+  latestReviews?: GraphqlLatestReviews
 }
 
 interface PullRequestDetailNode {
@@ -139,9 +161,9 @@ interface PullRequestDetailNode {
   comments: { totalCount: number }
   commitCount: { totalCount: number }
   lastCommit: { nodes: { commit: { oid?: string; statusCheckRollup: { state: string } | null } }[] }
-  labels: { nodes: { name: string; color: string }[] } | null
-  reviewRequests: { nodes: { requestedReviewer: RequestedReviewer | null }[] } | null
-  latestReviews: { nodes: { state: string; author: GraphqlAuthor | null }[] } | null
+  labels: GraphqlLabels
+  reviewRequests: GraphqlReviewRequests
+  latestReviews: GraphqlLatestReviews
 }
 
 interface PullRequestDetailResponse {
@@ -181,6 +203,7 @@ interface AddReviewThreadReplyResponse {
 
 const SEARCH_PULL_REQUESTS_QUERY = `
   query SearchPullRequests($searchQuery: String!) {
+    viewer { login }
     search(type: ISSUE, query: $searchQuery, first: 50) {
       nodes {
         __typename
@@ -205,6 +228,13 @@ const SEARCH_PULL_REQUESTS_QUERY = `
           comments { totalCount }
           lastCommit: commits(last: 1) {
             nodes { commit { oid statusCheckRollup { state } } }
+          }
+          labels(first: 20) { nodes { name color } }
+          reviewRequests(first: 20) {
+            nodes { requestedReviewer { ... on User { login avatarUrl } } }
+          }
+          latestReviews(first: 20) {
+            nodes { state author { login avatarUrl } }
           }
         }
       }
@@ -427,7 +457,43 @@ function mapReviewVote(state: string): ReviewerVote {
   }
 }
 
-function mapSearchNodeToSummary(node: SearchPullRequestNode): PullRequestSummary {
+function mapLabels(labels: GraphqlLabels | undefined): PrLabel[] {
+  return (labels?.nodes ?? []).map((label) => ({ name: label.name, color: label.color }))
+}
+
+/**
+ * The signed-in user's relation to a PR. GitHub has no optional reviewers:
+ * a review requested from the user directly (team requests don't count) or
+ * a standing review of theirs (`latestReviews`) is `required`. A review the
+ * author left on their own PR does not make them a reviewer. Logins compare
+ * case-insensitively (GitHub logins are).
+ */
+export function githubViewerRelation(
+  authorLogin: string | undefined,
+  sources: GraphqlReviewSources,
+  viewerLogin: string,
+): PrViewerRelation {
+  const me = viewerLogin.toLowerCase()
+  const isAuthor = authorLogin?.toLowerCase() === me
+  const requested = (sources.reviewRequests?.nodes ?? []).some(
+    ({ requestedReviewer }) => requestedReviewer?.login?.toLowerCase() === me,
+  )
+  const review = isAuthor
+    ? undefined
+    : (sources.latestReviews?.nodes ?? []).find(({ author }) => author?.login?.toLowerCase() === me)
+  if (!requested && !review) return { isAuthor, reviewer: null }
+  // A pending (re-)request wins over an old review, like `mapReviewers`.
+  return { isAuthor, reviewer: 'required', vote: requested ? 'none' : mapReviewVote(review!.state) }
+}
+
+/**
+ * Search node -> summary, with labels, reviewers and (when the signed-in
+ * login is known) the viewer relation.
+ */
+export function mapSearchNodeToSummary(
+  node: SearchPullRequestNode,
+  viewerLogin?: string | null,
+): PullRequestSummary {
   const repo: GithubRepoRef = {
     provider: 'github',
     owner: node.repository?.owner.login ?? '',
@@ -455,6 +521,9 @@ function mapSearchNodeToSummary(node: SearchPullRequestNode): PullRequestSummary
     additions: node.additions ?? 0,
     deletions: node.deletions ?? 0,
     changedFiles: node.changedFiles ?? 0,
+    labels: mapLabels(node.labels),
+    reviewers: mapReviewers(node),
+    ...(viewerLogin ? { viewer: githubViewerRelation(node.author?.login, node, viewerLogin) } : {}),
   }
 }
 
@@ -463,7 +532,7 @@ function mapSearchNodeToSummary(node: SearchPullRequestNode): PullRequestSummary
  * review requests (a re-requested reviewer's old vote no longer stands, so
  * the request wins with `none`). GitHub doesn't tell which are required.
  */
-function mapReviewers(pr: PullRequestDetailNode): PrReviewer[] {
+function mapReviewers(pr: GraphqlReviewSources): PrReviewer[] {
   const reviewers = new Map<string, PrReviewer>()
   for (const { state, author } of pr.latestReviews?.nodes ?? []) {
     if (author?.login) {
@@ -508,7 +577,7 @@ function mapDetailNode(pr: PullRequestDetailNode, repo: GithubRepoRef): PullRequ
     deletions: pr.deletions ?? 0,
     changedFiles: pr.changedFiles ?? 0,
     bodyMarkdown: pr.body ?? '',
-    labels: (pr.labels?.nodes ?? []).map((label) => ({ name: label.name, color: label.color })),
+    labels: mapLabels(pr.labels),
     reviewers: mapReviewers(pr),
     commits: pr.commitCount?.totalCount ?? 0,
     // `getPullRequestFiles` stops at MAX_PR_FILES; `changedFiles` stays the true total.
@@ -717,9 +786,10 @@ export class RealGithubService implements ScmDataSource {
       const data = await client.graphql<SearchPullRequestsResponse>(SEARCH_PULL_REQUESTS_QUERY, {
         searchQuery,
       })
+      const viewerLogin = data.viewer?.login ?? null
       return data.search.nodes
         .filter((node) => node.__typename === 'PullRequest')
-        .map(mapSearchNodeToSummary)
+        .map((node) => mapSearchNodeToSummary(node, viewerLogin))
     } catch (error) {
       throw mapGithubError(error)
     }
@@ -968,9 +1038,10 @@ export class RealGithubService implements ScmDataSource {
   /**
    * Open PRs of the repos the user has open PRs in (from the usual
    * `involves:@me` listing), so a whole chain shows up even where the user
-   * only reviews one link. Capped at `MAX_STACK_REPOS` repos.
+   * only reviews one link. Capped at `MAX_STACK_REPOS` repos (the dashboard
+   * adds the involved PRs of the repos past the cap on its own).
    */
-  async listStackCandidates(): Promise<StackInputPr[]> {
+  async listScopePullRequests(): Promise<ScopePullRequest[]> {
     const mine = await this.listPullRequests({ state: 'open' })
     const repos: GithubRepoRef[] = []
     const seen = new Set<string>()
@@ -980,7 +1051,7 @@ export class RealGithubService implements ScmDataSource {
       repos.push(pr.repo)
     }
     const token = this.requireToken()
-    const out: StackInputPr[] = []
+    const out: ScopePullRequest[] = []
     try {
       const client = this.client(token)
       const selected = repos.slice(0, MAX_STACK_REPOS)
@@ -993,20 +1064,12 @@ export class RealGithubService implements ScmDataSource {
         const data = await client.graphql<SearchPullRequestsResponse>(SEARCH_PULL_REQUESTS_QUERY, {
           searchQuery,
         })
+        const viewerLogin = data.viewer?.login ?? null
         for (const node of data.search.nodes) {
           if (node.__typename !== 'PullRequest') continue
-          const pr = mapSearchNodeToSummary(node)
-          out.push({
-            repo: pr.repo,
-            number: pr.number,
-            title: pr.title,
-            headRef: pr.headRef,
-            baseRef: pr.baseRef,
-            state: pr.state,
-            isDraft: pr.isDraft,
-            createdAt: pr.createdAt,
-            headIsFork: node.isCrossRepository === true,
-          })
+          const item: ScopePullRequest = { summary: mapSearchNodeToSummary(node, viewerLogin) }
+          if (node.isCrossRepository === true) item.headIsFork = true
+          out.push(item)
         }
       }
       return out
