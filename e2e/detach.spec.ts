@@ -43,8 +43,10 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci√
   await detached.waitForLoadState('domcontentloaded')
   expect(detached.url()).toContain(didacticPath(PR_482))
 
-  // El panel acoplado se CIERRA tras desacoplar (T22).
-  await expect(window.locator('button[aria-label="Open didactic panel"]')).toBeVisible()
+  // El panel acoplado se CIERRA tras desacoplar (T22), sin dejar franja: el
+  // toggle del title bar queda apagado.
+  const panelToggle = window.locator('header button[aria-label="Didactic panel"]')
+  await expect(panelToggle).toHaveAttribute('aria-pressed', 'false')
   await expect(window.locator('button[aria-label="Close didactic panel"]')).toHaveCount(0)
 
   // La ventana muestra el an√°lisis desde cache SIN pulsar nada.
@@ -91,7 +93,7 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci√
 
   // Reabrir el panel acoplado con cache poblado muestra el an√°lisis directo,
   // SIN pulsar "Analizar PR".
-  await window.locator('button[aria-label="Open didactic panel"]').click()
+  await panelToggle.click()
   await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeVisible()
   await expect(window.getByText('Looking for an existing analysis')).toHaveCount(0)
 })

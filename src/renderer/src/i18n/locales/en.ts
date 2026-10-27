@@ -171,6 +171,8 @@ export const en = {
       ariaLabel: 'Pull request list',
       search: 'Search pull requests',
       searchPlaceholder: 'Search by title, repo, branch or #number',
+      resize: 'Resize sidebar',
+      resizeHint: 'Drag to resize; double-click restores the default width',
       viewSwitch: 'Left column view',
       views: {
         queue: 'Queue',
@@ -811,7 +813,6 @@ export const en = {
     },
     panel: {
       title: 'Didactic panel',
-      open: 'Open didactic panel',
       close: 'Close didactic panel',
       openInWindow: 'Open in window',
       resize: 'Resize didactic panel',
