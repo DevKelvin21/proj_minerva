@@ -5,7 +5,7 @@
 Electron app for reviewing Pull Requests **didactically**: a GitKraken-style diff plus an
 AI agent that explains the _impact_ (C4 diagrams, new-endpoint docs with local try-it
 snippets, schema changes + ER diagram, cloud infra). Multi-provider source control:
-**GitHub** via the `gh` CLI, **Azure DevOps** via the `az` CLI (in progress, see
+**GitHub** via the `gh` CLI, **Azure DevOps** via the `az` CLI (stack view and comment-review UI in progress, see
 `docs/plan-azure-devops.md`). Every feature must help the reviewer **understand** the
 PR, not just see changed lines.
 
@@ -28,10 +28,19 @@ unified patches built in main.
   settings (`null` = follow gh) is passed as `--user`. Never run `gh auth switch/logout`
   (the CLI session is the user's). The gh spawn uses the raw env, NOT
   `buildSanitizedSpawnEnv` (that strips `GH_TOKEN`; it is for AI CLIs).
-- Azure DevOps (`main/scm/azure/`, coming): `az` only supplies the token; data goes by
-  REST from Node.
-- Provider-neutral in `main/scm/`: `snapshot-store`, `seen-store`, `pr-watcher`.
-- `MINERVA_MOCK=1` = mock SCM (universe "shopwave"); it does not affect AI.
+- Azure DevOps (`main/scm/azure/`): `az` only supplies the credential (the PAT of
+  `az devops login`, read via az's own Python keyring); data goes by REST from Node.
+  Scope = `scm.azure` orgs/projects in settings.json (default: `az devops configure`);
+  every per-repo call refuses orgs that are not configured. Patches are built from blobs
+  under an aggregate budget (`diff-files.ts`). `updatedAt` is derived (see the header of
+  `azure-provider.ts`).
+- Provider-neutral in `main/scm/`: `snapshot-store`, `seen-store`, `pr-watcher`,
+  `scm-settings` (enabled flags), `retarget` (re-validation before the only PR write),
+  `stacks-service` (orphans via exact merged-by-source lookups). Composition root:
+  `default-scm.ts`.
+- `MINERVA_MOCK=1` = mock SCM: GitHub universe "shopwave" + Azure org "contoso" (the real
+  `AzureScmProvider` over the in-memory `azure/fixtures/fake-server.ts`; writes stay in
+  memory). It does not affect AI. NEVER test write paths against a real org.
 
 **AI** runs through the user's own CLI sessions, no Minerva API keys: OpenCode (default;
 `opencode serve` + `@opencode-ai/sdk`, exact-pinned to the CLI), Claude Code (Agent SDK),
@@ -68,7 +77,7 @@ commit** and the model explores it with **read-only tools**. Jails: OpenCode
 ## Layout
 
 ```
-src/main/    index.ts, scm/ (provider.ts, registry.ts, github/, azure/ coming,
+src/main/    index.ts, scm/ (provider.ts, registry.ts, github/, azure/,
              snapshot-store, seen-store, pr-watcher; github/ = Octokit + gh bridge), ai/ (prompts/,
              providers/, stream-parser, analysis-cache), ipc/ (handlers, validators),
              settings/, updater/, windows/

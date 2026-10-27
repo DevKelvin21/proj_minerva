@@ -24,7 +24,7 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
     <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
       <span className="flex items-center gap-1.5">
         <Avatar user={pr.author} size={18} />
-        {pr.author.login}
+        {pr.author.displayName ?? pr.author.login}
       </span>
       <span className="flex items-center gap-1 font-mono">
         <GitBranch size={12} />
@@ -81,6 +81,30 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
     </div>
   )
 
+  // Linked work items (Azure DevOps). The URL is built in main from the
+  // organization/project and a numeric id.
+  const workItems = (pr.workItems?.length ?? 0) > 0 && (
+    <ul
+      aria-label="Work items"
+      className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted"
+    >
+      {pr.workItems?.map((item) => (
+        <li key={item.id} className="min-w-0 truncate">
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="underline decoration-dotted transition-colors hover:text-text"
+          >
+            {(item.type ? item.type + ' ' : '') + '#' + item.id}
+          </a>{' '}
+          {item.title}
+          {item.state ? ' · ' + item.state : ''}
+        </li>
+      ))}
+    </ul>
+  )
+
   if (tier.h !== 'tall') {
     return (
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-1.5">
@@ -95,6 +119,7 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
           <div className="absolute right-0 z-20 mt-1 flex w-72 flex-col gap-2 rounded-md border border-border bg-panel p-3 shadow-xl">
             {meta}
             {reviewers}
+            {workItems}
             {labels}
           </div>
         </details>
@@ -113,6 +138,7 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
 
       {meta}
       {reviewers}
+      {workItems}
       {labels}
     </header>
   )

@@ -1,6 +1,6 @@
 # Plan: Azure DevOps + stacked PRs + PR chat
 
-Status: analysis done (2026-10-26), nothing implemented yet.
+Status (2026-10-26): Wave 1 merged; Wave 2A (Azure provider wired, settings, new channels) on `feat/azure-provider-wiring`.
 Sources: three read-only agent reviews (GitHub coupling map, live `az` probe, architecture review).
 
 ## Verdict
