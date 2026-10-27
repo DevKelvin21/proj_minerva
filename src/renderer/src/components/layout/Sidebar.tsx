@@ -15,8 +15,11 @@ import { useStacksStore } from '../../stores/stacks-store'
 import { countOrphans } from '../../lib/stacks'
 import { RepoGroup } from '../pr-list/RepoGroup'
 import { StacksView } from '../stacks/StacksView'
+import { QueueView } from '../pr-list/QueueView'
+import { useNeedsReviewCount } from '../../hooks/use-needs-review-count'
 import { IconButton } from '../ui/IconButton'
 import { SignInHint } from './SignInHint'
+import { SidebarRail } from './SidebarRail'
 
 const STATE_FILTER_OPTIONS: readonly PrStateFilter[] = ['open', 'closed', 'all']
 
@@ -66,9 +69,10 @@ function StateFilterControl({
 }
 
 /**
- * "Pull requests | Stacks" switch for the left column. The Stacks segment
- * carries the orphan count once some consumer loaded the stacks (it does not
- * trigger the fetch itself: that is a cold ~10 s read on a real org).
+ * "Queue | Repos | Stacks" switch for the left column. Queue carries how many
+ * PRs need your review; Stacks the orphan count once some consumer loaded the
+ * stacks (it does not trigger the fetch itself: that is a cold ~10 s read on
+ * a real org).
  */
 function SidebarViewSwitch({
   value,
@@ -79,7 +83,9 @@ function SidebarViewSwitch({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const orphans = useStacksStore((s) => (s.result ? countOrphans(s.result.stacks) : 0))
+  const toReview = useNeedsReviewCount()
   const options: { value: SidebarView; label: string }[] = [
+    { value: 'queue', label: t('layout.sidebar.views.queue') },
     { value: 'list', label: t('layout.sidebar.views.list') },
     { value: 'stacks', label: t('layout.sidebar.views.stacks') },
   ]
@@ -100,6 +106,14 @@ function SidebarViewSwitch({
           }`}
         >
           <span className="truncate">{option.label}</span>
+          {option.value === 'queue' && toReview > 0 && (
+            <span
+              className="shrink-0 rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-fg"
+              title={t('layout.queue.toReview', { count: toReview })}
+            >
+              {toReview}
+            </span>
+          )}
           {option.value === 'stacks' && orphans > 0 && (
             <span
               className="shrink-0 rounded-full bg-warning/20 px-1.5 text-[10px] text-warning"
@@ -202,8 +216,8 @@ export function Sidebar(): React.JSX.Element | null {
   // The full-screen walkthrough takes the whole window (the hooks above keep running).
   if (walkthroughFocus) return null
   if (isDrawer && !sidebarOpen) return null
-  // Docked tiers: hidden by the TitleBar toggle / Cmd+B (persisted).
-  if (!isDrawer && sidebarCollapsed) return null
+  // Docked tiers, folded by the TitleBar toggle / Cmd+B (persisted): the rail.
+  if (!isDrawer && sidebarCollapsed) return <SidebarRail />
 
   const asideClass = isDrawer
     ? 'absolute inset-y-0 left-0 z-40 flex w-[300px] max-w-[85%] flex-col overflow-y-auto border-r border-border bg-panel shadow-2xl'
@@ -242,18 +256,23 @@ export function Sidebar(): React.JSX.Element | null {
         </div>
         {sidebarView === 'stacks' ? (
           <StacksView pullRequests={pullRequests} onSelectPr={handleSelectPr} />
+        ) : sidebarView === 'queue' && !noProviders && !needsLogin ? (
+          <QueueView />
         ) : (
           <>
-            <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
-              <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
-              <IconButton
-                icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
-                label={t('layout.sidebar.refresh')}
-                onClick={refetch}
-                disabled={loading}
-                className="ml-auto"
-              />
-            </div>
+            {/* Open / Closed / All belongs to the Repos list; the queue is open PRs only. */}
+            {sidebarView === 'list' && (
+              <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
+                <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
+                <IconButton
+                  icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
+                  label={t('layout.sidebar.refresh')}
+                  onClick={refetch}
+                  disabled={loading}
+                  className="ml-auto"
+                />
+              </div>
+            )}
             {noProviders ? (
               <div
                 data-testid="no-providers"

@@ -205,6 +205,17 @@ export async function openPrDetails(page: Page): Promise<void> {
   if (!open) await details.locator('summary').click()
 }
 
+/**
+ * Switches the sidebar to "Repos" (the PR list grouped by repo, with Open /
+ * Closed / All and refresh). The sidebar opens on "Queue".
+ */
+export async function openReposView(page: Page): Promise<void> {
+  await page
+    .getByRole('group', { name: 'Left column view' })
+    .getByRole('button', { name: 'Repos', exact: true })
+    .click()
+}
+
 /** Picks a tab of the didactic panel (Overview, Architecture, Endpoints, Data). */
 export async function openInsightTab(page: Page, name: string): Promise<void> {
   await page.getByTestId('insight-tabs').first().getByRole('tab', { name, exact: true }).click()

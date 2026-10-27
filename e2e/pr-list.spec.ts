@@ -1,4 +1,12 @@
-import { test, expect, launchMinerva, closeMinerva, mainWindow, attachScreenshot } from './fixtures'
+import {
+  test,
+  expect,
+  launchMinerva,
+  closeMinerva,
+  mainWindow,
+  attachScreenshot,
+  openReposView,
+} from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -44,6 +52,8 @@ const itemInfo = (page: Page, title: string) =>
 test('filtros de estado: Abiertos (default), Cerrados con badges, Todos', async ({
   window,
 }, testInfo) => {
+  // The state filters belong to the Repos view (the Queue is open PRs only).
+  await openReposView(window)
   // (1) Default "Abiertos": open visible, closed/merged fuera.
   await expect(aside(window).getByText(OPEN_PR).first()).toBeVisible()
   await expect(aside(window).getByText(CLOSED_PR)).toHaveCount(0)
@@ -73,6 +83,7 @@ test('filtros de estado: Abiertos (default), Cerrados con badges, Todos', async 
 })
 
 test('refresh manual y dots de no-visto con markPrSeen', async ({ window }, testInfo) => {
+  await openReposView(window)
   // (4) Refresh manual: re-fetchea sin error.
   await refreshButton(window).click()
   await expect(aside(window).getByText(OPEN_PR).first()).toBeVisible()
