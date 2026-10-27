@@ -8,6 +8,7 @@ import {
   mainWindow,
   attachScreenshot,
   setViewport,
+  openInsightTab,
   type Page,
 } from './fixtures'
 import { themeColorToHex } from '../src/shared/theme/color'
@@ -82,6 +83,7 @@ test('appearance: mode and theme apply live to both windows, persist, and restor
   )
   const detached = await detachedPromise
   await detached.waitForLoadState('domcontentloaded')
+  await openInsightTab(detached, 'Architecture')
   await expect(detached.locator('svg[aria-roledescription]').first()).toBeVisible({
     timeout: 30_000,
   })
@@ -262,6 +264,7 @@ test('screenshots: every built-in theme, light and dark, with a diff and a diagr
   await window.getByText('Files').first().click()
   await expect(window.getByText('@@').first()).toBeVisible()
   // Bring the C4 diagram into the docked didactic panel's view.
+  await openInsightTab(window, 'Architecture')
   await window.locator('svg[aria-roledescription]').first().scrollIntoViewIfNeeded()
 
   for (const theme of getBuiltInThemes()) {

@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot } from './fixtures'
+import { test, expect, attachScreenshot, openInsightTab } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -35,37 +35,43 @@ test('PR #482: resumen, endpoint con snippet y diagrama C4', async ({ window }, 
   await analyze(window, 'Add POST /carts/:id/apply-coupon')
 
   await expect(window.getByText('Summary').first()).toBeVisible()
-  // Sección de endpoint: snippet curl copiable.
-  await expect(window.locator('pre', { hasText: 'curl' }).first()).toBeVisible()
-  await expect(window.getByRole('button', { name: /Copy/ }).first()).toBeVisible()
-  // Diagrama mermaid renderizado como SVG (render lazy ⇒ timeout de expect).
-  await expect(window.locator('svg[aria-roledescription]').first()).toBeVisible()
 
-  // Card "Cómo levantar la app" (T20): env vars nuevas + snippets copiables.
-  // El check del env var es estricto contra la fixture — válido porque la IA
-  // es SIEMPRE mock aquí (MINERVA_MOCK_AI=1 en el fixture).
+  // Overview tab: the "How to run the app" card (T20), new env vars and
+  // copyable snippets. The env var check is strict against the fixture —
+  // valid because the AI is ALWAYS mock here (MINERVA_MOCK_AI=1).
   const card = setupCard(window)
   await expect(card).toBeVisible()
   await expect(card.getByText('COUPON_MAX_DISCOUNT_RATE').first()).toBeVisible()
   expect(await card.locator('pre').count()).toBeGreaterThanOrEqual(1)
   await expect(card.getByRole('button', { name: /Copy/ }).first()).toBeVisible()
-
   await attachScreenshot(window, testInfo, 'pr-482-didactic')
+
+  // Endpoints tab: copyable curl snippet.
+  await openInsightTab(window, 'Endpoints')
+  await expect(window.locator('pre', { hasText: 'curl' }).first()).toBeVisible()
+  await expect(window.getByRole('button', { name: /Copy/ }).first()).toBeVisible()
+  await expect(card).toHaveCount(0)
+  // Architecture tab: the Mermaid diagram renders as SVG (lazy ⇒ expect timeout).
+  await openInsightTab(window, 'Architecture')
+  await expect(window.locator('svg[aria-roledescription]').first()).toBeVisible()
+  await attachScreenshot(window, testInfo, 'pr-482-didactic-architecture')
 })
 
 test('PR #479: esquema con diagrama ER y setup sin env vars', async ({ window }, testInfo) => {
   await analyze(window, 'Add refunds table and migration')
 
+  // Opposite case of T20: the setup section says explicitly that the PR
+  // adds NO environment variables (it must never leave that out).
+  const card = setupCard(window)
+  await expect(card).toBeVisible()
+  await expect(card.getByText('adds or changes no environment variables')).toBeVisible()
+
+  // Data tab: the ER diagram.
+  await openInsightTab(window, 'Data')
   await expect(window.getByText('refunds').first()).toBeVisible()
   await expect(
     window.locator('svg[aria-roledescription="er"], svg[id*="mermaid"]').first(),
   ).toBeVisible()
-
-  // Caso contrario de T20: la sección setup declara explícitamente que el PR
-  // NO agrega variables de entorno (nunca debe omitir ese dato).
-  const card = setupCard(window)
-  await expect(card).toBeVisible()
-  await expect(card.getByText('adds or changes no environment variables')).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'pr-479-didactic')
 })
@@ -73,7 +79,7 @@ test('PR #479: esquema con diagrama ER y setup sin env vars', async ({ window },
 test('PR #201: sección de arquitectura con diagrama', async ({ window }, testInfo) => {
   await analyze(window, 'Refactor checkout state machine')
 
-  await expect(window.getByText('Architecture').first()).toBeVisible()
+  await openInsightTab(window, 'Architecture')
   await expect(window.locator('svg[aria-roledescription]').first()).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'pr-201-didactic')

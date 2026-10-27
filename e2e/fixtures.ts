@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { test as base, expect, chromium } from '@playwright/test'
-import type { Browser, BrowserContext, CDPSession, Page, TestInfo } from '@playwright/test'
+import type { Browser, BrowserContext, CDPSession, Locator, Page, TestInfo } from '@playwright/test'
 import type { ChildProcess } from 'node:child_process'
 import { reportSwept, sweepOrphanedOpencodeServers } from './opencode-sweep'
 
@@ -192,6 +192,28 @@ export async function setViewport(page: Page, width: number, height: number): Pr
     ([w, h]) => window.innerWidth === w && window.innerHeight === h,
     [width, height] as const,
   )
+}
+
+/**
+ * Opens the PR bar's "Details" popover (author, provider link, each
+ * reviewer's vote, checks, work items, labels, "Change target branch…").
+ * No-op when it is already open.
+ */
+export async function openPrDetails(page: Page): Promise<void> {
+  const details = page.getByTestId('pr-details')
+  const open = await details.evaluate((node) => (node as HTMLDetailsElement).open)
+  if (!open) await details.locator('summary').click()
+}
+
+/** Picks a tab of the didactic panel (Overview, Architecture, Endpoints, Data). */
+export async function openInsightTab(page: Page, name: string): Promise<void> {
+  await page.getByTestId('insight-tabs').first().getByRole('tab', { name, exact: true }).click()
+}
+
+/** Unfolds a diff thread (they start folded to their one-line header). No-op when open. */
+export async function expandThread(thread: Locator): Promise<void> {
+  const toggle = thread.locator('button[aria-expanded]').first()
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
 }
 
 /** Captura del viewport adjunta como artifact del test (verificación visual). */

@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot } from './fixtures'
+import { test, expect, attachScreenshot, openPrDetails } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -142,6 +142,7 @@ test('repo groups show a provider marker and reviewers show their vote', async (
 
   // #470 (shopwave/api) is approved in the mock universe.
   await aside.getByText('#470').first().click()
+  await openPrDetails(window)
   const reviewers = window.getByRole('list', { name: 'Reviewers' })
   await expect(reviewers.locator('[data-vote="approved"]')).toContainText('Approved')
   await expect(window.getByText('Open in GitHub').first()).toBeVisible()
