@@ -4,6 +4,9 @@ import type { en } from './en'
 /** Spanish messages of the main process; same shape as `en.ts` (a missing key is a type error). */
 export const es: MessageShape<typeof en> = {
   ai: {
+    lineQuestion: {
+      empty: 'La IA terminó sin responder tu pregunta. Intenta preguntar de nuevo.',
+    },
     errors: {
       inactivityTimeout:
         '{{provider}} dejó de enviar datos: sin ningún fragmento nuevo por más de {{seconds}} s (timeout de inactividad).',

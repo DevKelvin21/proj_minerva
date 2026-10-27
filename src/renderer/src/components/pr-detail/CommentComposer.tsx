@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
 import { buildSuggestionBlock, insertSuggestion } from '../../lib/suggestions'
@@ -19,6 +20,8 @@ interface CommentComposerProps {
   autoFocus?: boolean
   /** Clear the draft after a successful submit (replies); a new-thread composer is unmounted instead. */
   clearOnSubmit?: boolean
+  /** Starting text (an AI answer the reviewer turns into a comment). */
+  initialValue?: string
   className?: string
 }
 
@@ -42,9 +45,10 @@ export function CommentComposer({
   autoFocus = false,
   clearOnSubmit = false,
   className = '',
+  initialValue = '',
 }: CommentComposerProps): React.JSX.Element {
   const { t } = useTranslation()
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useState(initialValue)
   const [posting, setPosting] = useState(false)
   const [inserting, setInserting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -77,11 +81,11 @@ export function CommentComposer({
       const start = textarea?.selectionStart ?? draft.length
       const end = textarea?.selectionEnd ?? draft.length
       const { text, caret } = insertSuggestion(draft, buildSuggestionBlock(lines), start, end)
-      setDraft(text)
-      requestAnimationFrame(() => {
-        textareaRef.current?.focus()
-        textareaRef.current?.setSelectionRange(caret, caret)
-      })
+      // Commit the text and place the caret in the same task: a deferred
+      // (rAF) caret move could land after the user's next keystrokes.
+      flushSync(() => setDraft(text))
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(caret, caret)
     } catch (err: unknown) {
       setError(t('comments.composer.suggestionLoadError', { error: toErrorMessage(err) }))
     } finally {

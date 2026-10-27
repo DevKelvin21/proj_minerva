@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Loader2, MessageSquare, Sparkles, TriangleAlert, Workflow } from 'lucide-react'
 import type { CommentThread, DiffFile, WalkthroughCohort } from '../../../../shared/types'
 import type { WalkthroughStatus } from '../../hooks/use-walkthrough'
+import type { LayerVerdict } from '../../stores/app-store'
 import {
   flattenLayers,
   layerThreadCount,
@@ -9,8 +10,16 @@ import {
   sameLayerRef,
   unassignedFiles,
   type LayerRef,
+  layerVerdictKey,
 } from '../../lib/walkthrough'
 import { FileStatusIcon } from './FileStatusIcon'
+
+/** Number badge of a layer the reviewer already judged (status roles, never a hard-coded color). */
+const VERDICT_BADGE: Record<LayerVerdict, string> = {
+  good: 'border-success bg-success/15 text-success',
+  changes: 'border-danger bg-danger/15 text-danger',
+  question: 'border-warning bg-warning/15 text-warning',
+}
 
 interface LayerNavigatorProps {
   cohorts: WalkthroughCohort[] | null
@@ -24,6 +33,8 @@ interface LayerNavigatorProps {
   /** A file outside every layer: shows it with no layer active. */
   onSelectUnassignedFile: (path: string) => void
   onAnalyze: () => void
+  /** The reviewer's verdict per layer (`layerVerdictKey`), shown on its number. */
+  verdicts?: Record<string, LayerVerdict>
 }
 
 /**
@@ -43,6 +54,7 @@ export function LayerNavigator({
   onSelectLayer,
   onSelectUnassignedFile,
   onAnalyze,
+  verdicts,
 }: LayerNavigatorProps): React.JSX.Element {
   const { t } = useTranslation()
 
@@ -111,6 +123,7 @@ export function LayerNavigator({
             {cohort.layers.map((layer, l) => {
               const ref = { cohort: c, layer: l }
               const entry = flat.find((f) => sameLayerRef(f.ref, ref))
+              const verdict = verdicts?.[layerVerdictKey(ref)]
               const active = sameLayerRef(activeLayer, ref)
               const known = resolveLayerFiles(layer, files).known.length
               const comments = layerThreadCount(layer, threads)
@@ -126,10 +139,14 @@ export function LayerNavigator({
                     }`}
                   >
                     <span
+                      data-verdict={verdict}
+                      title={verdict ? t(`prDetail.layers.verdict.${verdict}`) : undefined}
                       className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold tabular-nums ${
                         active
                           ? 'border-accent bg-accent text-accent-fg'
-                          : 'border-border text-muted'
+                          : verdict
+                            ? VERDICT_BADGE[verdict]
+                            : 'border-border text-muted'
                       }`}
                     >
                       {(entry?.index ?? 0) + 1}

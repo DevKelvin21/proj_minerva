@@ -7,6 +7,7 @@ import type { DiffSection, HiddenGap } from '../../lib/expand-context'
 import type { DiffThreadsModel } from '../../lib/diff-threads'
 import type { HighlightToken } from '../../lib/highlighter'
 import type { LineSide } from '../../lib/line-threads'
+import type { LineAnswer } from '../../../../shared/types'
 
 export interface DiffBodyProps {
   sections: DiffSection[]
@@ -26,6 +27,8 @@ export interface DiffBodyProps {
     onExpand: (gap: HiddenGap, direction: 'up' | 'down' | 'all') => void
   }
   onCreateThread: (line: number, side: LineSide, bodyMarkdown: string) => Promise<void>
+  /** Asks the AI about one line (`ai:askAboutLines`); absent = no "Ask AI" button. */
+  askAi?: (line: number, side: LineSide, question: string) => Promise<LineAnswer>
 }
 
 export const KIND_BG: Partial<Record<DiffLineKind, string>> = {
@@ -48,6 +51,9 @@ export interface OpenComposer {
   side: LineSide
   line: number
   content: string
+  /** A new comment (optionally prefilled with `draft`) or a question to the AI. */
+  kind: 'comment' | 'ask'
+  draft?: string
 }
 
 /** A section's lines as a pseudo-hunk, for the row builders. */

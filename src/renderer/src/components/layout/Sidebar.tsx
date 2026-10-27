@@ -167,6 +167,7 @@ export function Sidebar(): React.JSX.Element | null {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const closeSidebar = useAppStore((s) => s.closeSidebar)
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
+  const walkthroughFocus = useAppStore((s) => s.walkthroughFocus)
 
   // Esc cierra el drawer (solo cuando está abierto y no hay un modal encima:
   // `SettingsModal` monta su propio listener y también cierra con Esc).
@@ -198,6 +199,8 @@ export function Sidebar(): React.JSX.Element | null {
     markSeen(pr)
   }
 
+  // The full-screen walkthrough takes the whole window (the hooks above keep running).
+  if (walkthroughFocus) return null
   if (isDrawer && !sidebarOpen) return null
   // Docked tiers: hidden by the TitleBar toggle / Cmd+B (persisted).
   if (!isDrawer && sidebarCollapsed) return null

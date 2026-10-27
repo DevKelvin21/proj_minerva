@@ -586,6 +586,35 @@ describe('payloadValidators', () => {
     })
   })
 
+  describe('ai:askAboutLines', () => {
+    const validate = payloadValidators['ai:askAboutLines']
+    const base = {
+      repo: validRepo,
+      number: 1,
+      path: 'src/a.ts',
+      side: 'new',
+      startLine: 3,
+      endLine: 5,
+      question: 'Why?',
+    }
+
+    it('accepts a path, a side, a line range and a question', () => {
+      expect(validate(base)).toBe(true)
+      expect(validate({ ...base, side: 'old', endLine: 3 })).toBe(true)
+    })
+
+    it('rejects bad paths, sides, ranges, empty or huge questions and extra keys', () => {
+      expect(validate({ ...base, path: '../etc/passwd' })).toBe(false)
+      expect(validate({ ...base, side: 'head' })).toBe(false)
+      expect(validate({ ...base, startLine: 0 })).toBe(false)
+      expect(validate({ ...base, endLine: 2 })).toBe(false)
+      expect(validate({ ...base, endLine: 3 + 400 })).toBe(false)
+      expect(validate({ ...base, question: '   ' })).toBe(false)
+      expect(validate({ ...base, question: 'x'.repeat(2001) })).toBe(false)
+      expect(validate({ ...base, extra: true })).toBe(false)
+    })
+  })
+
   describe('scm:getFileContent', () => {
     const validate = payloadValidators['scm:getFileContent']
     const base = { repo: validRepo, number: 1, path: 'src/a.ts', side: 'head' }

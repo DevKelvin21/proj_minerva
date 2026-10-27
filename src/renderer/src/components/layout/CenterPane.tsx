@@ -97,7 +97,8 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
   const { repo, number } = detail
   const centerTab = useAppStore((s) => s.centerTab)
   const setCenterTab = useAppStore((s) => s.setCenterTab)
-  const setFileTreeMode = useAppStore((s) => s.setFileTreeMode)
+  const openWalkthroughFocus = useAppStore((s) => s.openWalkthroughFocus)
+  const walkthroughFocus = useAppStore((s) => s.walkthroughFocus)
 
   // Threads and files of the PR: asked once here and shared by the
   // Conversation, Files and Comments tabs.
@@ -134,41 +135,42 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
   }, [number, headSha, files, reloadThreads, applyThreadStatus])
 
   const openThreads = threads.filter((thread) => isThreadOpen(thread.status)).length
-  // The walkthrough is the Files tab's layers view (full screen comes later).
-  const openWalkthrough = (): void => {
-    setFileTreeMode('layers')
-    setCenterTab('files')
-  }
 
   return (
     <ThreadActionsContext.Provider value={actions}>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <PrHeader
-          pr={detail}
-          onWalkthrough={openWalkthrough}
-          tabs={
-            <nav aria-label={t('layout.center.tabsLabel')} className="flex h-full gap-1">
-              <TabButton
-                active={centerTab === 'conversation'}
-                onClick={() => setCenterTab('conversation')}
-              >
-                {t('layout.center.tabs.conversation')}
-              </TabButton>
-              <TabButton active={centerTab === 'files'} onClick={() => setCenterTab('files')}>
-                {detail.changedFiles === null
-                  ? t('layout.center.tabs.files')
-                  : t('layout.center.tabs.filesWithCount', { count: detail.changedFiles })}
-              </TabButton>
-              <TabButton active={centerTab === 'comments'} onClick={() => setCenterTab('comments')}>
-                <span title={t('layout.center.openThreads', { count: openThreads })}>
-                  {threadsLoading && threads.length === 0
-                    ? t('layout.center.tabs.comments')
-                    : t('layout.center.tabs.commentsWithCount', { count: openThreads })}
-                </span>
-              </TabButton>
-            </nav>
-          }
-        />
+        {/* The full-screen walkthrough hides the PR bar: the title bar names the PR. */}
+        {!walkthroughFocus && (
+          <PrHeader
+            pr={detail}
+            onWalkthrough={openWalkthroughFocus}
+            tabs={
+              <nav aria-label={t('layout.center.tabsLabel')} className="flex h-full gap-1">
+                <TabButton
+                  active={centerTab === 'conversation'}
+                  onClick={() => setCenterTab('conversation')}
+                >
+                  {t('layout.center.tabs.conversation')}
+                </TabButton>
+                <TabButton active={centerTab === 'files'} onClick={() => setCenterTab('files')}>
+                  {detail.changedFiles === null
+                    ? t('layout.center.tabs.files')
+                    : t('layout.center.tabs.filesWithCount', { count: detail.changedFiles })}
+                </TabButton>
+                <TabButton
+                  active={centerTab === 'comments'}
+                  onClick={() => setCenterTab('comments')}
+                >
+                  <span title={t('layout.center.openThreads', { count: openThreads })}>
+                    {threadsLoading && threads.length === 0
+                      ? t('layout.center.tabs.comments')
+                      : t('layout.center.tabs.commentsWithCount', { count: openThreads })}
+                  </span>
+                </TabButton>
+              </nav>
+            }
+          />
+        )}
         <div className="min-h-0 flex-1 overflow-hidden">
           {centerTab === 'conversation' ? (
             <ConversationTab

@@ -275,7 +275,7 @@ function renderSection(
               })
       }
     >
-      {section.markdown.trim().length > 0 && <Markdown content={section.markdown} />}
+      {section.markdown.trim().length > 0 && <Markdown content={section.markdown} images={false} />}
       {section.kind === 'walkthrough' && (
         <WalkthroughBody cohorts={section.cohorts} onOpenLayer={onOpenLayer} />
       )}
@@ -339,7 +339,7 @@ function renderDraftSection(
               })
       }
     >
-      {section.markdown.trim().length > 0 && <Markdown content={section.markdown} />}
+      {section.markdown.trim().length > 0 && <Markdown content={section.markdown} images={false} />}
       {section.kind === 'walkthrough' && (
         <WalkthroughBody cohorts={section.cohorts} onOpenLayer={onOpenLayer} />
       )}

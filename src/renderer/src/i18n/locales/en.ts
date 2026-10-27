@@ -123,6 +123,8 @@ export const en = {
         showDidactic: 'Show the didactic panel',
         hideDidactic: 'Hide the didactic panel',
         didacticKeywords: 'ai analysis summary',
+        walkthrough: 'Start the walkthrough (full screen)',
+        walkthroughKeywords: 'layers guided focus review',
       },
     },
     sidebar: {
@@ -210,6 +212,19 @@ export const en = {
     },
   },
   prDetail: {
+    focus: {
+      title: 'Walkthrough',
+      exit: 'Exit walkthrough',
+      previous: 'Previous',
+      next: 'Next layer',
+      thisLayer: 'This layer',
+      verdictsLabel: 'Your verdict on this layer',
+      judged_one: '{{count}} of {{total}} layers judged',
+      judged_other: '{{count}} of {{total}} layers judged',
+      finish: 'Done',
+      progress: 'Layer {{current}} of {{total}}',
+      progressNone: '{{total}} layers',
+    },
     header: {
       walkthrough: 'Walkthrough',
       summary: {
@@ -277,6 +292,11 @@ export const en = {
       layersView: 'Layers view (guided walkthrough)',
     },
     layers: {
+      verdict: {
+        good: 'Looks good',
+        changes: 'Needs changes',
+        question: 'Question',
+      },
       title: 'Layers',
       placeholderTitle: 'Guided walkthrough',
       placeholderHint:
@@ -363,6 +383,25 @@ export const en = {
     },
   },
   comments: {
+    askAi: {
+      button: 'Ask AI about line {{line}}',
+      buttonTitle: 'Ask AI about this line',
+      title: 'Ask AI about line {{line}}',
+      titleOld: 'Ask AI about removed line {{line}}',
+      close: 'Close',
+      inputLabel: 'Your question about line {{line}}',
+      placeholder: 'What do you want to know about this line?',
+      followUpPlaceholder: 'Ask a follow-up…',
+      ask: 'Ask',
+      submitHint: '{{shortcut}} to ask',
+      thinking: 'Reading the code at the PR commit…',
+      youAsked: 'You asked:',
+      useAsComment: 'Use as comment',
+      private: 'Only you see this until you post it.',
+      failed: 'Could not get an answer: {{error}}',
+      followUpContext:
+        'Earlier I asked: {{question}}\nYou answered: {{answer}}\nFollow-up: {{followUp}}',
+    },
     threadStatus: {
       active: 'Active',
       pending: 'Pending',

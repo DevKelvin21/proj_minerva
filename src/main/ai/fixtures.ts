@@ -18,7 +18,25 @@
  */
 import { prKey } from '../../shared/scm'
 import { githubRepo } from '../../shared/scm-guards'
-import type { DidacticSection, PullRequestDetail } from '../../shared/types'
+import type { DidacticSection, LineQuestion, PullRequestDetail } from '../../shared/types'
+
+/** Mock answer to a reviewer's question about some lines (`ai:askAboutLines`). */
+export function lineAnswerSection(question: LineQuestion): DidacticSection {
+  const where =
+    question.startLine === question.endLine
+      ? question.path + ':' + question.startLine
+      : question.path + ':' + question.startLine + '-' + question.endLine
+  return {
+    kind: 'summary',
+    markdown:
+      'Mock answer for `' +
+      where +
+      '`: these lines are part of the change this PR makes. With a real AI provider, the ' +
+      'agent reads the file at the PR commit before answering your question.\n\n' +
+      'Next step: compare them with the code that calls them, then decide whether they need a ' +
+      'comment.',
+  }
+}
 
 /** Resumen genérico para PRs sin sección enriquecida en esta demo mock. */
 export function genericSummarySection(detail: PullRequestDetail): DidacticSection {

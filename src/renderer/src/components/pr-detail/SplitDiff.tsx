@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
+import { Plus, Sparkles } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
 import { buildSplitRows, type SplitCell, type SplitRow } from '../../lib/diff-parser'
 import type { DiffThreadsModel } from '../../lib/diff-threads'
@@ -11,6 +11,7 @@ import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
+import { AskAiCard } from './AskAiCard'
 import {
   asHunk,
   KIND_BG,
@@ -36,6 +37,8 @@ interface RowMeta {
   rightThreads: CommentThread[]
   onAddLeft?: () => void
   onAddRight?: () => void
+  onAskLeft?: () => void
+  onAskRight?: () => void
 }
 
 type Item = { type: 'full'; key: string; node: React.ReactNode } | { type: 'row'; meta: RowMeta }
@@ -50,6 +53,10 @@ interface SideCellsProps {
   model: DiffThreadsModel
   inLayer: boolean
   onAdd?: () => void
+  /** Opens "Ask AI" on this line; absent = no button (feature off or no position). */
+  onAsk?: () => void
+  /** Reserve the "Ask AI" slot even without a button here, so gutters line up. */
+  askSlot: boolean
   getTokens: (content: string) => HighlightToken[] | undefined
 }
 
@@ -67,6 +74,8 @@ function SideCells({
   model,
   inLayer,
   onAdd,
+  onAsk,
+  askSlot,
   getTokens,
 }: SideCellsProps): React.JSX.Element {
   const { t } = useTranslation()
@@ -95,6 +104,19 @@ function SideCells({
           </button>
         ) : (
           <span className="inline-block h-4 w-4 shrink-0" />
+        )}
+        {onAsk ? (
+          <button
+            type="button"
+            onClick={onAsk}
+            aria-label={t('comments.askAi.button', { line: cell?.number ?? 0 })}
+            title={t('comments.askAi.buttonTitle')}
+            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
+          >
+            <Sparkles size={11} />
+          </button>
+        ) : (
+          askSlot && <span className="inline-block h-4 w-4 shrink-0" />
         )}
         <span className="select-none">{cell?.number ?? ''}</span>
       </span>
@@ -133,6 +155,7 @@ export function SplitDiff({
   layerKeys,
   expander,
   onCreateThread,
+  askAi,
 }: DiffBodyProps): React.JSX.Element {
   const [openComposer, setOpenComposer] = useState<OpenComposer | null>(null)
 
@@ -181,11 +204,38 @@ export function SplitDiff({
       rightThreads,
       onAddLeft:
         leftPosition && row.left
-          ? () => setOpenComposer({ key: rowKey, content: row.left!.content, ...leftPosition })
+          ? () =>
+              setOpenComposer({
+                key: rowKey,
+                content: row.left!.content,
+                kind: 'comment',
+                ...leftPosition,
+              })
           : undefined,
       onAddRight:
         rightPosition && row.right
-          ? () => setOpenComposer({ key: rowKey, content: row.right!.content, ...rightPosition })
+          ? () =>
+              setOpenComposer({
+                key: rowKey,
+                content: row.right!.content,
+                kind: 'comment',
+                ...rightPosition,
+              })
+          : undefined,
+      onAskLeft:
+        askAi && leftPosition && row.left
+          ? () =>
+              setOpenComposer({ key: rowKey, content: row.left!.content, kind: 'ask', ...leftPosition })
+          : undefined,
+      onAskRight:
+        askAi && rightPosition && row.right
+          ? () =>
+              setOpenComposer({
+                key: rowKey,
+                content: row.right!.content,
+                kind: 'ask',
+                ...rightPosition,
+              })
           : undefined,
     }
   }
@@ -218,18 +268,30 @@ export function SplitDiff({
       items.push({
         type: 'full',
         key: `composer-${meta.rowKey}`,
-        node: (
-          <LineCommentComposer
-            line={composer.line}
-            side={composer.side}
-            lineContent={composer.content}
-            onCancel={() => setOpenComposer(null)}
-            onSubmit={async (bodyMarkdown) => {
-              await onCreateThread(composer.line, composer.side, bodyMarkdown)
-              setOpenComposer(null)
-            }}
-          />
-        ),
+        node:
+          composer.kind === 'ask' && askAi ? (
+            <AskAiCard
+              line={composer.line}
+              side={composer.side}
+              onAsk={(question) => askAi(composer.line, composer.side, question)}
+              onUseAsComment={(markdown) =>
+                setOpenComposer({ ...composer, kind: 'comment', draft: markdown })
+              }
+              onClose={() => setOpenComposer(null)}
+            />
+          ) : (
+            <LineCommentComposer
+              line={composer.line}
+              side={composer.side}
+              lineContent={composer.content}
+              initialValue={composer.draft}
+              onCancel={() => setOpenComposer(null)}
+              onSubmit={async (bodyMarkdown) => {
+                await onCreateThread(composer.line, composer.side, bodyMarkdown)
+                setOpenComposer(null)
+              }}
+            />
+          ),
       })
     }
     return items
@@ -295,6 +357,8 @@ export function SplitDiff({
               ? meta.onAddRight
               : undefined
         }
+        onAsk={side === 'left' ? meta.onAskLeft : meta.onAskRight}
+        askSlot={askAi !== undefined}
         getTokens={getTokens}
       />
     )
@@ -333,7 +397,8 @@ export function SplitDiff({
   }
 
   // Without wrap: runs of rows go in two panels; full-width items cut the run.
-  const gutterWidth = `calc(${gutterDigits}ch + 2.25rem)`
+  // Digits + padding + the "+" slot, plus the "Ask AI" slot when it is on.
+  const gutterWidth = `calc(${gutterDigits}ch + ${askAi ? '3.5rem' : '2.25rem'})`
   const segments: Array<{ key: string; rows: RowMeta[] } | { key: string; node: React.ReactNode }> =
     []
   let run: RowMeta[] = []

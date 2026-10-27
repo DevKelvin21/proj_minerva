@@ -41,6 +41,7 @@ import { DidacticPlaceholder } from '../didactic/DidacticPlaceholder'
 export function DidacticPanel(): React.JSX.Element {
   const { t } = useTranslation()
   const didacticPanelOpen = useAppStore((s) => s.didacticPanelOpen)
+  const walkthroughFocus = useAppStore((s) => s.walkthroughFocus)
   const toggleDidacticPanel = useAppStore((s) => s.toggleDidacticPanel)
   const selectedPr = useAppStore((s) => s.selectedPr)
   const preferredWidth = useAppStore((s) => s.didacticPanelWidth)
@@ -55,6 +56,9 @@ export function DidacticPanel(): React.JSX.Element {
   // El valor del store no se toca: al ensanchar de nuevo, el panel recupera su
   // ancho preferido solo.
   const panelWidth = clampDidacticWidth(preferredWidth, tier.width)
+
+  // The full-screen walkthrough shows the layer's explanation inline instead.
+  if (walkthroughFocus) return <></>
 
   if (!didacticPanelOpen) {
     return (

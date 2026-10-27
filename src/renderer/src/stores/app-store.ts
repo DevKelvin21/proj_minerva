@@ -32,6 +32,8 @@ export type DiffViewMode = 'split' | 'inline'
 export type FileTreeMode = 'tree' | 'list' | 'layers'
 /** What the left column shows: the PR list or the stacked-PR view. */
 export type SidebarView = 'list' | 'stacks'
+/** The reviewer's call on one walkthrough layer (full-screen walkthrough footer). */
+export type LayerVerdict = 'good' | 'changes' | 'question'
 
 /**
  * What the center shows: the home dashboard (repos, features, stacks) or the
@@ -180,6 +182,14 @@ interface AppState {
   settingsOpen: boolean
   /** The Cmd/Ctrl+K command palette (title bar "Jump to…" button). Session only. */
   commandPaletteOpen: boolean
+  /**
+   * Full-screen walkthrough of `selectedPr`: the Files tab in layers mode
+   * with the sidebar, the PR bar and the didactic panel out of the way, and a
+   * verdict bar. Cleared whenever the review is left. Session only.
+   */
+  walkthroughFocus: boolean
+  /** Verdicts per PR (`prKey`) and layer (`layerVerdictKey`). Session only, never sent anywhere. */
+  layerVerdicts: Record<string, Record<string, LayerVerdict>>
   aiModelInfo: AiSettingsInfo | null
 
   /** Left column: PR list or stacks. Session only. */
@@ -252,6 +262,11 @@ interface AppState {
   closeSettings: () => void
   openCommandPalette: () => void
   closeCommandPalette: () => void
+  /** Enters the full-screen walkthrough (Files tab, layers mode). No-op without a PR. */
+  openWalkthroughFocus: () => void
+  closeWalkthroughFocus: () => void
+  /** Sets (or, with `null`, clears) the verdict of one layer of one PR. */
+  setLayerVerdict: (prKey: string, layer: string, verdict: LayerVerdict | null) => void
   setAiModelInfo: (info: AiSettingsInfo) => void
 }
 
@@ -280,6 +295,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   settingsOpen: false,
   commandPaletteOpen: false,
+  walkthroughFocus: false,
+  layerVerdicts: {},
   aiModelInfo: null,
 
   sidebarView: 'list',
@@ -304,16 +321,24 @@ export const useAppStore = create<AppState>((set) => ({
       centerTab: 'conversation',
       selectedFilePath: null,
       activeLayer: null,
+      walkthroughFocus: false,
       expandedThreadId: null,
       pendingThreadFocus: null,
       // Elegir un PR cierra el drawer de la lista (F16/T82): en `md`/`sm` la
       // lista tapa el centro, y el gesto natural tras elegir es ver el PR.
       sidebarOpen: false,
     })),
-  goHome: () => set({ mainView: 'home', homeRoute: { kind: 'overview' }, sidebarOpen: false }),
+  goHome: () =>
+    set({
+      mainView: 'home',
+      homeRoute: { kind: 'overview' },
+      sidebarOpen: false,
+      walkthroughFocus: false,
+    }),
   navigateHome: (route) =>
     set((state) => ({
       mainView: 'home',
+      walkthroughFocus: false,
       homeRoute: sameRoute(state.homeRoute, route) ? state.homeRoute : route,
       // The viewer filter belongs to a repo page: a new repo starts at "All".
       repoFilter:
@@ -395,6 +420,26 @@ export const useAppStore = create<AppState>((set) => ({
   openSettings: () => set({ settingsOpen: true, commandPaletteOpen: false }),
   openCommandPalette: () => set({ commandPaletteOpen: true }),
   closeCommandPalette: () => set({ commandPaletteOpen: false }),
+  openWalkthroughFocus: () =>
+    set((state) =>
+      state.selectedPr
+        ? {
+            walkthroughFocus: true,
+            mainView: 'review',
+            centerTab: 'files',
+            fileTreeMode: 'layers',
+            sidebarOpen: false,
+          }
+        : {},
+    ),
+  closeWalkthroughFocus: () => set({ walkthroughFocus: false }),
+  setLayerVerdict: (key, layer, verdict) =>
+    set((state) => {
+      const current = { ...(state.layerVerdicts[key] ?? {}) }
+      if (verdict) current[layer] = verdict
+      else delete current[layer]
+      return { layerVerdicts: { ...state.layerVerdicts, [key]: current } }
+    }),
   closeSettings: () => set({ settingsOpen: false }),
   setAiModelInfo: (info) => set({ aiModelInfo: info }),
 }))
