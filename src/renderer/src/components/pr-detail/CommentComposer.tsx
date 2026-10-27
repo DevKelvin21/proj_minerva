@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
 import { buildSuggestionBlock, insertSuggestion } from '../../lib/suggestions'
@@ -80,11 +81,11 @@ export function CommentComposer({
       const start = textarea?.selectionStart ?? draft.length
       const end = textarea?.selectionEnd ?? draft.length
       const { text, caret } = insertSuggestion(draft, buildSuggestionBlock(lines), start, end)
-      setDraft(text)
-      requestAnimationFrame(() => {
-        textareaRef.current?.focus()
-        textareaRef.current?.setSelectionRange(caret, caret)
-      })
+      // Commit the text and place the caret in the same task: a deferred
+      // (rAF) caret move could land after the user's next keystrokes.
+      flushSync(() => setDraft(text))
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(caret, caret)
     } catch (err: unknown) {
       setError(t('comments.composer.suggestionLoadError', { error: toErrorMessage(err) }))
     } finally {
