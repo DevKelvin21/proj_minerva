@@ -112,8 +112,7 @@ export interface PullRequestDetail extends PullRequestSummary {
 }
 
 export type RetargetResult =
-  | { outcome: 'retargeted'; pr: PullRequestSummary }
-  | { outcome: 'cancelled' }
+  { outcome: 'retargeted'; pr: PullRequestSummary } | { outcome: 'cancelled' }
 
 export type DiffFileStatus = 'added' | 'modified' | 'removed' | 'renamed'
 
