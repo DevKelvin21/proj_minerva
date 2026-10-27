@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MessageSquareWarning } from 'lucide-react'
 import type { CommentThread, DiffFile, RepoRef } from '../../../../shared/types'
 import type { DiffViewMode } from '../../stores/app-store'
@@ -74,6 +75,7 @@ export function DiffView({
   reloadThreads,
   fileTreeToggle,
 }: DiffViewProps): React.JSX.Element {
+  const { t } = useTranslation()
   const actions = useThreadActions()
   const { ref, width } = useElementWidth<HTMLElement>()
   const splitTooNarrow = width !== null && width < SPLIT_DIFF_MIN_WIDTH
@@ -214,10 +216,10 @@ export function DiffView({
         <p className="flex items-center gap-1.5 text-xs text-muted">
           <MessageSquareWarning size={13} className="shrink-0" />
           {placingThreads
-            ? `Loading the code around ${unplaced.length} ${unplaced.length === 1 ? 'comment' : 'comments'}…`
+            ? t('prDetail.diff.loadingUnplaced', { count: unplaced.length })
             : head.status === 'error'
-              ? `Could not load the file to show these comments in place (${head.error}). Each one shows the code it refers to.`
-              : `${unplaced.length} ${unplaced.length === 1 ? 'comment is' : 'comments are'} not on a line this diff shows.`}
+              ? t('prDetail.diff.unplacedLoadError', { error: head.error })
+              : t('prDetail.diff.unplaced', { count: unplaced.length })}
         </p>
         {!placingThreads &&
           unplaced.map((thread) => (
@@ -242,7 +244,11 @@ export function DiffView({
     expander: {
       loading: head.status === 'loading',
       error:
-        head.status === 'error' ? head.error : head.status === 'unavailable' ? head.reason : null,
+        head.status === 'error'
+          ? head.error
+          : head.status === 'unavailable'
+            ? t(`prDetail.fileContent.${head.reason}`)
+            : null,
       onExpand: handleExpand,
     },
     onCreateThread: handleCreateThread,
@@ -265,7 +271,7 @@ export function DiffView({
         {!hasDiff ? (
           <>
             <p className="p-4 text-sm text-muted" data-patch-omitted={file.patchOmitted}>
-              {file.isBinary ? 'No preview available.' : noPatchMessage(file.patchOmitted)}
+              {file.isBinary ? t('prDetail.diff.noPreview') : noPatchMessage(file.patchOmitted, t)}
             </p>
             {unplacedBlock}
           </>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ArrowRight, LoaderCircle } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import type { RepoRef } from '../../../../shared/scm'
 import { useRetarget } from '../../hooks/use-retarget'
 import { validateBranchName } from '../../lib/retarget'
@@ -57,20 +58,28 @@ function Consequence({
   to: string
   parentNumber?: number
 }): React.JSX.Element {
+  const { t } = useTranslation()
+  const branch = <span className="font-mono text-text" />
   return (
     <div className="flex min-w-0 flex-col gap-1 text-xs text-muted">
       <p className="flex min-w-0 flex-wrap items-center gap-1">
-        <span>Target branch:</span>
+        <span>{t('stacks.retarget.targetBranch')}</span>
         <BaseChange from={from} to={to} />
       </p>
       <p>
-        The diff will be recomputed against <span className="font-mono text-text">{to}</span>
-        {parentNumber !== undefined
-          ? ', so the changes that already landed through #' +
-            parentNumber +
-            ' drop out and only this PR’s own work is left.'
-          : '. Files and line comments may shift.'}{' '}
-        Minerva asks you to confirm before writing.
+        {parentNumber !== undefined ? (
+          <Trans
+            i18nKey="stacks.retarget.consequenceOrphan"
+            values={{ branch: to, parent: parentNumber }}
+            components={{ branch }}
+          />
+        ) : (
+          <Trans
+            i18nKey="stacks.retarget.consequenceManual"
+            values={{ branch: to }}
+            components={{ branch }}
+          />
+        )}
       </p>
     </div>
   )
@@ -92,6 +101,7 @@ export function RetargetPanel({
   onClose,
   onRetargeted,
 }: RetargetPanelProps): React.JSX.Element {
+  const { t } = useTranslation()
   const { state, retarget, reset } = useRetarget(repo, number)
   const [previewing, setPreviewing] = useState(mode.kind === 'manual')
   const [draft, setDraft] = useState(currentBase)
@@ -124,8 +134,13 @@ export function RetargetPanel({
     return (
       <p role="status" className="flex items-center gap-1.5 text-xs text-muted">
         <LoaderCircle size={12} className="animate-spin" aria-hidden />
-        Waiting for your confirmation… then retargeting to{' '}
-        <span className="font-mono text-text">{state.newBase}</span>
+        <span>
+          <Trans
+            i18nKey="stacks.retarget.waiting"
+            values={{ branch: state.newBase }}
+            components={{ branch: <span className="font-mono text-text" /> }}
+          />
+        </span>
       </p>
     )
   }
@@ -138,12 +153,16 @@ export function RetargetPanel({
         data-error-code={failure.code ?? 'UNKNOWN'}
         className="flex min-w-0 flex-col gap-1.5 rounded-md border border-danger/40 bg-danger/10 p-2 text-xs"
       >
-        <p className="font-medium text-danger">Could not retarget #{number}.</p>
-        <p className="text-text/80">{failure.explanation}</p>
+        <p className="font-medium text-danger">
+          {t('stacks.retarget.couldNotRetarget', { number })}
+        </p>
+        <p className="text-text/80">
+          {t(`stacks.retarget.failures.${failure.reason}`, { branch: failure.newBase })}
+        </p>
         {failure.detail && <p className="break-words text-muted">{failure.detail}</p>}
         <div className="flex gap-1.5">
           <button type="button" onClick={close} className={ghostButton}>
-            Dismiss
+            {t('stacks.retarget.dismiss')}
           </button>
         </div>
       </div>
@@ -157,7 +176,7 @@ export function RetargetPanel({
         onClick={() => setPreviewing(true)}
         className={primaryButton + ' self-start'}
       >
-        Retarget to {mode.suggestedBase}
+        {t('stacks.retarget.retargetTo', { branch: mode.suggestedBase })}
       </button>
     )
   }
@@ -168,10 +187,10 @@ export function RetargetPanel({
         <Consequence from={currentBase} to={mode.suggestedBase} parentNumber={mode.parentNumber} />
         <div className="flex flex-wrap gap-1.5">
           <button type="button" onClick={() => void submit()} className={primaryButton}>
-            Retarget #{number}
+            {t('stacks.retarget.retargetNumber', { number })}
           </button>
           <button type="button" onClick={close} className={ghostButton}>
-            Cancel
+            {t('stacks.retarget.cancel')}
           </button>
         </div>
       </div>
@@ -179,14 +198,14 @@ export function RetargetPanel({
   }
 
   const problem = !target.ok
-    ? target.reason
+    ? t(`stacks.retarget.branchProblems.${target.reason}`)
     : isOwnHead
-      ? 'A pull request cannot target its own source branch.'
+      ? t('stacks.retarget.ownHead')
       : null
 
   return (
     <form
-      aria-label="Change target branch"
+      aria-label={t('stacks.retarget.formAriaLabel')}
       onSubmit={(event) => {
         event.preventDefault()
         void submit()
@@ -194,7 +213,7 @@ export function RetargetPanel({
       className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-bg/60 p-2"
     >
       <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
-        New target branch
+        {t('stacks.retarget.newTargetBranch')}
         <input
           autoFocus
           value={draft}
@@ -215,14 +234,14 @@ export function RetargetPanel({
       ) : target.ok && !sameAsCurrent ? (
         <Consequence from={currentBase} to={target.branch} />
       ) : (
-        <p className="text-xs text-muted">Type the branch this PR should merge into.</p>
+        <p className="text-xs text-muted">{t('stacks.retarget.typeBranch')}</p>
       )}
       <div className="flex flex-wrap gap-1.5">
         <button type="submit" disabled={!canSubmit} className={accentButton}>
-          Retarget
+          {t('stacks.retarget.retarget')}
         </button>
         <button type="button" onClick={close} className={ghostButton}>
-          Cancel
+          {t('stacks.retarget.cancel')}
         </button>
       </div>
     </form>

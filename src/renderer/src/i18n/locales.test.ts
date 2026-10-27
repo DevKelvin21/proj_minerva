@@ -4,7 +4,9 @@ import { en } from './locales/en'
 import { es } from './locales/es'
 
 function valueAt(table: object, key: string): string {
-  return key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], table) as string
+  return key
+    .split('.')
+    .reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], table) as string
 }
 
 const placeholders = (text: string): string[] =>

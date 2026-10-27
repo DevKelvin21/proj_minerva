@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   AlertTriangle,
   BookOpen,
@@ -6,6 +8,7 @@ import {
   Cloud,
   Database,
   Globe,
+  Languages,
   Loader2,
   RefreshCw,
   Rocket,
@@ -13,7 +16,8 @@ import {
 import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
 import { useProviderStatus } from '../../hooks/use-provider-status'
 import { useScmSettings } from '../../hooks/use-scm-settings'
-import { isAnalysisStale } from '../../lib/staleness'
+import { isAnalysisLanguageMismatch, isAnalysisStale } from '../../lib/staleness'
+import { useLocale } from '../../i18n/use-locale'
 import { DidacticSectionCard } from './DidacticSectionCard'
 import { Markdown } from '../ui/Markdown'
 import { MermaidDiagram } from './MermaidDiagram'
@@ -27,13 +31,21 @@ import { ResourceViewer, type ViewerResource } from './ResourceViewer'
 import type { DidacticSection, RepoRef } from '../../../../shared/types'
 import type { DraftDidacticSection } from '../../../../shared/events'
 
-const SECTION_META: Record<DidacticSection['kind'], { title: string; icon: React.JSX.Element }> = {
-  summary: { title: 'Resumen', icon: <BookOpen size={16} /> },
-  setup: { title: 'Cómo levantar la app', icon: <Rocket size={16} /> },
-  architecture: { title: 'Arquitectura', icon: <Building2 size={16} /> },
-  endpoint: { title: 'Endpoint', icon: <Globe size={16} /> },
-  schema: { title: 'Esquema', icon: <Database size={16} /> },
-  cloud: { title: 'Infraestructura cloud', icon: <Cloud size={16} /> },
+const SECTION_ICON: Record<DidacticSection['kind'], React.JSX.Element> = {
+  summary: <BookOpen size={16} />,
+  setup: <Rocket size={16} />,
+  architecture: <Building2 size={16} />,
+  endpoint: <Globe size={16} />,
+  schema: <Database size={16} />,
+  cloud: <Cloud size={16} />,
+}
+
+/** Icon + translated title of a section kind (`didactic.sections.*`). */
+function sectionMeta(
+  kind: DidacticSection['kind'],
+  t: TFunction,
+): { title: string; icon: React.JSX.Element } {
+  return { title: t(`didactic.sections.${kind}`), icon: SECTION_ICON[kind] }
 }
 
 /**
@@ -45,17 +57,20 @@ const SECTION_META: Record<DidacticSection['kind'], { title: string; icon: React
  * genérico "Diagrama N" evita que un desvío del modelo deje un diagrama sin
  * rótulo en vez de romper el render.
  */
-function cloudDiagramSubtitle(index: number): string {
-  if (index === 0) return 'Sistema completo'
-  if (index === 1) return 'Dónde incide este PR'
-  return `Diagrama ${index + 1}`
+function cloudDiagramSubtitle(index: number, t: TFunction): string {
+  if (index === 0) return t('didactic.cloudDiagram.fullSystem')
+  if (index === 1) return t('didactic.cloudDiagram.prImpact')
+  return t('didactic.cloudDiagram.numbered', { number: index + 1 })
 }
+
+/** Glyph, not text: nothing to translate. */
+const STREAMING_CURSOR_GLYPH = '▍'
 
 /** Cursor sutil que marca "esta sección todavía está recibiendo texto" (T13). */
 function StreamingCursor(): React.JSX.Element {
   return (
     <span aria-hidden className="inline-block animate-pulse text-sm leading-none text-accent">
-      ▍
+      {STREAMING_CURSOR_GLYPH}
     </span>
   )
 }
@@ -78,15 +93,22 @@ function renderCloudDiagrams(
   mermaids: string[],
   sectionTitle: string,
   onExpand: (resource: ViewerResource) => void,
+  t: TFunction,
 ): React.JSX.Element[] {
   return mermaids.map((mermaid, i) => {
-    const subtitle = cloudDiagramSubtitle(i)
+    const subtitle = cloudDiagramSubtitle(i, t)
     return (
       <div key={i} className="flex flex-col gap-1.5">
         <p className="text-xs font-medium text-muted">{subtitle}</p>
         <ExpandableResource
-          label="Expandir diagrama"
-          onExpand={() => onExpand({ kind: 'mermaid', title: sectionTitle + ' — ' + subtitle, code: mermaid })}
+          label={t('didactic.resources.expandDiagram')}
+          onExpand={() =>
+            onExpand({
+              kind: 'mermaid',
+              title: t('didactic.resources.diagramTitle', { section: sectionTitle, diagram: subtitle }),
+              code: mermaid,
+            })
+          }
         >
           <MermaidDiagram code={mermaid} />
         </ExpandableResource>
@@ -99,8 +121,9 @@ function renderSection(
   section: DidacticSection,
   key: number,
   onExpand: (resource: ViewerResource) => void,
+  t: TFunction,
 ): React.JSX.Element {
-  const meta = SECTION_META[section.kind]
+  const meta = sectionMeta(section.kind, t)
 
   return (
     <DidacticSectionCard
@@ -110,7 +133,7 @@ function renderSection(
       onExpandMarkdown={() =>
         onExpand({
           kind: 'markdown',
-          title: meta.title + ' — vista amplia',
+          title: t('didactic.resources.wideViewTitle', { title: meta.title }),
           markdown: section.markdown,
         })
       }
@@ -118,13 +141,13 @@ function renderSection(
       <Markdown content={section.markdown} />
       {(section.kind === 'architecture' || section.kind === 'schema') && (
         <ExpandableResource
-          label="Expandir diagrama"
+          label={t('didactic.resources.expandDiagram')}
           onExpand={() => onExpand({ kind: 'mermaid', title: meta.title, code: section.mermaid })}
         >
           <MermaidDiagram key={section.mermaid} code={section.mermaid} />
         </ExpandableResource>
       )}
-      {section.kind === 'cloud' && renderCloudDiagrams(section.mermaids, meta.title, onExpand)}
+      {section.kind === 'cloud' && renderCloudDiagrams(section.mermaids, meta.title, onExpand, t)}
       {(section.kind === 'endpoint' || section.kind === 'setup') &&
         section.snippets.map((snippet, i) => (
           <CodeSnippet
@@ -155,8 +178,9 @@ function renderDraftSection(
   section: DraftDidacticSection,
   key: number,
   onExpand: (resource: ViewerResource) => void,
+  t: TFunction,
 ): React.JSX.Element {
-  const meta = SECTION_META[section.kind]
+  const meta = sectionMeta(section.kind, t)
 
   return (
     <DidacticSectionCard
@@ -166,7 +190,7 @@ function renderDraftSection(
       onExpandMarkdown={() =>
         onExpand({
           kind: 'markdown',
-          title: meta.title + ' — vista amplia',
+          title: t('didactic.resources.wideViewTitle', { title: meta.title }),
           markdown: section.markdown,
         })
       }
@@ -175,7 +199,7 @@ function renderDraftSection(
       {section.streaming && <StreamingCursor />}
       {(section.kind === 'architecture' || section.kind === 'schema') && section.mermaid && (
         <ExpandableResource
-          label="Expandir diagrama"
+          label={t('didactic.resources.expandDiagram')}
           onExpand={() => {
             if (section.mermaid)
               onExpand({ kind: 'mermaid', title: meta.title, code: section.mermaid })
@@ -185,7 +209,7 @@ function renderDraftSection(
         </ExpandableResource>
       )}
       {section.kind === 'cloud' &&
-        renderCloudDiagrams(section.mermaids ?? [], meta.title, onExpand)}
+        renderCloudDiagrams(section.mermaids ?? [], meta.title, onExpand, t)}
       {(section.kind === 'endpoint' || section.kind === 'setup') &&
         section.snippets.map((snippet, i) => (
           <CodeSnippet
@@ -268,6 +292,8 @@ export function DidacticAnalysisArea({
     analyze,
     reanalyze,
   } = useDidacticAnalysis({ repo, number })
+  const { t } = useTranslation()
+  const { locale } = useLocale()
   const [viewerResource, setViewerResource] = useState<ViewerResource | null>(null)
   const providerStatus = useProviderStatus()
   const scmSettings = useScmSettings().info
@@ -287,6 +313,10 @@ export function DidacticAnalysisArea({
   // `currentHeadSha` cambian, sin efectos que "resetear" (T42, ver
   // comentario de la prop `currentHeadSha` arriba).
   const isStale = isAnalysisStale(analysis, currentHeadSha)
+  // Same derive-in-render rule for the language: an analysis written in
+  // another language than the UI (e.g. cached before switching) offers a
+  // regenerate instead of being served as is.
+  const isLanguageMismatch = isAnalysisLanguageMismatch(analysis, locale)
 
   // T60: card "Necesitás al menos un CLI de IA" en vez del placeholder
   // normal cuando los TRES proveedores reportan `unavailable` y la app NO
@@ -303,19 +333,19 @@ export function DidacticAnalysisArea({
   if (error) {
     body = (
       <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm">
-        <p className="mb-2 text-danger">No se pudo analizar el PR: {error}</p>
+        <p className="mb-2 text-danger">{t('didactic.analysis.failed', { error })}</p>
         <button
           type="button"
           onClick={analyze}
           className="rounded-md border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/15"
         >
-          Reintentar
+          {t('common.retry')}
         </button>
       </div>
     )
   } else if (analysis) {
     body = (
-      <>{analysis.sections.map((section, i) => renderSection(section, i, setViewerResource))}</>
+      <>{analysis.sections.map((section, i) => renderSection(section, i, setViewerResource, t))}</>
     )
   } else if (hasStreamedContent && streamingSections) {
     body = (
@@ -330,7 +360,7 @@ export function DidacticAnalysisArea({
             <HarnessActivityLog items={activity} />
           </div>
         )}
-        {streamingSections.map((section, i) => renderDraftSection(section, i, setViewerResource))}
+        {streamingSections.map((section, i) => renderDraftSection(section, i, setViewerResource, t))}
       </>
     )
   } else if (checkingCache || loading || isExploringEmpty) {
@@ -339,10 +369,10 @@ export function DidacticAnalysisArea({
         <div className="flex items-center gap-2 text-sm text-muted">
           <Loader2 size={14} className="animate-spin text-accent" />
           {checkingCache
-            ? 'Buscando un análisis ya hecho…'
+            ? t('didactic.analysis.checkingCache')
             : isExploringEmpty
-              ? 'Explorando el repositorio…'
-              : 'Analizando PR con IA…'}
+              ? t('didactic.analysis.exploring')
+              : t('didactic.analysis.analyzing')}
         </div>
         {/* Mini-log de actividad del harness (F13): qué está haciendo el
             agente sobre el snapshot mientras todavía no hay secciones. */}
@@ -366,11 +396,11 @@ export function DidacticAnalysisArea({
             type="button"
             onClick={reanalyze}
             disabled={loading}
-            title="Descarta el análisis cacheado y vuelve a pedirlo (útil tras cambiar de modelo en Settings)"
+            title={t('didactic.analysis.reanalyzeHint')}
             className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted transition-colors hover:bg-border/60 hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RefreshCw size={12} className={loading ? 'animate-spin' : undefined} />
-            Re-analizar
+            {t('didactic.analysis.reanalyze')}
           </button>
         </div>
       )}
@@ -378,8 +408,10 @@ export function DidacticAnalysisArea({
         <div className="flex items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs">
           <span className="flex items-center gap-2 text-warning">
             <AlertTriangle size={14} className="shrink-0" />
-            Este PR recibió commits nuevos desde que se generó este resumen (
-            {analysis.headSha.slice(0, 7)} → {currentHeadSha.slice(0, 7)}).
+            {t('didactic.analysis.staleNotice', {
+              from: analysis.headSha.slice(0, 7),
+              to: currentHeadSha.slice(0, 7),
+            })}
           </span>
           <button
             type="button"
@@ -387,7 +419,30 @@ export function DidacticAnalysisArea({
             disabled={loading}
             className="shrink-0 rounded-md border border-warning/40 px-2 py-1 font-medium text-warning transition-colors hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Actualizar
+            {t('didactic.analysis.update')}
+          </button>
+        </div>
+      )}
+      {isLanguageMismatch && analysis && (
+        <div
+          data-testid="analysis-language-banner"
+          className="flex items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs"
+        >
+          <span className="flex items-center gap-2 text-warning">
+            <Languages size={14} className="shrink-0" />
+            {t('didactic.analysis.languageMismatch', {
+              analysisLanguage: t(`didactic.languageNames.${analysis.language}`),
+              uiLanguage: t(`didactic.languageNames.${locale}`),
+            })}
+          </span>
+          <button
+            type="button"
+            data-testid="analysis-language-regenerate"
+            onClick={reanalyze}
+            disabled={loading}
+            className="shrink-0 rounded-md border border-warning/40 px-2 py-1 font-medium text-warning transition-colors hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t('didactic.analysis.regenerate')}
           </button>
         </div>
       )}

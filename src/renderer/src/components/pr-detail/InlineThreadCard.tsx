@@ -1,4 +1,5 @@
 import { EyeOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { CommentThread } from '../../../../shared/types'
 import { ThreadCard } from './ThreadCard'
 
@@ -19,6 +20,7 @@ export function InlineThreadCard({
   highlighted,
   onHide,
 }: InlineThreadCardProps): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div id={`thread-${thread.id}`} className="border-y border-border bg-bg px-2 py-2 font-sans">
       <ThreadCard
@@ -29,8 +31,8 @@ export function InlineThreadCard({
           <button
             type="button"
             onClick={onHide}
-            aria-label="Hide comments on this line"
-            title="Hide comments on this line (the gutter icon shows them again)"
+            aria-label={t('comments.line.hideComments')}
+            title={t('comments.line.hideCommentsTitle')}
             className="inline-flex h-5 w-5 items-center justify-center rounded text-muted hover:text-text"
           >
             <EyeOff size={13} />

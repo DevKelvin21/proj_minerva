@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Layers, RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { prKey, type PrStack, type StackNode } from '../../../../shared/scm'
 import type { PullRequestSummary, ScmListError } from '../../../../shared/types'
 import { useOpenPr } from '../../hooks/use-open-pr'
@@ -26,6 +27,7 @@ interface StacksViewProps {
 }
 
 function ProviderErrors({ errors }: { errors: ScmListError[] }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-1 border-b border-border p-3">
       {errors.map((providerError) => (
@@ -34,7 +36,10 @@ function ProviderErrors({ errors }: { errors: ScmListError[] }): React.JSX.Eleme
           data-error-code={providerError.code}
           className="text-xs text-danger"
         >
-          {SCM_PROVIDER_LABEL[providerError.provider]}: {providerError.message}
+          {t('stacks.view.providerError', {
+            provider: SCM_PROVIDER_LABEL[providerError.provider],
+            message: providerError.message,
+          })}
         </p>
       ))}
     </div>
@@ -54,9 +59,13 @@ function StackCard({
   pendingKey: string | null
   onOpen: (node: StackNode) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <section
-      aria-label={'Stack in ' + stack.repo.fullName + ' from #' + stack.root.number}
+      aria-label={t('stacks.view.stackAriaLabel', {
+        repo: stack.repo.fullName,
+        number: stack.root.number,
+      })}
       className="min-w-0"
     >
       <header className="flex min-w-0 items-center gap-1.5 px-3 pb-0.5 pt-2 text-[11px] text-muted">
@@ -65,7 +74,7 @@ function StackCard({
           {stack.repo.fullName}
         </span>
         <span className="ml-auto shrink-0">
-          {stack.size} {stack.size === 1 ? 'PR' : 'PRs'}
+          {t('stacks.view.prCount', { count: stack.size })}
         </span>
       </header>
       <ul>
@@ -91,6 +100,7 @@ function GroupBlock({
   pendingKey: string | null
   onOpen: (node: StackNode) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const repoCount = new Set(group.stacks.map((stack) => stack.repo.fullName)).size
   return (
     <div data-stack-group={group.key} className="border-b border-border pb-1 last:border-b-0">
@@ -103,7 +113,7 @@ function GroupBlock({
             </span>
           </span>
           <span className="pl-[18px] text-[11px] text-muted">
-            Same feature across {repoCount} {repoCount === 1 ? 'repo' : 'repos'}
+            {t('stacks.view.sameFeature', { count: repoCount })}
           </span>
         </div>
       )}
@@ -120,6 +130,7 @@ function GroupBlock({
  * orphans explain themselves and offer the retarget in place.
  */
 export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React.JSX.Element {
+  const { t } = useTranslation()
   const { stacks, providerErrors, loading, error, refresh } = useStacks()
   const searchQuery = useAppStore((s) => s.searchQuery)
   const selectedKey = useAppStore((s) =>
@@ -142,12 +153,12 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
 
   let body: React.JSX.Element
   if (error && stacks === null) {
-    body = <p className="p-4 text-sm text-danger">Could not load stacks: {error}</p>
+    body = <p className="p-4 text-sm text-danger">{t('stacks.view.loadFailed', { error })}</p>
   } else if (stacks === null) {
     body = (
       <div className="flex flex-col gap-1 p-4 text-sm text-muted">
-        <p>Loading stacks…</p>
-        <p className="text-xs">This reads every open PR in scope, so it can take a few seconds.</p>
+        <p>{t('stacks.view.loading')}</p>
+        <p className="text-xs">{t('stacks.view.loadingHint')}</p>
       </div>
     )
   } else if (visible.length === 0) {
@@ -155,16 +166,13 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
       stacks.length > 0 ? (
         <p className="p-4 text-sm text-muted">
           {searchQuery.trim()
-            ? 'No stacks match "' + searchQuery + '".'
-            : 'None of your pull requests is in a stack.'}
+            ? t('stacks.view.noMatch', { query: searchQuery })
+            : t('stacks.view.noneMine')}
         </p>
       ) : (
         <div className="flex flex-col gap-2 p-4 text-sm text-muted">
-          <p>No stacked pull requests.</p>
-          <p className="text-xs">
-            A stack appears when a PR targets another open PR’s branch, or when a PR still targets
-            the branch of a PR that was already completed.
-          </p>
+          <p>{t('stacks.view.empty')}</p>
+          <p className="text-xs">{t('stacks.view.emptyHint')}</p>
         </div>
       )
   } else {
@@ -191,29 +199,29 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
           type="button"
           aria-pressed={mineOnly}
           onClick={() => setMineOnly((value) => !value)}
-          title="Only stacks that contain a PR from your pull request list"
+          title={t('stacks.view.mineOnlyTitle')}
           className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors duration-150 ${
             mineOnly
               ? 'border-accent/40 bg-accent/15 text-accent'
               : 'border-border text-muted hover:text-text'
           }`}
         >
-          Mine only
+          {t('stacks.view.mineOnly')}
         </button>
         {orphanCount > 0 && (
-          <span className="min-w-0 truncate text-xs text-warning">{orphanCount} orphaned</span>
+          <span className="min-w-0 truncate text-xs text-warning">{t('stacks.view.orphaned', { count: orphanCount })}
+          </span>
         )}
         <IconButton
           icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
-          label="Refresh stacks"
+          label={t('stacks.view.refresh')}
           onClick={refresh}
           disabled={loading}
           className="ml-auto"
         />
       </div>
       <p className="border-b border-border px-3 py-2 text-[11px] leading-snug text-muted">
-        Each PR targets the branch of the one above it. Review from the top down: a child’s diff
-        only shows what it adds on top of its parent.
+        {t('stacks.view.intro')}
       </p>
       <RetargetNote
         onOpenPr={onSelectPr}
@@ -222,7 +230,7 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
       />
       {error && stacks !== null && (
         <p className="border-b border-border px-3 py-2 text-xs text-danger">
-          Refresh failed: {error}
+          {t('stacks.view.refreshFailed', { error })}
         </p>
       )}
       {openError && (

@@ -65,6 +65,8 @@ export default tseslint.config(
               'Minerva',
               'GitHub',
               'Azure DevOps',
+              // Decorative emoji (the defaults this list replaces included them).
+              /^[\p{Extended_Pictographic}\s]+$/u,
             ],
           },
         },

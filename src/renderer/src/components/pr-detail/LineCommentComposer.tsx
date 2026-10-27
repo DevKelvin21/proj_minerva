@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { SuggestionSource } from './CommentComposer'
 import { CommentComposer } from './CommentComposer'
 
@@ -21,20 +22,25 @@ export function LineCommentComposer({
   onSubmit,
   onCancel,
 }: LineCommentComposerProps): React.JSX.Element {
+  const { t } = useTranslation()
   const suggestion: SuggestionSource =
     side === 'RIGHT'
       ? { kind: 'lines', load: async () => [lineContent] }
       : {
           kind: 'disabled',
-          reason: 'Suggestions change the new version of the file; this line is on the old one.',
+          reason: t('comments.line.suggestionOldSide'),
         }
   return (
     <div className="border-y border-border bg-bg px-2 py-2 font-sans">
       <CommentComposer
         autoFocus
-        label={`Comment on line ${line}`}
-        placeholder={`Comment on line ${line}${side === 'LEFT' ? ' (old version)' : ''}…`}
-        submitLabel="Comment"
+        label={t('comments.line.commentOnLine', { line })}
+        placeholder={
+          side === 'LEFT'
+            ? t('comments.line.placeholderOld', { line })
+            : t('comments.line.placeholder', { line })
+        }
+        submitLabel={t('comments.line.submit')}
         suggestion={suggestion}
         onSubmit={onSubmit}
         onCancel={onCancel}

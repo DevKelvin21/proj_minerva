@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { ExternalLink, GraduationCap, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { clampDidacticWidth, DIDACTIC_PANEL_DEFAULT_WIDTH } from '../../lib/layout'
@@ -38,6 +39,7 @@ import { DidacticPlaceholder } from '../didactic/DidacticPlaceholder'
  * doble click en el handle vuelve al ancho por defecto.
  */
 export function DidacticPanel(): React.JSX.Element {
+  const { t } = useTranslation()
   const didacticPanelOpen = useAppStore((s) => s.didacticPanelOpen)
   const toggleDidacticPanel = useAppStore((s) => s.toggleDidacticPanel)
   const selectedPr = useAppStore((s) => s.selectedPr)
@@ -58,7 +60,7 @@ export function DidacticPanel(): React.JSX.Element {
       <aside className="flex w-10 shrink-0 flex-col items-center border-l border-border bg-panel py-3">
         <IconButton
           icon={<GraduationCap size={16} />}
-          label="Abrir panel didáctico"
+          label={t('didactic.panel.open')}
           onClick={toggleDidacticPanel}
         />
       </aside>
@@ -92,8 +94,8 @@ export function DidacticPanel(): React.JSX.Element {
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Redimensionar panel didáctico"
-          title="Arrastrar para redimensionar; doble click restaura el ancho por defecto"
+          aria-label={t('didactic.panel.resize')}
+          title={t('didactic.panel.resizeHint')}
           className="absolute inset-y-0 -left-[3px] z-10 w-1.5 cursor-col-resize touch-none hover:bg-accent/50 active:bg-accent/70"
           onPointerDown={(e) => {
             e.preventDefault()
@@ -111,13 +113,13 @@ export function DidacticPanel(): React.JSX.Element {
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-sm font-semibold text-text">
             <GraduationCap size={16} className="text-accent" />
-            Panel didáctico
+            {t('didactic.panel.title')}
           </span>
           <div className="flex items-center gap-1">
             {selectedPr && (
               <IconButton
                 icon={<ExternalLink size={16} />}
-                label="Abrir en ventana"
+                label={t('didactic.panel.openInWindow')}
                 onClick={() => {
                   void window.minerva.window.openDidactic({
                     repo: selectedPr.repo,
@@ -130,7 +132,7 @@ export function DidacticPanel(): React.JSX.Element {
             )}
             <IconButton
               icon={<X size={16} />}
-              label="Cerrar panel didáctico"
+              label={t('didactic.panel.close')}
               onClick={toggleDidacticPanel}
             />
           </div>

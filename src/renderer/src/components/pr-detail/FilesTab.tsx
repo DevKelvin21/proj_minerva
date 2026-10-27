@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { TriangleAlert } from 'lucide-react'
 import { useElementWidth } from '../../hooks/use-element-width'
 import { FILE_TREE_COLUMN_MIN_WIDTH } from '../../lib/layout'
@@ -47,6 +48,7 @@ export function FilesTab({
   threads,
   reloadThreads,
 }: FilesTabProps): React.JSX.Element {
+  const { t } = useTranslation()
   const { ref, width } = useElementWidth<HTMLDivElement>()
   const [treeOpen, setTreeOpen] = useState(false)
 
@@ -72,15 +74,15 @@ export function FilesTab({
   const treeIsDrawer = width !== null && width < FILE_TREE_COLUMN_MIN_WIDTH
 
   if (error) {
-    return <p className="p-4 text-sm text-danger">Could not load the files: {error}</p>
+    return <p className="p-4 text-sm text-danger">{t('prDetail.files.loadError', { error })}</p>
   }
 
   if (loading) {
-    return <p className="p-4 text-sm text-muted">Loading files…</p>
+    return <p className="p-4 text-sm text-muted">{t('prDetail.files.loading')}</p>
   }
 
   if (files.length === 0) {
-    return <p className="p-4 text-sm text-muted">This pull request has no changed files.</p>
+    return <p className="p-4 text-sm text-muted">{t('prDetail.files.empty')}</p>
   }
 
   const selectedFile = files.find((f) => f.path === selectedFilePath) ?? files[0]
@@ -110,7 +112,7 @@ export function FilesTab({
           className="flex shrink-0 items-start gap-2 border-b border-border bg-warning/10 px-3 py-1.5 text-xs text-warning"
         >
           <TriangleAlert size={13} className="mt-0.5 shrink-0" />
-          {truncatedFilesMessage(files.length, changedFiles, repo.provider)}
+          {truncatedFilesMessage(files.length, changedFiles, repo.provider, t)}
         </p>
       )}
       <div ref={ref} className="relative flex min-h-0 flex-1">

@@ -1,4 +1,5 @@
 import { GitPullRequest, GitPullRequestDraft, LoaderCircle, TriangleAlert } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { StackNode } from '../../../../shared/scm'
 import { orphanExplanation } from '../../lib/stacks'
 import { RetargetPanel } from './RetargetPanel'
@@ -6,6 +7,8 @@ import { RetargetPanel } from './RetargetPanel'
 /** Indent per level, capped so a deep stack still fits a 240px column. */
 const INDENT_PX = 12
 const MAX_INDENT_LEVELS = 4
+/** Box-drawing elbow before a child row (decoration, not text). */
+const TREE_BRANCH_GLYPH = '└'
 
 export function StackStateIcon({
   isDraft,
@@ -14,29 +17,36 @@ export function StackStateIcon({
   isDraft: boolean
   size?: number
 }): React.JSX.Element {
+  const { t } = useTranslation()
   return isDraft ? (
-    <GitPullRequestDraft size={size} className="shrink-0 text-muted" aria-label="Draft" />
+    <GitPullRequestDraft
+      size={size}
+      className="shrink-0 text-muted"
+      aria-label={t('stacks.tree.draft')}
+    />
   ) : (
-    <GitPullRequest size={size} className="shrink-0 text-accent" aria-label="Open" />
+    <GitPullRequest size={size} className="shrink-0 text-accent" aria-label={t('stacks.tree.open')} />
   )
 }
 
 /** Warning chip for an orphaned PR. */
 export function OrphanBadge(): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <span
       data-orphan-badge
       className="inline-flex shrink-0 items-center gap-0.5 rounded border border-warning/50 bg-warning/10 px-1 text-[10px] font-medium text-warning"
     >
       <TriangleAlert size={10} aria-hidden />
-      Orphaned
+      {t('stacks.tree.orphaned')}
     </span>
   )
 }
 
 /** The orphan's explanation plus the one-click retarget, shared by the tree and the PR header. */
 export function OrphanNotice({ node }: { node: StackNode }): React.JSX.Element | null {
-  const explanation = orphanExplanation(node)
+  const { t } = useTranslation()
+  const explanation = orphanExplanation(t, node)
   if (!node.orphan || !explanation) return null
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
@@ -82,6 +92,7 @@ export function StackTree({
   pendingKey,
   onOpen,
 }: StackTreeProps): React.JSX.Element {
+  const { t } = useTranslation()
   const isSelected = selectedKey === node.prKey
   const indent = 8 + Math.min(depth, MAX_INDENT_LEVELS) * INDENT_PX
 
@@ -100,7 +111,7 @@ export function StackTree({
         <span className="flex min-w-0 items-center gap-1.5">
           {depth > 0 && (
             <span className="shrink-0 text-muted/60" aria-hidden>
-              └
+              {TREE_BRANCH_GLYPH}
             </span>
           )}
           {pendingKey === node.prKey ? (
@@ -115,8 +126,8 @@ export function StackTree({
           {mineKeys.has(node.prKey) && (
             <span
               className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
-              title="In your pull request list"
-              aria-label="In your pull request list"
+              title={t('stacks.tree.inYourList')}
+              aria-label={t('stacks.tree.inYourList')}
             />
           )}
         </span>
@@ -125,7 +136,9 @@ export function StackTree({
             {node.headRef} → {node.baseRef}
           </span>
           {node.isDraft && (
-            <span className="shrink-0 rounded border border-border px-1 text-[10px]">draft</span>
+            <span className="shrink-0 rounded border border-border px-1 text-[10px]">
+              {t('stacks.tree.draftChip')}
+            </span>
           )}
           {node.orphan && <OrphanBadge />}
         </span>

@@ -1,16 +1,12 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { findModelInList, type AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
 import { useProviderModels } from '../../hooks/use-provider-models'
 import { Badge } from '../ui/Badge'
 import { ModelOptionPicker } from './ModelOptionPicker'
 import { CliLoginGuide } from './CliLoginGuide'
-
-/** Placeholder del campo "Otro (avanzado)" por proveedor con id libre habilitado (T57: OpenCode; T59: único que queda tras eliminar OpenRouter). */
-const CUSTOM_MODEL_PLACEHOLDER: Partial<Record<AiProviderId, string>> = {
-  opencode: 'slug <provider>/<modelo> de tu opencode, p. ej. anthropic/claude-sonnet-5',
-}
 
 interface ProviderModelPanelProps {
   info: AiSettingsInfo
@@ -61,6 +57,7 @@ export function ProviderModelPanel({
   setModelOption,
   wide = false,
 }: ProviderModelPanelProps): React.JSX.Element {
+  const { t } = useTranslation()
   const fallbackModels = info.catalog[viewedProvider].models
   const { models, error: modelsError } = useProviderModels(viewedProvider, fallbackModels)
 
@@ -96,7 +93,7 @@ export function ProviderModelPanel({
     }
 
     setActivating(null)
-    if (!ok) setActivateError('No se pudo activar el modelo. Probá de nuevo.')
+    if (!ok) setActivateError(t('settings.models.activateError'))
   }
 
   return (
@@ -107,13 +104,12 @@ export function ProviderModelPanel({
       className="p-4"
     >
       <p className="mb-3 text-xs text-muted">
-        Elegí el modelo que analiza los Pull Requests. Al elegirlo, {info.catalog[viewedProvider].label} pasa a
-        ser el proveedor activo.
+        {t('settings.models.intro', { provider: info.catalog[viewedProvider].label })}
       </p>
 
       {modelsError && (
         <p className="mb-2 text-xs text-muted">
-          No se pudo actualizar la lista de modelos ({modelsError}); mostrando el catálogo curado.
+          {t('settings.models.refreshFailed', { error: modelsError })}
         </p>
       )}
 
@@ -146,7 +142,7 @@ export function ProviderModelPanel({
               {isThisActivating ? (
                 <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-muted" />
               ) : isModelActive ? (
-                <Badge tone="success">Activo</Badge>
+                <Badge tone="success">{t('settings.models.active')}</Badge>
               ) : null}
             </button>
           )
@@ -161,8 +157,8 @@ export function ProviderModelPanel({
             }`}
           >
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-sm text-text">Otro (avanzado)</span>
-              {customIsActive && <Badge tone="success">Activo</Badge>}
+              <span className="text-sm text-text">{t('settings.models.custom')}</span>
+              {customIsActive && <Badge tone="success">{t('settings.models.active')}</Badge>}
             </div>
             <div className="flex gap-1.5">
               <input
@@ -173,7 +169,9 @@ export function ProviderModelPanel({
                   if (event.key === 'Enter') void activate(customValue)
                 }}
                 disabled={anyActivating}
-                placeholder={CUSTOM_MODEL_PLACEHOLDER[viewedProvider] ?? ''}
+                placeholder={
+                  viewedProvider === 'opencode' ? t('settings.models.customPlaceholderOpencode') : ''
+                }
                 maxLength={100}
                 className="w-full rounded-md border border-border bg-bg px-2 py-1 font-mono text-xs text-text placeholder:text-muted focus:border-accent disabled:opacity-60"
               />
@@ -188,7 +186,7 @@ export function ProviderModelPanel({
                 }
               >
                 {activating === customValue.trim() && <Loader2 size={13} className="animate-spin" />}
-                Usar
+                {t('settings.models.use')}
               </button>
             </div>
           </div>
@@ -209,7 +207,7 @@ export function ProviderModelPanel({
           />
         )
       ) : (
-        <p className="mt-3 text-[11px] text-muted">El razonamiento se configura sobre el modelo activo.</p>
+        <p className="mt-3 text-[11px] text-muted">{t('settings.models.reasoningOnActive')}</p>
       )}
 
       <CliLoginGuide

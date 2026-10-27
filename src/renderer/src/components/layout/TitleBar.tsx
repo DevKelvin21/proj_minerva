@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { GraduationCap, PanelLeft, Search, Settings, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useConnectionStatus } from '../../hooks/use-connection-status'
 import { useScmAuth } from '../../hooks/use-scm-auth'
@@ -40,6 +41,7 @@ import { Badge } from '../ui/Badge'
  * nunca un banner.
  */
 function SettingsChip({ compact }: { compact: boolean }): React.JSX.Element {
+  const { t } = useTranslation()
   const openSettings = useAppStore((s) => s.openSettings)
   const { info } = useSettings()
   const { status: updaterStatus } = useUpdater()
@@ -50,7 +52,7 @@ function SettingsChip({ compact }: { compact: boolean }): React.JSX.Element {
     <span
       className="pointer-events-none absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-panel"
       aria-hidden
-      title="Hay una actualización disponible"
+      title={t('layout.settingsChip.updateAvailable')}
     />
   ) : null
 
@@ -61,7 +63,11 @@ function SettingsChip({ compact }: { compact: boolean }): React.JSX.Element {
   if (!info || compact) {
     return (
       <span className="relative inline-flex">
-        <IconButton icon={<Settings size={16} />} label="Configuración" onClick={openSettings} />
+        <IconButton
+          icon={<Settings size={16} />}
+          label={t('layout.settingsChip.settings')}
+          onClick={openSettings}
+        />
         {updateDot}
       </span>
     )
@@ -76,14 +82,15 @@ function SettingsChip({ compact }: { compact: boolean }): React.JSX.Element {
     effortValue,
   )
 
-  const title =
-    'Configuración — ' +
-    providerLabel +
-    ' · ' +
-    info.model +
-    (effortLabel ? ' · Razonamiento: ' + effortLabel : '') +
-    ' · origen ' +
-    info.modelSource
+  const source = t(`layout.settingsChip.modelSource.${info.modelSource}`)
+  const title = effortLabel
+    ? t('layout.settingsChip.titleWithEffort', {
+        provider: providerLabel,
+        model: info.model,
+        effort: effortLabel,
+        source,
+      })
+    : t('layout.settingsChip.title', { provider: providerLabel, model: info.model, source })
 
   return (
     <span className="relative inline-flex">
@@ -104,11 +111,8 @@ function SettingsChip({ compact }: { compact: boolean }): React.JSX.Element {
   )
 }
 
-const CONNECTION_LABEL: Record<ReturnType<typeof useConnectionStatus>, string> = {
-  connected: 'Conectado',
-  error: 'Sin conexión',
-  checking: 'Comprobando…',
-}
+/** CLI command shown and copied verbatim (not translated). */
+const GH_LOGIN_COMMAND = 'gh auth login'
 
 /**
  * GitHub auth chip, from `scm:getAuthStatus` (the `gh` token bridge):
@@ -121,6 +125,7 @@ const CONNECTION_LABEL: Record<ReturnType<typeof useConnectionStatus>, string> =
  * Azure DevOps gets its own chip in Phase 2; today it's always `disabled`.
  */
 function AuthControls(): React.JSX.Element | null {
+  const { t } = useTranslation()
   const { statuses } = useScmAuth()
   const openSettings = useAppStore((s) => s.openSettings)
   const status = statuses?.github
@@ -131,10 +136,10 @@ function AuthControls(): React.JSX.Element | null {
     return (
       <div className="flex min-w-0 items-center gap-2 text-xs">
         <span className="max-w-[120px] truncate text-text">{status.user?.login}</span>
-        <Badge tone="neutral">via GitHub CLI</Badge>
+        <Badge tone="neutral">{t('layout.auth.viaGhCli')}</Badge>
         <IconButton
           icon={<Settings size={13} />}
-          label="Access is managed by GitHub CLI; change the account in Settings"
+          label={t('layout.auth.managedByGhCli')}
           onClick={openSettings}
         />
       </div>
@@ -144,13 +149,13 @@ function AuthControls(): React.JSX.Element | null {
   if (status.state === 'cli_unavailable') {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-muted">GitHub CLI not found</span>
+        <span className="text-muted">{t('layout.auth.ghCliNotFound')}</span>
         <button
           type="button"
           onClick={openSettings}
           className="rounded-md border border-border px-2 py-1 text-muted transition-colors duration-150 hover:border-accent hover:text-text"
         >
-          Open settings
+          {t('layout.auth.openSettings')}
         </button>
       </div>
     )
@@ -164,13 +169,13 @@ function AuthControls(): React.JSX.Element | null {
       />
       <button
         type="button"
-        title="Copy command"
-        onClick={() => void navigator.clipboard?.writeText('gh auth login').catch(() => {})}
+        title={t('layout.auth.copyCommand')}
+        onClick={() => void navigator.clipboard?.writeText(GH_LOGIN_COMMAND).catch(() => {})}
         className="rounded-md border border-accent/50 bg-accent/10 px-2 py-1 font-mono text-sm font-semibold text-accent transition-colors duration-150 hover:bg-accent/20"
       >
-        gh auth login
+        {GH_LOGIN_COMMAND}
       </button>
-      <span className="text-muted">Waiting for session…</span>
+      <span className="text-muted">{t('layout.auth.waitingForSession')}</span>
     </div>
   )
 }
@@ -190,6 +195,7 @@ function AuthControls(): React.JSX.Element | null {
  * 12px que en 540px de alto se notan en el contenido de abajo.
  */
 export function TitleBar(): React.JSX.Element {
+  const { t } = useTranslation()
   const searchQuery = useAppStore((s) => s.searchQuery)
   const setSearchQuery = useAppStore((s) => s.setSearchQuery)
   const didacticPanelOpen = useAppStore((s) => s.didacticPanelOpen)
@@ -204,15 +210,16 @@ export function TitleBar(): React.JSX.Element {
   const compact = tier.w === 'md' || tier.w === 'sm'
   const collapseSearch = tier.w === 'sm'
   const showConnectionLabel = tier.w === 'xl'
+  const connectionLabel = t(`layout.titleBar.connection.${connectionStatus}`)
 
   const searchInput = (
     <input
       type="search"
       value={searchQuery}
       onChange={(e) => setSearchQuery(e.target.value)}
-      placeholder="Search by title, repo, branch or #number"
-      aria-label="Search pull requests"
-      title="Search by title, repo, branch or #number"
+      placeholder={t('layout.titleBar.searchPlaceholder')}
+      aria-label={t('layout.titleBar.searchPrs')}
+      title={t('layout.titleBar.searchPlaceholder')}
       className="w-full rounded-md border border-border bg-bg py-1 pl-8 pr-3 text-sm text-text placeholder:text-muted transition-colors duration-150 focus:border-accent"
     />
   )
@@ -226,7 +233,7 @@ export function TitleBar(): React.JSX.Element {
       {showDrawerToggle && (
         <IconButton
           icon={<PanelLeft size={16} />}
-          label="Lista de PRs"
+          label={t('layout.titleBar.prListToggle')}
           active={sidebarOpen}
           onClick={toggleSidebar}
         />
@@ -240,7 +247,7 @@ export function TitleBar(): React.JSX.Element {
       {collapseSearch ? (
         <IconButton
           icon={<Search size={16} />}
-          label="Buscar PRs"
+          label={t('layout.titleBar.searchPrs')}
           active={searchQuery.length > 0}
           onClick={() => setSearchExpanded(true)}
         />
@@ -267,7 +274,7 @@ export function TitleBar(): React.JSX.Element {
           </div>
           <IconButton
             icon={<X size={16} />}
-            label="Cerrar búsqueda"
+            label={t('layout.titleBar.closeSearch')}
             onClick={() => setSearchExpanded(false)}
           />
         </div>
@@ -280,7 +287,7 @@ export function TitleBar(): React.JSX.Element {
 
         <span
           className="flex shrink-0 items-center gap-1.5 text-xs text-muted"
-          title={`Estado de la conexión IPC con el proceso principal: ${CONNECTION_LABEL[connectionStatus]}`}
+          title={t('layout.titleBar.connectionTitle', { status: connectionLabel })}
         >
           <span
             className={`h-1.5 w-1.5 rounded-full ${
@@ -291,12 +298,12 @@ export function TitleBar(): React.JSX.Element {
                   : 'bg-warning'
             }`}
           />
-          {showConnectionLabel && CONNECTION_LABEL[connectionStatus]}
+          {showConnectionLabel && connectionLabel}
         </span>
 
         <IconButton
           icon={<GraduationCap size={16} />}
-          label="Panel didáctico"
+          label={t('layout.titleBar.didacticPanel')}
           active={didacticPanelOpen}
           onClick={toggleDidacticPanel}
         />

@@ -3,12 +3,15 @@ import { loadFileContent, type FileContentKey } from '../lib/file-content-cache'
 import { splitFileLines } from '../lib/expand-context'
 import { prKey } from '../../../shared/scm'
 
+/** Why a file has no lines to show; the component translates it (`prDetail.fileContent.*`). */
+export type FileUnavailableReason = 'binary' | 'tooLarge' | 'noContent'
+
 export type FileLinesState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'ready'; lines: string[] }
   /** Binary, over the size cap, or no text: nothing to show, and that is not an error. */
-  | { status: 'unavailable'; reason: string }
+  | { status: 'unavailable'; reason: FileUnavailableReason }
   | { status: 'error'; error: string }
 
 function toErrorMessage(error: unknown): string {
@@ -35,10 +38,9 @@ export function useFileLines(key: FileContentKey | null): FileLinesState {
       let state: FileLinesState
       try {
         const content = await loadFileContent(key)
-        if (content.isBinary) state = { status: 'unavailable', reason: 'Binary file.' }
-        else if (content.tooLarge)
-          state = { status: 'unavailable', reason: 'File too large to show.' }
-        else if (content.content === null) state = { status: 'unavailable', reason: 'No content.' }
+        if (content.isBinary) state = { status: 'unavailable', reason: 'binary' }
+        else if (content.tooLarge) state = { status: 'unavailable', reason: 'tooLarge' }
+        else if (content.content === null) state = { status: 'unavailable', reason: 'noContent' }
         else state = { status: 'ready', lines: splitFileLines(content.content) }
       } catch (err: unknown) {
         state = { status: 'error', error: toErrorMessage(err) }

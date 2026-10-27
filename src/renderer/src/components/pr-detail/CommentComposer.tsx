@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
 import { buildSuggestionBlock, insertSuggestion } from '../../lib/suggestions'
 
@@ -41,6 +42,7 @@ export function CommentComposer({
   clearOnSubmit = false,
   className = '',
 }: CommentComposerProps): React.JSX.Element {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState('')
   const [posting, setPosting] = useState(false)
   const [inserting, setInserting] = useState(false)
@@ -59,7 +61,7 @@ export function CommentComposer({
         setPosting(false)
       }
     } catch (err: unknown) {
-      setError('Could not post: ' + toErrorMessage(err))
+      setError(t('comments.composer.postError', { error: toErrorMessage(err) }))
       setPosting(false)
     }
   }
@@ -80,7 +82,7 @@ export function CommentComposer({
         textareaRef.current?.setSelectionRange(caret, caret)
       })
     } catch (err: unknown) {
-      setError('Could not load the lines to suggest on: ' + toErrorMessage(err))
+      setError(t('comments.composer.suggestionLoadError', { error: toErrorMessage(err) }))
     } finally {
       setInserting(false)
     }
@@ -121,12 +123,12 @@ export function CommentComposer({
             title={
               suggestion.kind === 'disabled'
                 ? suggestion.reason
-                : 'Insert a suggested change prefilled with the commented line(s)'
+                : t('comments.composer.insertSuggestionTitle')
             }
             className="mr-auto inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Lightbulb size={12} />
-            {inserting ? 'Loading lines…' : 'Insert suggestion'}
+            {inserting ? t('comments.composer.loadingLines') : t('comments.composer.insertSuggestion')}
           </button>
         )}
         {onCancel && (
@@ -136,7 +138,7 @@ export function CommentComposer({
             disabled={posting}
             className="rounded-md px-2.5 py-1 text-xs text-muted hover:text-text"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         )}
         <button
@@ -144,7 +146,7 @@ export function CommentComposer({
           disabled={posting || draft.trim().length === 0}
           className="rounded-md border border-border bg-accent/90 px-2.5 py-1 text-xs font-medium text-bg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
         >
-          {posting ? 'Posting…' : submitLabel}
+          {posting ? t('comments.composer.posting') : submitLabel}
         </button>
       </div>
     </form>

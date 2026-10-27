@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import type { CommentThread, PullRequestDetail } from '../../../../shared/types'
@@ -27,6 +28,7 @@ export function ConversationTab({
   error,
   reload,
 }: ConversationTabProps): React.JSX.Element {
+  const { t } = useTranslation()
   const openLineThread = useAppStore((s) => s.openLineThread)
   const tier = useLayoutTier()
   const [draft, setDraft] = useState('')
@@ -64,22 +66,22 @@ export function ConversationTab({
         <div className="mb-2 flex items-center gap-2 text-xs text-muted">
           <Avatar user={pr.author} size={18} />
           <span className="font-medium text-text">{pr.author.displayName ?? pr.author.login}</span>
-          <span>abrió este PR</span>
+          <span>{t('comments.conversation.openedThisPr')}</span>
         </div>
         <Markdown content={pr.bodyMarkdown} />
       </article>
 
       {error && (
-        <p className="text-sm text-danger">No se pudieron cargar los comentarios: {error}</p>
+        <p className="text-sm text-danger">{t('comments.conversation.loadError', { error })}</p>
       )}
       {!error && loading && threads.length === 0 && (
-        <p className="text-sm text-muted">Cargando comentarios…</p>
+        <p className="text-sm text-muted">{t('comments.conversation.loading')}</p>
       )}
 
       {!error &&
         !(loading && threads.length === 0) &&
         (threads.length === 0 ? (
-          <p className="text-sm text-muted">Todavía no hay comentarios.</p>
+          <p className="text-sm text-muted">{t('comments.conversation.empty')}</p>
         ) : (
           threads.map((thread) => (
             <ThreadCard
@@ -96,7 +98,7 @@ export function ConversationTab({
 
       <form onSubmit={(event) => void handleSubmit(event)} className="flex flex-col gap-2">
         <label htmlFor="new-comment" className="text-xs font-medium text-muted">
-          Comentario general
+          {t('comments.conversation.generalCommentLabel')}
         </label>
         <textarea
           id="new-comment"
@@ -104,16 +106,18 @@ export function ConversationTab({
           onChange={(event) => setDraft(event.target.value)}
           disabled={posting}
           rows={3}
-          placeholder="Escribe un comentario para este PR…"
+          placeholder={t('comments.conversation.placeholder')}
           className="resize-y rounded-md border border-border bg-panel px-3 py-2 text-sm text-text placeholder:text-muted focus:border-accent"
         />
-        {postError && <p className="text-sm text-danger">No se pudo publicar: {postError}</p>}
+        {postError && (
+          <p className="text-sm text-danger">{t('comments.conversation.postError', { error: postError })}</p>
+        )}
         <button
           type="submit"
           disabled={posting || draft.trim().length === 0}
           className="self-end rounded-md border border-border bg-accent/90 px-3 py-1.5 text-sm font-medium text-bg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
         >
-          {posting ? 'Publicando…' : 'Comentar'}
+          {posting ? t('comments.conversation.posting') : t('comments.conversation.submit')}
         </button>
       </form>
     </div>

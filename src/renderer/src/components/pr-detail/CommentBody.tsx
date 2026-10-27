@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
 import { Markdown } from '../ui/Markdown'
 import { diffSuggestion, splitSuggestionBlocks } from '../../lib/suggestions'
@@ -25,6 +26,7 @@ export function SuggestionDiff({
   original,
   outdated = false,
 }: SuggestionDiffProps): React.JSX.Element {
+  const { t } = useTranslation()
   const rows = useMemo(
     () =>
       original
@@ -36,10 +38,10 @@ export function SuggestionDiff({
     <figure data-testid="suggestion-diff" className="overflow-hidden rounded border border-border">
       <figcaption className="flex items-center gap-1.5 border-b border-border bg-panel px-2 py-1 text-xs text-muted">
         <Lightbulb size={12} className="text-warning" />
-        <span className="font-medium text-text">Suggested change</span>
-        {suggested.length === 0 && <span>(remove these lines)</span>}
-        {original === null && <span>· original lines unavailable</span>}
-        {outdated && original !== null && <span>· the code may have changed since</span>}
+        <span className="font-medium text-text">{t('comments.suggestion.title')}</span>
+        {suggested.length === 0 && <span>{t('comments.suggestion.removeLines')}</span>}
+        {original === null && <span>· {t('comments.suggestion.originalUnavailable')}</span>}
+        {outdated && original !== null && <span>· {t('comments.suggestion.mayHaveChanged')}</span>}
       </figcaption>
       <div className="overflow-x-auto bg-code-bg font-mono text-xs leading-5">
         {rows.map((row, i) => (

@@ -1,4 +1,5 @@
 import { CircleCheck, TriangleAlert, X } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
 import { useStacksStore } from '../../stores/stacks-store'
@@ -24,6 +25,7 @@ export function RetargetNote({
   onOpenPr,
   className = '',
 }: RetargetNoteProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const note = useStacksStore((s) => s.lastRetarget)
   const dismiss = useStacksStore((s) => s.dismissRetargetNote)
   if (!note) return null
@@ -35,7 +37,7 @@ export function RetargetNote({
     <button
       type="button"
       onClick={dismiss}
-      aria-label="Dismiss"
+      aria-label={t('stacks.retarget.dismiss')}
       className="shrink-0 text-muted hover:text-text"
     >
       <X size={12} />
@@ -51,8 +53,12 @@ export function RetargetNote({
       >
         <TriangleAlert size={13} className="mt-0.5 shrink-0 text-warning" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-warning">Could not retarget #{note.number}.</p>
-          <p className="text-text/80">{note.failure.explanation}</p>
+          <p className="font-medium text-warning">
+            {t('stacks.retarget.couldNotRetarget', { number: note.number })}
+          </p>
+          <p className="text-text/80">
+            {t(`stacks.retarget.failures.${note.failure.reason}`, { branch: note.failure.newBase })}
+          </p>
           {note.failure.detail && <p className="break-words text-muted">{note.failure.detail}</p>}
         </div>
         {dismissButton}
@@ -68,20 +74,22 @@ export function RetargetNote({
     >
       <CircleCheck size={13} className="mt-0.5 shrink-0 text-success" aria-hidden />
       <p className="min-w-0 flex-1">
-        {onOpenPr ? (
-          <button
-            type="button"
-            onClick={() => onOpenPr(pr)}
-            className="font-medium underline decoration-dotted hover:text-text"
-          >
-            #{pr.number}
-          </button>
-        ) : (
-          <span className="font-medium">#{pr.number}</span>
-        )}{' '}
-        now targets <span className="font-mono">{pr.baseRef}</span> (was{' '}
-        <span className="font-mono">{oldBase}</span>). Its diff is now against{' '}
-        <span className="font-mono">{pr.baseRef}</span>.
+        <Trans
+          i18nKey="stacks.retarget.retargeted"
+          values={{ number: pr.number, base: pr.baseRef, oldBase }}
+          components={{
+            pr: onOpenPr ? (
+              <button
+                type="button"
+                onClick={() => onOpenPr(pr)}
+                className="font-medium underline decoration-dotted hover:text-text"
+              />
+            ) : (
+              <span className="font-medium" />
+            ),
+            branch: <span className="font-mono" />,
+          }}
+        />
       </p>
       {dismissButton}
     </div>

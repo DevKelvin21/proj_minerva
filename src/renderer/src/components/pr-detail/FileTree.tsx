@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FolderTree, List } from 'lucide-react'
 import type { DiffFile } from '../../../../shared/types'
 import type { FileTreeMode } from '../../stores/app-store'
@@ -30,6 +31,7 @@ export function FileTree({
   onSelectFile,
   overlay = false,
 }: FileTreeProps): React.JSX.Element {
+  const { t } = useTranslation()
   const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set())
 
   const tree = useMemo(() => buildFileTree(files), [files])
@@ -57,18 +59,18 @@ export function FileTree({
     >
       <div className="flex shrink-0 items-center justify-between gap-1 border-b border-border px-2 py-1.5">
         <span className="px-1 text-xs font-medium text-muted">
-          {files.length} {files.length === 1 ? 'archivo' : 'archivos'}
+          {t('prDetail.fileTree.fileCount', { count: files.length })}
         </span>
         <div className="flex gap-0.5">
           <IconButton
             icon={<FolderTree size={15} />}
-            label="Vista de árbol"
+            label={t('prDetail.fileTree.treeView')}
             active={mode === 'tree'}
             onClick={() => onModeChange('tree')}
           />
           <IconButton
             icon={<List size={15} />}
-            label="Vista de lista"
+            label={t('prDetail.fileTree.listView')}
             active={mode === 'list'}
             onClick={() => onModeChange('list')}
           />

@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { TFunction } from 'i18next'
 import type { RepoRef, ThreadStatus } from '../../../shared/scm'
 import type { CommentThread } from '../../../shared/types'
 import { loadFileContent, type FileContentKey } from '../lib/file-content-cache'
@@ -66,19 +67,14 @@ export function useThreadFileLines(
 export function suggestionSourceFor(
   actions: ThreadActions,
   anchor: Pick<CommentThread, 'path' | 'line' | 'lineEnd' | 'side'>,
+  t: TFunction,
 ): SuggestionSource {
   const range = threadLineRange(anchor)
   if (!anchor.path || !range) {
-    return {
-      kind: 'disabled',
-      reason: 'Suggestions need a line of code: comment on a line in the Files tab.',
-    }
+    return { kind: 'disabled', reason: t('comments.suggestion.needsLine') }
   }
   if (threadSide(anchor) === 'LEFT') {
-    return {
-      kind: 'disabled',
-      reason: 'Suggestions change the new version of the file; this comment is on the old one.',
-    }
+    return { kind: 'disabled', reason: t('comments.suggestion.oldSideComment') }
   }
   const key = threadFileKey(actions, anchor)
   return {
@@ -87,10 +83,10 @@ export function suggestionSourceFor(
       if (!key) return []
       const content = await loadFileContent(key)
       if (content.content === null || content.isBinary)
-        throw new Error('The file has no text to suggest on.')
+        throw new Error(t('comments.suggestion.noText'))
       const lines = splitFileLines(content.content)
       if (range.start > lines.length)
-        throw new Error('Line ' + range.start + ' is past the end of the file.')
+        throw new Error(t('comments.suggestion.pastEnd', { line: range.start }))
       return lines.slice(range.start - 1, range.end)
     },
   }

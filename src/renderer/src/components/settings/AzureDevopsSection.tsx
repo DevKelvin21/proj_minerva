@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import type { ScmAuthStatus } from '../../../../shared/scm'
 import { isAzureOrganizationName } from '../../../../shared/scm-guards'
 import type { ScmSettingsInfo } from '../../../../shared/types'
@@ -8,12 +9,13 @@ import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 
-const CREDENTIAL_SOURCE_LABEL: Record<NonNullable<ScmAuthStatus['credentialSource']>, string> = {
-  'gh-cli': 'GitHub CLI',
-  'env-pat': 'the AZURE_DEVOPS_EXT_PAT variable',
-  'az-devops-pat': 'the PAT saved by az devops login',
-  'az-entra': 'az login (Microsoft Entra)',
-}
+/** Key of `settings.azure.credentialSource` per credential source. */
+const CREDENTIAL_SOURCE_KEY = {
+  'gh-cli': 'ghCli',
+  'env-pat': 'envPat',
+  'az-devops-pat': 'azDevopsPat',
+  'az-entra': 'azEntra',
+} as const satisfies Record<NonNullable<ScmAuthStatus['credentialSource']>, string>
 
 /** Auth feedback for Azure DevOps (`AzureScmProvider.getAuthStatus`). */
 function AzureStatusFeedback({
@@ -21,15 +23,21 @@ function AzureStatusFeedback({
 }: {
   status: ScmAuthStatus | undefined
 }): React.JSX.Element | null {
+  const { t } = useTranslation()
   if (status === undefined) return null
   if (status.state === 'signed_in') {
-    const who = status.user?.displayName ?? status.user?.login ?? 'unknown user'
-    const via = status.credentialSource ? CREDENTIAL_SOURCE_LABEL[status.credentialSource] : null
+    const name =
+      status.user?.displayName ?? status.user?.login ?? t('settings.azure.unknownUser')
+    const who =
+      status.user?.login && status.user.login !== name ? name + ' (' + status.user.login + ')' : name
+    const via = status.credentialSource
+      ? t(`settings.azure.credentialSource.${CREDENTIAL_SOURCE_KEY[status.credentialSource]}`)
+      : null
     return (
       <p className="text-xs text-success" data-azure-auth="signed_in">
-        Signed in as {who}
-        {status.user?.login && status.user.login !== who ? ' (' + status.user.login + ')' : ''}
-        {via ? ' via ' + via : ''}.
+        {via
+          ? t('settings.azure.signedInVia', { who, source: via })
+          : t('settings.azure.signedIn', { who })}
       </p>
     )
   }
@@ -41,10 +49,10 @@ function AzureStatusFeedback({
         : 'text-warning'
   const fallback =
     status.state === 'disabled'
-      ? 'Azure DevOps is turned off.'
+      ? t('settings.azure.disabled')
       : status.state === 'cli_unavailable'
-        ? 'Azure CLI (az) not found.'
-        : 'No Azure DevOps credential. Run: az devops login'
+        ? t('settings.azure.cliNotFound')
+        : t('settings.azure.noCredential')
   return (
     <p className={'text-xs ' + tone} data-azure-auth={status.state}>
       {status.detail ?? fallback}
@@ -63,6 +71,7 @@ function AzureSettingsForm({
   info: ScmSettingsInfo
   compact: boolean
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const { saveProviderSettings, error: saveError } = useScmSettings()
   const { projects, loading, error: projectsError, load } = useAzureProjects()
   const saved = info.providers.azure
@@ -108,15 +117,13 @@ function AzureSettingsForm({
           type="checkbox"
           checked={enabled}
           onChange={(event) => setEnabled(event.target.checked)}
-          aria-label="Enable Azure DevOps"
+          aria-label={t('settings.azure.enable')}
         />
-        Enable Azure DevOps
+        {t('settings.azure.enable')}
       </label>
 
       {info.mockScm ? (
-        <p className="text-[11px] text-muted">
-          Demo mode lists the mock organization &quot;contoso&quot; whatever is saved here.
-        </p>
+        <p className="text-[11px] text-muted">{t('settings.azure.demoMode')}</p>
       ) : null}
 
       <div>
@@ -124,14 +131,14 @@ function AzureSettingsForm({
           className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted"
           htmlFor="azure-org"
         >
-          Organization
+          {t('settings.azure.organization')}
         </label>
         <div className="flex min-w-0 items-center gap-2">
           <input
             id="azure-org"
             value={organization}
             onChange={(event) => setOrganization(event.target.value)}
-            placeholder="e.g. Contoso"
+            placeholder={t('settings.azure.organizationPlaceholder')}
             spellCheck={false}
             className="min-w-0 flex-1 rounded-md border border-border bg-bg px-2 py-1 text-sm text-text outline-none focus:border-accent/60"
           />
@@ -142,29 +149,34 @@ function AzureSettingsForm({
             className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors hover:text-text disabled:opacity-50"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-            Load projects
+            {t('settings.azure.loadProjects')}
           </button>
         </div>
         {!compact && (
           <p className="mt-1 text-[11px] text-muted">
-            The name in https://dev.azure.com/<span className="font-mono">organization</span>.
+            <Trans
+              i18nKey="settings.azure.organizationHint"
+              components={{ mono: <span className="font-mono" /> }}
+            />
           </p>
         )}
         {projectsError && <p className="mt-1 text-xs text-danger">{projectsError}</p>}
       </div>
 
       <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Projects</h4>
+        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+          {t('settings.azure.projects')}
+        </h4>
         {options.length === 0 ? (
           <p className="text-[11px] text-muted">
             {projects === null
-              ? 'Load the projects of the organization, then pick the ones to review.'
-              : 'This organization has no projects you can see.'}
+              ? t('settings.azure.loadProjectsFirst')
+              : t('settings.azure.noProjects')}
           </p>
         ) : (
           <ul
             className="max-h-48 space-y-1 overflow-auto rounded-md border border-border p-2"
-            aria-label="Azure DevOps projects"
+            aria-label={t('settings.azure.projectsAriaLabel')}
           >
             {options.map((name) => (
               <li key={name}>
@@ -182,7 +194,7 @@ function AzureSettingsForm({
         )}
         {enabled && orgValid && selected.length === 0 && (
           <p className="mt-1 text-[11px] text-warning">
-            Pick at least one project to list its pull requests.
+            {t('settings.azure.pickProject')}
           </p>
         )}
       </div>
@@ -194,12 +206,10 @@ function AzureSettingsForm({
           disabled={saving || !dirty || (organization.trim() !== '' && !orgValid)}
           className="rounded-md bg-accent/90 px-3 py-1 text-xs font-medium text-bg transition-colors hover:bg-accent disabled:opacity-50"
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('settings.azure.saving') : t('settings.azure.save')}
         </button>
         {info.azureSettingsSource === 'az-cli-defaults' && (
-          <span className="text-[11px] text-muted">
-            Using the defaults from az devops configure.
-          </span>
+          <span className="text-[11px] text-muted">{t('settings.azure.usingAzDefaults')}</span>
         )}
       </div>
       {saveError && <p className="text-xs text-danger">{saveError}</p>}
@@ -225,9 +235,10 @@ export function AzureDevopsSection({ compact }: { compact: boolean }): React.JSX
       </h3>
       {!compact && (
         <p className="mb-2 text-xs text-muted">
-          Minerva uses your Azure CLI credential (
-          <span className="font-mono text-text">az devops login</span> with a PAT that has Code Read
-          &amp; Write scope). The credential never leaves the main process.
+          <Trans
+            i18nKey="settings.azure.intro"
+            components={{ mono: <span className="font-mono text-text" /> }}
+          />
         </p>
       )}
       <div className="rounded-md border border-border bg-bg/40 px-2.5 py-2">

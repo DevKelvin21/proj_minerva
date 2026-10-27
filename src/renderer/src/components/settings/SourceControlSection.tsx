@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import type { ScmAuthStatus } from '../../../../shared/scm'
 import { useGhAccounts } from '../../hooks/use-gh-accounts'
 import { useScmAuth } from '../../hooks/use-scm-auth'
@@ -14,7 +15,7 @@ function ExternalLink({
   children,
 }: {
   href: string
-  children: React.ReactNode
+  children?: React.ReactNode
 }): React.JSX.Element {
   return (
     <a
@@ -40,23 +41,22 @@ function GhCliStatusFeedback({
 }: {
   status: ScmAuthStatus | undefined
 }): React.JSX.Element | null {
+  const { t } = useTranslation()
   if (status === undefined) return null
   if (status.state === 'cli_unavailable') {
-    return (
-      <p className="text-xs text-danger">
-        GitHub CLI not found. Install it from the link above and try again.
-      </p>
-    )
+    return <p className="text-xs text-danger">{t('settings.github.cliNotFound')}</p>
   }
   if (status.state === 'cli_unauthenticated') {
     return (
-      <p className="text-xs text-warning">
-        {status.detail ?? "No gh session: run 'gh auth login' in a terminal."}
-      </p>
+      <p className="text-xs text-warning">{status.detail ?? t('settings.github.noSession')}</p>
     )
   }
   if (status.state === 'signed_in') {
-    return <p className="text-xs text-success">Signed in as {status.user?.login} via gh.</p>
+    return (
+      <p className="text-xs text-success">
+        {t('settings.github.signedInAs', { login: status.user?.login ?? '' })}
+      </p>
+    )
   }
   return null
 }
@@ -79,6 +79,7 @@ function AccountCard({
   badge?: React.JSX.Element | null
   onSelect: () => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <button
       type="button"
@@ -97,7 +98,7 @@ function AccountCard({
         {busy ? (
           <Loader2 size={14} className="mt-0.5 animate-spin text-muted" />
         ) : selected ? (
-          <Badge tone="success">Active</Badge>
+          <Badge tone="success">{t('settings.github.active')}</Badge>
         ) : null}
       </span>
     </button>
@@ -115,6 +116,7 @@ function AccountCard({
  * stays where it was.
  */
 function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Element | null {
+  const { t } = useTranslation()
   const { statuses } = useScmAuth()
   const { info, setGithubAccount, saveProviderSettings } = useScmSettings()
   const [togglingGithub, setTogglingGithub] = useState(false)
@@ -133,7 +135,7 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
     setSaveError(null)
     const ok = await setGithubAccount(login)
     setSaving(undefined)
-    if (!ok) setSaveError('Could not switch accounts. Try again.')
+    if (!ok) setSaveError(t('settings.github.switchError'))
   }
 
   const busy = saving !== undefined
@@ -143,13 +145,14 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
     <div>
       <h3 className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
         <ScmProviderIcon provider="github" size={12} />
-        GitHub access
+        {t('settings.github.title')}
       </h3>
       {!compact && (
         <p className="mb-3 text-xs text-muted">
-          Minerva uses your <span className="font-mono text-text">gh</span> (GitHub CLI) session:
-          there is no separate login to authorize. Enterprise orgs that block third-party OAuth apps
-          usually allow GitHub CLI.
+          <Trans
+            i18nKey="settings.github.intro"
+            components={{ mono: <span className="font-mono text-text" /> }}
+          />
         </p>
       )}
 
@@ -158,7 +161,7 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
           type="checkbox"
           checked={info.providers.github.enabled}
           disabled={togglingGithub}
-          aria-label="Enable GitHub"
+          aria-label={t('settings.github.enable')}
           onChange={(event) => {
             const enabled = event.target.checked
             setTogglingGithub(true)
@@ -167,27 +170,32 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
             )
           }}
         />
-        Enable GitHub
+        {t('settings.github.enable')}
       </label>
 
       {info.mockScm && (
         <p className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
-          Demo mode (MINERVA_MOCK): data is simulated; this setting applies once you go back to real
-          data.
+          {t('settings.github.demoMode')}
         </p>
       )}
 
       <div className="rounded-md border border-border bg-bg/40 px-2.5 py-2">
         <p className="mb-2 text-xs text-muted">
-          Install GitHub CLI from{' '}
-          <ExternalLink href="https://cli.github.com">cli.github.com</ExternalLink> and run{' '}
-          <span className="font-mono text-text">gh auth login</span> in a terminal.
+          <Trans
+            i18nKey="settings.github.install"
+            components={{
+              link: <ExternalLink href="https://cli.github.com" />,
+              mono: <span className="font-mono text-text" />,
+            }}
+          />
         </p>
         <GhCliStatusFeedback status={statuses?.github} />
       </div>
 
       <div className="mb-1.5 mt-3 flex items-center justify-between gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Account</h4>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+          {t('settings.github.account')}
+        </h4>
         <button
           type="button"
           onClick={() => void reload()}
@@ -195,7 +203,7 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted transition-colors duration-150 hover:text-text disabled:opacity-50"
         >
           <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
-          Refresh
+          {t('settings.github.refresh')}
         </button>
       </div>
 
@@ -206,11 +214,11 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
           leaving it out would turn a listing failure into "nothing to pick".
         */}
         <AccountCard
-          label="gh active account"
+          label={t('settings.github.followGh')}
           description={
             activeInGh !== null
-              ? 'Follows whichever account gh has active (now: ' + activeInGh.login + ').'
-              : 'Follows the account gh resolves on its own.'
+              ? t('settings.github.followGhNow', { login: activeInGh.login })
+              : t('settings.github.followGhResolved')
           }
           selected={githubAccount === null}
           busy={saving === null}
@@ -223,12 +231,14 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
             key={account.login}
             label={account.login}
             description={
-              account.valid ? 'Valid gh session.' : 'gh reports its token as invalid or expired.'
+              account.valid
+                ? t('settings.github.validSession')
+                : t('settings.github.invalidSession')
             }
             selected={githubAccount === account.login}
             busy={saving === account.login}
             disabled={busy}
-            badge={account.valid ? null : <Badge tone="warning">Token expired</Badge>}
+            badge={account.valid ? null : <Badge tone="warning">{t('settings.github.tokenExpired')}</Badge>}
             onSelect={() => void select(account.login)}
           />
         ))}
@@ -244,20 +254,17 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
           !accounts.some((account) => account.login === githubAccount) && (
             <AccountCard
               label={githubAccount}
-              description="Picked earlier, but gh no longer lists it. Pick another account."
+              description={t('settings.github.goneFromGh')}
               selected
               busy={saving === githubAccount}
               disabled={busy}
-              badge={<Badge tone="danger">No longer in gh</Badge>}
+              badge={<Badge tone="danger">{t('settings.github.noLongerInGh')}</Badge>}
               onSelect={() => void select(githubAccount)}
             />
           )}
 
         {!loading && accounts.length === 0 && (
-          <p className="text-[11px] text-muted">
-            Could not read gh&apos;s account list. With a single signed-in account this changes
-            nothing: Minerva uses whichever account gh resolves.
-          </p>
+          <p className="text-[11px] text-muted">{t('settings.github.listUnreadable')}</p>
         )}
       </div>
 

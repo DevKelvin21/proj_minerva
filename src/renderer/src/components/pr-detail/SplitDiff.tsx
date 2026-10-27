@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
 import { buildSplitRows, type SplitCell, type SplitRow } from '../../lib/diff-parser'
@@ -11,6 +12,10 @@ import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
 import { asHunk, KIND_BG, rangeClasses, type DiffBodyProps, type OpenComposer } from './diff-body'
+
+const SIDES = ['left', 'right'] as const
+const WRAP_CONTENT = 'whitespace-pre-wrap break-words'
+const NOWRAP_CONTENT = 'whitespace-pre'
 
 /** Everything a split row needs in both layouts (wrap and no-wrap). */
 interface RowMeta {
@@ -55,6 +60,7 @@ function SideCells({
   onAdd,
   getTokens,
 }: SideCellsProps): React.JSX.Element {
+  const { t } = useTranslation()
   const inRange = positionKey ? model.rangeKeys.has(positionKey) : false
   const focused = positionKey ? model.focusedKeys.has(positionKey) : false
   const marks = rangeClasses(inRange, focused)
@@ -72,7 +78,7 @@ function SideCells({
           <button
             type="button"
             onClick={onAdd}
-            aria-label="Add a comment on this line"
+            aria-label={t('comments.line.addComment')}
             className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
           >
             <Plus size={12} />
@@ -277,6 +283,19 @@ export function SplitDiff({
     )
   }
 
+  function wrapRow(meta: RowMeta): React.JSX.Element {
+    const left = cells(meta, 'left', WRAP_CONTENT)
+    const right = cells(meta, 'right', WRAP_CONTENT)
+    // `contents` takes the wrapper out of the grid layout (its children
+    // become grid items) but keeps it in the DOM for `group-hover`.
+    return (
+      <div key={meta.rowKey} className="group/row contents">
+        {left}
+        {right}
+      </div>
+    )
+  }
+
   if (wordWrap) {
     return (
       <div
@@ -289,12 +308,7 @@ export function SplitDiff({
               {item.node}
             </div>
           ) : (
-            // `contents` takes the wrapper out of the grid layout (its children
-            // become grid items) but keeps it in the DOM for `group-hover`.
-            <div key={item.meta.rowKey} className="group/row contents">
-              {cells(item.meta, 'left', 'whitespace-pre-wrap break-words')}
-              {cells(item.meta, 'right', 'whitespace-pre-wrap break-words')}
-            </div>
+            wrapRow(item.meta)
           ),
         )}
       </div>
@@ -324,7 +338,7 @@ export function SplitDiff({
           <Fragment key={segment.key}>{segment.node}</Fragment>
         ) : (
           <div key={segment.key} className="grid grid-cols-2">
-            {(['left', 'right'] as const).map((side) => (
+            {SIDES.map((side) => (
               <div
                 key={side}
                 className={`overflow-x-auto ${side === 'right' ? 'border-l border-border' : ''}`}
@@ -335,7 +349,7 @@ export function SplitDiff({
                 >
                   {segment.rows.map((meta) => (
                     <div key={meta.rowKey} className="group/row contents">
-                      {cells(meta, side, 'whitespace-pre')}
+                      {cells(meta, side, NOWRAP_CONTENT)}
                     </div>
                   ))}
                 </div>

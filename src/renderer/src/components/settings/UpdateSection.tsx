@@ -1,19 +1,22 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
+import type { AppLocale } from '../../../../shared/locale'
+import { useLocale } from '../../i18n/use-locale'
 import { useUpdater } from '../../hooks/use-updater'
 import type { UpdaterStatus } from '../../../../shared/types'
 
 type UnsupportedReason = Extract<UpdaterStatus, { phase: 'unsupported' }>['reason']
 
-/** Texto honesto de por qué ESTA instalación no puede auto-actualizarse (T93). */
-const UNSUPPORTED_REASON_TEXT: Record<UnsupportedReason, string> = {
-  'mac-unsigned': 'la versión de macOS todavía no está firmada',
-  'not-appimage': 'esta instalación no es la AppImage oficial',
-  'not-writable': 'Minerva no puede escribir sobre su propio archivo',
-}
+/** Texto honesto de por qué ESTA instalación no puede auto-actualizarse (T93): clave de `updater.unsupportedReasons`. */
+const UNSUPPORTED_REASON_KEY = {
+  'mac-unsigned': 'macUnsigned',
+  'not-appimage': 'notAppimage',
+  'not-writable': 'notWritable',
+} as const satisfies Record<UnsupportedReason, string>
 
-function formatCheckedAt(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+function formatCheckedAt(iso: string, locale: AppLocale): string {
+  return new Date(iso).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 interface UpdateSectionProps {
@@ -48,6 +51,8 @@ interface UpdateSectionProps {
  * único camino a esa información es `openReleasePage()`.
  */
 export function UpdateSection({ compact = false }: UpdateSectionProps): React.JSX.Element | null {
+  const { t } = useTranslation()
+  const { locale } = useLocale()
   const { status, version, error, check, download, quitAndInstall, openReleasePage } = useUpdater()
   const [restarting, setRestarting] = useState(false)
   const [openingRelease, setOpeningRelease] = useState(false)
@@ -71,15 +76,21 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
 
   return (
     <div className="border-t border-border p-4">
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Actualizaciones</h3>
+      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+        {t('updater.title')}
+      </h3>
       {!compact && (
         <p className="mb-3 text-xs text-muted">
-          Minerva revisa si hay una versión nueva; la descarga solo empieza con tu confirmación.
+          {t('updater.intro')}
         </p>
       )}
 
       <p className="text-xs text-muted">
-        Versión instalada: <span className="font-mono text-text">{version ?? '…'}</span>
+        <Trans
+          i18nKey="updater.installedVersion"
+          values={{ version: version ?? '…' }}
+          components={{ mono: <span className="font-mono text-text" /> }}
+        />
       </p>
 
       <div className="mt-2.5 space-y-2">
@@ -88,10 +99,12 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
             <div className="min-w-0">
               {status.phase === 'idle' && (
                 <>
-                  <p className="text-sm text-text">Estás al día.</p>
+                  <p className="text-sm text-text">{t('updater.upToDate')}</p>
                   {status.lastCheckedAt && (
                     <p className="text-[11px] text-muted">
-                      Último chequeo: {formatCheckedAt(status.lastCheckedAt)}
+                      {t('updater.lastChecked', {
+                        date: formatCheckedAt(status.lastCheckedAt, locale),
+                      })}
                     </p>
                   )}
                 </>
@@ -99,7 +112,7 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
               {status.phase === 'checking' && (
                 <p className="flex items-center gap-1.5 text-xs text-muted">
                   <Loader2 size={13} className="animate-spin" />
-                  Buscando actualizaciones…
+                  {t('updater.checking')}
                 </p>
               )}
               {status.phase === 'error' && (
@@ -107,7 +120,9 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
                   <p className="text-xs text-danger">{status.message}</p>
                   {status.lastCheckedAt && (
                     <p className="text-[11px] text-muted">
-                      Último chequeo con éxito: {formatCheckedAt(status.lastCheckedAt)}
+                      {t('updater.lastSuccessfulCheck', {
+                        date: formatCheckedAt(status.lastCheckedAt, locale),
+                      })}
                     </p>
                   )}
                 </>
@@ -119,27 +134,31 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
               onClick={() => void check()}
               className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-text transition-colors duration-150 hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {status.phase === 'error' ? 'Reintentar' : 'Buscar actualizaciones'}
+              {status.phase === 'error' ? t('updater.retry') : t('updater.check')}
             </button>
           </div>
         )}
 
         {status.phase === 'available' && (
           <div className="flex items-center justify-between gap-2">
-            <p className="min-w-0 truncate text-sm text-text">Disponible v{status.info.version}</p>
+            <p className="min-w-0 truncate text-sm text-text">
+              {t('updater.available', { version: status.info.version })}
+            </p>
             <button
               type="button"
               onClick={() => void download()}
               className="shrink-0 rounded-md border border-accent/50 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
             >
-              Descargar (130 MB)
+              {t('updater.download')}
             </button>
           </div>
         )}
 
         {status.phase === 'downloading' && (
           <div>
-            <p className="mb-1 truncate text-sm text-text">Descargando v{status.info.version}…</p>
+            <p className="mb-1 truncate text-sm text-text">
+              {t('updater.downloading', { version: status.info.version })}
+            </p>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/60">
               <div
                 className="h-full rounded-full bg-accent transition-[width] duration-150"
@@ -152,14 +171,14 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
 
         {status.phase === 'downloaded' && (
           <div>
-            <p className="text-sm text-text">Se instalará al salir de Minerva.</p>
+            <p className="text-sm text-text">{t('updater.installOnQuit')}</p>
             <button
               type="button"
               disabled={restarting}
               onClick={() => void handleRestart()}
               className="mt-1 text-[11px] text-muted underline decoration-dotted transition-colors duration-150 hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Reiniciar ahora
+              {t('updater.restartNow')}
             </button>
           </div>
         )}
@@ -173,8 +192,9 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
         {status.phase === 'unsupported' && (
           <div className="flex flex-col gap-2">
             <p className="min-w-0 text-xs text-muted">
-              Esta instalación no puede actualizarse sola:{' '}
-              {UNSUPPORTED_REASON_TEXT[status.reason]}.
+              {t('updater.unsupported', {
+                reason: t(`updater.unsupportedReasons.${UNSUPPORTED_REASON_KEY[status.reason]}`),
+              })}
             </p>
             {/*
               El chequeo manual TAMBIÉN vive acá: `unsupported` sigue
@@ -188,7 +208,7 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
                 onClick={() => void check()}
                 className="rounded-md border border-border px-2.5 py-1 text-xs text-text transition-colors duration-150 hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Buscar actualizaciones
+                {t('updater.check')}
               </button>
               {status.available && (
                 <button
@@ -197,7 +217,7 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
                   onClick={() => void handleOpenRelease()}
                   className="rounded-md border border-accent/50 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Ver la release
+                  {t('updater.viewRelease')}
                 </button>
               )}
             </div>

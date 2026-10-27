@@ -30,8 +30,6 @@ export type MessageKey<T> = {
 /** Every leaf key of `table` as a dotted path, for runtime coverage tests. */
 export function messageKeys(table: object, prefix = ''): string[] {
   return Object.entries(table).flatMap(([key, value]) =>
-    typeof value === 'string'
-      ? [prefix + key]
-      : messageKeys(value as object, prefix + key + '.'),
+    typeof value === 'string' ? [prefix + key] : messageKeys(value as object, prefix + key + '.'),
   )
 }

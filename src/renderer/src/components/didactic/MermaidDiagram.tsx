@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { Mermaid } from 'mermaid'
+import { useTranslation } from 'react-i18next'
 
 interface MermaidDiagramProps {
   code: string
@@ -184,6 +185,7 @@ export function MermaidDiagram({
   naturalSize = false,
   onRendered,
 }: MermaidDiagramProps): React.JSX.Element {
+  const { t } = useTranslation()
   const rawId = useId().replace(/:/g, '')
   const elementId = `mermaid-${rawId}`
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -222,7 +224,7 @@ export function MermaidDiagram({
   if (failed) {
     return (
       <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
-        <p className="mb-2 text-xs font-medium text-warning">Diagrama no renderizable.</p>
+        <p className="mb-2 text-xs font-medium text-warning">{t('didactic.mermaid.unrenderable')}</p>
         <pre className="overflow-x-auto text-[11px] whitespace-pre-wrap text-muted">{code}</pre>
       </div>
     )

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileCode, MessagesSquare } from 'lucide-react'
 import type { CommentThread, DiffFile } from '../../../../shared/types'
 import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
-import { THREAD_STATUS_LABEL } from '../../lib/scm-labels'
+import { threadStatusLabel } from '../../lib/scm-labels'
 import {
   countThreadsByFilter,
   filterThreads,
@@ -34,6 +35,7 @@ export function CommentsTab({
   error,
   files,
 }: CommentsTabProps): React.JSX.Element {
+  const { t } = useTranslation()
   const [filter, setFilter] = useState<ThreadFilter>('open')
   const openLineThread = useAppStore((s) => s.openLineThread)
   const tier = useLayoutTier()
@@ -46,11 +48,11 @@ export function CommentsTab({
   const filePaths = useMemo(() => new Set(files?.map((f) => f.path) ?? []), [files])
 
   const filters: Array<{ value: ThreadFilter; label: string }> = [
-    { value: 'open', label: 'Open' },
-    { value: 'all', label: 'All' },
+    { value: 'open', label: t('comments.tab.filterOpen') },
+    { value: 'all', label: t('comments.tab.filterAll') },
     ...THREAD_STATUS_ORDER.filter((status) => counts[status] > 0).map((status) => ({
       value: status as ThreadFilter,
-      label: THREAD_STATUS_LABEL[status],
+      label: threadStatusLabel(status, t),
     })),
   ]
 
@@ -60,7 +62,7 @@ export function CommentsTab({
         tier.w === 'sm' ? 'p-2' : 'p-4'
       }`}
     >
-      <div role="group" aria-label="Filter threads" className="flex flex-wrap items-center gap-1.5">
+      <div role="group" aria-label={t('comments.tab.filterGroup')} className="flex flex-wrap items-center gap-1.5">
         {filters.map((option) => (
           <button
             key={option.value}
@@ -82,15 +84,15 @@ export function CommentsTab({
         ))}
       </div>
 
-      {error && <p className="text-sm text-danger">Could not load the comments: {error}</p>}
+      {error && <p className="text-sm text-danger">{t('comments.tab.loadError', { error })}</p>}
       {!error && loading && threads.length === 0 && (
-        <p className="text-sm text-muted">Loading comments…</p>
+        <p className="text-sm text-muted">{t('comments.tab.loading')}</p>
       )}
       {!error && !loading && groups.length === 0 && (
         <p className="text-sm text-muted">
           {threads.length === 0
-            ? 'No comments on this pull request yet.'
-            : 'No threads match this filter.'}
+            ? t('comments.tab.empty')
+            : t('comments.tab.noMatch')}
         </p>
       )}
 
@@ -99,7 +101,7 @@ export function CommentsTab({
         return (
           <section
             key={group.path ?? '(general)'}
-            aria-label={group.path ?? 'General'}
+            aria-label={group.path ?? t('comments.tab.general')}
             data-thread-group={group.path ?? 'general'}
             className="flex min-w-0 flex-col gap-2"
           >
@@ -110,15 +112,15 @@ export function CommentsTab({
                 <FileCode size={13} className="shrink-0" />
               )}
               <span className="truncate font-mono text-text" title={group.path ?? undefined}>
-                {group.path ?? 'General'}
+                {group.path ?? t('comments.tab.general')}
               </span>
               <span className="shrink-0 tabular-nums">({group.threads.length})</span>
               {group.path !== null && files !== null && !inDiff && (
                 <span
                   className="shrink-0 text-warning"
-                  title="The file is not in this pull request's file list (it may be capped or from an older push)"
+                  title={t('comments.tab.notInDiffTitle')}
                 >
-                  · not in the diff
+                  · {t('comments.tab.notInDiff')}
                 </span>
               )}
             </h3>

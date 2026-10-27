@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { CommentThread } from '../../../../shared/types'
 import { useThreadFileLines } from '../../hooks/thread-actions'
 import { excerptWindow, threadLineRange, threadSide } from '../../lib/line-threads'
@@ -51,38 +52,41 @@ interface ThreadCodeExcerptProps {
  * threads say the code may have moved since.
  */
 export function ThreadCodeExcerpt({ thread }: ThreadCodeExcerptProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const range = threadLineRange(thread)
   const state = useThreadFileLines(thread, Boolean(thread.path && range))
   if (!thread.path || !range) return null
 
-  const sideLabel = threadSide(thread) === 'LEFT' ? 'base (before the change)' : 'latest version'
+  const pastEnd =
+    threadSide(thread) === 'LEFT'
+      ? t('comments.excerpt.pastEndBase', { line: range.start })
+      : t('comments.excerpt.pastEndLatest', { line: range.start })
   const note = thread.isOutdated ? (
     <p className="text-xs text-warning" data-testid="outdated-note">
-      This comment was left on an earlier version of the file. The code below is from the latest
-      version around line {range.start}; it may have changed since.
+      {t('comments.excerpt.outdatedNote', { line: range.start })}
     </p>
   ) : null
 
   let body: React.ReactNode
   if (state.status === 'loading' || state.status === 'idle') {
-    body = <p className="text-xs text-muted">Loading code…</p>
+    body = <p className="text-xs text-muted">{t('comments.excerpt.loading')}</p>
   } else if (state.status === 'error') {
-    body = <p className="text-xs text-danger">Could not load the code: {state.error}</p>
+    body = <p className="text-xs text-danger">
+        {t('comments.excerpt.loadError', { error: state.error })}
+      </p>
   } else if (state.status === 'unavailable') {
-    body = <p className="text-xs text-muted">{state.reason}</p>
+    body = <p className="text-xs text-muted">{t(`prDetail.fileContent.${state.reason}`)}</p>
   } else {
     const win = excerptWindow(range.start, range.end, state.lines.length)
     body = win ? (
       <CodeExcerpt lines={state.lines} from={win.from} to={win.to} highlight={range} />
     ) : (
-      <p className="text-xs text-muted">
-        Line {range.start} is past the end of the file in its {sideLabel}.
-      </p>
+      <p className="text-xs text-muted">{pastEnd}</p>
     )
   }
 
   return (
-    <div className="flex flex-col gap-1.5" aria-label={`Code at ${thread.path}:${range.start}`}>
+    <div className="flex flex-col gap-1.5" aria-label={t('comments.excerpt.label', { path: thread.path, line: range.start })}>
       {note}
       {body}
     </div>

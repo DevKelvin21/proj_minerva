@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
 import { buildInlineRows, type DiffLineKind, type InlineRow } from '../../lib/diff-parser'
@@ -32,6 +33,7 @@ export function InlineDiff({
   expander,
   onCreateThread,
 }: DiffBodyProps): React.JSX.Element {
+  const { t } = useTranslation()
   const [openComposer, setOpenComposer] = useState<OpenComposer | null>(null)
 
   const rowsBySection = useMemo(
@@ -82,7 +84,7 @@ export function InlineDiff({
               <button
                 type="button"
                 onClick={() => setOpenComposer({ key: rowKey, content: row.content, ...position })}
-                aria-label="Add a comment on this line"
+                aria-label={t('comments.line.addComment')}
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
               >
                 <Plus size={12} />

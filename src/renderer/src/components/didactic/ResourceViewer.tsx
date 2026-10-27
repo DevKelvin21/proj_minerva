@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { DidacticSnippet } from '../../../../shared/types'
 import { IconButton } from '../ui/IconButton'
 import { Markdown } from '../ui/Markdown'
@@ -29,6 +30,7 @@ interface ResourceViewerProps {
  * vista ancha centrada con scroll. Cierra con el botón X o con Escape.
  */
 export function ResourceViewer({ resource, onClose }: ResourceViewerProps): React.JSX.Element {
+  const { t } = useTranslation()
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key === 'Escape') onClose()
@@ -63,7 +65,7 @@ export function ResourceViewer({ resource, onClose }: ResourceViewerProps): Reac
       >
         <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
           <span className="truncate text-sm font-semibold text-text">{resource.title}</span>
-          <IconButton icon={<X size={16} />} label="Cerrar" onClick={onClose} />
+          <IconButton icon={<X size={16} />} label={t('common.close')} onClick={onClose} />
         </header>
 
         <div className="min-h-0 flex-1">
