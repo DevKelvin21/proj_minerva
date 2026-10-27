@@ -35,7 +35,8 @@ function candidateBinaries(): string[] {
   return [join(dist, 'linux-unpacked', 'minerva')]
 }
 
-const PACKAGED_BINARY = candidateBinaries().find((path) => existsSync(path)) ?? candidateBinaries()[0]
+const PACKAGED_BINARY =
+  candidateBinaries().find((path) => existsSync(path)) ?? candidateBinaries()[0]
 
 /**
  * The version the PACKAGED app reports through `window.minerva.system.getVersion()`
@@ -53,7 +54,9 @@ const PACKAGE_JSON_VERSION = (
 test('the packaged app starts, exposes the preload and serves the fixtures from the asar', async ({}, testInfo) => {
   test.skip(
     !existsSync(PACKAGED_BINARY),
-    'no packaged binary at ' + PACKAGED_BINARY + ' — run npm run dist:mac:dir (macOS) or npm run dist:dir (Linux) first',
+    'no packaged binary at ' +
+      PACKAGED_BINARY +
+      ' — run npm run dist:mac:dir (macOS) or npm run dist:dir (Linux) first',
   )
 
   const app = await launchMinerva(testInfo.outputPath('user-data'), {
@@ -83,7 +86,10 @@ test('the packaged app starts, exposes the preload and serves the fixtures from 
 
     // Mock PR list over IPC (main fixtures INSIDE the asar) + ping.
     await expect(window.getByText('apply-coupon').first()).toBeVisible({ timeout: 20_000 })
-    await expect(window.getByText('Connected').first()).toBeVisible()
+    // Ping ok; "Partially connected" on a machine without a gh session (GitHub's probe is real).
+    await expect(window.getByTestId('scm-connection')).toHaveText(
+      /^(Connected|Partially connected)$/,
+    )
 
     // Detail + Files tab (parsed diff + Shiki from the bundle).
     await window.getByText('Add refunds table and migration').first().click()

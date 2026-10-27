@@ -27,11 +27,23 @@ export const es: MessageShape<typeof en> = {
       searchPlaceholder: 'Buscar por título, repo, rama o #número',
       closeSearch: 'Cerrar búsqueda',
       didacticPanel: 'Panel didáctico',
-      connectionTitle: 'Estado de la conexión IPC con el proceso principal: {{status}}',
+      connectionTitle: 'Control de versiones: {{status}}',
+      connectionIpcError: 'Sin conexión con el proceso principal.',
       connection: {
         connected: 'Conectado',
+        partial: 'Conectado en parte',
+        signed_out: 'Sin sesión',
+        no_providers: 'Ningún origen activo',
         error: 'Sin conexión',
         checking: 'Comprobando…',
+      },
+      providerLine: '{{provider}}: {{state}}',
+      providerState: {
+        ready: 'sesión iniciada como {{who}}',
+        checking: 'comprobando…',
+        not_configured: 'sin organización configurada',
+        cli_unavailable: 'no se encontró la CLI',
+        signed_out: 'sin sesión',
       },
     },
     settingsChip: {
@@ -50,8 +62,21 @@ export const es: MessageShape<typeof en> = {
       viaGhCli: 'vía GitHub CLI',
       managedByGhCli: 'El acceso lo gestiona GitHub CLI; cambia la cuenta en Configuración',
       ghCliNotFound: 'No se encontró GitHub CLI',
+      azCliNotFound: 'No se encontró Azure CLI',
+      managedByAz:
+        'El acceso usa tu credencial de Azure CLI; cambia la organización en Configuración',
+      via: {
+        ghCli: 'vía GitHub CLI',
+        envPat: 'vía AZURE_DEVOPS_EXT_PAT',
+        azDevopsPat: 'vía PAT de az devops',
+        azEntra: 'vía az login (Entra)',
+      },
+      notConfigured: 'Sin organización',
+      notConfiguredTitle:
+        'Azure DevOps está activado pero todavía no tiene organización. Agrega una en Configuración.',
       openSettings: 'Abrir configuración',
       copyCommand: 'Copiar comando',
+      copyCommandNamed: 'Copiar comando: {{command}}',
       waitingForSession: 'Esperando la sesión…',
     },
     sidebar: {
@@ -75,14 +100,24 @@ export const es: MessageShape<typeof en> = {
         all: 'No hay PRs.',
       },
       noMatches: 'No hay PRs que coincidan con "{{query}}".',
-      searchTip:
-        'Consejo: el buscador acepta cualificadores de GitHub, p. ej. <code>org:mi-org</code> o <code>repo:owner/nombre</code>.',
+      searchTipGithub:
+        'Consejo: la búsqueda de GitHub acepta cualificadores, p. ej. <code>org:mi-org</code> o <code>repo:owner/nombre</code>.',
+      searchTipAzure:
+        'Consejo: la búsqueda de Azure DevOps compara el título, el repositorio, la rama, el autor o el <code>#número</code>.',
+      azureNotConfigured:
+        'Azure DevOps está activado pero todavía no tiene organización. Agrega una en Configuración.',
+      noProvidersTitle: 'No hay ningún control de versiones activado',
+      noProvidersHint: 'Activa GitHub o Azure DevOps en Configuración para listar pull requests.',
       loadFailed: 'No se pudo cargar la lista de PRs: {{error}}',
       loading: 'Cargando PRs…',
       accountNoSession:
         'La cuenta <mono>{{account}}</mono> no tiene una sesión de gh válida. Elige otra en Configuración o renuévala con <mono>{{command}}</mono>.',
       signInWithGhCli:
         'Inicia sesión con GitHub CLI: ejecuta <mono>{{command}}</mono> en una terminal.',
+      signInWithAz:
+        'Inicia sesión con Azure CLI: ejecuta <cmd>{{command}}</cmd> en una terminal y pega un PAT con permiso Code (Read & Write).',
+      installAz:
+        'Instala Azure CLI con la extensión azure-devops y luego ejecuta <cmd>{{command}}</cmd> (o define <mono>AZURE_DEVOPS_EXT_PAT</mono>).',
       openSettings: 'Abrir configuración',
     },
     center: {
@@ -106,6 +141,8 @@ export const es: MessageShape<typeof en> = {
     review: {
       approved: 'Aprobado',
       changesRequested: 'Cambios solicitados',
+      waitingForAuthor: 'Esperando al autor',
+      rejected: 'Rechazado',
       reviewRequired: 'Revisión pendiente',
     },
     state: {
@@ -135,14 +172,36 @@ export const es: MessageShape<typeof en> = {
       reviewers: 'Revisores',
       required: 'obligatorio',
       workItems: 'Work items',
+      labels: 'Etiquetas',
+      tags: 'Etiquetas',
       draft: 'Borrador',
       details: 'Detalles',
+      autoComplete: 'Autocompletar activado por {{name}}',
+      autoCompleteTitle:
+        'Este pull request se completa solo en cuanto pasen todas las directivas obligatorias.',
+      mergeStatus: {
+        clean: 'Sin conflictos de merge',
+        conflicts: 'Conflictos de merge',
+        checking: 'Comprobando el merge…',
+        blocked: 'Bloqueado por una directiva',
+        failed: 'Falló la comprobación de merge',
+      },
+      branchPolicies: 'Directivas de rama',
+      checks: 'Comprobaciones',
+      optional: 'opcional',
+      checkStatus: {
+        success: 'Aprobada',
+        failure: 'Falló',
+        pending: 'Pendiente',
+        not_applicable: 'No aplica',
+      },
     },
     reviewerVote: {
       approved: 'Aprobado',
       approved_with_suggestions: 'Aprobado con sugerencias',
       none: 'Sin voto todavía',
       changes_requested: 'Cambios solicitados',
+      waiting_for_author: 'Esperando al autor',
       rejected: 'Rechazado',
     },
     files: {

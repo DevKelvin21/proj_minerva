@@ -18,6 +18,8 @@ import {
 import type {
   CiStatus,
   CommentThread,
+  PrCheck,
+  PrMergeStatus,
   PrComment,
   PrReviewer,
   PullRequestState,
@@ -30,6 +32,7 @@ import type {
   AzComment,
   AzGitRepository,
   AzIdentityRef,
+  AzMergeStatus,
   AzPolicyEvaluation,
   AzPullRequest,
   AzPullRequestStatus,
@@ -119,12 +122,13 @@ export function mapReviewer(reviewer: AzReviewer): PrReviewer {
 
 /**
  * Overall review decision from the votes (Azure has no single field):
- * any "waiting for author" / "rejected" vote -> `changes_requested`; a
- * required reviewer without an approval -> `review_required`; at least one
- * approval -> `approved`; no votes at all -> `null`.
+ * any "rejected" vote -> `rejected`; any "waiting for author" vote ->
+ * `changes_requested`; a required reviewer without an approval ->
+ * `review_required`; at least one approval -> `approved`; no votes -> `null`.
  */
 export function mapReviewDecision(reviewers: AzReviewer[] | undefined): ReviewDecision {
   const list = reviewers ?? []
+  if (list.some((reviewer) => reviewer.vote <= -10)) return 'rejected'
   if (list.some((reviewer) => reviewer.vote < 0)) return 'changes_requested'
   if (list.some((reviewer) => reviewer.isRequired === true && reviewer.vote <= 0)) {
     return 'review_required'
@@ -215,17 +219,8 @@ export function mapPullRequestSummary(
   }
 }
 
-/**
- * CI status from PR statuses (latest per context) and policy evaluations
- * (blocking + enabled only; "required reviewers" style policies are not CI
- * and are skipped by type name). Failure beats pending beats success.
- */
-export function mapCiStatus(
-  statuses: AzPullRequestStatusEntry[],
-  evaluations: AzPolicyEvaluation[],
-): CiStatus {
-  const states: ('success' | 'failure' | 'pending')[] = []
-
+/** PR statuses keep their history: only the latest entry per context counts. */
+function latestStatusPerContext(statuses: AzPullRequestStatusEntry[]): AzPullRequestStatusEntry[] {
   const latestByContext = new Map<string, AzPullRequestStatusEntry>()
   for (const status of statuses) {
     const key = (status.context.genre ?? '') + '/' + status.context.name
@@ -238,7 +233,21 @@ export function mapCiStatus(
       latestByContext.set(key, status)
     }
   }
-  for (const status of latestByContext.values()) {
+  return [...latestByContext.values()]
+}
+
+/**
+ * CI status from PR statuses (latest per context) and policy evaluations
+ * (blocking + enabled only; "required reviewers" style policies are not CI
+ * and are skipped by type name). Failure beats pending beats success.
+ */
+export function mapCiStatus(
+  statuses: AzPullRequestStatusEntry[],
+  evaluations: AzPolicyEvaluation[],
+): CiStatus {
+  const states: ('success' | 'failure' | 'pending')[] = []
+
+  for (const status of latestStatusPerContext(statuses)) {
     if (status.state === 'succeeded') states.push('success')
     else if (status.state === 'failed' || status.state === 'error') states.push('failure')
     else if (status.state === 'pending') states.push('pending')
@@ -260,6 +269,74 @@ export function mapCiStatus(
   if (states.includes('pending')) return 'pending'
   if (states.includes('success')) return 'success'
   return null
+}
+
+/** `mergeStatus` of the PR; `notSet` / absent = unknown (the UI shows nothing). */
+export function mapMergeStatus(status: AzMergeStatus | undefined): PrMergeStatus | undefined {
+  switch (status) {
+    case 'succeeded':
+      return 'clean'
+    case 'conflicts':
+      return 'conflicts'
+    case 'queued':
+      return 'checking'
+    case 'rejectedByPolicy':
+      return 'blocked'
+    case 'failure':
+      return 'failed'
+    default:
+      return undefined
+  }
+}
+
+const POLICY_CHECK_STATUS: Record<AzPolicyEvaluation['status'], PrCheck['status']> = {
+  approved: 'success',
+  rejected: 'failure',
+  broken: 'failure',
+  queued: 'pending',
+  running: 'pending',
+  notApplicable: 'not_applicable',
+}
+
+/**
+ * Branch policies (enabled ones) and the latest status per context, as a
+ * provider-neutral checklist. Blocking policies first, then optional ones,
+ * then statuses; names are trimmed and capped (they come from the org).
+ */
+export function mapChecks(
+  statuses: AzPullRequestStatusEntry[],
+  evaluations: AzPolicyEvaluation[],
+): PrCheck[] {
+  const clip = (name: string): string => name.trim().slice(0, 120)
+  const policies: PrCheck[] = evaluations
+    .filter((evaluation) => evaluation.configuration.isEnabled)
+    .map((evaluation) => {
+      const config = evaluation.configuration
+      const own = config.settings?.displayName
+      const name = typeof own === 'string' && own.trim() ? own : config.type.displayName
+      return {
+        name: clip(name),
+        status: POLICY_CHECK_STATUS[evaluation.status] ?? 'pending',
+        isBlocking: config.isBlocking,
+        kind: 'policy' as const,
+      }
+    })
+    .sort((a, b) => Number(b.isBlocking) - Number(a.isBlocking))
+
+  const posted: PrCheck[] = latestStatusPerContext(statuses).map((status) => ({
+    name: clip((status.context.genre ? status.context.genre + '/' : '') + status.context.name),
+    status:
+      status.state === 'succeeded'
+        ? 'success'
+        : status.state === 'failed' || status.state === 'error'
+          ? 'failure'
+          : status.state === 'notApplicable'
+            ? 'not_applicable'
+            : 'pending',
+    isBlocking: false,
+    kind: 'status' as const,
+  }))
+  return [...policies, ...posted]
 }
 
 function isUserComment(comment: AzComment): boolean {

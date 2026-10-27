@@ -2,8 +2,9 @@
  * Display labels and tones for provider-neutral SCM states (reviewer votes,
  * thread statuses). Pure, so every provider's values render the same way.
  */
-import type { TFunction } from 'i18next'
-import type { ReviewerVote, ScmProviderId, ThreadStatus } from '../../../shared/scm'
+import type { ParseKeys, TFunction } from 'i18next'
+import type { ReviewerVote, ScmAuthStatus, ScmProviderId, ThreadStatus } from '../../../shared/scm'
+import type { ReviewDecision } from '../../../shared/types'
 
 export const SCM_PROVIDER_LABEL: Record<ScmProviderId, string> = {
   github: 'GitHub',
@@ -24,7 +25,10 @@ export function providerOfWebUrl(url: string): ScmProviderId {
 }
 
 /** Why a changed text file shows no diff (`DiffFile.patchOmitted`), or the generic fallback. */
-export function noPatchMessage(reason: 'too_large' | 'diff_budget' | undefined, t: TFunction): string {
+export function noPatchMessage(
+  reason: 'too_large' | 'diff_budget' | undefined,
+  t: TFunction,
+): string {
   if (reason === 'too_large') return t('prDetail.diff.tooLarge')
   if (reason === 'diff_budget') return t('prDetail.diff.overBudget')
   return t('prDetail.diff.noPreview')
@@ -40,10 +44,47 @@ export const REVIEWER_VOTE_TONE: Record<ReviewerVote, ScmTone> = {
   rejected: 'danger',
 }
 
-/** Display label of a reviewer vote, in the active UI language. */
-export function reviewerVoteLabel(vote: ReviewerVote, t: TFunction): string {
+/**
+ * Display label of a reviewer vote, in the active UI language. Azure DevOps
+ * calls a -5 vote "Waiting for author", not "Changes requested".
+ */
+export function reviewerVoteLabel(
+  vote: ReviewerVote,
+  t: TFunction,
+  provider: ScmProviderId = 'github',
+): string {
+  if (provider === 'azure' && vote === 'changes_requested') {
+    return t('prDetail.reviewerVote.waiting_for_author')
+  }
   return t(`prDetail.reviewerVote.${vote}`)
 }
+
+/** Key of the PR-list review chip, in each provider's own terms. */
+export function reviewDecisionLabelKey(
+  decision: NonNullable<ReviewDecision>,
+  provider: ScmProviderId,
+): ParseKeys {
+  switch (decision) {
+    case 'approved':
+      return 'prList.review.approved'
+    case 'changes_requested':
+      return provider === 'azure'
+        ? 'prList.review.waitingForAuthor'
+        : 'prList.review.changesRequested'
+    case 'rejected':
+      return 'prList.review.rejected'
+    case 'review_required':
+      return 'prList.review.reviewRequired'
+  }
+}
+
+/** Key of `layout.auth.via.*` per credential source (Azure DevOps). */
+export const CREDENTIAL_SOURCE_KEY = {
+  'gh-cli': 'ghCli',
+  'env-pat': 'envPat',
+  'az-devops-pat': 'azDevopsPat',
+  'az-entra': 'azEntra',
+} as const satisfies Record<NonNullable<ScmAuthStatus['credentialSource']>, string>
 
 /** Display label of a thread status, in the active UI language. */
 export function threadStatusLabel(status: ThreadStatus, t: TFunction): string {

@@ -15,6 +15,7 @@
 import type {
   AzComment,
   AzIteration,
+  AzPolicyEvaluation,
   AzPullRequest,
   AzPullRequestStatusEntry,
   AzThread,
@@ -90,6 +91,44 @@ const STATUSES: Record<number, AzPullRequestStatusEntry[]> = {
 }
 
 /** Linked work items per PR id. */
+/** Branch policy evaluations per PR id (`_apis/policy/evaluations?artifactId=…`). */
+function policy(
+  id: number,
+  status: AzPolicyEvaluation['status'],
+  typeName: string,
+  isBlocking: boolean,
+  displayName?: string,
+): AzPolicyEvaluation {
+  return {
+    evaluationId: 'eval-' + id,
+    status,
+    configuration: {
+      id,
+      isBlocking,
+      isEnabled: true,
+      type: { id: 'policy-type-' + id, displayName: typeName },
+      ...(displayName ? { settings: { displayName } } : {}),
+    },
+  }
+}
+
+const POLICY_EVALUATIONS: Record<number, AzPolicyEvaluation[]> = {
+  101: [
+    policy(1, 'running', 'Minimum number of reviewers', true),
+    policy(2, 'queued', 'Build', true, 'orders-api CI'),
+    policy(3, 'approved', 'Work item linking', true),
+    policy(4, 'approved', 'Comment requirements', false),
+  ],
+  105: [
+    policy(1, 'rejected', 'Minimum number of reviewers', true),
+    policy(2, 'rejected', 'Build', true, 'orders-api CI'),
+  ],
+  108: [
+    policy(1, 'approved', 'Minimum number of reviewers', true),
+    policy(5, 'approved', 'Build', true, 'storefront-web CI'),
+  ],
+}
+
 const WORK_ITEMS: Record<number, { id: number; title: string; type: string; state: string }[]> = {
   108: [{ id: 4711, title: 'Cart total is off by a cent', type: 'Bug', state: 'Active' }],
   101: [{ id: 4700, title: 'Checkout v2', type: 'User Story', state: 'Active' }],
@@ -396,7 +435,12 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
     if (project?.toLowerCase() !== MOCK_PROJECT.toLowerCase() || apis !== '_apis') {
       return notFound('project')
     }
-    if (area === 'policy' && kind === 'evaluations') return json({ count: 0, value: [] })
+    if (area === 'policy' && kind === 'evaluations') {
+      // artifactId = vstfs:///CodeReview/CodeReviewId/{projectId}/{pullRequestId}
+      const prId = Number((query.get('artifactId') ?? '').split('/').pop())
+      const value = clone(POLICY_EVALUATIONS[prId] ?? [])
+      return json({ count: value.length, value })
+    }
     if (area !== 'git') return notFound(area ?? '')
     if (kind?.toLowerCase() === 'pullrequests' && !repoId) {
       return json({ value: searchPrs(query) })

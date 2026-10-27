@@ -4,6 +4,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
 import { repoKey } from '../../../../shared/scm'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
+import { azDevopsLoginCommand, enabledProviders, GH_LOGIN_COMMAND } from '../../lib/scm-connection'
 import { groupByRepo } from '../../lib/pr-filters'
 import { usePullRequests } from '../../hooks/use-pull-requests'
 import { useScmSettings } from '../../hooks/use-scm-settings'
@@ -15,13 +16,74 @@ import { countOrphans } from '../../lib/stacks'
 import { RepoGroup } from '../pr-list/RepoGroup'
 import { StacksView } from '../stacks/StacksView'
 import { IconButton } from '../ui/IconButton'
-
-/** CLI command shown verbatim (not translated). */
-const GH_LOGIN_COMMAND = 'gh auth login'
+import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 
 /** A provider error that means "sign in first", not "something broke". */
 function isSignInError(error: ScmListError): boolean {
   return error.code === 'UNAUTHENTICATED' || error.code === 'CLI_UNAVAILABLE'
+}
+
+const MONO = <span className="font-mono text-text" />
+/** A long command (Azure's names the org URL) on its own line, wrapping anywhere. */
+const CMD = (
+  <code className="my-1 block break-all rounded bg-bg px-1.5 py-1 font-mono text-xs text-text" />
+)
+
+/**
+ * What to run for ONE provider that could not list because it needs a sign-in
+ * (`UNAUTHENTICATED` / `CLI_UNAVAILABLE`). GitHub: `gh auth login`, or the
+ * picked account by name (a bare "run gh auth login" would be wrong advice
+ * when the CLI is fine and only the choice is broken). Azure: the
+ * org-specific `az devops login`, or installing `az` first.
+ */
+function SignInHint({
+  error,
+  githubAccount,
+  azureOrganization,
+}: {
+  error: ScmListError
+  githubAccount: string | null
+  azureOrganization: string | undefined
+}): React.JSX.Element {
+  const body =
+    error.provider === 'github' ? (
+      githubAccount !== null ? (
+        <Trans
+          i18nKey="layout.sidebar.accountNoSession"
+          values={{ account: githubAccount, command: GH_LOGIN_COMMAND }}
+          components={{ mono: MONO }}
+        />
+      ) : (
+        <Trans
+          i18nKey="layout.sidebar.signInWithGhCli"
+          values={{ command: GH_LOGIN_COMMAND }}
+          components={{ mono: MONO }}
+        />
+      )
+    ) : (
+      <Trans
+        i18nKey={
+          error.code === 'CLI_UNAVAILABLE'
+            ? 'layout.sidebar.installAz'
+            : 'layout.sidebar.signInWithAz'
+        }
+        values={{ command: azDevopsLoginCommand(azureOrganization) }}
+        components={{ mono: MONO, cmd: CMD }}
+      />
+    )
+  return (
+    <div
+      data-sign-in={error.provider}
+      data-error-code={error.code}
+      className="flex w-full flex-col items-center gap-1 text-sm text-muted"
+    >
+      <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+        <ScmProviderIcon provider={error.provider} size={12} />
+        {SCM_PROVIDER_LABEL[error.provider]}
+      </span>
+      <p className="break-words">{body}</p>
+    </div>
+  )
 }
 
 const STATE_FILTER_OPTIONS: readonly PrStateFilter[] = ['open', 'closed', 'all']
@@ -155,7 +217,14 @@ export function Sidebar(): React.JSX.Element | null {
     authKey,
     prStateFilter,
   )
-  const githubAccount = useScmSettings().info?.githubAccount ?? null
+  const scmSettings = useScmSettings().info
+  const githubAccount = scmSettings?.githubAccount ?? null
+  const azureOrganization = scmSettings?.providers.azure.organizations[0]?.organization
+  const enabled = enabledProviders(scmSettings, scmAuth)
+  const noProviders = enabled !== null && enabled.length === 0
+  // Azure turned on without an organization: main reports it `disabled`.
+  const azureNotConfigured =
+    enabled?.includes('azure') === true && scmAuth?.azure?.state === 'disabled'
   const tier = useLayoutTier()
   const isDrawer = sidebarIsDrawer(tier.w)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
@@ -174,14 +243,13 @@ export function Sidebar(): React.JSX.Element | null {
   }, [isDrawer, sidebarOpen, settingsOpen, closeSidebar])
 
   const groups = useMemo(() => groupByRepo(pullRequests), [pullRequests])
-  const githubSignIn = providerErrors.find(
-    (providerError) => providerError.provider === 'github' && isSignInError(providerError),
-  )
-  // Full-panel sign-in CTA only when nothing could be listed at all.
-  const needsLogin = githubSignIn !== undefined && pullRequests.length === 0
+  const signInErrors = providerErrors.filter(isSignInError)
+  // Full-panel sign-in CTA (one hint per provider that needs it) only when
+  // nothing could be listed at all.
+  const needsLogin = signInErrors.length > 0 && pullRequests.length === 0
   // Everything else (or a sign-in error while other providers did list) is a banner.
   const otherErrors = needsLogin
-    ? providerErrors.filter((providerError) => providerError !== githubSignIn)
+    ? providerErrors.filter((providerError) => !isSignInError(providerError))
     : providerErrors
 
   const handleSelectPr = (pr: PullRequestSummary): void => {
@@ -222,33 +290,15 @@ export function Sidebar(): React.JSX.Element | null {
                 className="ml-auto"
               />
             </div>
-            {needsLogin ? (
-              <div className="flex flex-col items-center gap-3 p-6 text-center">
-                <span className="text-3xl" aria-hidden>
-                  🔒
-                </span>
-                {/*
-            If an account was picked by hand, name it: a bare "run gh auth
-            login" would be wrong advice when the CLI is fine and only the
-            choice is broken.
-          */}
-                {githubAccount !== null ? (
-                  <p className="text-sm text-muted">
-                    <Trans
-                      i18nKey="layout.sidebar.accountNoSession"
-                      values={{ account: githubAccount, command: GH_LOGIN_COMMAND }}
-                      components={{ mono: <span className="font-mono text-text" /> }}
-                    />
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted">
-                    <Trans
-                      i18nKey="layout.sidebar.signInWithGhCli"
-                      values={{ command: GH_LOGIN_COMMAND }}
-                      components={{ mono: <span className="font-mono text-text" /> }}
-                    />
-                  </p>
-                )}
+            {noProviders ? (
+              <div
+                data-testid="no-providers"
+                className="flex flex-col items-center gap-3 p-6 text-center"
+              >
+                <p className="text-sm font-medium text-text">
+                  {t('layout.sidebar.noProvidersTitle')}
+                </p>
+                <p className="text-xs text-muted">{t('layout.sidebar.noProvidersHint')}</p>
                 <button
                   type="button"
                   onClick={openSettings}
@@ -256,6 +306,31 @@ export function Sidebar(): React.JSX.Element | null {
                 >
                   {t('layout.sidebar.openSettings')}
                 </button>
+              </div>
+            ) : needsLogin ? (
+              <div
+                data-testid="sign-in-needed"
+                className="flex flex-col items-center gap-4 p-6 text-center"
+              >
+                <span className="text-3xl" aria-hidden>
+                  🔒
+                </span>
+                {signInErrors.map((signInError) => (
+                  <SignInHint
+                    key={signInError.provider}
+                    error={signInError}
+                    githubAccount={githubAccount}
+                    azureOrganization={azureOrganization}
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={openSettings}
+                  className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
+                >
+                  {t('layout.sidebar.openSettings')}
+                </button>
+                {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
               </div>
             ) : error ? (
               <p className="p-4 text-sm text-danger">{t('layout.sidebar.loadFailed', { error })}</p>
@@ -271,12 +346,26 @@ export function Sidebar(): React.JSX.Element | null {
               ) : (
                 <div className="flex flex-col gap-2 p-4 text-sm text-muted">
                   <p>{t(`layout.sidebar.empty.${prStateFilter}`)}</p>
-                  <p className="text-xs">
-                    <Trans
-                      i18nKey="layout.sidebar.searchTip"
-                      components={{ code: <code className="rounded bg-bg px-1" /> }}
-                    />
-                  </p>
+                  {azureNotConfigured && (
+                    <p className="text-xs text-warning">{t('layout.sidebar.azureNotConfigured')}</p>
+                  )}
+                  {/* Search help per enabled provider: GitHub qualifiers mean nothing to Azure. */}
+                  {enabled?.includes('github') && (
+                    <p className="text-xs" data-search-tip="github">
+                      <Trans
+                        i18nKey="layout.sidebar.searchTipGithub"
+                        components={{ code: <code className="rounded bg-bg px-1" /> }}
+                      />
+                    </p>
+                  )}
+                  {enabled?.includes('azure') && !azureNotConfigured && (
+                    <p className="text-xs" data-search-tip="azure">
+                      <Trans
+                        i18nKey="layout.sidebar.searchTipAzure"
+                        components={{ code: <code className="rounded bg-bg px-1" /> }}
+                      />
+                    </p>
+                  )}
                 </div>
               )
             ) : (
