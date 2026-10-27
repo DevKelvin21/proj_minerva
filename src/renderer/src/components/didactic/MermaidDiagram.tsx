@@ -1,6 +1,8 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import type { Mermaid } from 'mermaid'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import type { Mermaid, MermaidConfig } from 'mermaid'
 import { useTranslation } from 'react-i18next'
+import { useResolvedAppearance } from '../../stores/appearance-store'
+import { mermaidInk, mermaidThemeConfig, type MermaidInk } from '../../theme/mermaid-theme'
 
 interface MermaidDiagramProps {
   code: string
@@ -24,10 +26,10 @@ interface MermaidDiagramProps {
  * vez pase lo que pase (llamarlo de nuevo reinicia estado interno de mermaid
  * innecesariamente).
  *
- * Tema `neutral` (T16): los diagramas se renderizan SIEMPRE sobre fondo
- * blanco (tarjeta inline y área del visor `MermaidZoomPan`, un solo tema),
- * nunca sobre el fondo oscuro de la app — con `dark` las etiquetas de las
- * flechas de los C4 quedaban ilegibles. La config de `c4`/`er`/`flowchart`
+ * Theme: diagrams follow the app theme (`../../theme/mermaid-theme.ts`, the
+ * `base` theme with variables taken from the active palette), drawn on the
+ * theme's canvas, and re-render when the theme changes: `mermaid.initialize`
+ * runs again before each render with the current palette. La config de `c4`/`er`/`flowchart`
  * de abajo abre el layout por defecto (más fila/margen/padding) para que las
  * etiquetas largas de `Rel()` que genera la IA no se encimen entre sí ni con
  * las cajas.
@@ -81,10 +83,11 @@ const TRIM_PADDING = 24
  * tolerante y además es el mismo modelo con el que se consume el string
  * después (dangerouslySetInnerHTML).
  */
-function normalizeSvg(svgMarkup: string, naturalSize: boolean): string {
+function normalizeSvg(svgMarkup: string, naturalSize: boolean, ink: MermaidInk): string {
   const doc = new DOMParser().parseFromString(svgMarkup, 'text/html')
   const svg = doc.body.querySelector('svg')
   if (!svg) return svgMarkup
+  recolorFixedInk(svg, ink)
 
   const host = document.createElement('div')
   host.style.cssText = 'position:absolute; left:-99999px; top:0; visibility:hidden'
@@ -111,7 +114,10 @@ function normalizeSvg(svgMarkup: string, naturalSize: boolean): string {
     }
   }
 
-  const viewBox = (svg.getAttribute('viewBox') ?? '').trim().split(/[\s,]+/).map(Number)
+  const viewBox = (svg.getAttribute('viewBox') ?? '')
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number)
   const width = viewBox.length === 4 ? viewBox[2] : 0
   const height = viewBox.length === 4 ? viewBox[3] : 0
   if (!(width > 0) || !(height > 0)) return svgMarkup
@@ -121,6 +127,25 @@ function normalizeSvg(svgMarkup: string, naturalSize: boolean): string {
     svg.setAttribute('style', `max-width: none; width: ${width}px; height: ${height}px;`)
   }
   return new XMLSerializer().serializeToString(svg)
+}
+
+/**
+ * Mermaid's C4 renderer ignores the theme for relationship labels/lines and
+ * boundary titles: it hard-codes `#444444`, unreadable on a dark canvas.
+ * Those exact values are swapped for the theme's text (fills) and muted
+ * (strokes) colors.
+ */
+const FIXED_C4_INK = '#444444'
+
+function recolorFixedInk(svg: Element, ink: MermaidInk): void {
+  for (const element of svg.querySelectorAll('[fill], [stroke]')) {
+    if (element.getAttribute('fill')?.toLowerCase() === FIXED_C4_INK) {
+      element.setAttribute('fill', element.tagName.toLowerCase() === 'text' ? ink.text : ink.line)
+    }
+    if (element.getAttribute('stroke')?.toLowerCase() === FIXED_C4_INK) {
+      element.setAttribute('stroke', ink.line)
+    }
+  }
 }
 
 function getMermaid(): Promise<Mermaid> {
@@ -135,35 +160,36 @@ function getMermaid(): Promise<Mermaid> {
         { name: 'logos', icons: logosMod.icons },
         { name: 'cf', icons: cfMod.cfIconPack },
       ])
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: 'neutral',
-        securityLevel: 'strict',
-        c4: {
-          c4ShapeInRow: 3,
-          c4BoundaryInRow: 1,
-          // 110 y no menos: el hueco horizontal entre shapes debe caber una
-          // etiqueta de Rel de ~4 palabras sin pisar las cajas vecinas (el
-          // motor C4 centra la etiqueta en el punto medio de la flecha).
-          c4ShapeMargin: 110,
-          c4ShapePadding: 24,
-          diagramMarginX: 40,
-          diagramMarginY: 40,
-          messageFontSize: 14,
-        },
-        er: {
-          diagramPadding: 24,
-        },
-        flowchart: {
-          nodeSpacing: 60,
-          rankSpacing: 60,
-          diagramPadding: 16,
-        },
-      })
       return mermaid
     })
   }
   return mermaidPromise
+}
+
+/** Layout config shared by every render; the theme part is added per render. */
+const BASE_MERMAID_CONFIG: MermaidConfig = {
+  startOnLoad: false,
+  securityLevel: 'strict',
+  c4: {
+    c4ShapeInRow: 3,
+    c4BoundaryInRow: 1,
+    // 110 y no menos: el hueco horizontal entre shapes debe caber una
+    // etiqueta de Rel de ~4 palabras sin pisar las cajas vecinas (el
+    // motor C4 centra la etiqueta en el punto medio de la flecha).
+    c4ShapeMargin: 110,
+    c4ShapePadding: 24,
+    diagramMarginX: 40,
+    diagramMarginY: 40,
+    messageFontSize: 14,
+  },
+  er: {
+    diagramPadding: 24,
+  },
+  flowchart: {
+    nodeSpacing: 60,
+    rankSpacing: 60,
+    diagramPadding: 16,
+  },
 }
 
 /**
@@ -191,6 +217,10 @@ export function MermaidDiagram({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [svg, setSvg] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  // `colors` is the theme's own (stable) object, so the config, and with it
+  // the render effect, only changes when the palette or appearance does.
+  const { appearance, colors } = useResolvedAppearance()
+  const themeConfig = useMemo(() => mermaidThemeConfig(appearance, colors), [appearance, colors])
 
   useEffect(() => {
     let cancelled = false
@@ -198,8 +228,9 @@ export function MermaidDiagram({
     void (async () => {
       try {
         const mermaid = await getMermaid()
+        mermaid.initialize({ ...BASE_MERMAID_CONFIG, ...themeConfig })
         const { svg: rendered } = await mermaid.render(elementId, code)
-        if (!cancelled) setSvg(normalizeSvg(rendered, naturalSize))
+        if (!cancelled) setSvg(normalizeSvg(rendered, naturalSize, mermaidInk(themeConfig)))
       } catch (error) {
         // Log del motivo real: sin esto el fallback "no renderizable" es
         // indistinguible entre DSL inválido de la IA y un bug nuestro (T16).
@@ -211,7 +242,7 @@ export function MermaidDiagram({
     return () => {
       cancelled = true
     }
-  }, [code, elementId, naturalSize])
+  }, [code, elementId, naturalSize, themeConfig])
 
   // Avisa cuando el SVG ya está montado en el DOM (corre tras el render que
   // insertó `svg` vía dangerouslySetInnerHTML). Puede dispararse más de una
@@ -224,7 +255,9 @@ export function MermaidDiagram({
   if (failed) {
     return (
       <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
-        <p className="mb-2 text-xs font-medium text-warning">{t('didactic.mermaid.unrenderable')}</p>
+        <p className="mb-2 text-xs font-medium text-warning">
+          {t('didactic.mermaid.unrenderable')}
+        </p>
         <pre className="overflow-x-auto text-[11px] whitespace-pre-wrap text-muted">{code}</pre>
       </div>
     )
@@ -246,7 +279,7 @@ export function MermaidDiagram({
       className={
         naturalSize
           ? 'w-max'
-          : 'overflow-x-auto rounded-md border border-border bg-white p-3 [&_svg]:mx-auto'
+          : 'overflow-x-auto rounded-md border border-border bg-bg p-3 [&_svg]:mx-auto'
       }
       dangerouslySetInnerHTML={{ __html: svg }}
     />

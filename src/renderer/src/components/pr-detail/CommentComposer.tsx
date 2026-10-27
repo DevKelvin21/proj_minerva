@@ -145,7 +145,7 @@ export function CommentComposer({
         <button
           type="submit"
           disabled={posting || draft.trim().length === 0}
-          className="rounded-md border border-border bg-accent/90 px-2.5 py-1 text-xs font-medium text-bg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
+          className="rounded-md border border-border bg-accent/90 px-2.5 py-1 text-xs font-medium text-accent-fg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
         >
           {posting ? t('comments.composer.posting') : submitLabel}
         </button>

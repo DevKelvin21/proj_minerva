@@ -57,7 +57,7 @@ const components: Components = {
       return <code className={className}>{children}</code>
     }
     return (
-      <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-[0.85em] text-[#eef1f6]">
+      <code className="rounded bg-border/50 px-1 py-0.5 font-mono text-[0.85em] text-text">
         {children}
       </code>
     )
@@ -73,7 +73,7 @@ const components: Components = {
     </div>
   ),
   thead: ({ children }) => <thead className="bg-border/60 text-text">{children}</thead>,
-  tr: ({ children }) => <tr className="even:bg-white/[0.03]">{children}</tr>,
+  tr: ({ children }) => <tr className="even:bg-border/20">{children}</tr>,
   th: ({ children }) => (
     <th className="border-b border-border px-2 py-1 text-left font-semibold">{children}</th>
   ),

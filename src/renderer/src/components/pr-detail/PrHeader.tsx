@@ -10,6 +10,7 @@ import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
+import { labelStyle } from '../../lib/label-colors'
 import { REVIEWER_VOTE_TONE, reviewerVoteLabel } from '../../lib/scm-labels'
 
 interface PrHeaderProps {
@@ -116,17 +117,20 @@ function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
 
   const labels = pr.labels.length > 0 && (
     <div className="flex flex-wrap gap-1.5">
-      {pr.labels.map((label) => (
-        <span
-          key={label.name}
-          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-            label.color ? 'text-bg' : 'bg-border/60 text-muted'
-          }`}
-          style={label.color ? { backgroundColor: `#${label.color}` } : undefined}
-        >
-          {label.name}
-        </span>
-      ))}
+      {pr.labels.map((label) => {
+        const style = labelStyle(label.color)
+        return (
+          <span
+            key={label.name}
+            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+              style ? '' : 'bg-border/60 text-muted'
+            }`}
+            style={style ?? undefined}
+          >
+            {label.name}
+          </span>
+        )
+      })}
     </div>
   )
 

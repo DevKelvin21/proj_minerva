@@ -14,6 +14,7 @@ import { ProviderTabs } from './ProviderTabs'
 import { ProviderModelPanel } from './ProviderModelPanel'
 import { UpdateSection } from './UpdateSection'
 import { LanguageSection } from './LanguageSection'
+import { AppearanceSection } from './appearance/AppearanceSection'
 
 /**
  * Modal de settings (T12; rediseñado en T62/F12: tabs por proveedor + strip
@@ -170,6 +171,9 @@ function SettingsModalBody({
   // de la columna izquierda en dos).
   const language = <LanguageSection compact={compact} />
 
+  // Appearance (mode, themes, contrast): right below the language.
+  const appearance = <AppearanceSection compact={compact} />
+
   // Sección "Actualizaciones" (T93, F17): en una columna va al final de todo
   // el scroll; en dos columnas (≥980px) va debajo de GitHub, la columna más
   // corta (mismo criterio que el PLAN.md § F17). Se automonta en `disabled`
@@ -209,6 +213,7 @@ function SettingsModalBody({
       <div className="flex min-h-0 flex-1">
         <div className="w-[40%] min-w-0 shrink-0 overflow-y-auto border-r border-border">
           <div className="border-b border-border">{language}</div>
+          <div className="border-b border-border">{appearance}</div>
           {github}
           {updates}
         </div>
@@ -220,6 +225,7 @@ function SettingsModalBody({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="border-b border-border">{language}</div>
+      <div className="border-b border-border">{appearance}</div>
       <div className="border-b border-border">{github}</div>
       {ai}
       {updates}

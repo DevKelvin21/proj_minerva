@@ -5,6 +5,7 @@ import { DidacticWindowApp } from './DidacticWindowApp'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { parseDidacticHash } from '../../shared/didactic-route'
 import { bootI18n } from './i18n'
+import { bootAppearance } from './theme/boot'
 import './styles.css'
 
 const container = document.getElementById('root')
@@ -39,9 +40,9 @@ function Root(): React.JSX.Element {
   return didacticTarget ? <DidacticWindowApp key={hash} target={didacticTarget} /> : <App />
 }
 
-// The saved language is read before the first render so no window flashes
-// English before switching to Spanish (`bootI18n` never throws).
-void bootI18n().then(() => {
+// The saved language and theme are read before the first render so no window
+// flashes English or the wrong theme first (neither boot ever throws).
+void Promise.all([bootI18n(), bootAppearance()]).then(() => {
   createRoot(container).render(
     <StrictMode>
       <ErrorBoundary>

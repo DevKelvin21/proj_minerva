@@ -1,4 +1,4 @@
-import type { HighlightToken } from '../../lib/highlighter'
+import { tokenClass, tokenStyle, type HighlightToken } from '../../lib/highlighter'
 
 interface DiffLineContentProps {
   content: string
@@ -7,7 +7,8 @@ interface DiffLineContentProps {
 
 /**
  * Renderiza el contenido de una línea de diff. Si ya hay tokens de Shiki
- * disponibles los pinta como `<span>` con solo `color` inline (nunca HTML de
+ * disponibles los pinta como `<span>` con sus colores claro/oscuro como
+ * custom properties inline (nunca HTML de
  * shiki vía `dangerouslySetInnerHTML`: el contenido del patch es entrada no
  * confiable). Si todavía no hay tokens (highlighting async en curso, o
  * lenguaje no soportado), cae a texto plano.
@@ -20,7 +21,7 @@ export function DiffLineContent({ content, tokens }: DiffLineContentProps): Reac
   return (
     <>
       {tokens.map((token, index) => (
-        <span key={index} style={token.color ? { color: token.color } : undefined}>
+        <span key={index} className={tokenClass(token)} style={tokenStyle(token)}>
           {token.content}
         </span>
       ))}

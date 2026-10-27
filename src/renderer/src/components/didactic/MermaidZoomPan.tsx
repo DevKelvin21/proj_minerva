@@ -142,7 +142,7 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
       <div
         ref={containerRef}
         className={
-          'relative flex-1 overflow-hidden bg-white ' +
+          'relative flex-1 overflow-hidden bg-bg ' +
           (isDragging ? 'cursor-grabbing' : 'cursor-grab')
         }
         onWheel={handleWheel}

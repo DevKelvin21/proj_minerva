@@ -19,7 +19,7 @@ export function FileStatusIcon({ status, size = 14 }: FileStatusIconProps): Reac
       return (
         <ArrowRightLeft
           size={size}
-          className="shrink-0 text-blue-400"
+          className="shrink-0 text-info"
           aria-label={t('prDetail.fileStatus.renamed')}
         />
       )

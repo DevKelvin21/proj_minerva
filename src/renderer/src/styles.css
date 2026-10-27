@@ -1,25 +1,125 @@
 @import 'tailwindcss';
 
 /**
- * Tokens del tema (estilo GitKraken: oscuro profundo, acentos teal/verde).
- * `@theme` genera utilidades Tailwind a partir de estas variables, p. ej.
- * `--color-bg` -> `bg-bg` / `text-bg` / `border-bg`.
+ * Theme tokens. Every color comes from the active theme at runtime: the
+ * renderer sets one `--theme-<role>` custom property per T3 Code color role
+ * on <html> (`src/renderer/src/theme/apply-theme.ts`), plus `--theme-success`
+ * and the contrast variables. `@theme` keeps Minerva's Tailwind names
+ * (`bg-bg`, `text-muted`, `border-border`, …) pointing at those properties,
+ * so components never name a color.
+ *
+ * Contrast (Settings → Appearance) is T3 Code's formula: below 100% the
+ * foregrounds fade toward the canvas, above 100% they (and borders, a
+ * quarter as much) move toward black in light mode or white in dark mode.
  */
 @theme {
-  --color-bg: #1a1d23;
-  --color-panel: #22262e;
-  --color-border: #353b47;
-  --color-code-bg: #15181d;
-  --color-text: #e2e5ea;
-  --color-muted: #8b93a1;
-  --color-accent: #14b8a6;
-  --color-success: #22c55e;
-  --color-danger: #ef4444;
-  --color-warning: #eab308;
+  --color-bg: var(--theme-canvas);
+  --color-panel: var(--theme-surface);
+  --color-border: var(--contrast-border);
+  --color-code-bg: var(--theme-code-background);
+  --color-text: var(--contrast-text);
+  --color-muted: var(--contrast-text-muted);
+  --color-accent: var(--theme-accent);
+  --color-accent-fg: var(--contrast-accent-foreground);
+  --color-success: var(--theme-success);
+  --color-danger: var(--theme-error);
+  --color-warning: var(--theme-warning);
+  --color-merged: var(--theme-merged);
+  --color-info: var(--theme-info);
+  --color-diff-add: color-mix(in oklab, var(--theme-success) var(--diff-mix), var(--theme-canvas));
+  --color-diff-del: color-mix(in oklab, var(--theme-error) var(--diff-mix), var(--theme-canvas));
+}
+
+/*
+ * Defaults = the Minerva theme, used only until the boot script
+ * (`public/theme-boot.js`) or the renderer applies the saved theme. Main sets
+ * `nativeTheme.themeSource` from the saved mode, so `prefers-color-scheme`
+ * already matches the saved appearance here. Kept in sync with
+ * `shared/theme/themes.ts` by `theme/styles-defaults.test.ts`.
+ */
+:root {
+  --theme-canvas: oklch(0.23027 0.012474 264.293);
+  --theme-surface: oklch(0.268053 0.016024 264.256);
+  --theme-border: oklch(0.351587 0.022471 264.229);
+  --theme-code-background: oklch(0.208097 0.010968 260.669);
+  --theme-text: oklch(0.921046 0.007506 260.732);
+  --theme-text-muted: oklch(0.661339 0.022749 261.742);
+  --theme-accent: oklch(0.703753 0.123018 182.503);
+  --theme-accent-foreground: oklch(0.23027 0.012474 264.293);
+  --theme-error: oklch(0.636834 0.207849 25.331);
+  --theme-warning: oklch(0.795243 0.161668 86.047);
+  --theme-success: oklch(0.722746 0.192007 149.579);
+  --theme-focus: oklch(0.703753 0.123018 182.503);
+  --theme-merged: oklch(0.721685 0.176688 305.504);
+  --theme-info: oklch(0.71374 0.143381 254.624);
+
+  --appearance-contrast-base: 100%;
+  --appearance-contrast-boost: 0%;
+  --appearance-contrast-border-boost: 0%;
+  --appearance-contrast-target: white;
+  --diff-mix: 17%;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-appearance]) {
+    --theme-canvas: oklch(0.975942 0.002867 264.542);
+    --theme-surface: oklch(1 0 0);
+    --theme-border: oklch(0.887332 0.010522 261.788);
+    --theme-code-background: oklch(0.96948 0.004541 258.325);
+    --theme-text: oklch(0.254208 0.011124 254.038);
+    --theme-text-muted: oklch(0.500617 0.021556 258.372);
+    --theme-accent: oklch(0.510938 0.086055 186.391);
+    --theme-accent-foreground: oklch(1 0 0);
+    --theme-error: oklch(0.577099 0.215157 27.325);
+    --theme-warning: oklch(0.555283 0.145505 48.998);
+    --theme-success: oklch(0.527299 0.137103 150.069);
+    --theme-focus: oklch(0.510938 0.086055 186.391);
+    --theme-merged: oklch(0.495518 0.236871 301.924);
+    --theme-info: oklch(0.488198 0.217165 264.376);
+    --appearance-contrast-target: black;
+    --diff-mix: 14%;
+    color-scheme: light;
+  }
+}
+
+:root[data-appearance='light'] {
+  --appearance-contrast-target: black;
+  --diff-mix: 14%;
+  color-scheme: light;
+}
+
+:root[data-appearance='dark'] {
+  --appearance-contrast-target: white;
+  --diff-mix: 17%;
+  color-scheme: dark;
 }
 
 :root {
-  color-scheme: dark;
+  --contrast-text: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--theme-text) var(--appearance-contrast-base), var(--theme-canvas)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-text-muted: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--theme-text-muted) var(--appearance-contrast-base), var(--theme-canvas)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-accent-foreground: color-mix(
+    in oklab,
+    color-mix(
+      in oklab,
+      var(--theme-accent-foreground) var(--appearance-contrast-base),
+      var(--theme-accent)
+    ),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-border: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--theme-border) var(--appearance-contrast-base), transparent),
+    var(--theme-text) var(--appearance-contrast-border-boost)
+  );
 }
 
 * {
@@ -43,7 +143,16 @@ body {
     sans-serif;
 }
 
-/* Scrollbars finos, coherentes con el tema oscuro. */
+/* Syntax highlighting: each Shiki token carries its light and dark color. */
+.shiki-token {
+  color: var(--shiki-dark);
+}
+
+:root[data-appearance='light'] .shiki-token {
+  color: var(--shiki-light);
+}
+
+/* Thin scrollbars in the theme's border/muted colors. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;
@@ -67,8 +176,8 @@ body {
   background-color: var(--color-muted);
 }
 
-/* Focus ring visible y consistente para elementos interactivos. */
+/* Visible, consistent focus ring in the theme's focus color. */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--theme-focus);
   outline-offset: 2px;
 }
