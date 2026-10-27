@@ -181,3 +181,17 @@ body {
   outline: 2px solid var(--theme-focus);
   outline-offset: 2px;
 }
+
+/*
+ * Frameless window (`main/windows/title-bar.ts`): the title bar drags the
+ * window and every control in it opts out, as does any popover opened from
+ * it (`data-no-drag`), so clicks reach them instead of moving the window.
+ */
+.app-drag {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.app-drag :is(button, a, input, select, textarea, [role='button'], [data-no-drag]) {
+  -webkit-app-region: no-drag;
+}

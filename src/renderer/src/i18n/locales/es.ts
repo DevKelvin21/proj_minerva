@@ -26,9 +26,10 @@ export const es: MessageShape<typeof en> = {
       home: 'Inicio',
       sidebarHide: 'Ocultar la lista de pull requests',
       sidebarShow: 'Mostrar la lista de pull requests',
-      searchPrs: 'Buscar PRs',
-      searchPlaceholder: 'Buscar por título, repo, rama o #número',
-      closeSearch: 'Cerrar búsqueda',
+      jumpTo: 'Ir a un PR, archivo o comando ({{shortcut}})',
+      jumpPlaceholder: 'Ir a un PR, archivo o comando',
+      jumpShort: 'Ir a',
+      switchPr: 'Cambiar de pull request — {{title}}',
       didacticPanel: 'Panel didáctico',
       connectionTitle: 'Control de versiones: {{status}}',
       connectionIpcError: 'Sin conexión con el proceso principal.',
@@ -52,14 +53,7 @@ export const es: MessageShape<typeof en> = {
     settingsChip: {
       settings: 'Configuración',
       updateAvailable: 'Hay una actualización disponible',
-      title: 'Configuración — {{provider}} · {{model}} · origen: {{source}}',
-      titleWithEffort:
-        'Configuración — {{provider}} · {{model}} · Razonamiento: {{effort}} · origen: {{source}}',
-      modelSource: {
-        settings: 'configuración',
-        env: 'entorno',
-        default: 'predeterminado',
-      },
+      settingsWithUpdate: 'Configuración — hay una actualización disponible',
     },
     auth: {
       viaGhCli: 'vía GitHub CLI',
@@ -82,8 +76,58 @@ export const es: MessageShape<typeof en> = {
       copyCommandNamed: 'Copiar comando: {{command}}',
       waitingForSession: 'Esperando la sesión…',
     },
+    aiChip: {
+      title: 'IA — {{provider}} · {{model}} · origen: {{source}} (cámbialo en Configuración)',
+      titleWithEffort:
+        'IA — {{provider}} · {{model}} · Razonamiento: {{effort}} · origen: {{source}} (cámbialo en Configuración)',
+      modelSource: {
+        settings: 'configuración',
+        env: 'entorno',
+        default: 'predeterminado',
+      },
+      analysis: 'Análisis: {{status}}',
+      status: {
+        idle: 'Sin analizar',
+        exploring: 'Explorando…',
+        writing: 'Escribiendo…',
+        ready: 'Listo',
+        failed: 'Falló',
+      },
+    },
+    accounts: {
+      button: 'Cuentas — {{status}}',
+      title: 'Cuentas de control de versiones',
+      manage: 'Administrar en Configuración',
+    },
+    palette: {
+      ariaLabel: 'Paleta de comandos',
+      inputLabel: 'Ir a',
+      placeholder: 'Ir a un PR, archivo o comando…',
+      resultsLabel: 'Resultados',
+      noResults: 'Nada coincide con “{{query}}”',
+      group: {
+        commands: 'Comandos',
+        pullRequests: 'Pull requests',
+        files: 'Archivos de este PR',
+      },
+      command: {
+        home: 'Ir a Inicio',
+        prList: 'Mostrar u ocultar la lista de pull requests',
+        settings: 'Abrir Configuración',
+        settingsKeywords: 'preferencias modelo proveedor tema idioma',
+        continueReview: 'Seguir revisando',
+        conversation: 'Mostrar Conversación',
+        files: 'Mostrar Archivos',
+        comments: 'Mostrar Comentarios',
+        showDidactic: 'Mostrar el panel didáctico',
+        hideDidactic: 'Ocultar el panel didáctico',
+        didacticKeywords: 'ia análisis resumen',
+      },
+    },
     sidebar: {
       ariaLabel: 'Lista de pull requests',
+      search: 'Buscar pull requests',
+      searchPlaceholder: 'Buscar por título, repo, rama o #número',
       viewSwitch: 'Vista de la columna izquierda',
       views: {
         list: 'Pull requests',

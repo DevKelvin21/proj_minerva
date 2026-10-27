@@ -231,6 +231,21 @@ export function windowBackgroundHex(resolved: ResolvedAppearance): string {
   return (themeColorToHex(resolved.colors.canvas) ?? '#1a1d23').slice(0, 7)
 }
 
+/**
+ * Colors of the native window controls drawn over the title bar on Windows
+ * and Linux (`titleBarOverlay`): the bar's own surface behind them and the
+ * theme's text for the glyphs, so the controls read as part of the bar.
+ */
+export function titleBarOverlayColors(resolved: ResolvedAppearance): {
+  color: string
+  symbolColor: string
+} {
+  return {
+    color: (themeColorToHex(resolved.colors.surface) ?? '#22262e').slice(0, 7),
+    symbolColor: (themeColorToHex(resolved.colors.text) ?? '#e5e7eb').slice(0, 7),
+  }
+}
+
 // ---------------------------------------------------------------------------
 // CSS custom properties. Every role becomes `--theme-<kebab-role>`; Minerva's
 // Tailwind tokens (`bg-bg`, `text-muted`, …) point at them in `styles.css`.

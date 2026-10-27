@@ -28,9 +28,10 @@ export const en = {
       home: 'Home',
       sidebarHide: 'Hide pull request list',
       sidebarShow: 'Show pull request list',
-      searchPrs: 'Search pull requests',
-      searchPlaceholder: 'Search by title, repo, branch or #number',
-      closeSearch: 'Close search',
+      jumpTo: 'Jump to a PR, file or command ({{shortcut}})',
+      jumpPlaceholder: 'Jump to a PR, file or command',
+      jumpShort: 'Jump to',
+      switchPr: 'Switch pull request — {{title}}',
       didacticPanel: 'Didactic panel',
       connectionTitle: 'Source control: {{status}}',
       connectionIpcError: 'No connection to the main process.',
@@ -54,14 +55,7 @@ export const en = {
     settingsChip: {
       settings: 'Settings',
       updateAvailable: 'An update is available',
-      title: 'Settings — {{provider}} · {{model}} · source: {{source}}',
-      titleWithEffort:
-        'Settings — {{provider}} · {{model}} · Reasoning: {{effort}} · source: {{source}}',
-      modelSource: {
-        settings: 'settings',
-        env: 'environment',
-        default: 'default',
-      },
+      settingsWithUpdate: 'Settings — an update is available',
     },
     auth: {
       viaGhCli: 'via GitHub CLI',
@@ -83,8 +77,58 @@ export const en = {
       copyCommandNamed: 'Copy command: {{command}}',
       waitingForSession: 'Waiting for session…',
     },
+    aiChip: {
+      title: 'AI — {{provider}} · {{model}} · source: {{source}} (change it in Settings)',
+      titleWithEffort:
+        'AI — {{provider}} · {{model}} · Reasoning: {{effort}} · source: {{source}} (change it in Settings)',
+      modelSource: {
+        settings: 'settings',
+        env: 'environment',
+        default: 'default',
+      },
+      analysis: 'Analysis: {{status}}',
+      status: {
+        idle: 'Not analyzed',
+        exploring: 'Exploring…',
+        writing: 'Writing…',
+        ready: 'Ready',
+        failed: 'Failed',
+      },
+    },
+    accounts: {
+      button: 'Accounts — {{status}}',
+      title: 'Source control accounts',
+      manage: 'Manage in Settings',
+    },
+    palette: {
+      ariaLabel: 'Command palette',
+      inputLabel: 'Jump to',
+      placeholder: 'Jump to a PR, file or command…',
+      resultsLabel: 'Results',
+      noResults: 'Nothing matches “{{query}}”',
+      group: {
+        commands: 'Commands',
+        pullRequests: 'Pull requests',
+        files: 'Files in this PR',
+      },
+      command: {
+        home: 'Go to Home',
+        prList: 'Show or hide the pull request list',
+        settings: 'Open Settings',
+        settingsKeywords: 'preferences model provider theme language',
+        continueReview: 'Continue reviewing',
+        conversation: 'Show Conversation',
+        files: 'Show Files',
+        comments: 'Show Comments',
+        showDidactic: 'Show the didactic panel',
+        hideDidactic: 'Hide the didactic panel',
+        didacticKeywords: 'ai analysis summary',
+      },
+    },
     sidebar: {
       ariaLabel: 'Pull request list',
+      search: 'Search pull requests',
+      searchPlaceholder: 'Search by title, repo, branch or #number',
       viewSwitch: 'Left column view',
       views: {
         list: 'Pull requests',

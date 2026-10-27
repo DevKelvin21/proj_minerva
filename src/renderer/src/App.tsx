@@ -4,6 +4,8 @@ import { CenterPane } from './components/layout/CenterPane'
 import { DidacticPanel } from './components/layout/DidacticPanel'
 import { HomeView } from './components/home/HomeView'
 import { SettingsModal } from './components/settings/SettingsModal'
+import { CommandPalette } from './components/layout/CommandPalette'
+import { useCommandPaletteShortcut } from './hooks/use-command-palette-shortcut'
 import { useSidebarShortcut } from './hooks/use-sidebar-shortcut'
 import { useAppStore } from './stores/app-store'
 
@@ -27,7 +29,9 @@ function App(): React.JSX.Element {
   const settingsOpen = useAppStore((s) => s.settingsOpen)
   const mainView = useAppStore((s) => s.mainView)
   const hasSelection = useAppStore((s) => s.selectedPr !== null)
+  const paletteOpen = useAppStore((s) => s.commandPaletteOpen)
   useSidebarShortcut()
+  useCommandPaletteShortcut()
 
   const onHome = mainView === 'home'
 
@@ -53,6 +57,7 @@ function App(): React.JSX.Element {
           </div>
         )}
       </div>
+      {paletteOpen && <CommandPalette />}
       {settingsOpen && <SettingsModal />}
     </div>
   )

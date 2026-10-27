@@ -105,7 +105,9 @@ test('con la ventana angosta la lista de PRs pasa a drawer y se abre desde el Ti
 
   // Elegir un PR cierra el drawer (gesto de un solo click).
   await window.getByText(prTitle).first().click()
-  await expect(window.getByText(prTitle)).toHaveCount(0)
+  await expect(window.locator('aside[aria-label="Pull request list"]')).toHaveCount(0)
+  // The title bar now names the PR under review.
+  await expect(window.getByTestId('review-breadcrumb')).toContainText(prTitle)
 })
 
 test('Settings: todo el contenido es alcanzable con la ventana tileada', async ({
