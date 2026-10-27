@@ -19,7 +19,7 @@ import {
   useThreadFileLines,
 } from '../../hooks/thread-actions'
 import { CommentBody } from './CommentBody'
-import { CommentComposer } from './CommentComposer'
+import { CommentComposer, type CommentComposerHandle } from './CommentComposer'
 import { ThreadCodeExcerpt } from './CodeExcerpt'
 import { ThreadStatusPicker } from './ThreadStatusPicker'
 import { errorText } from '../../lib/error-text'
@@ -38,6 +38,10 @@ interface ThreadCardProps {
   showPath?: boolean
   /** Focused (jumped to from the Comments view). */
   highlighted?: boolean
+  /** Starting text of the reply box, focused (an AI answer the reviewer turns into a reply). */
+  replyDraft?: string
+  /** The reply box, while the thread is open (an AI answer is appended through it). */
+  replyRef?: React.Ref<CommentComposerHandle>
 }
 
 function toErrorMessage(error: unknown): string {
@@ -79,6 +83,8 @@ export function ThreadCard({
   showExcerpt = false,
   showPath = true,
   highlighted = false,
+  replyDraft,
+  replyRef,
 }: ThreadCardProps): React.JSX.Element {
   const { t } = useTranslation()
   const { locale } = useLocale()
@@ -272,11 +278,14 @@ export function ThreadCard({
           </ul>
 
           <CommentComposer
+            ref={replyRef}
             className="border-t border-border p-3"
             label={t('comments.thread.replyLabel')}
             placeholder={t('comments.thread.replyPlaceholder')}
             submitLabel={t('comments.thread.reply')}
             clearOnSubmit
+            initialValue={replyDraft}
+            autoFocus={replyDraft !== undefined}
             suggestion={suggestionSourceFor(actions, thread, t)}
             onSubmit={(bodyMarkdown) => actions.reply(thread.id, bodyMarkdown)}
           />

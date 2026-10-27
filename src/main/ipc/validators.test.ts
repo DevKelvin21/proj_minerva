@@ -613,6 +613,57 @@ describe('payloadValidators', () => {
       expect(validate({ ...base, question: 'x'.repeat(2001) })).toBe(false)
       expect(validate({ ...base, extra: true })).toBe(false)
     })
+
+    const thread = { outdated: false, comments: [{ author: 'alice', body: 'Is this safe?' }] }
+
+    it('accepts earlier exchanges and a thread as context', () => {
+      expect(validate({ ...base, history: [] })).toBe(true)
+      expect(validate({ ...base, history: [{ question: 'Why?', answer: 'Because.' }] })).toBe(true)
+      expect(validate({ ...base, thread })).toBe(true)
+      expect(
+        validate({ ...base, thread: { ...thread, comments: [{ author: 'a', body: '' }] } }),
+      ).toBe(true)
+    })
+
+    it('leaves the line range out only for a thread, and only both ends together', () => {
+      const noLines = {
+        repo: base.repo,
+        number: base.number,
+        path: base.path,
+        side: base.side,
+        question: base.question,
+      }
+      expect(validate({ ...noLines, thread })).toBe(true)
+      expect(validate(noLines)).toBe(false)
+      expect(validate({ ...noLines, startLine: 3, thread })).toBe(false)
+      expect(validate({ ...noLines, endLine: 3, thread })).toBe(false)
+    })
+
+    it('rejects malformed or oversized context', () => {
+      const turn = { question: 'Why?', answer: 'Because.' }
+      expect(validate({ ...base, history: turn })).toBe(false)
+      expect(validate({ ...base, history: [{ ...turn, answer: '' }] })).toBe(false)
+      expect(validate({ ...base, history: [{ ...turn, extra: 1 }] })).toBe(false)
+      expect(validate({ ...base, history: Array(11).fill(turn) })).toBe(false)
+      expect(validate({ ...base, thread: { ...thread, comments: [] } })).toBe(false)
+      expect(validate({ ...base, thread: { comments: thread.comments } })).toBe(false)
+      expect(
+        validate({ ...base, thread: { ...thread, comments: [{ author: '', body: 'x' }] } }),
+      ).toBe(false)
+      expect(
+        validate({ ...base, thread: { ...thread, comments: Array(51).fill(thread.comments[0]) } }),
+      ).toBe(false)
+      // History and thread share one budget.
+      const half = 'x'.repeat(12_000)
+      expect(validate({ ...base, history: [{ question: 'q', answer: half }] })).toBe(true)
+      expect(
+        validate({
+          ...base,
+          history: [{ question: 'q', answer: half }],
+          thread: { outdated: false, comments: [{ author: 'a', body: half }] },
+        }),
+      ).toBe(false)
+    })
   })
 
   describe('scm:getFileContent', () => {

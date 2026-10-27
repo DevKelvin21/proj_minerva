@@ -23,9 +23,12 @@ import type { DidacticSection, LineQuestion, PullRequestDetail } from '../../sha
 /** Mock answer to a reviewer's question about some lines (`ai:askAboutLines`). */
 export function lineAnswerSection(question: LineQuestion): DidacticSection {
   const where =
-    question.startLine === question.endLine
-      ? question.path + ':' + question.startLine
-      : question.path + ':' + question.startLine + '-' + question.endLine
+    question.startLine === undefined
+      ? question.path
+      : question.startLine === question.endLine
+        ? question.path + ':' + question.startLine
+        : question.path + ':' + question.startLine + '-' + question.endLine
+  const turn = (question.history?.length ?? 0) + 1
   return {
     kind: 'summary',
     markdown:
@@ -33,6 +36,14 @@ export function lineAnswerSection(question: LineQuestion): DidacticSection {
       where +
       '`: these lines are part of the change this PR makes. With a real AI provider, the ' +
       'agent reads the file at the PR commit before answering your question.\n\n' +
+      (question.thread
+        ? 'You asked from a thread of ' +
+          question.thread.comments.length +
+          ' comment(s); the first one is by ' +
+          question.thread.comments[0].author +
+          '.\n\n'
+        : '') +
+      (turn > 1 ? 'Follow-up ' + turn + ': the earlier answers came along as context.\n\n' : '') +
       'Next step: compare them with the code that calls them, then decide whether they need a ' +
       'comment.',
   }

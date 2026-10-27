@@ -7,7 +7,24 @@ import type { DiffSection, HiddenGap } from '../../lib/expand-context'
 import type { DiffThreadsModel } from '../../lib/diff-threads'
 import type { HighlightToken } from '../../lib/highlighter'
 import type { LineSide } from '../../lib/line-threads'
-import type { LineAnswer } from '../../../../shared/types'
+import type { CommentThread } from '../../../../shared/types'
+import type { AskRunner, AskSubject } from '../../stores/ask-ai-store'
+
+/** "Ask AI" from a comment thread of this file (`DiffView`). */
+export interface ThreadAskBinding {
+  subject: (thread: CommentThread) => AskSubject
+  /** Asks with the thread (and the earlier exchanges) as context. */
+  run: (thread: CommentThread) => AskRunner
+}
+
+/** "Ask AI" in this file's diff (`DiffView`). */
+export interface AskAiBinding {
+  lineSubject: (line: number, side: LineSide) => AskSubject
+  runLine: (line: number, side: LineSide) => AskRunner
+  /** `lineThreadKey`s of the lines with a conversation: their button stays lit. */
+  askedLines: ReadonlySet<string>
+  thread: ThreadAskBinding
+}
 
 export interface DiffBodyProps {
   sections: DiffSection[]
@@ -27,8 +44,8 @@ export interface DiffBodyProps {
     onExpand: (gap: HiddenGap, direction: 'up' | 'down' | 'all') => void
   }
   onCreateThread: (line: number, side: LineSide, bodyMarkdown: string) => Promise<void>
-  /** Asks the AI about one line (`ai:askAboutLines`); absent = no "Ask AI" button. */
-  askAi?: (line: number, side: LineSide, question: string) => Promise<LineAnswer>
+  /** "Ask AI" on lines and threads (`ai:askAboutLines`); absent = no "Ask AI" buttons. */
+  askAi?: AskAiBinding
 }
 
 export const KIND_BG: Partial<Record<DiffLineKind, string>> = {

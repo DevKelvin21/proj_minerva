@@ -45,7 +45,9 @@ test('full screen: only the layers and the diff, verdicts by key, Esc back to th
   )
   await window.keyboard.press('j')
   await expect(window.getByTestId('walkthrough-progress')).toContainText('Layer 2 of 3')
-  await focusBar(window).getByRole('button', { name: /Question/ }).click()
+  await focusBar(window)
+    .getByRole('button', { name: /Question/ })
+    .click()
   await expect(layers(window).nth(1).locator('[data-verdict]')).toHaveAttribute(
     'data-verdict',
     'question',
@@ -66,26 +68,89 @@ test('full screen: only the layers and the diff, verdicts by key, Esc back to th
   )
 })
 
-test('Ask AI on a line: the answer shows under it and can become a comment draft', async ({
+test('Ask AI on a line: the conversation keeps every answer, survives closing, and can become a comment draft', async ({
   window,
 }, testInfo) => {
   await openWalkthrough(window)
 
   // The coupon service layer: ask about line 18 (new side).
-  await window.getByRole('button', { name: 'Ask AI about line 18' }).first().click()
+  const lineButton = window.getByRole('button', { name: 'Ask AI about line 18' }).first()
+  await lineButton.click()
   const card = window.getByTestId('ask-ai-card')
   await expect(card).toBeVisible()
   await card.getByRole('textbox').fill('Why multiply by (1 - discountRate) here?')
   await card.getByRole('button', { name: 'Ask', exact: true }).click()
-  const answer = card.getByTestId('ask-ai-answer')
-  await expect(answer).toContainText('src/services/coupon-service.ts:18', { timeout: 30_000 })
+  const answers = card.getByTestId('ask-ai-answer')
+  await expect(answers.nth(0)).toContainText('src/services/coupon-service.ts:18', {
+    timeout: 30_000,
+  })
   await expect(card).toContainText('Why multiply by (1 - discountRate) here?')
-  await attachScreenshot(window, testInfo, 'walkthrough-ask-ai')
 
-  // "Use as comment": the line's composer opens with the answer as a draft; nothing is posted.
-  await card.getByRole('button', { name: 'Use as comment' }).click()
+  // A follow-up keeps the first answer on screen and carries it to the AI.
+  await card.getByRole('textbox').fill('Could the rate ever be above 1?')
+  await card
+    .getByRole('textbox')
+    .press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter')
+  await expect(answers).toHaveCount(2, { timeout: 30_000 })
+  await expect(answers.nth(1)).toContainText('Follow-up 2')
+  await expect(answers.nth(0)).not.toContainText('Follow-up')
+  await expect(card).toContainText('Could the rate ever be above 1?')
+  await attachScreenshot(window, testInfo, 'walkthrough-ask-ai-history')
+
+  // Closing loses nothing: the line's button stays lit and reopens the same conversation.
+  await card.getByRole('button', { name: 'Close' }).click()
+  await expect(card).toHaveCount(0)
+  await expect(lineButton).toHaveAttribute('data-asked', 'true')
+  await lineButton.click()
+  await expect(window.getByTestId('ask-ai-exchange')).toHaveCount(2)
+  await expect(card).toContainText('Why multiply by (1 - discountRate) here?')
+
+  // "Use as comment": the line's composer opens with that answer as a draft; nothing is posted.
+  await card.getByRole('button', { name: 'Use as comment' }).first().click()
   await expect(card).toHaveCount(0)
   const draft = window.getByRole('textbox', { name: /Comment on line 18/ })
   await expect(draft).toBeVisible()
   await expect(draft).toHaveValue(/Mock answer for `src\/services\/coupon-service.ts:18`/)
+})
+
+test('Ask AI from a comment thread: the thread is the context and the answer becomes a reply draft', async ({
+  window,
+}, testInfo) => {
+  await openWalkthrough(window)
+
+  // The thread on coupon-service.ts:16 (two comments, folded under its line).
+  const thread = window.locator('[data-thread-id="thread-482-1"]')
+  await expect(thread).toBeVisible()
+  const threadButton = thread.getByRole('button', { name: 'Ask AI about this thread' })
+  await threadButton.click()
+  const card = window.getByTestId('ask-ai-card')
+  await expect(card).toContainText('Ask AI about this thread')
+
+  // A quick question asks in one click; the thread reached the AI.
+  await card.getByRole('button', { name: 'Is this concern valid?' }).click()
+  const answer = card.getByTestId('ask-ai-answer')
+  await expect(answer).toContainText('a thread of 2 comment(s); the first one is by dkumar', {
+    timeout: 30_000,
+  })
+  await expect(answer).toContainText('src/services/coupon-service.ts:16')
+  await expect(card).toContainText('Is this concern valid?')
+  await expect(threadButton).toHaveAttribute('data-asked', 'true')
+  await attachScreenshot(window, testInfo, 'walkthrough-ask-ai-thread')
+
+  // "Use as reply": the thread opens with the answer in its reply box; nothing is posted.
+  await card.getByRole('button', { name: 'Use as reply' }).click()
+  await expect(card).toHaveCount(0)
+  const reply = thread.getByRole('textbox', { name: 'Reply to this thread' })
+  await expect(reply).toBeFocused()
+  await expect(reply).toHaveValue(/Mock answer for `src\/services\/coupon-service.ts:16`/)
+  await expect(thread.locator('li')).toHaveCount(2)
+
+  // With the thread open, a second answer goes after what the reviewer typed, never over it.
+  await reply.fill('My own note.')
+  await threadButton.click()
+  await expect(card.getByTestId('ask-ai-exchange')).toHaveCount(1)
+  await card.getByRole('button', { name: 'Use as reply' }).click()
+  await expect(card).toHaveCount(0)
+  await expect(reply).toHaveValue(/^My own note\.\n\nMock answer for /)
+  await expect(reply).toBeFocused()
 })

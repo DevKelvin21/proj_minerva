@@ -11,7 +11,7 @@ import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
-import { AskAiCard } from './AskAiCard'
+import { LineAskAiCard } from './LineAskAiCard'
 import {
   asHunk,
   KIND_BG,
@@ -39,6 +39,9 @@ interface RowMeta {
   onAddRight?: () => void
   onAskLeft?: () => void
   onAskRight?: () => void
+  /** The side's line has an AI conversation. */
+  askedLeft: boolean
+  askedRight: boolean
 }
 
 type Item = { type: 'full'; key: string; node: React.ReactNode } | { type: 'row'; meta: RowMeta }
@@ -57,6 +60,8 @@ interface SideCellsProps {
   onAsk?: () => void
   /** Reserve the "Ask AI" slot even without a button here, so gutters line up. */
   askSlot: boolean
+  /** This line has an AI conversation: its button stays lit. */
+  asked: boolean
   getTokens: (content: string) => HighlightToken[] | undefined
 }
 
@@ -76,6 +81,7 @@ function SideCells({
   onAdd,
   onAsk,
   askSlot,
+  asked,
   getTokens,
 }: SideCellsProps): React.JSX.Element {
   const { t } = useTranslation()
@@ -110,8 +116,13 @@ function SideCells({
             type="button"
             onClick={onAsk}
             aria-label={t('comments.askAi.button', { line: cell?.number ?? 0 })}
-            title={t('comments.askAi.buttonTitle')}
-            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
+            title={asked ? t('comments.askAi.buttonTitleActive') : t('comments.askAi.buttonTitle')}
+            data-asked={asked || undefined}
+            className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded hover:text-accent ${
+              asked
+                ? 'text-accent'
+                : 'text-muted opacity-0 focus:opacity-100 group-hover/row:opacity-100'
+            }`}
           >
             <Sparkles size={11} />
           </button>
@@ -222,10 +233,17 @@ export function SplitDiff({
                 ...rightPosition,
               })
           : undefined,
+      askedLeft: Boolean(leftPosition && leftKey && askAi?.askedLines.has(leftKey)),
+      askedRight: Boolean(rightPosition && rightKey && askAi?.askedLines.has(rightKey)),
       onAskLeft:
         askAi && leftPosition && row.left
           ? () =>
-              setOpenComposer({ key: rowKey, content: row.left!.content, kind: 'ask', ...leftPosition })
+              setOpenComposer({
+                key: rowKey,
+                content: row.left!.content,
+                kind: 'ask',
+                ...leftPosition,
+              })
           : undefined,
       onAskRight:
         askAi && rightPosition && row.right
@@ -258,6 +276,7 @@ export function SplitDiff({
               thread={thread}
               highlighted={thread.id === model.focusedThreadId}
               onHide={() => model.toggleHidden(key)}
+              ask={askAi?.thread}
             />
           ),
         })
@@ -270,10 +289,10 @@ export function SplitDiff({
         key: `composer-${meta.rowKey}`,
         node:
           composer.kind === 'ask' && askAi ? (
-            <AskAiCard
+            <LineAskAiCard
+              askAi={askAi}
               line={composer.line}
               side={composer.side}
-              onAsk={(question) => askAi(composer.line, composer.side, question)}
               onUseAsComment={(markdown) =>
                 setOpenComposer({ ...composer, kind: 'comment', draft: markdown })
               }
@@ -359,6 +378,7 @@ export function SplitDiff({
         }
         onAsk={side === 'left' ? meta.onAskLeft : meta.onAskRight}
         askSlot={askAi !== undefined}
+        asked={side === 'left' ? meta.askedLeft : meta.askedRight}
         getTokens={getTokens}
       />
     )

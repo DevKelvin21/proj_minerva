@@ -161,7 +161,9 @@ export interface IpcContract {
    * The reviewer asks about some lines of one file. Same jailed, read-only
    * agent as the analysis (snapshot at the PR commit, `Read`/`Grep`/`Glob`
    * only), with its own prompt; the answer is one Markdown block. Not
-   * streamed and not cached: each question is its own short run.
+   * streamed and not cached: each question is its own short run, and a
+   * follow-up carries the earlier exchanges (`history`). Asked from a comment
+   * thread, it carries the thread too (`thread`).
    */
   'ai:askAboutLines': { req: { repo: RepoRef; number: number } & LineQuestion; res: LineAnswer }
   /**

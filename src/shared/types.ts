@@ -659,18 +659,50 @@ export type UpdaterStatus =
 export const MAX_LINE_QUESTION_LEN = 2000
 /** Widest line range one question can cover. */
 export const MAX_LINE_QUESTION_SPAN = 400
+/** Earlier exchanges a follow-up carries (the newest ones). */
+export const MAX_ASK_HISTORY_TURNS = 10
+/** Comments of a thread a question carries. */
+export const MAX_ASK_THREAD_COMMENTS = 50
+/** Longest comment author a thread context carries. */
+export const MAX_ASK_AUTHOR_LEN = 200
+/**
+ * Characters of context one question carries on top of the question itself:
+ * every earlier question and answer plus every thread author and comment.
+ * The renderer trims to fit (`lib/ask-ai.ts`); main rejects anything over it.
+ */
+export const MAX_ASK_CONTEXT_LEN = 24_000
+
+/** One earlier question and its answer, sent back so a follow-up has the conversation. */
+export interface AskHistoryTurn {
+  question: string
+  answer: string
+}
+
+/** The comment thread a question is about (comments by PR participants: untrusted). */
+export interface AskThreadContext {
+  /** The thread no longer matches the latest version of the PR. */
+  outdated: boolean
+  comments: Array<{ author: string; body: string }>
+}
 
 /**
  * A reviewer's question about some lines of one file of a PR (`ai:askAboutLines`).
  * `side` says which file the numbers count in: `new` = the head version
  * (added and context lines), `old` = the base version (removed lines).
+ *
+ * `startLine`/`endLine` come together. Only a question about a file-level
+ * thread (`thread` set) may leave both out: it is about the whole file.
+ * `history` = the earlier exchanges of this conversation, oldest first: each
+ * question is its own run in main, so a follow-up carries them.
  */
 export interface LineQuestion {
   path: string
   side: 'old' | 'new'
-  startLine: number
-  endLine: number
+  startLine?: number
+  endLine?: number
   question: string
+  history?: AskHistoryTurn[]
+  thread?: AskThreadContext
 }
 
 /**
