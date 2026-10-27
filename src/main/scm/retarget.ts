@@ -23,6 +23,7 @@ import { shortRef } from '../../shared/scm'
 import type { PullRequestDetail, RetargetRequest, RetargetResult } from '../../shared/types'
 import { dialogText, type ConfirmFn } from './confirm'
 import { ScmError } from './errors'
+import { mt } from '../i18n'
 import type { ScmProvider } from './provider'
 
 export type RetargetCapable = Pick<
@@ -44,19 +45,13 @@ function assertStillRetargetable(
   expected: string,
 ): string {
   if (pr.state !== 'open') {
-    throw new ScmError('CONFLICT', 'Pull request #' + req.number + ' is no longer open.')
+    throw new ScmError('CONFLICT', mt('scm.retarget.notOpen', { number: req.number }))
   }
   const currentBase = shortRef(pr.baseRef)
   if (currentBase !== expected) {
     throw new ScmError(
       'CONFLICT',
-      'Pull request #' +
-        req.number +
-        ' now targets ' +
-        currentBase +
-        ', not ' +
-        expected +
-        '. Refresh and try again.',
+      mt('scm.retarget.baseMoved', { number: req.number, current: currentBase, expected }),
     )
   }
   return currentBase
@@ -70,18 +65,18 @@ export async function validateRetarget(
   const expected = shortRef(req.expectedCurrentBase)
   const newBase = shortRef(req.newBase)
   if (newBase === expected) {
-    throw new ScmError('CONFLICT', 'The pull request already targets ' + newBase + '.')
+    throw new ScmError('CONFLICT', mt('scm.retarget.alreadyTargets', { branch: newBase }))
   }
 
   const pr = await provider.getPullRequestDetail(req.repo, req.number)
   const currentBase = assertStillRetargetable(pr, req, expected)
   if (newBase === shortRef(pr.headRef)) {
-    throw new ScmError('CONFLICT', 'A pull request cannot target its own source branch.')
+    throw new ScmError('CONFLICT', mt('scm.retarget.ownSource'))
   }
   if (!(await provider.branchExists(req.repo, newBase))) {
     throw new ScmError(
       'NOT_FOUND',
-      'Branch ' + newBase + ' does not exist in ' + req.repo.fullName + '.',
+      mt('scm.retarget.branchMissing', { branch: newBase, repo: req.repo.fullName }),
     )
   }
   return { pr, currentBase, newBase }
@@ -90,17 +85,14 @@ export async function validateRetarget(
 /** The dialog text for a plan (only facts main read itself). */
 export function retargetConfirmRequest(plan: RetargetPlan): Parameters<ConfirmFn>[0] {
   return {
-    message: 'Retarget PR #' + plan.pr.number + '?',
-    detail:
-      'Repository: ' +
-      dialogText(plan.pr.repo.fullName) +
-      '\nTitle: ' +
-      dialogText(plan.pr.title) +
-      '\n\nBase branch: ' +
-      dialogText(plan.currentBase) +
-      ' → ' +
-      dialogText(plan.newBase),
-    confirmLabel: 'Retarget',
+    message: mt('dialogs.retarget.message', { number: plan.pr.number }),
+    detail: mt('dialogs.retarget.detail', {
+      repo: dialogText(plan.pr.repo.fullName),
+      title: dialogText(plan.pr.title),
+      from: dialogText(plan.currentBase),
+      to: dialogText(plan.newBase),
+    }),
+    confirmLabel: mt('dialogs.retarget.confirm'),
   }
 }
 

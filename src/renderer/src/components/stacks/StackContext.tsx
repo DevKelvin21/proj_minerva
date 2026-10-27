@@ -1,6 +1,9 @@
 import { ChevronRight, Layers } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { prKey, shortRef, type StackNode } from '../../../../shared/scm'
 import type { PullRequestDetail } from '../../../../shared/types'
+import type { AppLocale } from '../../../../shared/locale'
+import { useLocale } from '../../i18n/use-locale'
 import { useOpenPr } from '../../hooks/use-open-pr'
 import { useStacks } from '../../hooks/use-stacks'
 import { descendantsOf, locatePrInStacks } from '../../lib/stacks'
@@ -17,11 +20,12 @@ function NodeChip({
   pending: boolean
   onOpen: (node: StackNode) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const label = (
     <>
       <StackStateIcon isDraft={node.isDraft} size={12} />
       <span className="shrink-0 font-mono">#{node.number}</span>
-      <span className="min-w-0 truncate">{current ? 'This PR' : node.title}</span>
+      <span className="min-w-0 truncate">{current ? t('stacks.context.thisPr') : node.title}</span>
     </>
   )
   if (current) {
@@ -57,11 +61,10 @@ function Separator(): React.JSX.Element {
   )
 }
 
-/** "#101, #110 and #104": a compact list of PR numbers. */
-function numbersList(nodes: StackNode[]): string {
+/** "#101, #110 and #104" (or "#101, #110 y #104"): a compact list of PR numbers. */
+function numbersList(locale: AppLocale, nodes: StackNode[]): string {
   const numbers = nodes.map((node) => '#' + node.number)
-  if (numbers.length <= 1) return numbers.join('')
-  return numbers.slice(0, -1).join(', ') + ' and ' + numbers[numbers.length - 1]
+  return new Intl.ListFormat(locale, { type: 'conjunction' }).format(numbers)
 }
 
 /**
@@ -72,6 +75,8 @@ function numbersList(nodes: StackNode[]): string {
  * when the PR is in no stack (or stacks are not loaded yet).
  */
 export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Element | null {
+  const { t } = useTranslation()
+  const { locale } = useLocale()
   const { stacks } = useStacks()
   const { open, pendingKey, error } = useOpenPr()
   if (!stacks) return null
@@ -95,20 +100,23 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
 
   return (
     <section
-      aria-label="Stack"
+      aria-label={t('stacks.context.ariaLabel')}
       className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-bg/40 px-2.5 py-2"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
           <Layers size={12} aria-hidden />
-          Stack
+          {t('stacks.context.title')}
           <span className="font-normal normal-case">
-            · {path.length} of {path.length + descendants.length}
+            {t('stacks.context.position', {
+              position: path.length,
+              total: path.length + descendants.length,
+            })}
           </span>
         </span>
         {orphanIsCurrent && <OrphanBadge />}
       </div>
-      <ol aria-label="Stack map" className="flex min-w-0 flex-wrap items-center gap-1">
+      <ol aria-label={t('stacks.context.mapAriaLabel')} className="flex min-w-0 flex-wrap items-center gap-1">
         {ancestors.map((ancestor) => (
           <StackMapItem
             key={ancestor.prKey}
@@ -131,32 +139,38 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
       </ol>
       <p className="text-xs text-muted">
         {parent ? (
-          <>
-            Built on top of #{parent.number} (<span className="font-mono">{parent.headRef}</span>):
-            this diff only shows what this PR adds on top of it.
-          </>
+          <Trans
+            i18nKey="stacks.context.builtOnTop"
+            values={{ number: parent.number, branch: parent.headRef }}
+            components={{ branch: <span className="font-mono" /> }}
+          />
         ) : orphanIsCurrent ? null : (
-          <>
-            First in the stack: it targets <span className="font-mono">{node.baseRef}</span>{' '}
-            directly.
-          </>
+          <Trans
+            i18nKey="stacks.context.firstInStack"
+            values={{ base: node.baseRef }}
+            components={{ branch: <span className="font-mono" /> }}
+          />
         )}
         {descendants.length > 0 && (
           <>
             {' '}
-            {numbersList(descendants)} {descendants.length === 1 ? 'builds' : 'build'} on top of
-            this one; changes here flow up to {descendants.length === 1 ? 'it' : 'them'}.
+            {t('stacks.context.descendants', {
+              count: descendants.length,
+              numbers: numbersList(locale, descendants),
+            })}
           </>
         )}
       </p>
       {related.length > 0 && (
         <p className="text-xs text-muted">
-          Same feature in{' '}
+          {t('stacks.context.sameFeatureIn')}{' '}
           {related.map((other, index) => (
             <span key={other.root.prKey}>
-              {index > 0 && ', '}
-              <span className="text-text/80">{other.repo.name}</span> (
-              {numbersList([other.root, ...descendantsOf(other.root)])})
+              {index > 0 && t('stacks.context.listSeparator')}
+              <span className="text-text/80">{other.repo.name}</span>{' '}
+              {t('stacks.context.relatedNumbers', {
+                numbers: numbersList(locale, [other.root, ...descendantsOf(other.root)]),
+              })}
             </span>
           ))}
           .

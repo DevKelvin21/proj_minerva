@@ -23,10 +23,10 @@ const registeredChannels = new Set<IpcChannel>()
  */
 export function handle<C extends IpcChannel>(channel: C, handler: Handler<C>): void {
   if (!(IPC_CHANNELS as readonly string[]).includes(channel)) {
-    throw new Error(`Canal IPC no declarado en el contrato: ${channel}`)
+    throw new Error('IPC channel not declared in the contract: ' + channel)
   }
   if (registeredChannels.has(channel)) {
-    throw new Error(`Canal IPC ya registrado: ${channel}`)
+    throw new Error('IPC channel already registered: ' + channel)
   }
   registeredChannels.add(channel)
 
@@ -36,7 +36,7 @@ export function handle<C extends IpcChannel>(channel: C, handler: Handler<C>): v
     // El mensaje de error es genérico a propósito — nunca describe qué campo
     // falló ni el valor recibido, para no filtrar detalles internos al renderer.
     if (!payloadValidators[channel](payload)) {
-      throw new Error(`Payload inválido para el canal "${channel}"`)
+      throw new Error('Invalid payload for channel "' + channel + '"')
     }
     try {
       return await handler(payload as IpcRequest<C>, event)

@@ -20,6 +20,7 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import type { RepoRef } from '../../shared/types'
 import { buildDidacticHash } from '../../shared/didactic-route'
+import { mt } from '../i18n'
 import { secureWebPreferences } from './secure-web-preferences'
 import { installExternalLinkGuard } from './external-link-guard'
 
@@ -33,9 +34,17 @@ const DIDACTIC_WINDOW_MIN_WIDTH = 520
 const DIDACTIC_WINDOW_MIN_HEIGHT = 420
 
 let didacticWindow: BrowserWindow | null = null
+/** PR the detached window shows, so a language change can retitle it. */
+let didacticTarget: { repo: RepoRef; number: number } | null = null
 
 function windowTitleFor(repo: RepoRef, number: number): string {
-  return 'Minerva — Análisis ' + repo.fullName + '#' + number
+  return mt('windows.didacticTitle', { repo: repo.fullName, number })
+}
+
+/** Re-renders the detached window's title in the current language (no-op without one). */
+export function refreshDidacticWindowTitle(): void {
+  if (!didacticWindow || didacticWindow.isDestroyed() || !didacticTarget) return
+  didacticWindow.setTitle(windowTitleFor(didacticTarget.repo, didacticTarget.number))
 }
 
 /**
@@ -56,6 +65,7 @@ function loadDidacticRoute(win: BrowserWindow, repo: RepoRef, number: number, ti
 }
 
 export function openDidacticWindow(repo: RepoRef, number: number, title: string): void {
+  didacticTarget = { repo, number }
   if (didacticWindow && !didacticWindow.isDestroyed()) {
     didacticWindow.setTitle(windowTitleFor(repo, number))
     loadDidacticRoute(didacticWindow, repo, number, title)
@@ -79,7 +89,10 @@ export function openDidacticWindow(repo: RepoRef, number: number, title: string)
   // ventana en cada navegación; se bloquea esa actualización automática.
   win.on('page-title-updated', (event) => event.preventDefault())
   win.on('closed', () => {
-    if (didacticWindow === win) didacticWindow = null
+    if (didacticWindow === win) {
+      didacticWindow = null
+      didacticTarget = null
+    }
   })
 
   installExternalLinkGuard(win)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { PullRequestDetail, RepoRef } from '../../../shared/types'
 import { repoKey } from '../../../shared/scm'
 import { useAppStore } from '../stores/app-store'
+import { errorText } from '../lib/error-text'
 
 interface UsePullRequestDetailResult {
   detail: PullRequestDetail | null
@@ -10,7 +11,7 @@ interface UsePullRequestDetailResult {
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 /**

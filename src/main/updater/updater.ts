@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow } from 'electron'
 import { accessSync, constants as fsConstants } from 'node:fs'
 import type { Logger, ProgressInfo, UpdateInfo } from 'electron-updater'
 import { MINERVA_EVENTS } from '../../shared/events'
+import { mt } from '../i18n'
 import type { UpdaterStatus, UpdateInfoLite } from '../../shared/types'
 import { resolveUpdaterCapability, type UpdaterCapability } from './capability'
 import { ALLOW_PRERELEASE, CHECK_INTERVAL_MS, STARTUP_DELAY_MS, buildReleaseUrl } from './config'
@@ -95,7 +96,7 @@ function setStatus(next: UpdaterStatus): void {
 /** Mensaje de exhibición sin stack interno (frontera IPC, ver `CLAUDE.md`). */
 function displayMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message
-  return 'Error desconocido al buscar actualizaciones.'
+  return mt('updater.unknownError')
 }
 
 function toUpdateInfoLite(info: UpdateInfo): UpdateInfoLite | undefined {
@@ -131,9 +132,7 @@ export function resolveAutoUpdaterExport(mod: ElectronUpdaterModule): AppUpdater
   if (named) return named
   const fromDefault = (mod as { default?: ElectronUpdaterModule }).default?.autoUpdater
   if (fromDefault) return fromDefault
-  throw new Error(
-    'electron-updater no expuso `autoUpdater` ni como export nombrado ni en `default`; el auto-update no puede inicializarse.',
-  )
+  throw new Error(mt('updater.missingExport'))
 }
 
 /** Wiring de `electron-updater` (una sola vez, perezoso — ver comentario del módulo). */
@@ -159,7 +158,7 @@ async function ensureRealAutoUpdater(): Promise<AppUpdaterInstance> {
       currentInfo = undefined
       setStatus({
         phase: 'error',
-        message: `El feed de actualizaciones devolvió una versión con formato inválido ("${info.version}"); no se puede continuar de forma segura.`,
+        message: mt('updater.invalidVersion', { version: info.version }),
         lastCheckedAt,
       })
       return

@@ -21,6 +21,7 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import { repoKey, type RepoRef } from '../../shared/scm'
 import type { ScmProvider } from './provider'
+import { mt } from '../i18n'
 
 /** What `ensureSnapshot` needs from a provider. */
 export type SnapshotWriter = Pick<ScmProvider, 'writeSnapshot'>
@@ -132,9 +133,7 @@ async function ensureSnapshotUncached(
       await touchDir(finalDir)
       return finalDir
     }
-    throw new Error(
-      'Could not finalize the snapshot of ' + repo.fullName + '@' + sha7 + ' (rename failed).',
-    )
+    throw new Error(mt('scm.snapshotFinalize', { repo: repo.fullName, sha: sha7 }))
   }
 
   return finalDir

@@ -1,6 +1,7 @@
+import { useTranslation } from 'react-i18next'
 import type { ThreadStatus } from '../../../../shared/scm'
 import { Badge } from '../ui/Badge'
-import { THREAD_STATUS_LABEL, THREAD_STATUS_TONE, type ScmTone } from '../../lib/scm-labels'
+import { threadStatusLabel, THREAD_STATUS_TONE, type ScmTone } from '../../lib/scm-labels'
 
 const TONE_CLASS: Record<ScmTone, string> = {
   neutral: 'bg-border/60 text-muted',
@@ -29,18 +30,19 @@ export function ThreadStatusPicker({
   onChange,
   busy = false,
 }: ThreadStatusPickerProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   if (allowed.length === 0) {
     if (status === 'active') return null
     return (
       <Badge tone={THREAD_STATUS_TONE[status]}>
-        <span data-thread-status={status}>{THREAD_STATUS_LABEL[status]}</span>
+        <span data-thread-status={status}>{threadStatusLabel(status, t)}</span>
       </Badge>
     )
   }
   const options = allowed.includes(status) ? allowed : [status, ...allowed]
   return (
     <select
-      aria-label="Thread status"
+      aria-label={t('comments.thread.statusLabel')}
       data-thread-status={status}
       value={status}
       disabled={busy}
@@ -55,7 +57,7 @@ export function ThreadStatusPicker({
           disabled={!allowed.includes(option)}
           className="bg-panel text-text"
         >
-          {THREAD_STATUS_LABEL[option]}
+          {threadStatusLabel(option, t)}
         </option>
       ))}
     </select>

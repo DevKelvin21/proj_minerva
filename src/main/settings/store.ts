@@ -68,6 +68,7 @@ import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 
 import { join } from 'node:path'
 import { app } from 'electron'
 import { DEFAULT_AI_PROVIDER, isAiProviderId, type AiProviderId } from '../../shared/ai-providers'
+import { DEFAULT_LOCALE, isAppLocale, type AppLocale } from '../../shared/locale'
 import type { AzureOrganizationSettings } from '../../shared/scm'
 import {
   isAzureOrganizationName,
@@ -121,6 +122,12 @@ export interface PersistedSettings {
    * the file.
    */
   scm?: PersistedScmSettings
+  /**
+   * UI language (also the language of native dialogs, main's error messages
+   * and the AI analysis). Absent = English (installs older than i18n); an
+   * invalid value is dropped on load without discarding the rest of the file.
+   */
+  language?: AppLocale
 }
 
 export interface PersistedScmSettings {
@@ -217,6 +224,15 @@ function dropInvalidScm(value: Record<string, unknown>): Record<string, unknown>
   return next
 }
 
+/** Same idea as `dropInvalidScm` for `language`: a bad hand edit falls back to English. */
+function dropInvalidLanguage(value: Record<string, unknown>): Record<string, unknown> {
+  if (value.language === undefined || isAppLocale(value.language)) return value
+  console.warn('[settings] settings.json has an invalid "language"; using the default.')
+  const next = { ...value }
+  delete next.language
+  return next
+}
+
 function isNewPersistedSettings(value: unknown): value is PersistedSettings {
   if (!isPlainObject(value)) return false
   if (!isAiProviderId(value.aiProvider) || !isModelsMap(value.models)) return false
@@ -227,6 +243,7 @@ function isNewPersistedSettings(value: unknown): value is PersistedSettings {
   // con algo que no es un login usable se rechaza (settings.json editado a mano no
   // debe colar basura que después termine en un argv de `gh`).
   if (value.scm !== undefined && !isPersistedScmSettings(value.scm)) return false
+  if (value.language !== undefined && !isAppLocale(value.language)) return false
   return value.githubAccount === undefined || isGithubAccountLogin(value.githubAccount)
 }
 
@@ -325,7 +342,7 @@ function migrateRaw(parsed: unknown): MigrationResult | null {
 
   if (!isPlainObject(parsed)) return null
 
-  const migrated = dropInvalidScm(migrateRawOpenRouterToOpenCode(parsed))
+  const migrated = dropInvalidLanguage(dropInvalidScm(migrateRawOpenRouterToOpenCode(parsed)))
   if (!isNewPersistedSettings(migrated)) return null
   return { settings: migrated, changedFromDisk: migrated !== parsed }
 }
@@ -429,6 +446,15 @@ export class SettingsStore {
     return this.load()?.scm ?? {}
   }
 
+  /** UI language; `en` when nothing (or nothing valid) is saved. */
+  getLanguage(): AppLocale {
+    return this.load()?.language ?? DEFAULT_LOCALE
+  }
+
+  setLanguage(language: AppLocale): void {
+    this.persist({ ...this.baseSettings(), language })
+  }
+
   /** Replaces the saved per-provider SCM settings (caller validated `next`). */
   setScmSettings(next: PersistedScmSettings): void {
     this.persist({ ...this.baseSettings(), scm: next })
@@ -450,6 +476,7 @@ export class SettingsStore {
       modelOptions: current.modelOptions,
       githubAccount: current.githubAccount,
       scm: current.scm,
+      language: current.language,
     }
   }
 

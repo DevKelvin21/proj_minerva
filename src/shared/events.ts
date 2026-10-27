@@ -12,6 +12,7 @@
  * renderer se suscriba a un canal arbitrario si en algún momento tuviera
  * acceso a `ipcRenderer` por una vía no prevista.
  */
+import type { AppLocale } from './locale'
 import type { DidacticSnippet, RepoRef, UpdaterStatus } from './types'
 
 interface DraftSectionCommon {
@@ -173,10 +174,20 @@ export interface UpdaterStatusChangedEvent {
   status: UpdaterStatus
 }
 
+/**
+ * Payload of `minerva:event:languageChanged`: the language just saved by
+ * `settings:setLanguage`, pushed to EVERY window (main + detached didactic)
+ * so all of them switch without a reload.
+ */
+export interface LanguageChangedEvent {
+  language: AppLocale
+}
+
 export interface EventContract {
   'minerva:event:analysisProgress': AnalysisProgressEvent
   'minerva:event:prListChanged': PrListChangedEvent
   'minerva:event:updaterStatusChanged': UpdaterStatusChangedEvent
+  'minerva:event:languageChanged': LanguageChangedEvent
 }
 
 export type EventChannel = keyof EventContract
@@ -191,4 +202,5 @@ export const MINERVA_EVENTS = {
   analysisProgress: 'minerva:event:analysisProgress',
   prListChanged: 'minerva:event:prListChanged',
   updaterStatusChanged: 'minerva:event:updaterStatusChanged',
+  languageChanged: 'minerva:event:languageChanged',
 } satisfies Record<string, EventChannel>

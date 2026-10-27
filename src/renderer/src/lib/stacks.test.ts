@@ -1,4 +1,6 @@
+import i18next from 'i18next'
 import { describe, expect, it } from 'vitest'
+import { resources } from '../i18n'
 import { prKey, type AzureRepoRef, type PrStack, type StackNode } from '../../../shared/scm'
 import {
   countOrphans,
@@ -141,17 +143,29 @@ describe('filters', () => {
   })
 })
 
+const i18n = i18next.createInstance()
+await i18n.init({ resources, lng: 'en', interpolation: { escapeValue: false } })
+const t = i18n.t.bind(i18n)
+
 describe('orphans', () => {
   it('counts orphaned roots', () => {
     expect(countOrphans(STACKS)).toBe(1)
   })
 
   it('explains what happened, and says when the stale branch is gone', () => {
-    expect(orphanExplanation(n105)).toBe(
+    expect(orphanExplanation(t, n105)).toBe(
       'Parent #100 was completed into main, but this PR still targets feature/refund-schema.',
     )
     const gone = { ...n105, orphan: { ...n105.orphan!, targetBranchExists: false } }
-    expect(orphanExplanation(gone)).toMatch(/That branch no longer exists\.$/)
-    expect(orphanExplanation(n101)).toBeNull()
+    expect(orphanExplanation(t, gone)).toMatch(/That branch no longer exists\.$/)
+    expect(orphanExplanation(t, n101)).toBeNull()
+  })
+
+  it('follows the language', async () => {
+    await i18n.changeLanguage('es')
+    expect(orphanExplanation(t, n105)).toBe(
+      'El padre #100 se completó en main, pero este PR sigue apuntando a feature/refund-schema.',
+    )
+    await i18n.changeLanguage('en')
   })
 })

@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Check, ChevronDown, ChevronRight, Link } from 'lucide-react'
 import { isThreadOpen } from '../../../../shared/scm'
 import type { ThreadStatus } from '../../../../shared/scm'
@@ -7,6 +9,7 @@ import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { providerOfWebUrl, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { formatAbsoluteTime, formatRelativeTime } from '../../lib/relative-time'
+import { useLocale } from '../../i18n/use-locale'
 import { hasSuggestion } from '../../lib/suggestions'
 import { threadLineRange } from '../../lib/line-threads'
 import { settableStatusesFor } from '../../lib/thread-groups'
@@ -19,6 +22,7 @@ import { CommentBody } from './CommentBody'
 import { CommentComposer } from './CommentComposer'
 import { ThreadCodeExcerpt } from './CodeExcerpt'
 import { ThreadStatusPicker } from './ThreadStatusPicker'
+import { errorText } from '../../lib/error-text'
 
 interface ThreadCardProps {
   thread: CommentThread
@@ -37,10 +41,10 @@ interface ThreadCardProps {
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
-function positionLabel(thread: CommentThread, showPath: boolean): string | null {
+function positionLabel(thread: CommentThread, showPath: boolean, t: TFunction): string | null {
   const range = threadLineRange(thread)
   if (!thread.path) return null
   const lines = range
@@ -48,8 +52,12 @@ function positionLabel(thread: CommentThread, showPath: boolean): string | null 
       ? `${range.start}–${range.end}`
       : `${range.start}`
     : null
-  if (!showPath)
-    return lines ? (range && range.end > range.start ? 'Lines ' : 'Line ') + lines : 'File comment'
+  if (!showPath) {
+    if (!lines) return t('comments.thread.fileComment')
+    return range && range.end > range.start
+      ? t('comments.thread.lines', { lines })
+      : t('comments.thread.line', { line: lines })
+  }
   return lines ? `${thread.path}:${lines}` : thread.path
 }
 
@@ -72,6 +80,8 @@ export function ThreadCard({
   showPath = true,
   highlighted = false,
 }: ThreadCardProps): React.JSX.Element {
+  const { t } = useTranslation()
+  const { locale } = useLocale()
   const actions = useThreadActions()
   const [collapsed, setCollapsed] = useState(
     highlighted ? false : (collapsedByDefault ?? !isThreadOpen(thread.status)),
@@ -83,7 +93,7 @@ export function ThreadCard({
   const status = pendingStatus ?? thread.status
   const allowed = settableStatusesFor(actions.repo.provider, thread)
   const range = threadLineRange(thread)
-  const label = positionLabel(thread, showPath)
+  const label = positionLabel(thread, showPath, t)
 
   // Original lines for suggestion mini-diffs: only fetched when a comment has one.
   const wantsOriginal = useMemo(
@@ -103,7 +113,7 @@ export function ThreadCard({
     try {
       await actions.setStatus(thread.id, next)
     } catch (err: unknown) {
-      setStatusError('Could not change the status: ' + toErrorMessage(err))
+      setStatusError(t('comments.thread.statusError', { error: toErrorMessage(err) }))
     } finally {
       setPendingStatus(null)
     }
@@ -150,7 +160,7 @@ export function ThreadCard({
               <span
                 role="link"
                 tabIndex={0}
-                title="Show this line in the Files tab"
+                title={t('comments.thread.showLineInFiles')}
                 onClick={(event) => {
                   event.stopPropagation()
                   onNavigateToLine()
@@ -172,11 +182,9 @@ export function ThreadCard({
               </span>
             )
           ) : (
-            <span>General comment</span>
+            <span>{t('comments.thread.generalComment')}</span>
           )}
-          <span className="shrink-0">
-            · {count} {count === 1 ? 'comment' : 'comments'}
-          </span>
+          <span className="shrink-0">· {t('comments.thread.commentCount', { count })}</span>
           {collapsed && first && (
             <span className="min-w-0 truncate text-muted/80">
               · {first.author.displayName ?? first.author.login}:{' '}
@@ -187,8 +195,8 @@ export function ThreadCard({
         <div className="flex shrink-0 items-center gap-2">
           {thread.isOutdated && (
             <Badge tone="warning">
-              <span data-testid="outdated-badge" title="Left on an earlier version of the code">
-                Outdated
+              <span data-testid="outdated-badge" title={t('comments.thread.outdatedTitle')}>
+                {t('comments.thread.outdated')}
               </span>
             </Badge>
           )}
@@ -218,7 +226,7 @@ export function ThreadCard({
             {thread.comments.map((comment) => {
               const provider = comment.htmlUrl ? providerOfWebUrl(comment.htmlUrl) : null
               const copyLabel = provider
-                ? 'Copy link to the comment on ' + SCM_PROVIDER_LABEL[provider]
+                ? t('comments.thread.copyLink', { provider: SCM_PROVIDER_LABEL[provider] })
                 : ''
               return (
                 <li key={comment.id} className="min-w-0 p-3">
@@ -229,10 +237,10 @@ export function ThreadCard({
                     </span>
                     <time
                       dateTime={comment.createdAt}
-                      title={formatAbsoluteTime(comment.createdAt)}
+                      title={formatAbsoluteTime(comment.createdAt, locale)}
                       className="shrink-0"
                     >
-                      {formatRelativeTime(comment.createdAt)}
+                      {formatRelativeTime(comment.createdAt, locale)}
                     </time>
                     {comment.htmlUrl && (
                       <button
@@ -245,7 +253,7 @@ export function ThreadCard({
                         {copiedCommentId === comment.id ? (
                           <>
                             <Check size={12} className="text-success" />
-                            Copied
+                            {t('common.copied')}
                           </>
                         ) : (
                           <Link size={12} />
@@ -265,11 +273,11 @@ export function ThreadCard({
 
           <CommentComposer
             className="border-t border-border p-3"
-            label="Reply to this thread"
-            placeholder="Reply…"
-            submitLabel="Reply"
+            label={t('comments.thread.replyLabel')}
+            placeholder={t('comments.thread.replyPlaceholder')}
+            submitLabel={t('comments.thread.reply')}
             clearOnSubmit
-            suggestion={suggestionSourceFor(actions, thread)}
+            suggestion={suggestionSourceFor(actions, thread, t)}
             onSubmit={(bodyMarkdown) => actions.reply(thread.id, bodyMarkdown)}
           />
         </>

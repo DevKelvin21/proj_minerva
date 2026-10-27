@@ -99,7 +99,7 @@ test('modal F12: strip "En uso", tabs de proveedor y activación por card', asyn
   await openSettingsModal(window)
 
   // Strip "En uso" (uppercase vía CSS ⇒ case-insensitive) y 3 proveedores.
-  await expect(window.getByText(/en uso/i).first()).toBeVisible()
+  await expect(window.getByText(/in use/i).first()).toBeVisible()
   await expect(window.getByText('OpenCode').first()).toBeVisible()
   await expect(window.getByText('Claude Code').first()).toBeVisible()
   await expect(window.getByText('Codex').first()).toBeVisible()
@@ -132,7 +132,7 @@ test('modal F12: strip "En uso", tabs de proveedor y activación por card', asyn
 
   // El strip "En uso" y el badge "Activo" reflejan la activación.
   await expect(window.getByText(targetModel).first()).toBeVisible()
-  await expect(window.getByText('Activo').first()).toBeVisible()
+  await expect(window.getByText('Active').first()).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'settings-modal-activacion')
 })

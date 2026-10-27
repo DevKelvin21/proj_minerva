@@ -135,7 +135,7 @@ test('repo groups show a provider marker and reviewers show their vote', async (
   window,
 }, testInfo) => {
   await expect(window.getByText('apply-coupon').first()).toBeVisible({ timeout: 20_000 })
-  const aside = window.locator('aside[aria-label="Lista de pull requests"]')
+  const aside = window.locator('aside[aria-label="Pull request list"]')
   await expect(aside.locator('[data-provider="github"]').first()).toBeVisible()
 
   // #470 (shopwave/api) is approved in the mock universe.

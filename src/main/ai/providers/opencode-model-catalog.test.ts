@@ -114,7 +114,7 @@ describe('fetchOpencodeModelCatalog', () => {
     expect(models).toEqual([{ id: 'opencode/big-pickle', label: 'Big Pickle', vendor: 'OpenCode' }])
   })
 
-  it('arma el descriptor `variant` a partir de las CLAVES de model.variants, con Bajo/Medio/Alto para low/medium/high', async () => {
+  it('arma el descriptor `variant` a partir de las CLAVES de model.variants, con Low/Medium/High para low/medium/high', async () => {
     getOpencodeServerMock.mockResolvedValue({ url: 'http://127.0.0.1:1' })
     const data: FakeProviderListData = {
       all: [
@@ -144,11 +144,11 @@ describe('fetchOpencodeModelCatalog', () => {
         options: [
           {
             id: 'variant',
-            label: 'Variante',
+            label: 'Variant',
             choices: [
-              { value: 'low', label: 'Bajo', isDefault: false },
-              { value: 'medium', label: 'Medio', isDefault: false },
-              { value: 'high', label: 'Alto', isDefault: false },
+              { value: 'low', label: 'Low', isDefault: false },
+              { value: 'medium', label: 'Medium', isDefault: false },
+              { value: 'high', label: 'High', isDefault: false },
             ],
           },
         ],

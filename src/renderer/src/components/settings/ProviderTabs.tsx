@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { AI_PROVIDER_IDS } from '../../../../shared/ai-providers'
 import type { AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
@@ -7,12 +8,6 @@ const DOT_TONE: Record<AiProviderStatus['status'], string> = {
   unavailable: 'bg-border',
   installed: 'bg-warning',
   authenticated: 'bg-success',
-}
-
-const DOT_TITLE: Record<AiProviderStatus['status'], string> = {
-  unavailable: 'No disponible',
-  installed: 'Instalado, sin sesión',
-  authenticated: 'Conectado',
 }
 
 interface ProviderTabsProps {
@@ -40,6 +35,7 @@ interface ProviderTabsProps {
  * grupo en un solo salto.
  */
 export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsProps): React.JSX.Element {
+  const { t } = useTranslation()
   function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number): void {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
@@ -55,7 +51,7 @@ export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsP
     // tres tabs se comprimían hasta cortar los labels; ahora scrollean.
     <div
       role="tablist"
-      aria-label="Proveedor de IA"
+      aria-label={t('settings.providerTabs.ariaLabel')}
       className="flex overflow-x-auto border-b border-border bg-panel px-2"
     >
       {AI_PROVIDER_IDS.map((provider, index) => {
@@ -82,13 +78,17 @@ export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsP
           >
             <span
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${status ? DOT_TONE[status.status] : 'bg-border'}`}
-              title={status ? DOT_TITLE[status.status] : 'Comprobando estado…'}
+              title={
+                status
+                  ? t(`settings.providerStatus.${status.status}`)
+                  : t('settings.providerStatus.checking')
+              }
             />
             {entry.label}
             {isActiveProvider && (
               <>
                 <Check size={12} className="text-accent" aria-hidden />
-                <span className="sr-only">(proveedor activo)</span>
+                <span className="sr-only">{t('settings.providerTabs.activeProvider')}</span>
               </>
             )}
           </button>

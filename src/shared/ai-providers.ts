@@ -88,22 +88,26 @@ export interface AiProviderCatalogEntry {
  * todos los descriptores `effort` del catálogo (T34, F8) — así la UI (T37)
  * siempre ve el mismo texto para el mismo nivel, sea cual sea el proveedor.
  */
-const EFFORT_CHOICE_LABELS: Record<string, string> = {
-  low: 'Bajo',
-  medium: 'Medio',
-  high: 'Alto',
-  xhigh: 'Muy alto',
-  max: 'Máximo',
+// English on purpose (default UI language): the renderer translates known
+// levels by `value` (`settings.modelOptions.*` in its locales) and shows this
+// text only as the fallback. Exported so the renderer can tell a curated
+// description (translatable) from one a provider sent (shown as is).
+export const EFFORT_CHOICE_LABELS: Record<string, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Very high',
+  max: 'Max',
   ultra: 'Ultra',
 }
 
-const EFFORT_CHOICE_DESCRIPTIONS: Record<string, string> = {
-  low: 'Respuestas más rápidas, con menos razonamiento.',
-  medium: 'Equilibrio entre velocidad y profundidad de razonamiento.',
-  high: 'Razonamiento más profundo; respuestas más lentas.',
-  xhigh: 'Razonamiento extendido para tareas complejas.',
-  max: 'El máximo razonamiento disponible; la opción más lenta.',
-  ultra: 'Razonamiento máximo con delegación automática de tareas.',
+export const EFFORT_CHOICE_DESCRIPTIONS: Record<string, string> = {
+  low: 'Faster answers, with less reasoning.',
+  medium: 'Balance between speed and reasoning depth.',
+  high: 'Deeper reasoning; slower answers.',
+  xhigh: 'Extended reasoning for complex tasks.',
+  max: 'The most reasoning available; the slowest option.',
+  ultra: 'Maximum reasoning with automatic task delegation.',
 }
 
 /**
@@ -127,7 +131,7 @@ export function effortDescriptor(
 ): ModelOptionDescriptor {
   return {
     id: 'effort',
-    label: 'Razonamiento',
+    label: 'Reasoning',
     choices: values.map((value) => ({
       value,
       label: EFFORT_CHOICE_LABELS[value] ?? value,
@@ -167,7 +171,7 @@ const CLAUDE_CODE_HAIKU_EFFORT = effortDescriptor(['low', 'medium', 'high'], 'hi
  * persistidos en `settings.json` de instalaciones previas.
  */
 const CLAUDE_CODE_MODELS = [
-  { id: 'opus', label: 'Opus (última versión)', vendor: 'Anthropic', options: [CLAUDE_CODE_FULL_EFFORT] },
+  { id: 'opus', label: 'Opus (latest)', vendor: 'Anthropic', options: [CLAUDE_CODE_FULL_EFFORT] },
   { id: 'claude-fable-5', label: 'Fable 5', vendor: 'Anthropic', options: [CLAUDE_CODE_FULL_EFFORT] },
   { id: 'claude-sonnet-5', label: 'Sonnet 5', vendor: 'Anthropic', options: [CLAUDE_CODE_FULL_EFFORT] },
   { id: 'claude-haiku-4-5', label: 'Haiku 4.5', vendor: 'Anthropic', options: [CLAUDE_CODE_HAIKU_EFFORT] },

@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
 import { repoKey } from '../../../../shared/scm'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
@@ -15,28 +16,15 @@ import { RepoGroup } from '../pr-list/RepoGroup'
 import { StacksView } from '../stacks/StacksView'
 import { IconButton } from '../ui/IconButton'
 
+/** CLI command shown verbatim (not translated). */
+const GH_LOGIN_COMMAND = 'gh auth login'
+
 /** A provider error that means "sign in first", not "something broke". */
 function isSignInError(error: ScmListError): boolean {
   return error.code === 'UNAUTHENTICATED' || error.code === 'CLI_UNAVAILABLE'
 }
 
-const STATE_FILTER_OPTIONS: { value: PrStateFilter; label: string }[] = [
-  { value: 'open', label: 'Abiertos' },
-  { value: 'closed', label: 'Cerrados' },
-  { value: 'all', label: 'Todos' },
-]
-
-/** Mensaje de lista vacía (T52, F10) según el filtro de estado vigente. */
-function emptyStateMessage(filter: PrStateFilter): string {
-  switch (filter) {
-    case 'open':
-      return 'No hay PRs abiertos.'
-    case 'closed':
-      return 'No hay PRs cerrados.'
-    case 'all':
-      return 'No hay PRs.'
-  }
-}
+const STATE_FILTER_OPTIONS: readonly PrStateFilter[] = ['open', 'closed', 'all']
 
 /** One line per provider that failed while the others still listed (typed code + message). */
 function ProviderErrors({ errors }: { errors: ScmListError[] }): React.JSX.Element {
@@ -63,19 +51,20 @@ function StateFilterControl({
   value: PrStateFilter
   onChange: (filter: PrStateFilter) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div className="flex rounded-md border border-border bg-bg p-0.5 text-xs">
       {STATE_FILTER_OPTIONS.map((option) => (
         <button
-          key={option.value}
+          key={option}
           type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
+          aria-pressed={value === option}
+          onClick={() => onChange(option)}
           className={`rounded px-2 py-1 font-medium transition-colors duration-150 ${
-            value === option.value ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
+            value === option ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
           }`}
         >
-          {option.label}
+          {t(`layout.sidebar.stateFilter.${option}`)}
         </button>
       ))}
     </div>
@@ -94,15 +83,16 @@ function SidebarViewSwitch({
   value: SidebarView
   onChange: (view: SidebarView) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const orphans = useStacksStore((s) => (s.result ? countOrphans(s.result.stacks) : 0))
   const options: { value: SidebarView; label: string }[] = [
-    { value: 'list', label: 'Pull requests' },
-    { value: 'stacks', label: 'Stacks' },
+    { value: 'list', label: t('layout.sidebar.views.list') },
+    { value: 'stacks', label: t('layout.sidebar.views.stacks') },
   ]
   return (
     <div
       role="group"
-      aria-label="Left column view"
+      aria-label={t('layout.sidebar.viewSwitch')}
       className="flex w-full rounded-md border border-border bg-bg p-0.5 text-xs"
     >
       {options.map((option) => (
@@ -119,7 +109,7 @@ function SidebarViewSwitch({
           {option.value === 'stacks' && orphans > 0 && (
             <span
               className="shrink-0 rounded-full bg-warning/20 px-1.5 text-[10px] text-warning"
-              title={orphans + ' orphaned ' + (orphans === 1 ? 'PR' : 'PRs')}
+              title={t('layout.sidebar.orphans', { count: orphans })}
             >
               {orphans}
             </span>
@@ -144,6 +134,7 @@ function SidebarViewSwitch({
  * (y su watcher) no debe depender de si el overlay está visible.
  */
 export function Sidebar(): React.JSX.Element | null {
+  const { t } = useTranslation()
   const searchQuery = useAppStore((s) => s.searchQuery)
   const scmAuth = useAppStore((s) => s.scmAuth)
   const openSettings = useAppStore((s) => s.openSettings)
@@ -210,7 +201,7 @@ export function Sidebar(): React.JSX.Element | null {
         <div className="absolute inset-0 z-30 bg-black/50" onClick={closeSidebar} aria-hidden />
       )}
       <aside
-        aria-label="Lista de pull requests"
+        aria-label={t('layout.sidebar.ariaLabel')}
         style={isDrawer ? undefined : { width: SIDEBAR_WIDTH[tier.w] }}
         className={asideClass}
       >
@@ -225,7 +216,7 @@ export function Sidebar(): React.JSX.Element | null {
               <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
               <IconButton
                 icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
-                label="Actualizar"
+                label={t('layout.sidebar.refresh')}
                 onClick={refetch}
                 disabled={loading}
                 className="ml-auto"
@@ -243,14 +234,19 @@ export function Sidebar(): React.JSX.Element | null {
           */}
                 {githubAccount !== null ? (
                   <p className="text-sm text-muted">
-                    The account <span className="font-mono text-text">{githubAccount}</span> has no
-                    valid gh session. Pick another one in Settings, or renew it with{' '}
-                    <span className="font-mono text-text">gh auth login</span>.
+                    <Trans
+                      i18nKey="layout.sidebar.accountNoSession"
+                      values={{ account: githubAccount, command: GH_LOGIN_COMMAND }}
+                      components={{ mono: <span className="font-mono text-text" /> }}
+                    />
                   </p>
                 ) : (
                   <p className="text-sm text-muted">
-                    Sign in with GitHub CLI: run{' '}
-                    <span className="font-mono text-text">gh auth login</span> in a terminal.
+                    <Trans
+                      i18nKey="layout.sidebar.signInWithGhCli"
+                      values={{ command: GH_LOGIN_COMMAND }}
+                      components={{ mono: <span className="font-mono text-text" /> }}
+                    />
                   </p>
                 )}
                 <button
@@ -258,27 +254,28 @@ export function Sidebar(): React.JSX.Element | null {
                   onClick={openSettings}
                   className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
                 >
-                  Open settings
+                  {t('layout.sidebar.openSettings')}
                 </button>
               </div>
             ) : error ? (
-              <p className="p-4 text-sm text-danger">No se pudo cargar la lista de PRs: {error}</p>
+              <p className="p-4 text-sm text-danger">{t('layout.sidebar.loadFailed', { error })}</p>
             ) : otherErrors.length > 0 && pullRequests.length === 0 ? (
               <ProviderErrors errors={otherErrors} />
             ) : loading && pullRequests.length === 0 ? (
-              <p className="p-4 text-sm text-muted">Cargando PRs…</p>
+              <p className="p-4 text-sm text-muted">{t('layout.sidebar.loading')}</p>
             ) : groups.length === 0 ? (
               searchQuery.trim() ? (
                 <p className="p-4 text-sm text-muted">
-                  No hay PRs que coincidan con "{searchQuery}".
+                  {t('layout.sidebar.noMatches', { query: searchQuery })}
                 </p>
               ) : (
                 <div className="flex flex-col gap-2 p-4 text-sm text-muted">
-                  <p>{emptyStateMessage(prStateFilter)}</p>
+                  <p>{t(`layout.sidebar.empty.${prStateFilter}`)}</p>
                   <p className="text-xs">
-                    Tip: el buscador acepta cualificadores de GitHub, p. ej.{' '}
-                    <code className="rounded bg-bg px-1">org:mi-org</code> o{' '}
-                    <code className="rounded bg-bg px-1">repo:owner/nombre</code>.
+                    <Trans
+                      i18nKey="layout.sidebar.searchTip"
+                      components={{ code: <code className="rounded bg-bg px-1" /> }}
+                    />
                   </p>
                 </div>
               )

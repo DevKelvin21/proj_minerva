@@ -58,6 +58,7 @@ import type {
 } from '../../../shared/types'
 import { AZURE_GUID_RE, isAzureRepoRef } from '../../../shared/scm-guards'
 import { ScmError, toScmError } from '../errors'
+import { mt } from '../../i18n'
 import type { ListPullRequestsQuery, ScmProvider, SnapshotRequest } from '../provider'
 import type { StackInputPr } from '../stacks'
 import type {
@@ -214,14 +215,14 @@ export function createLimiter(limit: number): <T>(fn: () => Promise<T>) => Promi
 
 function asAzureRepo(repo: RepoRef): AzureRepoRef {
   if (repo.provider !== 'azure') {
-    throw new ScmError('NOT_FOUND', 'Not an Azure DevOps repository: ' + repo.fullName)
+    throw new ScmError('NOT_FOUND', mt('azure.notAzureRepo', { repo: repo.fullName }))
   }
   return repo
 }
 
-function parseNumericId(value: string, label: string): number {
+function parseNumericId(value: string): number {
   if (!/^[1-9][0-9]{0,9}$/.test(value)) {
-    throw new ScmError('NOT_FOUND', 'Unknown ' + label + ': ' + value.slice(0, 40))
+    throw new ScmError('NOT_FOUND', mt('azure.unknownThread', { value: value.slice(0, 40) }))
   }
   return Number(value)
 }
@@ -369,25 +370,24 @@ export class AzureScmProvider implements ScmProvider {
   protected scoped(repoRef: RepoRef): AzureRepoRef {
     const repo = asAzureRepo(repoRef)
     if (!isAzureRepoRef(repo) || !AZURE_GUID_RE.test(repo.repositoryId)) {
-      throw new ScmError('NOT_FOUND', 'Not a valid Azure DevOps repository: ' + repo.fullName)
+      throw new ScmError('NOT_FOUND', mt('azure.invalidRepo', { repo: repo.fullName }))
     }
     const org = repo.organization.toLowerCase()
     const entry = this.organizations().find((item) => item.organization.toLowerCase() === org)
     if (!entry) {
       throw new ScmError(
         'FORBIDDEN',
-        'Azure DevOps organization ' + repo.organization + ' is not configured in Settings.',
+        mt('azure.orgNotConfigured', { organization: repo.organization }),
       )
     }
     const project = repo.project.toLowerCase()
     if (!entry.projects.some((name) => name.toLowerCase() === project)) {
       throw new ScmError(
         'FORBIDDEN',
-        'Azure DevOps project ' +
-          repo.project +
-          ' is not configured for ' +
-          repo.organization +
-          ' in Settings.',
+        mt('azure.projectNotConfigured', {
+          project: repo.project,
+          organization: repo.organization,
+        }),
       )
     }
     return repo
@@ -426,18 +426,18 @@ export class AzureScmProvider implements ScmProvider {
   private async computeAuthStatus(): Promise<ScmAuthStatus> {
     const config = this.getConfig()
     if (!config.enabled) {
-      return { provider: 'azure', state: 'disabled', detail: 'Turned off in Settings.' }
+      return { provider: 'azure', state: 'disabled', detail: mt('azure.turnedOff') }
     }
     const first = config.organizations[0]
     if (!first) {
       return {
         provider: 'azure',
         state: 'disabled',
-        detail: 'No Azure DevOps organization configured. Add one in Settings.',
+        detail: mt('azure.noOrganization'),
       }
     }
     const org = first.organization
-    const loginHint = 'Run: az devops login --organization ' + organizationUrl(org)
+    const loginCommand = 'az devops login --organization ' + organizationUrl(org)
     let source: AzureCredentialKind
     try {
       source = (await this.credentials.getAuthHeader(org)).source
@@ -455,7 +455,7 @@ export class AzureScmProvider implements ScmProvider {
       }
       const detail =
         scmError.code === 'UNAUTHENTICATED' && !scmError.message.includes('az devops login')
-          ? scmError.message + '. ' + loginHint + ' with a PAT that has Code (Read & Write) scope.'
+          ? mt('azure.unauthenticatedDetail', { message: scmError.message, command: loginCommand })
           : scmError.message
       return { provider: 'azure', state: 'cli_unauthenticated', detail }
     }
@@ -675,7 +675,7 @@ export class AzureScmProvider implements ScmProvider {
   private async requireLatestIteration(repo: AzureRepoRef, number: number): Promise<AzIteration> {
     const latest = latestIteration(await this.iterations(repo, number))
     if (!latest) {
-      throw new ScmError('NOT_FOUND', 'Pull request ' + number + ' has no iterations yet.')
+      throw new ScmError('NOT_FOUND', mt('azure.noIterations', { number }))
     }
     return latest
   }
@@ -983,7 +983,7 @@ export class AzureScmProvider implements ScmProvider {
     const comment = { content: req.bodyMarkdown, commentType: 1 as const }
 
     if (req.threadId) {
-      const threadId = parseNumericId(req.threadId, 'thread')
+      const threadId = parseNumericId(req.threadId)
       const thread = await this.client.json<AzThread>(
         org,
         this.repoUrl(repo, 'pullRequests', req.number, 'threads', threadId),
@@ -1013,15 +1013,12 @@ export class AzureScmProvider implements ScmProvider {
         throw new ScmError(
           'NOT_FOUND',
           pastCap
-            ? 'Cannot comment on ' +
-                path +
-                ' from Minerva: the pull request changes ' +
-                (iteration.countCapped ? 'more than ' : '') +
-                iteration.total +
-                ' files and only the first ' +
-                iteration.changes.length +
-                ' are loaded. Comment on it in Azure DevOps.'
-            : 'Cannot comment on ' + path + ': the file is not part of the latest iteration.',
+            ? mt(iteration.countCapped ? 'azure.commentCappedAtLeast' : 'azure.commentCapped', {
+                path,
+                total: iteration.total,
+                loaded: iteration.changes.length,
+              })
+            : mt('azure.commentNotInIteration', { path }),
         )
       }
       const position = { line: req.line, offset: 1 }
@@ -1040,13 +1037,13 @@ export class AzureScmProvider implements ScmProvider {
       { method: 'POST', body },
     )
     const first = created.comments[0]
-    if (!first) throw new ScmError('UNKNOWN', 'Azure DevOps returned a thread without comments.')
+    if (!first) throw new ScmError('UNKNOWN', mt('azure.threadWithoutComments'))
     return mapComment(first, created.id, repo, req.number)
   }
 
   async setThreadStatus(req: SetThreadStatusRequest): Promise<CommentThread> {
     const repo = this.scoped(req.repo)
-    const threadId = parseNumericId(req.threadId, 'thread')
+    const threadId = parseNumericId(req.threadId)
     const url = this.repoUrl(repo, 'pullRequests', req.number, 'threads', threadId)
     await this.client.json<AzThread>(repo.organization, url, {
       method: 'PATCH',
@@ -1061,7 +1058,7 @@ export class AzureScmProvider implements ScmProvider {
       : undefined
     const paths = AzureScmProvider.knownPaths(cached)
     const mapped = this.finishThread(thread, repo, req.number, latest?.id ?? null, paths)
-    if (!mapped) throw new ScmError('NOT_FOUND', 'Comment thread not found: ' + req.threadId)
+    if (!mapped) throw new ScmError('NOT_FOUND', mt('scm.threadNotFound', { id: req.threadId }))
     return mapped
   }
 
@@ -1073,7 +1070,10 @@ export class AzureScmProvider implements ScmProvider {
         ? latest.sourceRefCommit?.commitId
         : (latest.commonRefCommit?.commitId ?? latest.targetRefCommit?.commitId)
     if (!commit || !COMMIT_SHA_RE.test(commit)) {
-      throw new ScmError('NOT_FOUND', 'Azure DevOps did not report the ' + req.side + ' commit.')
+      throw new ScmError(
+        'NOT_FOUND',
+        mt(req.side === 'head' ? 'azure.headCommitMissing' : 'azure.baseCommitMissing'),
+      )
     }
     let bytes: Uint8Array
     try {
@@ -1180,7 +1180,7 @@ export class AzureScmProvider implements ScmProvider {
   async writeSnapshot(req: SnapshotRequest, destDir: string): Promise<void> {
     const repo = this.scoped(req.repo)
     if (!COMMIT_SHA_RE.test(req.headSha)) {
-      throw new ScmError('NOT_FOUND', 'Not a commit id: ' + req.headSha.slice(0, 40))
+      throw new ScmError('NOT_FOUND', mt('azure.notCommitId', { value: req.headSha.slice(0, 40) }))
     }
     const workDir = await mkdtemp(join(this.tmpRoot(), 'minerva-azure-zip-'))
     try {
@@ -1199,10 +1199,7 @@ export class AzureScmProvider implements ScmProvider {
         await extractZipSafely(zipPath, destDir)
       } catch (error) {
         if (error instanceof ZipExtractError) {
-          throw new ScmError(
-            'UNKNOWN',
-            error.message + ' An agentic analysis cannot be generated for this PR.',
-          )
+          throw new ScmError('UNKNOWN', error.message + ' ' + mt('scm.noAgenticAnalysis'))
         }
         throw error
       }

@@ -331,7 +331,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
 
     const service = new ClaudeCodeAiService(makeGithubService())
     await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow(
-      'No se encontró el CLI "claude" instalado',
+      'The "claude" CLI is not installed',
     )
     expect(queryMock).not.toHaveBeenCalled()
     expect(ensureSnapshotMock).not.toHaveBeenCalled()
@@ -419,7 +419,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
     expect(firstMeta).toEqual({
       done: false,
       phase: 'exploring',
-      activity: [{ id: 'think-0', kind: 'thinking', label: 'Pensando…', status: 'running' }],
+      activity: [{ id: 'think-0', kind: 'thinking', label: 'Thinking…', status: 'running' }],
     })
     expect(firstSections).toEqual([])
 
@@ -453,7 +453,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
     // Edge 1 (begin, SIN throttle): fila running genérica — el nombre de la
     // tool llega en el start pero los args todavía no.
     expect(progressCalls[0][1].activity).toEqual([
-      { id: 'toolu_1', kind: 'read', label: 'Leyendo un archivo…', status: 'running' },
+      { id: 'toolu_1', kind: 'read', label: 'Reading a file…', status: 'running' },
     ])
     // Edge del complete (también SIN throttle; entre medio pueden colarse
     // pings throttled de los input_json_delta): MISMA fila (mismo id,
@@ -461,7 +461,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
     // acumulado, relativa al snapshot.
     const doneCall = progressCalls.find(([, meta]) => meta.activity?.[0]?.status === 'done')
     expect(doneCall?.[1].activity).toEqual([
-      { id: 'toolu_1', kind: 'read', label: 'Leyó src/routes/carts.ts', status: 'done' },
+      { id: 'toolu_1', kind: 'read', label: 'Read src/routes/carts.ts', status: 'done' },
     ])
     // El terminal NO trae actividad (efímera por diseño).
     const [, lastMeta] = progressCalls[progressCalls.length - 1]
@@ -490,12 +490,12 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
     // label es SIEMPRE el genérico — el texto del razonamiento jamás viaja.
     const activityCalls = progressCalls.filter(([, meta]) => !meta.done && meta.activity?.length)
     expect(activityCalls[0][1].activity).toEqual([
-      { id: 'think-0', kind: 'thinking', label: 'Pensando…', status: 'running' },
+      { id: 'think-0', kind: 'thinking', label: 'Thinking…', status: 'running' },
     ])
     // Con el primer delta de texto la fila cierra a "Pensó" y viaja con esa
     // misma emisión (throttled), sin edge extra.
     const writingCall = progressCalls.find(([, meta]) => !meta.done && meta.activity?.[0]?.status === 'done')
-    expect(writingCall?.[1].activity?.[0].label).toBe('Pensó')
+    expect(writingCall?.[1].activity?.[0].label).toBe('Thought')
   })
 
   it('lanza un mensaje accionable de login cuando el assistant reporta authentication_failed', async () => {
@@ -542,7 +542,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
 
     const service = new ClaudeCodeAiService(makeGithubService())
     await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow(
-      'no encontró un binario ejecutable',
+      'could not find an executable binary',
     )
   })
 
@@ -551,7 +551,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
 
     const service = new ClaudeCodeAiService(makeGithubService())
     await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow(
-      'Claude Code no respondió a tiempo (timeout total de 300s)',
+      'Claude Code did not answer in time (total timeout of 300s)',
     )
   })
 
@@ -577,7 +577,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
 
     const service = new ClaudeCodeAiService(makeGithubService())
     await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow(
-      'no devolvió contenido de streaming',
+      'returned no streaming content',
     )
   })
 
@@ -585,7 +585,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
     fakeQuery([textDeltaMessage('@@@SECTION kind=nope\ncontenido\n')])
 
     const service = new ClaudeCodeAiService(makeGithubService())
-    await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow('Ninguna sección')
+    await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow('None of the sections')
   })
 })
 

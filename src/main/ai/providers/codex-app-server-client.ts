@@ -41,6 +41,7 @@
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { app } from 'electron'
+import { mt } from '../../i18n'
 import { resolveCliPath } from './resolve-cli'
 import { buildSanitizedSpawnEnv } from './spawn-env'
 
@@ -111,25 +112,15 @@ function ensureQuitHookRegistered(): void {
 function describeSpawnError(binary: string, error: unknown): string {
   const code = (error as NodeJS.ErrnoException | undefined)?.code
   if (code === 'ENOENT') {
-    return (
-      'No se encontró el binario "' +
-      binary +
-      '" en el PATH. Instalá el Codex CLI oficial de OpenAI (paquete "@openai/codex" o el ' +
-      'instalador de tu plataforma) y volvé a intentar.'
-    )
+    return mt('ai.codex.binaryNotInPath', { binary })
   }
   const message = error instanceof Error ? error.message : String(error)
-  return 'No se pudo lanzar el proceso "' + binary + '": ' + message
+  return mt('ai.errors.spawnFailed', { binary, detail: message })
 }
 
 /** Mensaje accionable cuando `resolveCliPath` no encuentra el binario en ninguna ubicación conocida (ni siquiera se intenta el `spawn`). */
 function describeUnresolvedBinary(binary: string): string {
-  return (
-    'No se encontró el binario "' +
-    binary +
-    '" instalado. Instalá el Codex CLI oficial de OpenAI (paquete "@openai/codex" o el ' +
-    'instalador de tu plataforma), corré «codex login» y volvé a intentar.'
-  )
+  return mt('ai.codex.binaryNotInstalled', { binary })
 }
 
 export interface CodexAppServerClientOptions {
@@ -208,11 +199,7 @@ export class CodexAppServerClient {
       if (this.closed) return
       this.failFatally(
         new CodexProcessExitError(
-          'El proceso "codex app-server" terminó inesperadamente (code=' +
-            String(code) +
-            ', signal=' +
-            String(signal) +
-            ').',
+          mt('ai.codex.processExited', { code: String(code), signal: String(signal) }),
         ),
       )
     })
@@ -303,14 +290,14 @@ export class CodexAppServerClient {
   /** Manda una request JSON-RPC y devuelve una promesa que resuelve con `result` (o rechaza con `JsonRpcRemoteError`/error fatal del proceso). */
   request<T = unknown>(method: string, params?: unknown, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Promise<T> {
     if (this.closed) {
-      return Promise.reject(this.closeError ?? new Error('Cliente de codex app-server ya cerrado.'))
+      return Promise.reject(this.closeError ?? new Error(mt('ai.codex.clientClosed')))
     }
 
     const id = this.nextId++
     return new Promise<T>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         this.pending.delete(id)
-        reject(new Error('codex app-server no respondió a "' + method + '" dentro de ' + timeoutMs + 'ms.'))
+        reject(new Error(mt('ai.codex.requestTimeout', { method, ms: timeoutMs })))
       }, timeoutMs)
 
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject, timeoutId })
@@ -343,7 +330,7 @@ export class CodexAppServerClient {
       }
       return
     }
-    this.failFatally(new Error('Análisis cancelado: se cerró el proceso de codex app-server.'))
+    this.failFatally(new Error(mt('ai.codex.cancelled')))
     liveChildren.delete(this.child)
     try {
       this.child.kill('SIGTERM')

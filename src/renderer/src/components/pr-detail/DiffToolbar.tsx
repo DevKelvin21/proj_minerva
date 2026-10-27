@@ -1,4 +1,5 @@
 import { AlignJustify, Columns2, Files, WrapText } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { DiffFile } from '../../../../shared/types'
 import type { DiffViewMode } from '../../stores/app-store'
 import { SPLIT_DIFF_MIN_WIDTH } from '../../lib/layout'
@@ -30,6 +31,7 @@ export function DiffToolbar({
   fileTreeToggle,
   compact = false,
 }: DiffToolbarProps): React.JSX.Element {
+  const { t } = useTranslation()
   // Compacto (F16/T86): el path completo es lo primero que sobra cuando la
   // toolbar no entra; el nombre del archivo alcanza para saber dónde estás y la
   // ruta entera sigue disponible en el `title`.
@@ -42,7 +44,8 @@ export function DiffToolbar({
           type="button"
           onClick={fileTreeToggle.onToggle}
           aria-expanded={fileTreeToggle.open}
-          title="Ver los archivos del PR"
+          title={t('prDetail.toolbar.showFiles')}
+          aria-label={t('prDetail.toolbar.showFilesCount', { count: fileTreeToggle.count })}
           className={`flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition-colors duration-150 ${
             fileTreeToggle.open
               ? 'border-accent/50 bg-accent/10 text-accent'
@@ -78,8 +81,8 @@ export function DiffToolbar({
           icon={<Columns2 size={15} />}
           label={
             splitTooNarrow
-              ? `Vista split (necesita ~${SPLIT_DIFF_MIN_WIDTH}px de ancho; cierra el panel didáctico o agranda la ventana)`
-              : 'Vista split'
+              ? t('prDetail.toolbar.splitTooNarrow', { width: SPLIT_DIFF_MIN_WIDTH })
+              : t('prDetail.toolbar.split')
           }
           active={mode === 'split'}
           disabled={splitTooNarrow}
@@ -87,13 +90,13 @@ export function DiffToolbar({
         />
         <IconButton
           icon={<AlignJustify size={15} />}
-          label="Vista inline"
+          label={t('prDetail.toolbar.inline')}
           active={mode === 'inline'}
           onClick={() => onModeChange('inline')}
         />
         <IconButton
           icon={<WrapText size={15} />}
-          label="Word wrap"
+          label={t('prDetail.toolbar.wordWrap')}
           active={wordWrap}
           onClick={onToggleWordWrap}
         />

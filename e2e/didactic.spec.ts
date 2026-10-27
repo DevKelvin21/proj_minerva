@@ -17,11 +17,11 @@ import type { Page } from './fixtures'
 /** Selecciona un PR por título y lanza el análisis didáctico. */
 async function analyze(window: Page, prTitle: string): Promise<void> {
   await window.getByText(prTitle).first().click()
-  await window.getByRole('button', { name: 'Analizar PR' }).click()
+  await window.getByRole('button', { name: 'Analyze PR' }).click()
   // Señal inequívoca de término (regla de la suite legacy): "Re-analizar"
   // solo existe con resultado y está deshabilitado mientras carga. NO esperar
   // por "Resumen": el placeholder ya dice "Resumen didáctico del cambio".
-  await expect(window.getByRole('button', { name: /Re-?analizar/i })).toBeEnabled({
+  await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,
   })
 }
@@ -29,15 +29,15 @@ async function analyze(window: Page, prTitle: string): Promise<void> {
 const setupCard = (window: Page) =>
   window
     .locator('section')
-    .filter({ has: window.locator('header', { hasText: 'Cómo levantar la app' }) })
+    .filter({ has: window.locator('header', { hasText: 'How to run the app' }) })
 
 test('PR #482: resumen, endpoint con snippet y diagrama C4', async ({ window }, testInfo) => {
   await analyze(window, 'Add POST /carts/:id/apply-coupon')
 
-  await expect(window.getByText('Resumen').first()).toBeVisible()
+  await expect(window.getByText('Summary').first()).toBeVisible()
   // Sección de endpoint: snippet curl copiable.
   await expect(window.locator('pre', { hasText: 'curl' }).first()).toBeVisible()
-  await expect(window.getByRole('button', { name: /Copiar/ }).first()).toBeVisible()
+  await expect(window.getByRole('button', { name: /Copy/ }).first()).toBeVisible()
   // Diagrama mermaid renderizado como SVG (render lazy ⇒ timeout de expect).
   await expect(window.locator('svg[aria-roledescription]').first()).toBeVisible()
 
@@ -48,7 +48,7 @@ test('PR #482: resumen, endpoint con snippet y diagrama C4', async ({ window }, 
   await expect(card).toBeVisible()
   await expect(card.getByText('COUPON_MAX_DISCOUNT_RATE').first()).toBeVisible()
   expect(await card.locator('pre').count()).toBeGreaterThanOrEqual(1)
-  await expect(card.getByRole('button', { name: /Copiar/ }).first()).toBeVisible()
+  await expect(card.getByRole('button', { name: /Copy/ }).first()).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'pr-482-didactic')
 })
@@ -65,7 +65,7 @@ test('PR #479: esquema con diagrama ER y setup sin env vars', async ({ window },
   // NO agrega variables de entorno (nunca debe omitir ese dato).
   const card = setupCard(window)
   await expect(card).toBeVisible()
-  await expect(card.getByText('no agrega ni cambia variables de entorno')).toBeVisible()
+  await expect(card.getByText('adds or changes no environment variables')).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'pr-479-didactic')
 })
@@ -73,7 +73,7 @@ test('PR #479: esquema con diagrama ER y setup sin env vars', async ({ window },
 test('PR #201: sección de arquitectura con diagrama', async ({ window }, testInfo) => {
   await analyze(window, 'Refactor checkout state machine')
 
-  await expect(window.getByText('Arquitectura').first()).toBeVisible()
+  await expect(window.getByText('Architecture').first()).toBeVisible()
   await expect(window.locator('svg[aria-roledescription]').first()).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'pr-201-didactic')
@@ -83,5 +83,5 @@ test('cambiar de PR resetea el panel al placeholder', async ({ window }) => {
   await analyze(window, 'Add POST /carts/:id/apply-coupon')
   await window.getByText('Add dark mode toggle').first().click()
   // El remount por key debe volver al placeholder con el botón de análisis.
-  await expect(window.getByRole('button', { name: 'Analizar PR' })).toBeVisible()
+  await expect(window.getByRole('button', { name: 'Analyze PR' })).toBeVisible()
 })

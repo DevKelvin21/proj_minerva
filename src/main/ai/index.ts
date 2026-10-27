@@ -8,6 +8,7 @@ import { CodexAiService } from './providers/codex-service'
 import { OpenCodeAiService } from './providers/opencode-service'
 import { getCliProviderStatus } from './providers/cli-probe'
 import { getEffectiveAiSelection } from './env'
+import { mt } from '../i18n'
 
 export type { AiService } from './service'
 
@@ -73,21 +74,9 @@ function cliUnavailableReason(
   status: 'unavailable' | 'installed',
 ): string {
   if (status === 'installed') {
-    return (
-      'El proveedor de IA activo (' +
-      label +
-      ') está instalado pero sin sesión iniciada. Corré «' +
-      binary +
-      ' login» en una terminal y reintentá, o elegí otro proveedor en Settings (engrane de la barra de título).'
-    )
+    return mt('ai.provider.notLoggedIn', { provider: label, binary })
   }
-  return (
-    'No se encontró el CLI «' +
-    binary +
-    '» del proveedor de IA activo (' +
-    label +
-    ') en esta máquina. Instalalo y reintentá, o elegí otro proveedor en Settings (engrane de la barra de título).'
-  )
+  return mt('ai.provider.cliNotFound', { provider: label, binary })
 }
 
 async function createAiServiceForProvider(
@@ -123,21 +112,9 @@ async function createAiServiceForProvider(
         return new OpenCodeAiService(context)
       }
       if (status.status === 'installed') {
-        return mockFallbackOrThrow(
-          'OpenCode está instalado pero no reporta ningún proveedor de modelos conectado. ' +
-            'Corré «opencode auth login» en una terminal para conectar uno (OpenRouter, ' +
-            'Anthropic, etc.) y reintentá, o elegí otro proveedor en Settings (engrane de ' +
-            'la barra de título).',
-          context,
-        )
+        return mockFallbackOrThrow(mt('ai.provider.opencodeNoUpstream'), context)
       }
-      return mockFallbackOrThrow(
-        'No se encontró el CLI «opencode» del proveedor de IA activo (OpenCode) en esta ' +
-          'máquina (o su versión es más vieja que la mínima soportada). Instalalo o ' +
-          'actualizalo (https://opencode.ai/docs/) y reintentá, o elegí otro proveedor en ' +
-          'Settings (engrane de la barra de título).',
-        context,
-      )
+      return mockFallbackOrThrow(mt('ai.provider.opencodeNotFound'), context)
     }
   }
 }

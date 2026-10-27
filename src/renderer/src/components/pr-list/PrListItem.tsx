@@ -5,11 +5,9 @@ import {
   GitPullRequestDraft,
   MessageSquare,
 } from 'lucide-react'
-import type {
-  PullRequestState,
-  PullRequestSummary,
-  ReviewDecision,
-} from '../../../../shared/types'
+import { useTranslation } from 'react-i18next'
+import type { ParseKeys } from 'i18next'
+import type { PullRequestState, PullRequestSummary, ReviewDecision } from '../../../../shared/types'
 import { useAppStore } from '../../stores/app-store'
 import { Avatar } from '../ui/Avatar'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
@@ -34,17 +32,10 @@ function reviewDecisionTone(decision: ReviewDecision): string {
   }
 }
 
-function reviewDecisionLabel(decision: ReviewDecision): string {
-  switch (decision) {
-    case 'approved':
-      return 'Aprobado'
-    case 'changes_requested':
-      return 'Cambios solicitados'
-    case 'review_required':
-      return 'Revisión pendiente'
-    default:
-      return ''
-  }
+const REVIEW_DECISION_LABEL: Record<NonNullable<ReviewDecision>, ParseKeys> = {
+  approved: 'prList.review.approved',
+  changes_requested: 'prList.review.changesRequested',
+  review_required: 'prList.review.reviewRequired',
 }
 
 /** Icono de estado (T52, F10): coherente con el tono del badge (merge morado, closed atenuado). */
@@ -55,31 +46,57 @@ function StateIcon({
   state: PullRequestState
   isDraft: boolean
 }): React.JSX.Element {
+  const { t } = useTranslation()
   if (isDraft) {
-    return <GitPullRequestDraft size={14} className="mt-0.5 shrink-0 text-muted" aria-label="Draft" />
+    return (
+      <GitPullRequestDraft
+        size={14}
+        className="mt-0.5 shrink-0 text-muted"
+        aria-label={t('prList.state.draft')}
+      />
+    )
   }
   if (state === 'merged') {
-    return <GitMerge size={14} className="mt-0.5 shrink-0 text-purple-400" aria-label="Mergeado" />
+    return (
+      <GitMerge
+        size={14}
+        className="mt-0.5 shrink-0 text-purple-400"
+        aria-label={t('prList.state.merged')}
+      />
+    )
   }
   if (state === 'closed') {
-    return <GitPullRequestClosed size={14} className="mt-0.5 shrink-0 text-muted" aria-label="Cerrado" />
+    return (
+      <GitPullRequestClosed
+        size={14}
+        className="mt-0.5 shrink-0 text-muted"
+        aria-label={t('prList.state.closed')}
+      />
+    )
   }
-  return <GitPullRequest size={14} className="mt-0.5 shrink-0 text-accent" aria-label="Abierto" />
+  return (
+    <GitPullRequest
+      size={14}
+      className="mt-0.5 shrink-0 text-accent"
+      aria-label={t('prList.state.open')}
+    />
+  )
 }
 
 /** Chip pequeño de estado (T52, F10): solo para PRs no abiertos (closed incluye merged, con badges distintos). */
 function StateBadge({ state }: { state: PullRequestState }): React.JSX.Element | null {
+  const { t } = useTranslation()
   if (state === 'merged') {
     return (
       <span className="rounded border border-purple-400/40 px-1 text-[10px] text-purple-400">
-        merged
+        {t('prList.state.mergedBadge')}
       </span>
     )
   }
   if (state === 'closed') {
     return (
       <span className="rounded border border-danger/40 px-1 text-[10px] text-danger/80">
-        closed
+        {t('prList.state.closedBadge')}
       </span>
     )
   }
@@ -87,6 +104,7 @@ function StateBadge({ state }: { state: PullRequestState }): React.JSX.Element |
 }
 
 export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element {
+  const { t } = useTranslation()
   const selectedPrKey = useAppStore((s) =>
     s.selectedPr ? prKey(s.selectedPr.repo, s.selectedPr.number) : null,
   )
@@ -112,7 +130,7 @@ export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element
           <span
             className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger"
             aria-hidden
-            title="Cambios sin ver"
+            title={t('prList.unseenChanges')}
           />
         )}
         <span
@@ -131,18 +149,21 @@ export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element
         {pr.reviewDecision && (
           <span
             className={`h-1.5 w-1.5 rounded-full ${reviewDecisionTone(pr.reviewDecision)}`}
-            title={reviewDecisionLabel(pr.reviewDecision)}
+            title={t(REVIEW_DECISION_LABEL[pr.reviewDecision])}
           />
         )}
         {pr.commentCount !== null && pr.commentCount > 0 && (
-          <span className="relative flex items-center gap-0.5">
+          <span
+            className="relative flex items-center gap-0.5"
+            title={t('prList.comments', { count: pr.commentCount })}
+          >
             <MessageSquare size={12} aria-hidden />
             <span>{pr.commentCount}</span>
             {hasNewComments && (
               <span
                 className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-danger"
                 aria-hidden
-                title="Comentarios nuevos"
+                title={t('prList.newComments')}
               />
             )}
           </span>

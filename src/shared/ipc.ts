@@ -31,7 +31,13 @@ import type {
 } from './types'
 import type { FileContent, ScmAuthStatus, ScmProviderId } from './scm'
 import type { AiModelOption, AiProviderId } from './ai-providers'
-import type { AnalysisProgressEvent, PrListChangedEvent, UpdaterStatusChangedEvent } from './events'
+import type { AppLocale } from './locale'
+import type {
+  AnalysisProgressEvent,
+  LanguageChangedEvent,
+  PrListChangedEvent,
+  UpdaterStatusChangedEvent,
+} from './events'
 
 export interface IpcContract {
   'minerva:ping': { req: void; res: string }
@@ -220,6 +226,16 @@ export interface IpcContract {
     res: AiSettingsInfo
   }
 
+  /** UI language from settings.json (`en` when unset). Read once by each window at boot. */
+  'settings:getLanguage': { req: void; res: AppLocale }
+  /**
+   * Persists the UI language, applies it to main (native dialogs, error
+   * messages, window titles, the next AI analysis) and pushes
+   * `languageChanged` to every window so both the main and the detached
+   * didactic window switch at once. Answers the saved language.
+   */
+  'settings:setLanguage': { req: { language: AppLocale }; res: AppLocale }
+
   /**
    * Abre (o enfoca, si ya hay una) la ventana didáctica desacoplada (T14,
    * `../main/windows/didactic-window.ts`) sincronizada con `repo`/`number`.
@@ -305,6 +321,8 @@ export const IPC_CHANNELS = [
   'settings:setAiProvider',
   'settings:setProviderModel',
   'settings:setModelOption',
+  'settings:getLanguage',
+  'settings:setLanguage',
   'window:openDidactic',
   'updater:getStatus',
   'updater:check',
@@ -368,6 +386,8 @@ interface EventsApi {
    * preload, nunca un `on(channel, cb)` genérico.
    */
   onUpdaterStatus(callback: (payload: UpdaterStatusChangedEvent) => void): () => void
+  /** The UI language changed (from any window); same concrete-method pattern. */
+  onLanguageChanged(callback: (payload: LanguageChangedEvent) => void): () => void
 }
 
 export type MinervaApi = InvokeApi & { events: EventsApi }

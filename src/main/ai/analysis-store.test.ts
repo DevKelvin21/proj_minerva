@@ -35,6 +35,7 @@ function analysis(prId: string, overrides: Partial<DidacticAnalysis> = {}): Dida
     generatedAt: '2026-07-06T00:00:00.000Z',
     headSha: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
     generatedWith: { provider: 'opencode', model: 'opencode/big-pickle', options: {} },
+    language: 'en',
     ...overrides,
   }
 }
@@ -125,6 +126,36 @@ describe('AnalysisStore', () => {
     const store = new AnalysisStore()
     expect(store.loadEntries()).toEqual([valid])
     warn.mockRestore()
+  })
+
+  it('loads a legacy entry without language as Spanish (pre-i18n analyses used the Spanish prompt)', () => {
+    const legacy = analysis('legacy') as Partial<DidacticAnalysis>
+    delete legacy.language
+    writeFileSync(
+      analysesFilePath(),
+      JSON.stringify({ version: 2, entries: [{ key: 'shopwave/api#9', analysis: legacy }] }),
+      'utf-8',
+    )
+
+    const [entry] = new AnalysisStore().loadEntries()
+    expect(entry.analysis.language).toBe('es')
+    expect(entry.analysis.prId).toBe('legacy')
+  })
+
+  it('keeps the recorded language and drops an entry with an unknown one', () => {
+    const english = { key: 'shopwave/api#1', analysis: analysis('en', { language: 'en' }) }
+    const spanish = { key: 'shopwave/api#2', analysis: analysis('es', { language: 'es' }) }
+    const unknown = {
+      key: 'shopwave/api#3',
+      analysis: analysis('fr', { language: 'fr' as never }),
+    }
+    writeFileSync(
+      analysesFilePath(),
+      JSON.stringify({ version: 2, entries: [english, spanish, unknown] }),
+      'utf-8',
+    )
+
+    expect(new AnalysisStore().loadEntries()).toEqual([english, spanish])
   })
 
   it('roundtrip: saveEntries + loadEntries en la misma instancia (cache en memoria)', () => {

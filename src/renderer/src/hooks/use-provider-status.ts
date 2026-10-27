@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AiProviderId } from '../../../shared/ai-providers'
 import type { AiProviderStatus } from '../../../shared/types'
+import { errorText } from '../lib/error-text'
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 interface UseProviderStatusResult {

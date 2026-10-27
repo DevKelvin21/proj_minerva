@@ -40,6 +40,7 @@ import { execFile } from 'node:child_process'
 import { GH_HOSTNAME } from './config'
 import { parseGhAccountsJson, parseGhAccountsText } from './gh-accounts'
 import { fetchGithubUser } from './github-user'
+import { mt } from '../../i18n'
 import { resolveCliPath } from '../../ai/providers/resolve-cli'
 import { settingsStore } from '../../settings/store'
 import type { GhAccount } from '../../../shared/types'
@@ -71,10 +72,7 @@ function unauthenticated(account: string | null): ScmAuthStatus {
     provider: 'github',
     state: 'cli_unauthenticated',
     credentialSource: 'gh-cli',
-    detail:
-      account === null
-        ? "No gh session. Run 'gh auth login' in a terminal."
-        : `The selected gh account "${account}" has no valid session. Run 'gh auth login' for it or pick another account in Settings.`,
+    detail: account === null ? mt('github.noSession') : mt('github.accountNoSession', { account }),
   }
 }
 
@@ -196,8 +194,7 @@ export class GhCliAuth {
         provider: 'github',
         state: 'cli_unavailable',
         credentialSource: 'gh-cli',
-        detail:
-          "GitHub CLI not found. Install it (https://cli.github.com) and run 'gh auth login'.",
+        detail: mt('github.cliNotFound'),
       }
     }
 

@@ -2,6 +2,7 @@
  * Display labels and tones for provider-neutral SCM states (reviewer votes,
  * thread statuses). Pure, so every provider's values render the same way.
  */
+import type { TFunction } from 'i18next'
 import type { ReviewerVote, ScmProviderId, ThreadStatus } from '../../../shared/scm'
 
 export const SCM_PROVIDER_LABEL: Record<ScmProviderId, string> = {
@@ -23,31 +24,30 @@ export function providerOfWebUrl(url: string): ScmProviderId {
 }
 
 /** Why a changed text file shows no diff (`DiffFile.patchOmitted`), or the generic fallback. */
-export function noPatchMessage(reason: 'too_large' | 'diff_budget' | undefined): string {
-  if (reason === 'too_large') return 'Diff not shown: the file is too large to diff here.'
-  if (reason === 'diff_budget') {
-    return 'Diff not shown: this pull request is too large to diff every file. Open it on the provider to see this one.'
-  }
-  return 'No preview available.'
+export function noPatchMessage(reason: 'too_large' | 'diff_budget' | undefined, t: TFunction): string {
+  if (reason === 'too_large') return t('prDetail.diff.tooLarge')
+  if (reason === 'diff_budget') return t('prDetail.diff.overBudget')
+  return t('prDetail.diff.noPreview')
 }
 
 export type ScmTone = 'neutral' | 'accent' | 'success' | 'danger' | 'warning'
 
-export const REVIEWER_VOTE_DISPLAY: Record<ReviewerVote, { label: string; tone: ScmTone }> = {
-  approved: { label: 'Approved', tone: 'success' },
-  approved_with_suggestions: { label: 'Approved with suggestions', tone: 'success' },
-  none: { label: 'No vote yet', tone: 'neutral' },
-  changes_requested: { label: 'Changes requested', tone: 'warning' },
-  rejected: { label: 'Rejected', tone: 'danger' },
+export const REVIEWER_VOTE_TONE: Record<ReviewerVote, ScmTone> = {
+  approved: 'success',
+  approved_with_suggestions: 'success',
+  none: 'neutral',
+  changes_requested: 'warning',
+  rejected: 'danger',
 }
 
-export const THREAD_STATUS_LABEL: Record<ThreadStatus, string> = {
-  active: 'Active',
-  pending: 'Pending',
-  resolved: 'Resolved',
-  wont_fix: "Won't fix",
-  closed: 'Closed',
-  by_design: 'By design',
+/** Display label of a reviewer vote, in the active UI language. */
+export function reviewerVoteLabel(vote: ReviewerVote, t: TFunction): string {
+  return t(`prDetail.reviewerVote.${vote}`)
+}
+
+/** Display label of a thread status, in the active UI language. */
+export function threadStatusLabel(status: ThreadStatus, t: TFunction): string {
+  return t(`comments.threadStatus.${status}`)
 }
 
 export const THREAD_STATUS_TONE: Record<ThreadStatus, ScmTone> = {
@@ -60,9 +60,12 @@ export const THREAD_STATUS_TONE: Record<ThreadStatus, ScmTone> = {
 }
 
 /** Badge for a thread status, or `null` for `active` (the default state needs no badge). */
-export function threadStatusBadge(status: ThreadStatus): { label: string; tone: ScmTone } | null {
+export function threadStatusBadge(
+  status: ThreadStatus,
+  t: TFunction,
+): { label: string; tone: ScmTone } | null {
   if (status === 'active') return null
-  return { label: THREAD_STATUS_LABEL[status], tone: THREAD_STATUS_TONE[status] }
+  return { label: threadStatusLabel(status, t), tone: THREAD_STATUS_TONE[status] }
 }
 
 /**
@@ -73,10 +76,11 @@ export function truncatedFilesMessage(
   shown: number,
   total: number | null,
   provider: ScmProviderId,
+  t: TFunction,
 ): string {
-  const where = 'Open the pull request in ' + SCM_PROVIDER_LABEL[provider] + ' to see the rest.'
+  const vars = { shown, provider: SCM_PROVIDER_LABEL[provider] }
   if (total !== null && total > shown) {
-    return 'Showing ' + shown + ' of ' + total + ' files: the provider capped the list. ' + where
+    return t('prDetail.files.truncatedOfTotal', { ...vars, total })
   }
-  return 'Showing the first ' + shown + ' files: the provider capped the list. ' + where
+  return t('prDetail.files.truncatedFirst', vars)
 }

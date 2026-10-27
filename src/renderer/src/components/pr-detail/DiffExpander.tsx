@@ -1,4 +1,5 @@
 import { ArrowDownToLine, ArrowUpToLine, UnfoldVertical } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { EXPAND_STEP, gapLength, type HiddenGap } from '../../lib/expand-context'
 
 interface DiffExpanderProps {
@@ -28,6 +29,7 @@ export function DiffExpander({
   error,
   onExpand,
 }: DiffExpanderProps): React.JSX.Element {
+  const { t } = useTranslation()
   const length = gapLength(gap)
   const hasAbove = gap.beforeHunk > 0 || gap.newStart > 1
   const hasBelow = gap.beforeHunk < hunkCount
@@ -42,11 +44,11 @@ export function DiffExpander({
       <UnfoldVertical size={12} className="shrink-0" />
       <span>
         {length === null
-          ? 'More lines below'
-          : `${length} hidden ${length === 1 ? 'line' : 'lines'}`}
+          ? t('prDetail.expander.moreBelow')
+          : t('prDetail.expander.hiddenLines', { count: length })}
       </span>
       {error ? (
-        <span className="text-danger">Could not load the file: {error}</span>
+        <span className="text-danger">{t('prDetail.expander.loadError', { error })}</span>
       ) : small || length === null ? (
         <button
           type="button"
@@ -54,7 +56,11 @@ export function DiffExpander({
           className={BUTTON}
           onClick={() => onExpand(length === null ? 'down' : 'all')}
         >
-          {loading ? 'Loading…' : length === null ? `Show ${EXPAND_STEP} more` : 'Show'}
+          {loading
+            ? t('common.loading')
+            : length === null
+              ? t('prDetail.expander.showMore', { count: EXPAND_STEP })
+              : t('prDetail.expander.show')}
         </button>
       ) : (
         <>
@@ -63,8 +69,8 @@ export function DiffExpander({
               type="button"
               disabled={loading}
               className={BUTTON}
-              title={`Show ${EXPAND_STEP} more lines after the code above`}
-              aria-label={`Expand down ${EXPAND_STEP} lines`}
+              title={t('prDetail.expander.downTitle', { count: EXPAND_STEP })}
+              aria-label={t('prDetail.expander.downLabel', { count: EXPAND_STEP })}
               onClick={() => onExpand('down')}
             >
               <ArrowDownToLine size={11} /> {EXPAND_STEP}
@@ -75,8 +81,8 @@ export function DiffExpander({
               type="button"
               disabled={loading}
               className={BUTTON}
-              title={`Show ${EXPAND_STEP} more lines before the code below`}
-              aria-label={`Expand up ${EXPAND_STEP} lines`}
+              title={t('prDetail.expander.upTitle', { count: EXPAND_STEP })}
+              aria-label={t('prDetail.expander.upLabel', { count: EXPAND_STEP })}
               onClick={() => onExpand('up')}
             >
               <ArrowUpToLine size={11} /> {EXPAND_STEP}
@@ -88,7 +94,7 @@ export function DiffExpander({
             className={BUTTON}
             onClick={() => onExpand('all')}
           >
-            {loading ? 'Loading…' : `Show all ${length}`}
+            {loading ? t('common.loading') : t('prDetail.expander.showAll', { count: length })}
           </button>
         </>
       )}

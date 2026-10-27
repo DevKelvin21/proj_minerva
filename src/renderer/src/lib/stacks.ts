@@ -3,6 +3,7 @@
  * stack map in the PR header). The stacks themselves are built in main
  * (`scm:getStacks`); this only locates, groups, filters and explains them.
  */
+import type { TFunction } from 'i18next'
 import type { PrStack, StackNode } from '../../../shared/scm'
 
 /** Depth-first list of a stack's nodes, root first. */
@@ -136,16 +137,15 @@ export function countOrphans(stacks: readonly PrStack[]): number {
  * One-line explanation of an orphan, written to teach what happened:
  * "Parent #100 was completed into main, but this PR still targets feature/x."
  */
-export function orphanExplanation(node: StackNode): string | null {
+export function orphanExplanation(t: TFunction, node: StackNode): string | null {
   const orphan = node.orphan
   if (!orphan) return null
-  const base =
-    'Parent #' +
-    orphan.parent.number +
-    ' was completed into ' +
-    orphan.parent.mergedInto +
-    ', but this PR still targets ' +
-    node.baseRef +
-    '.'
-  return orphan.targetBranchExists ? base : base + ' That branch no longer exists.'
+  const values = {
+    parent: orphan.parent.number,
+    mergedInto: orphan.parent.mergedInto,
+    base: node.baseRef,
+  }
+  return orphan.targetBranchExists
+    ? t('stacks.tree.orphanExplanation', values)
+    : t('stacks.tree.orphanBranchGone', values)
 }

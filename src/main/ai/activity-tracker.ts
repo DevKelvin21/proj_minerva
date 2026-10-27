@@ -29,6 +29,8 @@
  * futuros proveedores que sí lo señalicen.
  */
 import type { AnalysisActivityItem, AnalysisActivityKind } from '../../shared/events'
+import type { AppLocale } from '../../shared/locale'
+import { getMainLocale, mt } from '../i18n'
 
 /** Tamaño del buffer rodante: el renderer muestra estas filas y ninguna más. */
 export const MAX_ACTIVITY_ITEMS = 5
@@ -77,6 +79,8 @@ export interface ActivityTrackerOptions {
    * relativas al repo ("src/api/routes.ts", no "/home/.../snapshots/...").
    */
   basePath?: string
+  /** Language of the labels: the analysis language (default: current main locale). */
+  language?: AppLocale
   /**
    * Llamado en cada transición de estado (ver arriba). El proveedor emite
    * `onProgress` acá, SIN throttle.
@@ -108,7 +112,7 @@ export function sanitizeDetail(raw: string, basePath?: string): string {
 }
 
 /**
- * Deriva la etiqueta en español de una entrada (idea `deriveToolActivityPresentation`
+ * Deriva la etiqueta de una entrada en `language` (idea `deriveToolActivityPresentation`
  * de t3code): verbo por `kind` + estado gramatical por `status`, con
  * fallbacks genéricos cuando no hay detalle. `detail` DEBE llegar ya
  * saneado (esta función no vuelve a sanear). Exportada para tests.
@@ -117,27 +121,29 @@ export function deriveActivityLabel(
   kind: AnalysisActivityKind,
   status: AnalysisActivityItem['status'],
   detail?: string,
+  language: AppLocale = getMainLocale(),
 ): string {
   const d = detail && detail.length > 0 ? detail : undefined
+  const l = (key: Parameters<typeof mt>[0]): string => mt(key, { detail: d ?? '' }, language)
   switch (kind) {
     case 'read':
-      if (status === 'error') return d ? 'Falló al leer ' + d : 'Falló al leer un archivo'
-      if (status === 'done') return d ? 'Leyó ' + d : 'Leyó un archivo'
-      return d ? 'Leyendo ' + d : 'Leyendo un archivo…'
+      if (status === 'error') return l(d ? 'ai.activity.readFailedDetail' : 'ai.activity.readFailed')
+      if (status === 'done') return l(d ? 'ai.activity.readDoneDetail' : 'ai.activity.readDone')
+      return l(d ? 'ai.activity.readingDetail' : 'ai.activity.reading')
     case 'search':
-      if (status === 'error') return 'Falló una búsqueda'
-      if (status === 'done') return d ? 'Buscó "' + d + '"' : 'Buscó en el repo'
-      return d ? 'Buscando "' + d + '"' : 'Buscando…'
+      if (status === 'error') return l('ai.activity.searchFailed')
+      if (status === 'done') return l(d ? 'ai.activity.searchDoneDetail' : 'ai.activity.searchDone')
+      return l(d ? 'ai.activity.searchingDetail' : 'ai.activity.searching')
     case 'list':
-      if (status === 'error') return 'Falló un listado'
-      if (status === 'done') return d ? 'Listó ' + d : 'Listó la estructura'
-      return d ? 'Listando ' + d : 'Listando la estructura…'
+      if (status === 'error') return l('ai.activity.listFailed')
+      if (status === 'done') return l(d ? 'ai.activity.listDoneDetail' : 'ai.activity.listDone')
+      return l(d ? 'ai.activity.listingDetail' : 'ai.activity.listing')
     case 'thinking':
-      return status === 'done' ? 'Pensó' : 'Pensando…'
+      return l(status === 'done' ? 'ai.activity.thought' : 'ai.activity.thinking')
     case 'tool':
-      if (status === 'error') return 'Falló una herramienta'
-      if (status === 'done') return d ? 'Usó ' + d : 'Exploró el repositorio'
-      return d ? 'Usando ' + d : 'Explorando el repositorio…'
+      if (status === 'error') return l('ai.activity.toolFailed')
+      if (status === 'done') return l(d ? 'ai.activity.toolDoneDetail' : 'ai.activity.toolDone')
+      return l(d ? 'ai.activity.usingToolDetail' : 'ai.activity.usingTool')
   }
 }
 
@@ -150,6 +156,7 @@ interface ActivityEntry {
 
 export function createActivityTracker(options: ActivityTrackerOptions): ActivityTracker {
   const { basePath, onEdge } = options
+  const language = options.language ?? getMainLocale()
   /** Buffer ordenado viejo -> nuevo; nunca supera MAX_ACTIVITY_ITEMS. */
   const entries: ActivityEntry[] = []
   /**
@@ -232,7 +239,7 @@ export function createActivityTracker(options: ActivityTrackerOptions): Activity
       return entries.map((e) => ({
         id: e.id,
         kind: e.kind,
-        label: deriveActivityLabel(e.kind, e.status, e.detail),
+        label: deriveActivityLabel(e.kind, e.status, e.detail, language),
         status: e.status,
       }))
     },

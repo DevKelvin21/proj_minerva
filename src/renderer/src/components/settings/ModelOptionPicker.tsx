@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { resolveOptionValue } from '../../../../shared/ai-providers'
 import type { AiModelOption, AiProviderId } from '../../../../shared/ai-providers'
+import { choiceDescription, choiceLabel, optionLabel } from '../../lib/model-labels'
 
 interface ModelOptionPickerProps {
   provider: AiProviderId
@@ -44,6 +46,7 @@ export function ModelOptionPicker({
   selected,
   onSelect,
 }: ModelOptionPickerProps): React.JSX.Element | null {
+  const { t } = useTranslation()
   const [savingValue, setSavingValue] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -55,17 +58,19 @@ export function ModelOptionPicker({
     setSaveError(null)
     const ok = await onSelect(provider, optionId, value)
     setSavingValue(null)
-    if (!ok) setSaveError('No se pudo guardar la opción. Probá de nuevo.')
+    if (!ok) setSaveError(t('settings.modelOptions.saveError'))
   }
 
   return (
     <div className="mt-3 space-y-3 border-t border-border pt-3">
       {descriptors.map((descriptor) => {
         const currentValue = resolveOptionValue(descriptor, selected[descriptor.id])
+        const currentChoice = descriptor.choices.find((choice) => choice.value === currentValue)
+        const currentDescription = currentChoice ? choiceDescription(t, currentChoice) : undefined
         return (
           <div key={descriptor.id}>
             <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-              {descriptor.label}
+              {optionLabel(t, descriptor)}
             </h4>
             <div className="flex flex-wrap gap-1.5">
               {descriptor.choices.map((choice) => {
@@ -75,7 +80,7 @@ export function ModelOptionPicker({
                   <button
                     key={choice.value}
                     type="button"
-                    title={choice.description}
+                    title={choiceDescription(t, choice)}
                     disabled={savingValue !== null}
                     onClick={() => void handleSelect(descriptor.id, choice.value)}
                     className={
@@ -85,15 +90,13 @@ export function ModelOptionPicker({
                     }
                   >
                     {isSaving && <Loader2 size={11} className="animate-spin" />}
-                    {choice.label}
+                    {choiceLabel(t, choice)}
                   </button>
                 )
               })}
             </div>
-            {descriptor.choices.find((choice) => choice.value === currentValue)?.description && (
-              <p className="mt-1 text-[11px] text-muted">
-                {descriptor.choices.find((choice) => choice.value === currentValue)?.description}
-              </p>
+            {currentDescription && (
+              <p className="mt-1 text-[11px] text-muted">{currentDescription}</p>
             )}
           </div>
         )

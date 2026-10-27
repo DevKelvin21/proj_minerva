@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { AnalysisGenerationInfo } from '../../../../shared/types'
 import { useSettings } from '../../hooks/use-settings'
 import { resolveModelHintLabels } from '../../lib/model-labels'
@@ -30,6 +31,7 @@ interface ActiveModelHintProps {
  */
 export function ActiveModelHint({ generatedWith }: ActiveModelHintProps = {}): React.JSX.Element | null {
   const { info } = useSettings()
+  const { t } = useTranslation()
   if (!info) return null
 
   const provider = generatedWith?.provider ?? info.provider
@@ -43,8 +45,8 @@ export function ActiveModelHint({ generatedWith }: ActiveModelHintProps = {}): R
   const summary = providerLabel + ' · ' + model + (effortLabel ? ' · ' + effortLabel : '')
 
   return (
-    <span className="truncate text-[11px] text-muted" title={'Proveedor y modelo activos: ' + summary}>
-      vía <span className="font-mono">{summary}</span>
+    <span className="truncate text-[11px] text-muted" title={t('didactic.modelHint.title', { summary })}>
+      {t('didactic.modelHint.via')} <span className="font-mono">{summary}</span>
     </span>
   )
 }

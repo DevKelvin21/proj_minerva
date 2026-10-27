@@ -9,11 +9,9 @@
  * token from `gh` (`ghCliAuth.refetchTokenAfter401()`) and retries ONCE.
  */
 import { ScmError, isScmError } from '../errors'
+import { mt } from '../../i18n'
 import type { ScmDataSource } from '../provider'
 import { ghCliAuth } from './gh-cli-auth'
-
-const GH_CLI_REAUTH_MESSAGE =
-  "Not authenticated with GitHub CLI: run 'gh auth login' in a terminal and retry."
 
 function isAuthError(error: unknown): boolean {
   return isScmError(error) && error.code === 'UNAUTHENTICATED'
@@ -27,7 +25,7 @@ async function guarded<Result>(fn: () => Promise<Result>): Promise<Result> {
 
     const refreshedToken = await ghCliAuth.refetchTokenAfter401()
     if (refreshedToken === null) {
-      throw new ScmError('UNAUTHENTICATED', GH_CLI_REAUTH_MESSAGE, { cause: error })
+      throw new ScmError('UNAUTHENTICATED', mt('github.reauth'), { cause: error })
     }
 
     try {
@@ -36,7 +34,7 @@ async function guarded<Result>(fn: () => Promise<Result>): Promise<Result> {
       // Single retry: a second auth failure (token revoked mid-way, or `gh`
       // points at another account) surfaces as the actionable gh message.
       if (isAuthError(retryError)) {
-        throw new ScmError('UNAUTHENTICATED', GH_CLI_REAUTH_MESSAGE, { cause: retryError })
+        throw new ScmError('UNAUTHENTICATED', mt('github.reauth'), { cause: retryError })
       }
       throw retryError
     }

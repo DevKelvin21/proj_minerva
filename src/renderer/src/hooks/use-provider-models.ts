@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { AiModelOption, AiProviderId } from '../../../shared/ai-providers'
+import { errorText } from '../lib/error-text'
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 interface UseProviderModelsResult {

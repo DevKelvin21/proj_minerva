@@ -4,7 +4,7 @@
 
 Electron app for reviewing Pull Requests **didactically**: a GitKraken-style diff plus an
 AI agent that explains the _impact_ (C4 diagrams, new-endpoint docs with local try-it
-snippets, schema changes + ER diagram, cloud infra). Multi-provider source control:
+snippets, schema changes + ER diagram, cloud infra). English UI with a Spanish translation (i18n, see "UI text / i18n"). Multi-provider source control:
 **GitHub** via the `gh` CLI, **Azure DevOps** via the `az` CLI (stack view and comment-review UI in progress, see
 `docs/plan-azure-devops.md`). Every feature must help the reviewer **understand** the
 PR, not just see changed lines.
@@ -98,7 +98,29 @@ author's Spanish logs, not maintained)
 - **Responsive**: the app is used tiled. Rules in `renderer/src/lib/layout.ts`;
   `useLayoutTier()` (window) for structure, `useElementWidth()` for intra-panel layout.
   New panels: `min-w-0` on flex containers, no fixed `shrink-0` widths without a clamp.
-- Network/AI errors: visible loading and error state, never a silent throw.
+- Network/AI errors: visible loading and error state, never a silent throw. Show IPC errors
+  with `errorText()` (`renderer/src/lib/error-text.ts`: drops Electron's wrapper and `[SCM:CODE]`).
+
+### UI text / i18n
+
+- English is the default; Spanish is the translation. The language lives in settings.json
+  (`language`, absent = `en`), set via `settings:setLanguage`; main pushes `languageChanged`
+  to every window (main + detached didactic) and each window boots with `settings:getLanguage`.
+- **Renderer**: every user-visible string goes through `t()` (`react-i18next`), including
+  `title`/`aria-label`/`placeholder` and error/empty states. Add the key to
+  `renderer/src/i18n/locales/en.ts` (source of truth, nested by area) AND `es.ts` (typed
+  `MessageShape<typeof en>`: a missing key is a typecheck error; `locales.test.ts` checks it
+  at runtime too). Plurals `key_one`/`key_other` + `{ count }`, `{{name}}` interpolation,
+  `<Trans>` for inline markup; never concatenate translated fragments. Dates/lists via `Intl`
+  with `useLocale().locale`. Lint `i18next/no-literal-string` flags literal JSX text.
+  Spanish is neutral Latin American "tú" (no voseo).
+- **Main**: text the user sees (native dialogs, error messages, window titles, activity
+  labels) goes through `mt(key, vars)` from `main/i18n` (`locales/en.ts` + `es.ts`, same
+  typing). Error codes (`[SCM:CODE]`) never change; dev log lines stay untranslated.
+- **AI**: `buildAnalyzeSystemPrompt(language)` (English instructions) asks for output in the
+  UI language captured at analysis start; `DidacticAnalysis.language` records it and the
+  didactic panel offers to regenerate when it differs. Mock AI: `fixtures.ts` (en) and
+  `fixtures.es.ts` (es).
 
 ## Hard gotchas
 

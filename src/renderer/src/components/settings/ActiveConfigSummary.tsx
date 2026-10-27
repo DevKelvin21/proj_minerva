@@ -1,13 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import type { AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
 import { resolveModelHintLabels } from '../../lib/model-labels'
 import { Badge } from '../ui/Badge'
-
-const STATUS_LABEL: Record<AiProviderStatus['status'], string> = {
-  unavailable: 'No disponible',
-  installed: 'Instalado, sin sesión',
-  authenticated: 'Conectado',
-}
 
 const STATUS_TONE: Record<AiProviderStatus['status'], 'neutral' | 'warning' | 'success'> = {
   unavailable: 'neutral',
@@ -43,17 +38,19 @@ export function ActiveConfigSummary({
   statuses,
   compact = false,
 }: ActiveConfigSummaryProps): React.JSX.Element {
+  const { t } = useTranslation()
   const status = statuses?.[info.provider]
   const { effortLabel } = resolveModelHintLabels(
     info.catalog,
     info.provider,
     info.model,
     info.selectedOptions?.[info.provider]?.effort,
+    t,
   )
 
   const statusBadge = status ? (
     <Badge tone={STATUS_TONE[status.status]}>
-      {STATUS_LABEL[status.status]}
+      {t(`settings.providerStatus.${status.status}`)}
       {status.status === 'authenticated' && status.account?.plan ? ' · ' + status.account.plan : ''}
       {status.status === 'authenticated' && status.account?.email ? ' · ' + status.account.email : ''}
     </Badge>
@@ -67,13 +64,11 @@ export function ActiveConfigSummary({
     <>
       {info.modelSource === 'env' && (
         <p className="mt-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
-          Definido por MINERVA_AI_MODEL en tu entorno. Elegir un modelo acá lo pisa.
+          {t('settings.activeConfig.envOverride')}
         </p>
       )}
       {info.modelSource === 'default' && (
-        <p className="mt-1.5 text-xs text-muted">
-          Usando el default del proveedor (todavía no elegiste un modelo).
-        </p>
+        <p className="mt-1.5 text-xs text-muted">{t('settings.activeConfig.providerDefault')}</p>
       )}
     </>
   )
@@ -82,7 +77,9 @@ export function ActiveConfigSummary({
     return (
       <div className="border-b border-border px-4 py-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">En uso</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+            {t('settings.activeConfig.title')}
+          </h3>
           <span className="text-sm font-medium text-text">{info.catalog[info.provider].label}</span>
           {statusBadge}
           <span className="min-w-0 truncate font-mono text-xs text-text">{info.model}</span>
@@ -95,7 +92,9 @@ export function ActiveConfigSummary({
 
   return (
     <div className="border-b border-border px-4 py-3">
-      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">En uso</h3>
+      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+        {t('settings.activeConfig.title')}
+      </h3>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-text">{info.catalog[info.provider].label}</span>
@@ -104,7 +103,12 @@ export function ActiveConfigSummary({
 
       <p className="mt-1 text-sm text-text">
         <span className="font-mono">{info.model}</span>
-        {effortLabel && <span className="text-muted"> · Razonamiento: {effortLabel}</span>}
+        {effortLabel && (
+          <span className="text-muted">
+            {' · '}
+            {t('settings.activeConfig.reasoning', { effort: effortLabel })}
+          </span>
+        )}
       </p>
 
       {sourceNote}

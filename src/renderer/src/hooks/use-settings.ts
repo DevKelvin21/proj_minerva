@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import type { AiProviderId } from '../../../shared/ai-providers'
 import type { AiSettingsInfo } from '../../../shared/types'
 import { useAppStore } from '../stores/app-store'
+import { errorText } from '../lib/error-text'
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 interface UseSettingsResult {

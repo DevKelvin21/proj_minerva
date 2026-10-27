@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isAnalysisStale } from './staleness'
+import { isAnalysisLanguageMismatch, isAnalysisStale } from './staleness'
 import type { DidacticAnalysis } from '../../../shared/types'
 
 function analysis(headSha: string): DidacticAnalysis {
@@ -9,6 +9,7 @@ function analysis(headSha: string): DidacticAnalysis {
     generatedAt: '2026-07-07T00:00:00.000Z',
     headSha,
     generatedWith: { provider: 'opencode', model: 'opencode/big-pickle', options: {} },
+    language: 'en',
   }
 }
 
@@ -36,5 +37,20 @@ describe('isAnalysisStale', () => {
 
   it('is not stale when there is no analysis yet', () => {
     expect(isAnalysisStale(null, 'abc123')).toBe(false)
+  })
+})
+
+describe('isAnalysisLanguageMismatch', () => {
+  it('is false when the analysis language matches the UI language', () => {
+    expect(isAnalysisLanguageMismatch(analysis('abc123'), 'en')).toBe(false)
+  })
+
+  it('is true when the analysis was written in another language', () => {
+    expect(isAnalysisLanguageMismatch(analysis('abc123'), 'es')).toBe(true)
+    expect(isAnalysisLanguageMismatch({ ...analysis('abc123'), language: 'es' }, 'en')).toBe(true)
+  })
+
+  it('is false when there is no analysis yet', () => {
+    expect(isAnalysisLanguageMismatch(null, 'es')).toBe(false)
   })
 })

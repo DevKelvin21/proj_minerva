@@ -1,3 +1,4 @@
+import type { AppLocale } from '../../../shared/locale'
 import type { DidacticAnalysis } from '../../../shared/types'
 
 /**
@@ -27,4 +28,18 @@ export function isAnalysisStale(
     !!analysis.headSha &&
     analysis.headSha !== currentHeadSha
   )
+}
+
+/**
+ * The analysis shown was written in another language than the current UI
+ * language (`DidacticAnalysis.language`, captured when it was requested):
+ * the panel offers to regenerate it in the UI language instead of silently
+ * serving, say, a Spanish analysis to an English user. `false` without an
+ * analysis.
+ */
+export function isAnalysisLanguageMismatch(
+  analysis: DidacticAnalysis | null,
+  locale: AppLocale,
+): boolean {
+  return analysis != null && analysis.language !== locale
 }

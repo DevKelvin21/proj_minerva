@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { usePullRequestDetail } from '../../hooks/use-pull-request-detail'
 import { useCommentThreads } from '../../hooks/use-comment-threads'
@@ -36,14 +37,15 @@ function TabButton({
 }
 
 export function CenterPane(): React.JSX.Element {
+  const { t } = useTranslation()
   const selectedPr = useAppStore((s) => s.selectedPr)
 
   if (!selectedPr) {
     return (
       <section className="flex flex-1 flex-col bg-bg">
         <EmptyState
-          title="Elige un Pull Request"
-          hint="Selecciona un PR de la lista de la izquierda para ver su conversación y sus archivos."
+          title={t('layout.center.choosePrTitle')}
+          hint={t('layout.center.choosePrHint')}
         />
       </section>
     )
@@ -61,12 +63,13 @@ export function CenterPane(): React.JSX.Element {
 }
 
 function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): React.JSX.Element {
+  const { t } = useTranslation()
   const { detail, error } = usePullRequestDetail(repo, number)
 
   if (error) {
     return (
       <section className="flex flex-1 flex-col bg-bg">
-        <EmptyState title="No se pudo cargar el PR" hint={error} />
+        <EmptyState title={t('layout.center.loadFailed')} hint={error} />
       </section>
     )
   }
@@ -78,7 +81,7 @@ function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): Reac
   if (!detail || !detailIsCurrent) {
     return (
       <section className="flex flex-1 flex-col bg-bg">
-        <EmptyState title="Cargando PR…" hint={`${repo.fullName}#${number}`} />
+        <EmptyState title={t('layout.center.loading')} hint={`${repo.fullName}#${number}`} />
       </section>
     )
   }
@@ -88,6 +91,7 @@ function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): Reac
 }
 
 function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Element {
+  const { t } = useTranslation()
   const { repo, number } = detail
   const centerTab = useAppStore((s) => s.centerTab)
   const setCenterTab = useAppStore((s) => s.setCenterTab)
@@ -126,7 +130,7 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `repo` is fixed for this mount (keyed by PR).
   }, [number, headSha, files, reloadThreads, applyThreadStatus])
 
-  const openThreads = threads.filter((t) => isThreadOpen(t.status)).length
+  const openThreads = threads.filter((thread) => isThreadOpen(thread.status)).length
 
   return (
     <ThreadActionsContext.Provider value={actions}>
@@ -137,14 +141,18 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
             active={centerTab === 'conversation'}
             onClick={() => setCenterTab('conversation')}
           >
-            Conversación
+            {t('layout.center.tabs.conversation')}
           </TabButton>
           <TabButton active={centerTab === 'files'} onClick={() => setCenterTab('files')}>
-            {detail.changedFiles === null ? 'Archivos' : `Archivos (${detail.changedFiles})`}
+            {detail.changedFiles === null
+              ? t('layout.center.tabs.files')
+              : t('layout.center.tabs.filesWithCount', { count: detail.changedFiles })}
           </TabButton>
           <TabButton active={centerTab === 'comments'} onClick={() => setCenterTab('comments')}>
-            <span title={`${openThreads} open ${openThreads === 1 ? 'thread' : 'threads'}`}>
-              Comments{threadsLoading && threads.length === 0 ? '' : ` (${openThreads})`}
+            <span title={t('layout.center.openThreads', { count: openThreads })}>
+              {threadsLoading && threads.length === 0
+                ? t('layout.center.tabs.comments')
+                : t('layout.center.tabs.commentsWithCount', { count: openThreads })}
             </span>
           </TabButton>
         </nav>

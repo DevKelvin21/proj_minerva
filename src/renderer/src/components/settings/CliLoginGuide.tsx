@@ -1,9 +1,16 @@
 import { RefreshCw } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import type { AiProviderStatus } from '../../../../shared/types'
 import { CLI_META, type CliProvider } from '../../lib/cli-meta'
 
 /** Enlace externo consistente con el resto del design system (`Markdown.tsx`/`TitleBar.tsx`): `target="_blank"` lo intercepta `external-link-guard` en main y lo abre en el navegador del sistema. */
-function ExternalLink({ href, children }: { href: string; children: React.ReactNode }): React.JSX.Element {
+function ExternalLink({
+  href,
+  children,
+}: {
+  href: string
+  children?: React.ReactNode
+}): React.JSX.Element {
   return (
     <a
       href={href}
@@ -46,56 +53,66 @@ export function CliLoginGuide({
   loading,
   onRecheck,
 }: CliLoginGuideProps): React.JSX.Element {
+  const { t } = useTranslation()
   const meta = CLI_META[provider]
   const value = status?.status ?? 'unavailable'
+  const mono = <span className="font-mono text-text" />
+  const docs = <ExternalLink href={meta.installUrl} />
 
   return (
     <div className="mt-2 rounded-md border border-border bg-bg/40 p-2.5">
       {value === 'unavailable' && status?.reason === 'probe-failed' && (
         <p className="text-xs text-muted">
-          Encontramos el CLI <span className="font-mono text-text">{meta.binary}</span>
           {status.resolvedPath ? (
-            <>
-              {' '}
-              en <span className="font-mono text-text break-all">{status.resolvedPath}</span>
-            </>
-          ) : null}{' '}
-          pero no respondió a la comprobación (versión demasiado vieja, o no terminó a tiempo —
-          p. ej. justo después de una actualización del CLI). Probá{' '}
-          <span className="font-mono text-text">{meta.binary} --version</span> en una terminal y
-          volvé a comprobar acá.
+            <Trans
+              i18nKey="settings.cliGuide.probeFailedAt"
+              values={{ binary: meta.binary, path: status.resolvedPath }}
+              components={{ mono, path: <span className="font-mono text-text break-all" /> }}
+            />
+          ) : (
+            <Trans
+              i18nKey="settings.cliGuide.probeFailed"
+              values={{ binary: meta.binary }}
+              components={{ mono }}
+            />
+          )}
         </p>
       )}
       {value === 'unavailable' && status?.reason !== 'probe-failed' && (
         <p className="text-xs text-muted">
-          No se encontró el CLI <span className="font-mono text-text">{meta.binary}</span> ni en tu
-          PATH ni en las ubicaciones de instalación comunes. Instalalo desde{' '}
-          <ExternalLink href={meta.installUrl}>la documentación oficial</ExternalLink> y volvé a
-          intentar.
+          <Trans
+            i18nKey="settings.cliGuide.notFound"
+            values={{ binary: meta.binary }}
+            components={{ mono, docs }}
+          />
         </p>
       )}
       {value === 'installed' && provider === 'opencode' && (
         <p className="text-xs text-muted">
-          OpenCode está instalado pero no tiene ningún proveedor de modelos conectado. Corré{' '}
-          <span className="font-mono text-text">{meta.loginCmd}</span> en una terminal para conectar
-          uno (no es un login del CLI: agrega credenciales de un proveedor de IA, ver{' '}
-          <ExternalLink href={meta.installUrl}>la documentación oficial</ExternalLink>) y volvé a
-          comprobar acá.
+          <Trans
+            i18nKey="settings.cliGuide.opencodeNoProvider"
+            values={{ command: meta.loginCmd }}
+            components={{ mono, docs }}
+          />
         </p>
       )}
       {value === 'installed' && provider !== 'opencode' && (
         <p className="text-xs text-muted">
-          El CLI está instalado pero no detectamos una sesión iniciada. Corré{' '}
-          <span className="font-mono text-text">{meta.loginCmd}</span> en una terminal y volvé a
-          comprobar acá.
+          <Trans
+            i18nKey="settings.cliGuide.noSession"
+            values={{ command: meta.loginCmd }}
+            components={{ mono }}
+          />
         </p>
       )}
       {value === 'authenticated' && (
         <p className="text-xs text-muted">
-          Conectado
-          {status?.account?.plan ? ' · plan ' + status.account.plan : ''}
-          {status?.account?.email ? ' · ' + status.account.email : ''}. Si cerraste sesión desde la
-          terminal, volvé a comprobar para reflejarlo acá.
+          {t('settings.cliGuide.connected', {
+            details:
+              (status?.account?.plan
+                ? t('settings.cliGuide.planDetail', { plan: status.account.plan })
+                : '') + (status?.account?.email ? ' · ' + status.account.email : ''),
+          })}
         </p>
       )}
 
@@ -106,7 +123,7 @@ export function CliLoginGuide({
         className="mt-2 flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-text transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-60"
       >
         <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-        Volver a comprobar
+        {t('settings.cliGuide.recheck')}
       </button>
     </div>
   )

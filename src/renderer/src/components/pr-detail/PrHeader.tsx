@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ExternalLink, GitBranch } from 'lucide-react'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestDetail } from '../../../../shared/types'
@@ -9,7 +10,7 @@ import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
-import { REVIEWER_VOTE_DISPLAY } from '../../lib/scm-labels'
+import { REVIEWER_VOTE_TONE, reviewerVoteLabel } from '../../lib/scm-labels'
 
 interface PrHeaderProps {
   pr: PullRequestDetail
@@ -31,6 +32,7 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
  * El `<details>` nativo evita sumar estado y cierra con Esc por sí solo.
  */
 function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
+  const { t } = useTranslation()
   const tier = useLayoutTier()
   const [editingBase, setEditingBase] = useState(false)
 
@@ -52,12 +54,10 @@ function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
           onClick={() => setEditingBase(true)}
           className="underline decoration-dotted transition-colors hover:text-text"
         >
-          Change target branch…
+          {t('prDetail.header.changeTargetBranch')}
         </button>
       )}
-      <span>
-        {pr.commits} {pr.commits === 1 ? 'commit' : 'commits'}
-      </span>
+      <span>{t('prDetail.header.commitCount', { count: pr.commits })}</span>
       <a
         href={pr.webUrl}
         target="_blank"
@@ -65,7 +65,7 @@ function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
         className="flex items-center gap-1 underline decoration-dotted transition-colors hover:text-text"
       >
         <ExternalLink size={12} aria-hidden />
-        Open in {SCM_PROVIDER_LABEL[pr.repo.provider]}
+        {t('prDetail.header.openIn', { provider: SCM_PROVIDER_LABEL[pr.repo.provider] })}
       </a>
     </div>
   )
@@ -94,16 +94,19 @@ function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
   // Reviewer chips with their vote (approved / with suggestions / changes
   // requested / rejected / no vote yet), provider-neutral.
   const reviewers = pr.reviewers.length > 0 && (
-    <ul aria-label="Reviewers" className="flex flex-wrap gap-1.5">
+    <ul aria-label={t('prDetail.header.reviewers')} className="flex flex-wrap gap-1.5">
       {pr.reviewers.map((reviewer) => {
-        const vote = REVIEWER_VOTE_DISPLAY[reviewer.vote]
         return (
           <li key={reviewer.user.login} data-vote={reviewer.vote}>
-            <Badge tone={vote.tone}>
+            <Badge tone={REVIEWER_VOTE_TONE[reviewer.vote]}>
               <Avatar user={reviewer.user} size={14} />
               <span>{reviewer.user.displayName ?? reviewer.user.login}</span>
-              <span className="font-normal opacity-80">· {vote.label}</span>
-              {reviewer.isRequired && <span className="font-normal opacity-80">· required</span>}
+              <span className="font-normal opacity-80">
+                · {reviewerVoteLabel(reviewer.vote, t)}
+              </span>
+              {reviewer.isRequired && (
+                <span className="font-normal opacity-80">· {t('prDetail.header.required')}</span>
+              )}
             </Badge>
           </li>
         )
@@ -131,7 +134,7 @@ function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
   // organization/project and a numeric id.
   const workItems = (pr.workItems?.length ?? 0) > 0 && (
     <ul
-      aria-label="Work items"
+      aria-label={t('prDetail.header.workItems')}
       className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted"
     >
       {pr.workItems?.map((item) => (
@@ -157,11 +160,11 @@ function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
         <h1 className="min-w-0 truncate text-sm font-semibold text-text">
           {pr.title} <span className="font-normal text-muted">#{pr.number}</span>
         </h1>
-        {pr.isDraft && <Badge tone="neutral">Draft</Badge>}
+        {pr.isDraft && <Badge tone="neutral">{t('prDetail.header.draft')}</Badge>}
         <StackOrphanFlag pr={pr} />
         <details className="relative ml-auto shrink-0">
           <summary className="cursor-pointer list-none rounded border border-border px-2 py-0.5 text-xs text-muted transition-colors hover:border-accent hover:text-text">
-            Detalles
+            {t('prDetail.header.details')}
           </summary>
           <div className="absolute right-0 z-20 mt-1 flex max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto rounded-md border border-border bg-panel p-3 shadow-xl">
             {meta}
@@ -181,7 +184,7 @@ function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
         <h1 className="text-base font-semibold text-text">
           {pr.title} <span className="font-normal text-muted">#{pr.number}</span>
         </h1>
-        {pr.isDraft && <Badge tone="neutral">Draft</Badge>}
+        {pr.isDraft && <Badge tone="neutral">{t('prDetail.header.draft')}</Badge>}
       </div>
 
       {meta}

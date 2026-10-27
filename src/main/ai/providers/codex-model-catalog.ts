@@ -78,11 +78,11 @@ interface ModelListResponse {
  * OpenAI) cae a una versión capitalizada del valor crudo en vez de romper.
  */
 const KNOWN_EFFORT_LABELS: Record<string, string> = {
-  low: 'Bajo',
-  medium: 'Medio',
-  high: 'Alto',
-  xhigh: 'Muy alto',
-  max: 'Máximo',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Very high',
+  max: 'Max',
   ultra: 'Ultra',
 }
 
@@ -111,7 +111,7 @@ function buildEffortDescriptor(model: CodexModel): ModelOptionDescriptor | undef
     isDefault: reasoningEffort === model.defaultReasoningEffort,
   }))
 
-  return { id: 'effort', label: 'Razonamiento', choices }
+  return { id: 'effort', label: 'Reasoning', choices }
 }
 
 function toModelOption(model: CodexModel): AiModelOption | null {

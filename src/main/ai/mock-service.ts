@@ -27,12 +27,19 @@
  * contrato T60 ("el mock no emite `phase`"): desde F13 SÍ la emite, porque
  * es LA vía para que las suites e2e con `MINERVA_MOCK_AI=1` ejerciten el
  * mini-log y el skeleton "Explorando el repositorio…" de forma determinista.
+ *
+ * i18n: the fixtures exist in English (`./fixtures.ts`) and Spanish
+ * (`./fixtures.es.ts`); the mock picks the one of the requested analysis
+ * language, like a real model following the prompt's output-language rule.
  */
 import type { IpcRequest } from '../../shared/ipc'
+import type { AppLocale } from '../../shared/locale'
 import { prKey, sameRepo } from '../../shared/scm'
 import type { DidacticSection } from '../../shared/types'
 import { prFixtures } from '../scm/github/fixtures'
-import { genericSummarySection, richDidacticSections } from './fixtures'
+import * as fixturesEn from './fixtures'
+import * as fixturesEs from './fixtures.es'
+import { getMainLocale, mt } from '../i18n'
 import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from './service'
 import type { PrContextSource } from './pr-context'
 import { StreamSectionParser, stringifySections } from './stream-parser'
@@ -70,8 +77,10 @@ function chunkText(text: string, chunks: number): string[] {
 async function streamActivityPrelude(
   onProgress: NonNullable<AnalyzePullRequestOptions['onProgress']>,
   parser: StreamSectionParser,
+  language: AppLocale,
 ): Promise<ActivityTracker> {
   const activity = createActivityTracker({
+    language,
     onEdge: () => {
       onProgress(parser.snapshot(), {
         done: false,
@@ -105,6 +114,7 @@ async function streamActivityPrelude(
  */
 async function streamFixture(
   sections: DidacticSection[],
+  language: AppLocale,
   onProgress?: AnalyzePullRequestOptions['onProgress'],
 ): Promise<DidacticSection[]> {
   const parser = new StreamSectionParser()
@@ -117,7 +127,7 @@ async function streamFixture(
 
   // Fase 'exploring' guionada (F13) antes del primer chunk de texto — mismo
   // orden de fases que un proveedor agéntico real.
-  const activity = await streamActivityPrelude(onProgress, parser)
+  const activity = await streamActivityPrelude(onProgress, parser, language)
   activity.settleThinking()
 
   for (const chunk of chunkText(text, STREAM_CHUNKS)) {
@@ -140,28 +150,52 @@ async function streamFixture(
  * the snapshot on disk. So `MINERVA_MOCK_AI=1` still runs the real context
  * pipeline (provider -> patches -> snapshot-store) end to end.
  */
+const CONTEXT_SUMMARY_TEXT: Record<
+  AppLocale,
+  { heading: string; intro: string; files: string; snapshotReady: string; noSnapshot: string }
+> = {
+  en: {
+    heading: 'Summary',
+    intro: 'Mock analysis built from the real SCM pipeline: ',
+    files: ' changed file(s), ',
+    snapshotReady: 'repository snapshot ready',
+    noSnapshot: 'no repository snapshot',
+  },
+  es: {
+    heading: 'Resumen',
+    intro: 'Análisis mock armado con el pipeline real de SCM: ',
+    files: ' archivo(s) cambiado(s), ',
+    snapshotReady: 'snapshot del repositorio listo',
+    noSnapshot: 'sin snapshot del repositorio',
+  },
+}
+
 function contextSummarySection(
   detail: Awaited<ReturnType<PrContextSource['getDetail']>>,
   files: Awaited<ReturnType<PrContextSource['getFiles']>>,
   snapshotDir: string | null,
+  language: AppLocale,
 ): DidacticSection {
+  const text = CONTEXT_SUMMARY_TEXT[language]
   const fileLines = files
     .slice(0, 20)
     .map((file) => '- `' + file.path + '` (' + file.status + ', +' + file.additions + ' / -' + file.deletions + ')')
   return {
     kind: 'summary',
     markdown:
-      '## Summary\n\n**' +
+      '## ' +
+      text.heading +
+      '\n\n**' +
       detail.title +
       '** (' +
       detail.repo.fullName +
       '#' +
       detail.number +
       ')\n\n' +
-      'Mock analysis built from the real SCM pipeline: ' +
+      text.intro +
       files.length +
-      ' changed file(s), ' +
-      (snapshotDir ? 'repository snapshot ready' : 'no repository snapshot') +
+      text.files +
+      (snapshotDir ? text.snapshotReady : text.noSnapshot) +
       '.\n\n' +
       fileLines.join('\n'),
   }
@@ -174,6 +208,8 @@ export class MockAiService implements AiService {
     req: IpcRequest<'ai:analyzePullRequest'>,
     options?: AnalyzePullRequestOptions,
   ): Promise<AnalyzeResult> {
+    const language = options?.language ?? getMainLocale()
+    const { genericSummarySection, richDidacticSections } = language === 'es' ? fixturesEs : fixturesEn
     const prId = prKey(req.repo, req.number)
     const rich = richDidacticSections[prId]
     const fixture = prFixtures.find(
@@ -183,7 +219,7 @@ export class MockAiService implements AiService {
     const headSha = fixture?.detail.headSha ?? ''
 
     if (rich) {
-      const sections = await streamFixture(rich, options?.onProgress)
+      const sections = await streamFixture(rich, language, options?.onProgress)
       return { prId, headSha, sections, generatedAt: new Date().toISOString() }
     }
 
@@ -194,7 +230,8 @@ export class MockAiService implements AiService {
         ? await this.context.ensureSnapshot(req.repo, detail.headSha)
         : null
       const sections = await streamFixture(
-        [contextSummarySection(detail, files, snapshotDir)],
+        [contextSummarySection(detail, files, snapshotDir, language)],
+        language,
         options?.onProgress,
       )
       return { prId, headSha: detail.headSha, sections, generatedAt: new Date().toISOString() }
@@ -204,16 +241,14 @@ export class MockAiService implements AiService {
       // Mensaje honesto: el PR existe perfectamente, es ESTE mock el que no
       // lo conoce. Decir "Pull request no encontrado" culpaba al PR cuando el
       // problema era la configuración de IA (ver `./index.ts`).
-      throw new Error(
-        'La IA en modo demo solo tiene análisis para los PRs de ejemplo; no conoce ' +
-          req.repo.fullName +
-          '#' +
-          req.number +
-          '. Configurá un proveedor de IA en Settings (engrane de la barra de título).',
-      )
+      throw new Error(mt('ai.mock.unknownPr', { pr: req.repo.fullName + '#' + req.number }))
     }
 
-    const sections = await streamFixture([genericSummarySection(fixture.detail)], options?.onProgress)
+    const sections = await streamFixture(
+      [genericSummarySection(fixture.detail)],
+      language,
+      options?.onProgress,
+    )
     return { prId, headSha, sections, generatedAt: new Date().toISOString() }
   }
 }

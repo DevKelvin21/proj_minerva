@@ -28,6 +28,7 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web'
 import type { ScmErrorCode } from '../../../shared/scm'
 import type { AzureAuthHeader } from './credentials'
 import { AzureScmError } from './errors'
+import { mt } from '../../i18n'
 
 export const AZURE_API_VERSION = '7.1'
 
@@ -110,7 +111,7 @@ export function statusToErrorCode(status: number): ScmErrorCode {
 function encodeSegment(segment: string | number): string {
   const text = String(segment)
   if (text === '' || text === '.' || text === '..') {
-    throw new AzureScmError('NOT_FOUND', 'Invalid Azure DevOps URL segment.')
+    throw new AzureScmError('NOT_FOUND', mt('azure.invalidUrlSegment'))
   }
   return encodeURIComponent(text)
 }
@@ -203,16 +204,16 @@ async function serverMessage(response: Response): Promise<string> {
 function describeStatus(status: number, endpoint: string, detail: string): string {
   const base =
     status === 401 || status === 203
-      ? 'Azure DevOps rejected the credential'
+      ? mt('azure.status.rejected')
       : status === 403
-        ? 'Not allowed by Azure DevOps (missing permission or PAT scope)'
+        ? mt('azure.status.forbidden')
         : status === 404
-          ? 'Not found on Azure DevOps (or no access)'
+          ? mt('azure.status.notFound')
           : status === 409 || status === 412
-            ? 'Conflict: the item changed on Azure DevOps'
+            ? mt('azure.status.conflict')
             : status === 429
-              ? 'Azure DevOps rate limit reached'
-              : 'Azure DevOps error (HTTP ' + status + ')'
+              ? mt('azure.status.rateLimited')
+              : mt('azure.status.other', { status })
   return base + ' [' + endpoint + ']' + (detail ? ': ' + detail : '')
 }
 
@@ -397,11 +398,10 @@ export class AzureDevOpsClient {
 
   private tooLarge(target: URL, maxBytes: number): AzureApiError {
     return new AzureTooLargeError(
-      'Download larger than ' +
-        Math.floor(maxBytes / (1024 * 1024)) +
-        ' MB [' +
-        endpointOf(target) +
-        ']',
+      mt('azure.downloadTooLarge', {
+        mb: Math.floor(maxBytes / (1024 * 1024)),
+        endpoint: endpointOf(target),
+      }),
       { method: 'GET', endpoint: endpointOf(target) },
     )
   }
@@ -410,12 +410,9 @@ export class AzureDevOpsClient {
     const name = error instanceof Error ? error.name : ''
     const timedOut = name === 'TimeoutError' || name === 'AbortError'
     const message = timedOut
-      ? 'Azure DevOps did not answer in time [' + endpointOf(target) + ']'
+      ? mt('azure.timeout', { endpoint: endpointOf(target) })
       : // Never append the raw error text: undici can echo header values in it.
-        'Could not reach Azure DevOps [' +
-        endpointOf(target) +
-        ']' +
-        (name ? ' (' + name + ')' : '')
+        mt('azure.unreachable', { endpoint: endpointOf(target) }) + (name ? ' (' + name + ')' : '')
     return new AzureApiError('NETWORK', message, { method, endpoint: endpointOf(target) })
   }
 
@@ -429,7 +426,7 @@ export class AzureDevOpsClient {
     request: { method: string; accept: string; body?: unknown; timeoutMs: number },
   ): Promise<Response> {
     if (!isAllowedAzureUrl(target, org)) {
-      throw new AzureApiError('UNKNOWN', 'Refusing to send credentials to ' + target.host, {
+      throw new AzureApiError('UNKNOWN', mt('azure.refusingCredentials', { host: target.host }), {
         method: request.method,
         endpoint: endpointOf(target),
       })

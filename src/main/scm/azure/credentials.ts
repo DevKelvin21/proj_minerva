@@ -30,6 +30,7 @@ import { homedir, tmpdir } from 'node:os'
 import { delimiter, dirname, join, resolve, win32 } from 'node:path'
 import { promisify } from 'node:util'
 import { AzureScmError } from './errors'
+import { mt } from '../../i18n'
 
 export type AzureCredentialKind = 'env-pat' | 'az-devops-pat' | 'az-entra'
 
@@ -172,7 +173,7 @@ export function organizationName(orgOrUrl: string): string {
   const host = url.hostname.toLowerCase()
   if (host.endsWith('.visualstudio.com')) return host.slice(0, -'.visualstudio.com'.length)
   const first = url.pathname.split('/').find((segment) => segment.length > 0)
-  if (!first) throw new AzureScmError('UNKNOWN', 'Not an Azure DevOps organization URL: ' + trimmed)
+  if (!first) throw new AzureScmError('UNKNOWN', mt('azure.notOrganizationUrl', { url: trimmed }))
   return decodeURIComponent(first)
 }
 
@@ -543,12 +544,7 @@ export class AzureCredentialSource {
     }
 
     if (!az) {
-      throw new AzureScmError(
-        'CLI_UNAVAILABLE',
-        'Azure CLI (az) was not found. Install it with the azure-devops extension, then run: ' +
-          loginHint +
-          ' (or set AZURE_DEVOPS_EXT_PAT).',
-      )
+      throw new AzureScmError('CLI_UNAVAILABLE', mt('azure.cliNotFound', { command: loginHint }))
     }
 
     const entra = await this.readEntraToken()
@@ -557,14 +553,10 @@ export class AzureCredentialSource {
     const rejectedAny = (this.rejected.get(orgKey)?.size ?? 0) > 0
     throw new AzureScmError(
       'UNAUTHENTICATED',
-      (rejectedAny
-        ? 'Azure DevOps rejected the stored credential for ' +
-          org +
-          ' (expired or missing scopes). '
-        : 'No Azure DevOps credential found for ' + org + '. ') +
-        'Run: ' +
-        loginHint +
-        ' and paste a PAT with Code (Read & Write) scope.',
+      mt(rejectedAny ? 'azure.credentialRejected' : 'azure.noCredential', {
+        organization: org,
+        command: loginHint,
+      }),
     )
   }
 

@@ -523,11 +523,11 @@ describe('OpenCodeAiService.analyzePullRequest', () => {
     // callID), con la ruta del input relativizada contra el snapshot.
     const runningCall = progressCalls.find(([, meta]) => meta.activity?.[0]?.status === 'running')
     expect(runningCall?.[1].activity).toEqual([
-      { id: 'call-1', kind: 'read', label: 'Leyendo src/routes/carts.ts', status: 'running' },
+      { id: 'call-1', kind: 'read', label: 'Reading src/routes/carts.ts', status: 'running' },
     ])
     const doneCall = progressCalls.find(([, meta]) => meta.activity?.[0]?.status === 'done')
     expect(doneCall?.[1].activity).toEqual([
-      { id: 'call-1', kind: 'read', label: 'Leyó src/routes/carts.ts', status: 'done' },
+      { id: 'call-1', kind: 'read', label: 'Read src/routes/carts.ts', status: 'done' },
     ])
     const [, lastMeta] = progressCalls[progressCalls.length - 1]
     expect(lastMeta.done).toBe(true)
@@ -638,7 +638,7 @@ describe('OpenCodeAiService.analyzePullRequest', () => {
     const labels = progressCalls.flatMap(([, meta]) => meta.activity?.map((i) => i.label) ?? [])
     expect(labels.length).toBeGreaterThan(0)
     for (const label of labels) {
-      expect(label).toMatch(/^Pens/)
+      expect(label).toMatch(/^Th(inking|ought)/)
       expect(label).not.toContain('secreto')
     }
   })
@@ -714,9 +714,9 @@ describe('OpenCodeAiService.analyzePullRequest', () => {
     const service = new OpenCodeAiService(makeGithubService())
     const pending = service.analyzePullRequest({ repo, number: 482 })
     const assertion = expect(pending).rejects.toThrow(
-      'OpenCode dejó de enviar datos: sin ningún fragmento nuevo por más de ' +
+      'OpenCode stopped sending data: no new chunk for more than ' +
         AGENTIC_INACTIVITY_TIMEOUT_MS / 1000 +
-        's (timeout de inactividad).',
+        's (inactivity timeout).',
     )
 
     await vi.advanceTimersByTimeAsync(AGENTIC_INACTIVITY_TIMEOUT_MS + 1)
@@ -728,7 +728,7 @@ describe('OpenCodeAiService.analyzePullRequest', () => {
 
     const service = new OpenCodeAiService(makeGithubService())
     await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow(
-      'no devolvió contenido de streaming',
+      'returned no streaming content',
     )
   })
 
@@ -743,7 +743,7 @@ describe('OpenCodeAiService.analyzePullRequest', () => {
     })
 
     const service = new OpenCodeAiService(makeGithubService())
-    await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow('Ninguna sección')
+    await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow('None of the sections')
   })
 
   it('lanza un mensaje accionable si session.create rechaza por falta de proveedor', async () => {
@@ -773,7 +773,7 @@ describe('OpenCodeAiService.analyzePullRequest', () => {
 
     const service = new OpenCodeAiService(makeGithubService())
     await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow(
-      'no tiene el formato',
+      'does not have the expected',
     )
     expect(getOpencodeServerMock).not.toHaveBeenCalled()
   })

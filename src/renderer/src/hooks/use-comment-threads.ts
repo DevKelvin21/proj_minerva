@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CommentThread, RepoRef } from '../../../shared/types'
 import { repoKey } from '../../../shared/scm'
+import { errorText } from '../lib/error-text'
 
 interface UseCommentThreadsResult {
   threads: CommentThread[]
@@ -22,7 +23,7 @@ interface UseCommentThreadsResult {
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 /**

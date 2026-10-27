@@ -1,4 +1,5 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { AI_PROVIDER_IDS, AI_PROVIDER_CATALOG } from '../../../../shared/ai-providers'
 import { CLI_META } from '../../lib/cli-meta'
 
@@ -21,16 +22,15 @@ interface NoCliProvidersCardProps {
  * que `CliLoginGuide` en Settings) en vez de duplicar la tabla de enlaces.
  */
 export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardProps): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
       <p className="mb-1 flex items-center gap-2 font-medium text-warning">
         <AlertTriangle size={16} className="shrink-0" />
-        Necesitás al menos un CLI de IA
+        {t('didactic.noCli.title')}
       </p>
       <p className="mb-3 text-xs text-muted">
-        El análisis didáctico corre sobre un CLI agéntico que ya tengas instalado y logueado en tu
-        máquina — Minerva no trae ninguno propio ni pide una API key. Instalá y logueá al menos uno
-        de estos tres para empezar:
+        {t('didactic.noCli.body')}
       </p>
 
       <ul className="mb-3 space-y-1.5">
@@ -45,7 +45,7 @@ export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardPro
                 rel="noreferrer"
                 className="text-accent underline underline-offset-2 hover:text-accent/80"
               >
-                instalación
+                {t('didactic.noCli.install')}
               </a>
               <span>·</span>
               <span className="font-mono text-text">{meta.loginCmd}</span>
@@ -61,7 +61,7 @@ export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardPro
         className="flex items-center gap-1.5 rounded-md border border-warning/40 px-2.5 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-        Volver a comprobar
+        {t('didactic.noCli.recheck')}
       </button>
     </div>
   )

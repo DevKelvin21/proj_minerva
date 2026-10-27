@@ -177,6 +177,8 @@ describe('resolveAutoUpdaterExport (interop ESM/CJS)', () => {
 
   it('lanza con mensaje accionable si no está en ninguno de los dos lados', async () => {
     const { resolveAutoUpdaterExport } = await import('./updater')
-    expect(() => resolveAutoUpdaterExport({ default: {} } as never)).toThrow(/no expuso/)
+    expect(() => resolveAutoUpdaterExport({ default: {} } as never)).toThrow(
+      /exposed no autoUpdater/,
+    )
   })
 })

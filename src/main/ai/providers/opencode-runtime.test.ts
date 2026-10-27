@@ -200,7 +200,7 @@ describe('checkOpencodeVersion', () => {
 
     expect(result.ok).toBe(false)
     expect(result.version).toBe('no-version-here')
-    expect(result.error?.toLowerCase()).toContain('no se pudo interpretar')
+    expect(result.error?.toLowerCase()).toContain('could not read the opencode version')
   })
 
   it('ok:false cuando execFile falla (ENOENT/timeout)', async () => {
@@ -284,7 +284,7 @@ describe('getOpencodeServer', () => {
 
     // Sin una ready-line válida, eventualmente escala a timeout (ver test de abajo).
     await vi.advanceTimersByTimeAsync(10_001)
-    await expect(promise).rejects.toThrow(/no arrancó/)
+    await expect(promise).rejects.toThrow(/did not start/)
   })
 
   it('rechaza con detalle de stdout/stderr si el proceso sale ANTES de quedar listo', async () => {
@@ -293,7 +293,7 @@ describe('getOpencodeServer', () => {
     lastChild!.stderr.emit('data', Buffer.from('algo salió mal\n'))
     lastChild!.emit('exit', 1, null)
 
-    await expect(promise).rejects.toThrow(/terminó antes de quedar listo/)
+    await expect(promise).rejects.toThrow(/exited before it was ready/)
     await expect(promise).rejects.toThrow(/code=1/)
     await expect(promise).rejects.toThrow(/algo salió mal/)
   })
@@ -310,7 +310,7 @@ describe('getOpencodeServer', () => {
 
     await vi.advanceTimersByTimeAsync(10_001)
 
-    await expect(promise).rejects.toThrow(/no arrancó/)
+    await expect(promise).rejects.toThrow(/did not start/)
     await expect(promise).rejects.toThrow(/arrancando/)
   })
 
@@ -432,7 +432,7 @@ describe('stopOpencodeServer', () => {
     // Si el arranque termina DESPUÉS del stop, ese server ya está condenado: no
     // se publica como el singleton vivo (quedaría una URL muerta en la cache).
     lastChild!.stdout.emit('data', Buffer.from(readyLine('http://127.0.0.1:45000')))
-    await expect(pending).rejects.toThrow(/se detuvo mientras arrancaba/)
+    await expect(pending).rejects.toThrow(/stopped while starting/)
   })
 
   it('cancela un arranque que todavía NO llegó al spawn (no deja un proceso naciendo sin dueño)', async () => {
@@ -449,7 +449,7 @@ describe('stopOpencodeServer', () => {
     await stopOpencodeServer()
     await flushMicrotasks()
 
-    await expect(pending).rejects.toThrow(/se canceló antes de lanzarlo/)
+    await expect(pending).rejects.toThrow(/cancelled before it launched/)
     expect(spawnMock, 'no se spawneó nada tras el stop').not.toHaveBeenCalled()
   })
 

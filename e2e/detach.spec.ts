@@ -38,23 +38,23 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci�
   // T22: se cliquea el botón REAL "Abrir en ventana" (el efecto de cerrar el
   // panel acoplado vive en el onClick de DidacticPanel, no en el canal IPC).
   const detachedPromise = minerva.context.waitForEvent('page')
-  await window.locator('button[aria-label="Abrir en ventana"]').click()
+  await window.locator('button[aria-label="Open in window"]').click()
   const detached = await detachedPromise
   await detached.waitForLoadState('domcontentloaded')
   expect(detached.url()).toContain(didacticPath(PR_482))
 
   // El panel acoplado se CIERRA tras desacoplar (T22).
-  await expect(window.locator('button[aria-label="Abrir panel didáctico"]')).toBeVisible()
-  await expect(window.locator('button[aria-label="Cerrar panel didáctico"]')).toHaveCount(0)
+  await expect(window.locator('button[aria-label="Open didactic panel"]')).toBeVisible()
+  await expect(window.locator('button[aria-label="Close didactic panel"]')).toHaveCount(0)
 
   // La ventana muestra el análisis desde cache SIN pulsar nada.
-  await expect(detached.getByText(/Resumen|Endpoint/).first()).toBeVisible()
-  await expect(detached.getByRole('button', { name: /Re-?analizar/i })).toBeVisible()
+  await expect(detached.getByText(/Summary|Endpoint/).first()).toBeVisible()
+  await expect(detached.getByRole('button', { name: /Re-?analyze/i })).toBeVisible()
 
   // Visor de recursos: el análisis mock del #482 trae diagrama ⇒ expandir
   // debe abrir el overlay con zoom y el SVG visible dentro (el gotcha del
   // visor colapsado a 0px que pasaba los checks geométricos).
-  await detached.locator('button[aria-label="Expandir diagrama"]').first().click()
+  await detached.locator('button[aria-label="Expand diagram"]').first().click()
   const overlay = detached.locator('.fixed.inset-0')
   await expect(overlay).toBeVisible()
   await expect(detached.getByText(/^\d+%$/).first()).toBeVisible()
@@ -90,9 +90,9 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci�
 
   // Reabrir el panel acoplado con cache poblado muestra el análisis directo,
   // SIN pulsar "Analizar PR".
-  await window.locator('button[aria-label="Abrir panel didáctico"]').click()
-  await expect(window.getByRole('button', { name: /Re-?analizar/i })).toBeVisible()
-  await expect(window.getByText('Buscando un análisis')).toHaveCount(0)
+  await window.locator('button[aria-label="Open didactic panel"]').click()
+  await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeVisible()
+  await expect(window.getByText('Looking for an existing analysis')).toHaveCount(0)
 })
 
 test('ventana abierta a mitad de streaming se engancha y se sincroniza con análisis posteriores', async ({
@@ -129,8 +129,8 @@ test('ventana abierta a mitad de streaming se engancha y se sincroniza con anál
       ),
     ])
     lastState = state
-    const hasContent = text.length > 80 && /Resumen|Qué cambia/.test(text)
-    if (text.includes('Analizar PR')) sawPlaceholder = true
+    const hasContent = text.length > 80 && /Summary|What changes/.test(text)
+    if (text.includes('Analyze PR')) sawPlaceholder = true
     if (hasContent && (state === 'streaming' || text.includes('▍'))) sawPartial = true
     if (state === 'cached' && hasContent) break
     await detached.waitForTimeout(100)
@@ -141,7 +141,7 @@ test('ventana abierta a mitad de streaming se engancha y se sincroniza con anál
   ).toBe(true)
 
   // Termina mostrando el análisis completo y el estado cierra en cached.
-  await expect(detached.getByRole('button', { name: /Re-?analizar/i })).toBeVisible()
+  await expect(detached.getByRole('button', { name: /Re-?analyze/i })).toBeVisible()
   await expect
     .poll(
       () =>
@@ -183,9 +183,9 @@ test('ventana abierta a mitad de streaming se engancha y se sincroniza con anál
     .not.toBe(beforeReplay)
   // La desacoplada muestra el análisis nuevo sin interacción: contenido
   // completo, sin cursor ▍ ni placeholder.
-  await expect(detached.getByText(/Resumen|Qué cambia/).first()).toBeVisible()
+  await expect(detached.getByText(/Summary|What changes/).first()).toBeVisible()
   await expect(detached.getByText('▍')).toHaveCount(0, { timeout: 10_000 })
-  await expect(detached.getByText('Analizar PR')).toHaveCount(0)
+  await expect(detached.getByText('Analyze PR')).toHaveCount(0)
 
   // Cerrar la didáctica explícitamente: el quit con esta ventana (creada vía
   // IPC a mitad de streaming) abierta se cuelga bajo Xvfb; cerrarla primero

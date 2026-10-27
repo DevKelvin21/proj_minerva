@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Maximize2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface DidacticSectionCardProps {
   icon: ReactNode
@@ -25,6 +26,7 @@ export function DidacticSectionCard({
   children,
   onExpandMarkdown,
 }: DidacticSectionCardProps): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <section className="rounded-md border border-border bg-bg">
       <header className="flex items-center justify-between gap-1.5 border-b border-border bg-white/[0.04] px-3 py-2 text-sm font-semibold text-text">
@@ -38,8 +40,8 @@ export function DidacticSectionCard({
           <button
             type="button"
             onClick={onExpandMarkdown}
-            title="Ver esta sección en grande (incluye tablas)"
-            aria-label="Ver esta sección en grande"
+            title={t('didactic.resources.expandSection')}
+            aria-label={t('didactic.resources.expandSectionLabel')}
             className="rounded p-1 text-muted transition-colors hover:bg-border/60 hover:text-text"
           >
             <Maximize2 size={14} />

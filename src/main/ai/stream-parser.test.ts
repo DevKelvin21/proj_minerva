@@ -15,7 +15,7 @@ describe('StreamSectionParser', () => {
   it('stream vacío: snapshot() es [] y finalize() lanza', () => {
     const parser = new StreamSectionParser()
     expect(parser.snapshot()).toEqual([])
-    expect(() => parser.finalize()).toThrow('Ninguna sección')
+    expect(() => parser.finalize()).toThrow('None of the sections')
   })
 
   it('ignora texto huérfano antes de la primera sección', () => {
@@ -234,7 +234,7 @@ describe('StreamSectionParser', () => {
   it('finalize() lanza si ninguna sección sobrevive', () => {
     const parser = new StreamSectionParser()
     parser.push('@@@SECTION kind=architecture\ntexto sin mermaid nunca cerrado\n')
-    expect(() => parser.finalize()).toThrow('Ninguna sección')
+    expect(() => parser.finalize()).toThrow('None of the sections')
   })
 
   describe('kind=cloud (T75)', () => {

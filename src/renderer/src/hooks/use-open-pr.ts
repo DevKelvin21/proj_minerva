@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { prKey, type RepoRef } from '../../../shared/scm'
 import type { PullRequestSummary } from '../../../shared/types'
 import { useAppStore } from '../stores/app-store'
+import { errorText } from '../lib/error-text'
 
 interface UseOpenPrResult {
   /** Selects the PR: from `known` when listed there, else after fetching its detail. */
@@ -12,7 +14,7 @@ interface UseOpenPrResult {
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 /**
@@ -26,6 +28,7 @@ export function useOpenPr(
   known: readonly PullRequestSummary[] = [],
   onSelect?: (pr: PullRequestSummary) => void,
 ): UseOpenPrResult {
+  const { t } = useTranslation()
   const selectPr = useAppStore((s) => s.selectPr)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -62,10 +65,12 @@ export function useOpenPr(
       window.minerva.scm
         .getPullRequestDetail({ repo, number })
         .then((detail) => select(detail))
-        .catch((err: unknown) => setError('Could not open #' + number + ': ' + toErrorMessage(err)))
+        .catch((err: unknown) =>
+          setError(t('errors.openPrFailed', { number, error: toErrorMessage(err) })),
+        )
         .finally(() => setPendingKey((current) => (current === key ? null : current)))
     },
-    [known, select],
+    [known, select, t],
   )
 
   return { open, pendingKey, error }

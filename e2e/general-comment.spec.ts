@@ -11,24 +11,24 @@ test('flujo T4: lista → detalle → Archivos → publicar comentario general',
   window,
 }, testInfo) => {
   // Indicador de conexión IPC (ping ok) — check heredado de la suite legacy.
-  await expect(window.getByText('Conectado').first()).toBeVisible()
+  await expect(window.getByText('Connected').first()).toBeVisible()
 
   await window.getByText('Add refunds table and migration').first().click()
   await expect(window.getByText('#479').first()).toBeVisible()
 
   // Señal inequívoca del diff (nombre de archivo del fixture): el título del
   // PR también contiene "refunds", así que un regex laxo pasaría sin diff.
-  await window.getByText('Archivos').first().click()
+  await window.getByText('Files').first().click()
   await expect(window.getByText('2026070401_create_refunds.sql').first()).toBeVisible()
 
   // Volver a Conversación y publicar por el composer GENERAL (identificado
   // por su placeholder: desde T8 hay varios textareas de replies de hilos).
-  await window.getByText('Conversación').first().click()
-  const composer = window.locator('textarea[placeholder*="Escribe un comentario para este PR"]')
+  await window.getByText('Conversation').first().click()
+  const composer = window.locator('textarea[placeholder*="Write a comment on this pull request"]')
   await composer.fill('Comentario de humo e2e — publicado vía Playwright')
   // Nombre EXACTO: /comentar/i también matchea "· 1 comentario" en el header
   // colapsable de los hilos (aprendido a la mala en la suite CDP).
-  await window.getByRole('button', { name: 'Comentar', exact: true }).click()
+  await window.getByRole('button', { name: 'Comment', exact: true }).click()
 
   // postComment + recarga de hilos ⇒ el comentario aparece en la conversación.
   await expect(window.getByText('Comentario de humo e2e').first()).toBeVisible()

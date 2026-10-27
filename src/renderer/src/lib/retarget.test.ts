@@ -40,6 +40,12 @@ describe('validateBranchName', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason.length).toBeGreaterThan(0)
   })
+
+  it('names the problem so the UI can explain it', () => {
+    expect(validateBranchName('')).toEqual({ ok: false, reason: 'empty' })
+    expect(validateBranchName('a b')).toEqual({ ok: false, reason: 'invalidChars' })
+    expect(validateBranchName('x.lock')).toEqual({ ok: false, reason: 'dotOrLock' })
+  })
 })
 
 describe('describeRetargetError', () => {
@@ -54,6 +60,7 @@ describe('describeRetargetError', () => {
     expect(failure).toMatchObject({
       code: 'CONFLICT',
       detail: 'Pull request #105 now targets main.',
+      reason: 'conflict',
       shouldRefresh: true,
     })
   })
@@ -64,13 +71,18 @@ describe('describeRetargetError', () => {
       'nope',
     )
     expect(failure.code).toBe('NOT_FOUND')
-    expect(failure.explanation).toContain('nope')
+    expect(failure).toMatchObject({ reason: 'notFound', newBase: 'nope' })
     expect(failure.shouldRefresh).toBe(false)
   })
 
   it('unknown errors stay visible with their text', () => {
     const failure = describeRetargetError(new Error('socket hang up'), 'main')
-    expect(failure).toMatchObject({ code: null, detail: 'socket hang up', shouldRefresh: false })
+    expect(failure).toMatchObject({
+      code: null,
+      detail: 'socket hang up',
+      reason: 'unchanged',
+      shouldRefresh: false,
+    })
     expect(describeRetargetError('boom', 'main').detail).toBe('boom')
   })
 })

@@ -83,14 +83,14 @@ test('the packaged app starts, exposes the preload and serves the fixtures from 
 
     // Mock PR list over IPC (main fixtures INSIDE the asar) + ping.
     await expect(window.getByText('apply-coupon').first()).toBeVisible({ timeout: 20_000 })
-    await expect(window.getByText('Conectado').first()).toBeVisible()
+    await expect(window.getByText('Connected').first()).toBeVisible()
 
     // Detail + Files tab (parsed diff + Shiki from the bundle).
     await window.getByText('Add refunds table and migration').first().click()
     await expect(window.getByText('#479').first()).toBeVisible()
     // The fixture's file name, not a loose regex: the PR title also contains
     // "refunds" and would mask a diff that fails to load.
-    await window.getByText('Archivos').first().click()
+    await window.getByText('Files').first().click()
     await expect(window.getByText('2026070401_create_refunds.sql').first()).toBeVisible()
 
     await attachScreenshot(window, testInfo, 'packaged-archivos-479')

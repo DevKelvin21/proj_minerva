@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { DiffFile, RepoRef } from '../../../shared/types'
 import { repoKey } from '../../../shared/scm'
+import { errorText } from '../lib/error-text'
 
 interface UsePullRequestFilesResult {
   files: DiffFile[]
@@ -9,7 +10,7 @@ interface UsePullRequestFilesResult {
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 /**

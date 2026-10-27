@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { Maximize, Minus, Plus, RotateCcw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { MermaidDiagram } from './MermaidDiagram'
 import { IconButton } from '../ui/IconButton'
 
@@ -34,6 +35,7 @@ function clamp(value: number, min: number, max: number): number {
  * transform CSS activo).
  */
 export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -170,7 +172,7 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
       <div className="flex items-center justify-center gap-2 border-t border-border bg-panel px-3 py-2">
         <IconButton
           icon={<Minus size={14} />}
-          label="Reducir zoom"
+          label={t('didactic.mermaid.zoomOut')}
           onClick={() => zoomBy(1 / (1 + ZOOM_STEP))}
         />
         <span className="w-12 text-center text-xs text-muted tabular-nums">
@@ -178,15 +180,15 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
         </span>
         <IconButton
           icon={<Plus size={14} />}
-          label="Aumentar zoom"
+          label={t('didactic.mermaid.zoomIn')}
           onClick={() => zoomBy(1 + ZOOM_STEP)}
         />
         <IconButton
           icon={<Maximize size={14} />}
-          label="Ajustar al contenedor"
+          label={t('didactic.mermaid.fit')}
           onClick={fitToContainer}
         />
-        <IconButton icon={<RotateCcw size={14} />} label="Restablecer zoom" onClick={resetView} />
+        <IconButton icon={<RotateCcw size={14} />} label={t('didactic.mermaid.reset')} onClick={resetView} />
       </div>
     </div>
   )

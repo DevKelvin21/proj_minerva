@@ -127,7 +127,8 @@ import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from '../ser
 import type { PrContextSource } from '../pr-context'
 import type { IpcRequest } from '../../../shared/ipc'
 import { getEffectiveAiSelection } from '../env'
-import { ANALYZE_PR_SYSTEM_PROMPT } from '../prompts/analyze-pr'
+import { buildAnalyzeSystemPrompt } from '../prompts/analyze-pr'
+import { getMainLocale, mt } from '../../i18n'
 import { buildAgenticUserMessage, prId } from '../analysis-prompt'
 import { StreamSectionParser } from '../stream-parser'
 import { createThrottle } from '../throttle'
@@ -222,34 +223,34 @@ function extractErrorBody(error: unknown): OpencodeErrorBody | null {
 
 /** Mensaje accionable para "sin upstream conectado", reutilizado tanto para excepciones HTTP como para eventos `session.error`. */
 function providerAuthErrorMessage(providerID: unknown): string {
-  return (
-    'OpenCode no tiene un proveedor de IA conectado' +
-    (typeof providerID === 'string' && providerID.length > 0 ? ' (' + providerID + ')' : '') +
-    ': corré «opencode auth login» en una terminal y conectá un proveedor, o elegí otro modelo en Settings.'
-  )
+  return typeof providerID === 'string' && providerID.length > 0
+    ? mt('ai.opencode.noProviderConnectedNamed', { provider: providerID })
+    : mt('ai.opencode.noProviderConnected')
 }
 
-/** Mapea una excepción lanzada por el cliente (`throwOnError: true`) a un mensaje accionable en español. */
+/** Mapea una excepción lanzada por el cliente (`throwOnError: true`) a un mensaje accionable (idioma de la UI). */
 function mapOpencodeError(error: unknown): Error {
   const body = extractErrorBody(error)
   if (body?.name === 'ProviderAuthError') {
     return new Error(providerAuthErrorMessage(body.data?.providerID), { cause: error })
   }
   if (error instanceof Error) {
-    return new Error('OpenCode devolvió un error: ' + error.message, { cause: error })
+    return new Error(mt('ai.errors.providerError', { provider: 'OpenCode', detail: error.message }), {
+      cause: error,
+    })
   }
-  return new Error('OpenCode devolvió un error desconocido.', { cause: error })
+  return new Error(mt('ai.opencode.unknownError'), { cause: error })
 }
 
 /** Mensaje accionable a partir del payload de un evento `session.error` (forma cruda del protocolo, no una excepción). */
 function describeSessionErrorPayload(error: SessionErrorPayload): string {
-  if (!error) return 'error de sesión sin detalle.'
+  if (!error) return mt('ai.opencode.sessionErrorNoDetail')
   if (error.name === 'ProviderAuthError') {
     return providerAuthErrorMessage(error.data.providerID)
   }
   const data = error.data as Record<string, unknown>
   const message = data.message
-  return typeof message === 'string' && message.length > 0 ? message : 'error desconocido de OpenCode.'
+  return typeof message === 'string' && message.length > 0 ? message : mt('ai.opencode.unknownSessionError')
 }
 
 export class OpenCodeAiService implements AiService {
@@ -260,13 +261,10 @@ export class OpenCodeAiService implements AiService {
     options?: AnalyzePullRequestOptions,
   ): Promise<AnalyzeResult> {
     const { model } = getEffectiveAiSelection()
+    const language = options?.language ?? getMainLocale()
     const parsedModel = parseOpencodeModelSlug(model)
     if (parsedModel === null) {
-      throw new Error(
-        'El modelo de OpenCode "' +
-          model +
-          '" no tiene el formato <proveedor>/<modelo> esperado. Elegí un modelo válido en Settings.',
-      )
+      throw new Error(mt('ai.opencode.badModelSlug', { model }))
     }
 
     const [detail, files] = await Promise.all([
@@ -297,14 +295,16 @@ export class OpenCodeAiService implements AiService {
     const abortErrorMessage = (): string | null => {
       const reason = timeouts.getAbortReason()
       if (reason === 'inactivity-timeout') {
-        return (
-          'OpenCode dejó de enviar datos: sin ningún fragmento nuevo por más de ' +
-          AGENTIC_INACTIVITY_TIMEOUT_MS / 1000 +
-          's (timeout de inactividad).'
-        )
+        return mt('ai.errors.inactivityTimeout', {
+          provider: 'OpenCode',
+          seconds: AGENTIC_INACTIVITY_TIMEOUT_MS / 1000,
+        })
       }
       if (reason === 'total-timeout') {
-        return 'OpenCode no respondió a tiempo (timeout total de ' + AGENTIC_REQUEST_TIMEOUT_MS / 1000 + 's).'
+        return mt('ai.errors.totalTimeout', {
+          provider: 'OpenCode',
+          seconds: AGENTIC_REQUEST_TIMEOUT_MS / 1000,
+        })
       }
       return null
     }
@@ -324,6 +324,7 @@ export class OpenCodeAiService implements AiService {
     // SIN throttle, los refinamientos viajan con la próxima emisión.
     const activity = createActivityTracker({
       basePath: snapshotDir,
+      language,
       onEdge: () => {
         if (onProgress) {
           onProgress(parser.snapshot(), { done: false, phase, activity: activity.buffer() })
@@ -342,7 +343,7 @@ export class OpenCodeAiService implements AiService {
       })
 
       const sessionResp = await client.session.create(
-        { title: 'Minerva: análisis de PR ' + prId(req) },
+        { title: 'Minerva: PR analysis ' + prId(req) },
         { signal: controller.signal, throwOnError: true },
       )
       sessionId = sessionResp.data.id
@@ -453,7 +454,14 @@ export class OpenCodeAiService implements AiService {
               if (event.properties.sessionID !== undefined && event.properties.sessionID !== currentSessionId) {
                 continue
               }
-              rejectSession(new Error('OpenCode devolvió un error: ' + describeSessionErrorPayload(event.properties.error)))
+              rejectSession(
+                new Error(
+                  mt('ai.errors.providerError', {
+                    provider: 'OpenCode',
+                    detail: describeSessionErrorPayload(event.properties.error),
+                  }),
+                ),
+              )
               return
             }
 
@@ -468,7 +476,7 @@ export class OpenCodeAiService implements AiService {
             // de que el server sigue con actividad.
             pingExploring()
           }
-          rejectSession(new Error('OpenCode cerró la conexión de eventos antes de terminar el análisis.'))
+          rejectSession(new Error(mt('ai.opencode.eventsClosed')))
         } catch (error) {
           rejectSession(error instanceof Error ? error : new Error(String(error)))
         }
@@ -478,7 +486,7 @@ export class OpenCodeAiService implements AiService {
         {
           sessionID: sessionId,
           model: parsedModel,
-          system: ANALYZE_PR_SYSTEM_PROMPT,
+          system: buildAnalyzeSystemPrompt(language),
           parts: [{ type: 'text', text: userMessage }],
         },
         { signal: controller.signal, throwOnError: true },
@@ -501,9 +509,7 @@ export class OpenCodeAiService implements AiService {
     }
 
     if (!sawAnyDelta) {
-      throw new Error(
-        'OpenCode no devolvió contenido de streaming (revisá que el server siga activo y que el modelo elegido responda).',
-      )
+      throw new Error(mt('ai.opencode.noStreamingContent'))
     }
 
     const sections = parser.finalize((m) => console.warn(m))

@@ -108,7 +108,7 @@ test('#102: a comment outside every hunk shows next to its line; outdated badge;
   window,
 }, testInfo) => {
   await openPr(window, 'Checkout v2: submit validation')
-  await tab(window, /^Archivos/).click()
+  await tab(window, /^Files/).click()
 
   // Line 12 is outside the only hunk: the file is fetched and the lines around
   // the comment are revealed in place.
@@ -153,7 +153,7 @@ test('suggestions: insert from the head file, post, and render as a mini-diff', 
   window,
 }, testInfo) => {
   await openPr(window, 'Checkout v2: submit validation')
-  await tab(window, /^Archivos/).click()
+  await tab(window, /^Files/).click()
   const thread = window.locator('#thread-1')
   await expect(thread).toBeVisible()
 
@@ -178,7 +178,7 @@ test('suggestions: insert from the head file, post, and render as a mini-diff', 
 
   // New line comment on #108 (RIGHT line 3): insert, edit, post, rendered.
   await openPr(window, 'Fix cart rounding')
-  await tab(window, /^Archivos/).click()
+  await tab(window, /^Files/).click()
   const line3 = window.locator('[data-new-line="3"]').first()
   await expect(line3).toContainText('return cents / 100')
   await line3.hover()
@@ -217,7 +217,7 @@ test('Comments view: filters, General group, and jumping to a hidden line', asyn
 
   // Jump: Files tab, the file, line 12 revealed, highlighted and in view.
   await window.getByRole('link', { name: 'src/Services/CheckoutService.cs:12' }).click()
-  await expect(tab(window, /^Archivos/)).toHaveAttribute('aria-pressed', 'true')
+  await expect(tab(window, /^Files/)).toHaveAttribute('aria-pressed', 'true')
   const focused = window.locator('[data-new-line="12"][data-focused="true"]').first()
   await expect(focused).toContainText('// Line 12: kept as context.')
   await expect(focused).toBeInViewport()
@@ -252,7 +252,7 @@ test('GitHub #482: chip jumps to the diff thread and accepts a reply', async ({ 
 
 test('gutter indicators for line threads (#479)', async ({ window }) => {
   await window.getByText('Add refunds table and migration').first().click()
-  await tab(window, /^Archivos/).click()
+  await tab(window, /^Files/).click()
   await expect(window.locator('svg.lucide-message-square').first()).toBeVisible()
 })
 
@@ -265,7 +265,7 @@ const VIEWPORTS = [
 
 test('Files tab with comments at tiled sizes', async ({ window }, testInfo) => {
   await openPr(window, 'Checkout v2: submit validation')
-  await tab(window, /^Archivos/).click()
+  await tab(window, /^Files/).click()
   await expect(window.locator('#thread-1')).toBeVisible()
 
   for (const viewport of VIEWPORTS) {

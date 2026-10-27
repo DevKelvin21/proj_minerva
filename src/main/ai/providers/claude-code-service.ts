@@ -16,7 +16,7 @@
  *    `query()`, y el mensaje de usuario (`buildAgenticUserMessage`, en vez de
  *    `buildUserMessage`) le pide explícitamente que lo explore.
  * 3. Arma el mismo system prompt de producto que el resto de proveedores
- *    (`../prompts/analyze-pr.ts`, `ANALYZE_PR_SYSTEM_PROMPT`) — el SDK lo
+ *    (`../prompts/analyze-pr.ts`, `buildAnalyzeSystemPrompt(language)`) — el SDK lo
  *    recibe por `options.systemPrompt` como STRING CUSTOM (no el preset
  *    `claude_code`): eso reemplaza por completo el prompt de sistema por
  *    defecto de Claude Code en vez de "aparentar ser" el cliente oficial.
@@ -96,7 +96,8 @@ import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from '../ser
 import type { PrContextSource } from '../pr-context'
 import type { IpcRequest } from '../../../shared/ipc'
 import { getEffectiveAiSelection } from '../env'
-import { ANALYZE_PR_SYSTEM_PROMPT } from '../prompts/analyze-pr'
+import { buildAnalyzeSystemPrompt } from '../prompts/analyze-pr'
+import { getMainLocale, mt } from '../../i18n'
 import { buildAgenticUserMessage, prId } from '../analysis-prompt'
 import { StreamSectionParser } from '../stream-parser'
 import { createThrottle } from '../throttle'
@@ -147,10 +148,9 @@ function extractClaudeToolDetail(name: string, input: unknown): string | undefin
 }
 
 /** Mensaje accionable cuando `resolveCliPath('claude')` no encuentra el binario en ninguna ubicación conocida. */
-const CLAUDE_CLI_NOT_FOUND_MESSAGE =
-  'No se encontró el CLI "claude" instalado: instalá Claude Code (ver ' +
-  'https://code.claude.com/docs/en/setup) y corré «claude login» antes de ' +
-  'analizar con este proveedor.'
+function claudeCliNotFoundMessage(): string {
+  return mt('ai.claude.cliNotFound')
+}
 
 /** Mismo union que `EffortLevel` del Agent SDK (`sdk.d.ts`), repetido acá para no importar un tipo interno solo para esto. */
 type ClaudeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
@@ -180,22 +180,19 @@ function mapAssistantError(code: SDKAssistantMessageError | string): string {
   switch (code) {
     case 'authentication_failed':
     case 'oauth_org_not_allowed':
-      return (
-        'Claude Code no tiene una sesión válida: corré «claude login» en una terminal ' +
-        '(con la cuenta Pro/Max que quieras usar) y volvé a intentar el análisis.'
-      )
+      return mt('ai.claude.authFailed')
     case 'billing_error':
-      return 'La cuenta de Claude autenticada reportó un problema de facturación.'
+      return mt('ai.claude.billing')
     case 'rate_limit':
-      return 'Rate limit de Claude Code: intenta de nuevo en unos minutos.'
+      return mt('ai.claude.rateLimit')
     case 'overloaded':
-      return 'Claude está sobrecargado en este momento: intenta de nuevo más tarde.'
+      return mt('ai.claude.overloaded')
     case 'model_not_found':
-      return 'El modelo de Claude Code seleccionado no existe o no está disponible para esta cuenta.'
+      return mt('ai.claude.modelNotFound')
     case 'max_output_tokens':
-      return 'Claude Code cortó la respuesta por límite de tokens de salida.'
+      return mt('ai.claude.maxOutputTokens')
     default:
-      return 'Claude Code devolvió un error (' + code + ').'
+      return mt('ai.claude.errorCode', { code })
   }
 }
 
@@ -212,10 +209,11 @@ export class ClaudeCodeAiService implements AiService {
     options?: AnalyzePullRequestOptions,
   ): Promise<AnalyzeResult> {
     const { model, options: modelOptions } = getEffectiveAiSelection()
+    const language = options?.language ?? getMainLocale()
 
     const claudeCliPath = resolveCliPath('claude')
     if (claudeCliPath === null) {
-      throw new Error(CLAUDE_CLI_NOT_FOUND_MESSAGE)
+      throw new Error(claudeCliNotFoundMessage())
     }
 
     const [detail, files] = await Promise.all([
@@ -243,15 +241,15 @@ export class ClaudeCodeAiService implements AiService {
     const abortErrorMessage = (error: unknown): string | null => {
       if (!(error instanceof AbortError)) return null
       if (timeouts.getAbortReason() === 'inactivity-timeout') {
-        return (
-          'Claude Code dejó de enviar datos: sin ningún fragmento nuevo por más de ' +
-          AGENTIC_INACTIVITY_TIMEOUT_MS / 1000 +
-          's (timeout de inactividad).'
-        )
+        return mt('ai.errors.inactivityTimeout', {
+          provider: 'Claude Code',
+          seconds: AGENTIC_INACTIVITY_TIMEOUT_MS / 1000,
+        })
       }
-      return (
-        'Claude Code no respondió a tiempo (timeout total de ' + AGENTIC_REQUEST_TIMEOUT_MS / 1000 + 's).'
-      )
+      return mt('ai.errors.totalTimeout', {
+        provider: 'Claude Code',
+        seconds: AGENTIC_REQUEST_TIMEOUT_MS / 1000,
+      })
     }
 
     const parser = new StreamSectionParser()
@@ -270,6 +268,7 @@ export class ClaudeCodeAiService implements AiService {
     // silencio largo del modelo.
     const activity = createActivityTracker({
       basePath: snapshotDir,
+      language,
       onEdge: () => {
         if (onProgress) {
           onProgress(parser.snapshot(), { done: false, phase, activity: activity.buffer() })
@@ -309,7 +308,7 @@ export class ClaudeCodeAiService implements AiService {
           // Claude Code, no lo extiende (ver el comentario de arriba —
           // nunca usar el preset `claude_code` con `append` acá, eso sería
           // "aparentar" ser el cliente oficial).
-          systemPrompt: ANALYZE_PR_SYSTEM_PROMPT,
+          systemPrompt: buildAnalyzeSystemPrompt(language),
           // Solo lectura: `Read`/`Grep`/`Glob` (ver el comentario del módulo
           // y `READ_ONLY_TOOLS` arriba) — NADA de Write/Edit/Bash/WebFetch/
           // WebSearch/Task. `allowedTools` + `permissionMode: 'dontAsk'`
@@ -433,7 +432,7 @@ export class ClaudeCodeAiService implements AiService {
           // vuelta de tool-use ya se manejaron arriba (o se ignoraron).
           if (message.is_error) {
             const detailText = message.subtype === 'success' ? message.result : message.errors.join('; ')
-            throw new Error('Claude Code devolvió un error: ' + detailText)
+            throw new Error(mt('ai.errors.providerError', { provider: 'Claude Code', detail: detailText }))
           }
           continue
         }
@@ -446,10 +445,7 @@ export class ClaudeCodeAiService implements AiService {
       const abortMessage = abortErrorMessage(error)
       if (abortMessage) throw new Error(abortMessage, { cause: error })
       if (error instanceof Error && looksLikeMissingCli(error.message)) {
-        throw new Error(
-          'Claude Code (Agent SDK) no encontró un binario ejecutable: ' + error.message,
-          { cause: error },
-        )
+        throw new Error(mt('ai.claude.noExecutable', { detail: error.message }), { cause: error })
       }
       throw error
     }
@@ -457,9 +453,7 @@ export class ClaudeCodeAiService implements AiService {
     timeouts.clearAll()
 
     if (!sawAnyDelta) {
-      throw new Error(
-        'Claude Code no devolvió contenido de streaming (revisa que la sesión siga activa: «claude login»).',
-      )
+      throw new Error(mt('ai.claude.noStreamingContent'))
     }
 
     const sections = parser.finalize((m) => console.warn(m))

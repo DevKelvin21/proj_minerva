@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { ScmAuthStatus, ScmProviderId } from '../../../shared/scm'
 import { useAppStore } from '../stores/app-store'
+import { errorText } from '../lib/error-text'
 
 const POLL_INTERVAL_MS = 3000
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return errorText(error)
 }
 
 /** A provider that is configured but not ready yet: keep polling until it signs in. */

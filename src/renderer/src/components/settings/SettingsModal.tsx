@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useSettings } from '../../hooks/use-settings'
 import { useProviderStatus } from '../../hooks/use-provider-status'
@@ -12,6 +13,7 @@ import { SourceControlSection } from './SourceControlSection'
 import { ProviderTabs } from './ProviderTabs'
 import { ProviderModelPanel } from './ProviderModelPanel'
 import { UpdateSection } from './UpdateSection'
+import { LanguageSection } from './LanguageSection'
 
 /**
  * Modal de settings (T12; rediseñado en T62/F12: tabs por proveedor + strip
@@ -53,6 +55,7 @@ import { UpdateSection } from './UpdateSection'
  * dar ningún click.
  */
 export function SettingsModal(): React.JSX.Element {
+  const { t } = useTranslation()
   const closeSettings = useAppStore((s) => s.closeSettings)
   const { info, error, selectProvider, saveModel, setModelOption } = useSettings()
   const providerStatus = useProviderStatus()
@@ -92,13 +95,13 @@ export function SettingsModal(): React.JSX.Element {
       >
         <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
           <h2 id="settings-modal-title" className="text-sm font-semibold text-text">
-            Configuración
+            {t('settings.modal.title')}
           </h2>
-          <IconButton icon={<X size={16} />} label="Cerrar configuración" onClick={closeSettings} />
+          <IconButton icon={<X size={16} />} label={t('settings.modal.close')} onClick={closeSettings} />
         </header>
 
         {info === null ? (
-          <p className="p-4 text-xs text-muted">Cargando…</p>
+          <p className="p-4 text-xs text-muted">{t('common.loading')}</p>
         ) : (
           <SettingsModalBody
             info={info}
@@ -163,6 +166,10 @@ function SettingsModalBody({
   // es el `border-r` del contenedor (F16/T80).
   const github = <SourceControlSection compact={compact} />
 
+  // Idioma: primera sección del modal (arriba de todo en una columna; arriba
+  // de la columna izquierda en dos).
+  const language = <LanguageSection compact={compact} />
+
   // Sección "Actualizaciones" (T93, F17): en una columna va al final de todo
   // el scroll; en dos columnas (≥980px) va debajo de GitHub, la columna más
   // corta (mismo criterio que el PLAN.md § F17). Se automonta en `disabled`
@@ -201,6 +208,7 @@ function SettingsModalBody({
     return (
       <div className="flex min-h-0 flex-1">
         <div className="w-[40%] min-w-0 shrink-0 overflow-y-auto border-r border-border">
+          <div className="border-b border-border">{language}</div>
           {github}
           {updates}
         </div>
@@ -211,6 +219,7 @@ function SettingsModalBody({
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="border-b border-border">{language}</div>
       <div className="border-b border-border">{github}</div>
       {ai}
       {updates}
