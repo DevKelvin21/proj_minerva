@@ -38,6 +38,11 @@ export interface StackInputPr {
   isDraft: boolean
   /** For merged PRs: the branch it was merged into (defaults to `baseRef`). */
   mergedInto?: string
+  /**
+   * The head branch lives in another repository (a fork). Its name says nothing
+   * about this repo's branches, so it can never be a stack parent.
+   */
+  headIsFork?: boolean
   /** ISO dates; optional, used only to reject false orphans. */
   createdAt?: string
   closedAt?: string
@@ -118,7 +123,12 @@ export function buildStacks(
     // parent[child] = the open PR whose head is the child's base (lowest number wins).
     const parentOf = new Map<StackInputPr, StackInputPr>()
     for (const pr of repoPrs) {
-      const parent = openByHead.get(pr.baseRef)?.find((candidate) => candidate !== pr)
+      // A PR into main/develop is never stacked on another PR, even when some
+      // fork PR happens to have a head branch with the same name.
+      if (isLongLived(pr.baseRef)) continue
+      const parent = openByHead
+        .get(pr.baseRef)
+        ?.find((candidate) => candidate !== pr && !candidate.headIsFork)
       if (parent) parentOf.set(pr, parent)
     }
 

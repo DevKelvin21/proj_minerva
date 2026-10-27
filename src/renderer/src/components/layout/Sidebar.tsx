@@ -8,8 +8,11 @@ import { usePullRequests } from '../../hooks/use-pull-requests'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { SIDEBAR_WIDTH, sidebarIsDrawer } from '../../lib/layout'
-import { useAppStore } from '../../stores/app-store'
+import { useAppStore, type SidebarView } from '../../stores/app-store'
+import { useStacksStore } from '../../stores/stacks-store'
+import { countOrphans } from '../../lib/stacks'
 import { RepoGroup } from '../pr-list/RepoGroup'
+import { StacksView } from '../stacks/StacksView'
 import { IconButton } from '../ui/IconButton'
 
 /** A provider error that means "sign in first", not "something broke". */
@@ -69,12 +72,58 @@ function StateFilterControl({
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={`rounded px-2 py-1 font-medium transition-colors duration-150 ${
-            value === option.value
-              ? 'bg-accent/15 text-accent'
-              : 'text-muted hover:text-text'
+            value === option.value ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
           }`}
         >
           {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * "Pull requests | Stacks" switch for the left column. The Stacks segment
+ * carries the orphan count once some consumer loaded the stacks (it does not
+ * trigger the fetch itself: that is a cold ~10 s read on a real org).
+ */
+function SidebarViewSwitch({
+  value,
+  onChange,
+}: {
+  value: SidebarView
+  onChange: (view: SidebarView) => void
+}): React.JSX.Element {
+  const orphans = useStacksStore((s) => (s.result ? countOrphans(s.result.stacks) : 0))
+  const options: { value: SidebarView; label: string }[] = [
+    { value: 'list', label: 'Pull requests' },
+    { value: 'stacks', label: 'Stacks' },
+  ]
+  return (
+    <div
+      role="group"
+      aria-label="Left column view"
+      className="flex w-full rounded-md border border-border bg-bg p-0.5 text-xs"
+    >
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-2 py-1 font-medium transition-colors duration-150 ${
+            value === option.value ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
+          }`}
+        >
+          <span className="truncate">{option.label}</span>
+          {option.value === 'stacks' && orphans > 0 && (
+            <span
+              className="shrink-0 rounded-full bg-warning/20 px-1.5 text-[10px] text-warning"
+              title={orphans + ' orphaned ' + (orphans === 1 ? 'PR' : 'PRs')}
+            >
+              {orphans}
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -101,6 +150,8 @@ export function Sidebar(): React.JSX.Element | null {
   const prStateFilter = useAppStore((s) => s.prStateFilter)
   const setPrStateFilter = useAppStore((s) => s.setPrStateFilter)
   const selectPr = useAppStore((s) => s.selectPr)
+  const sidebarView = useAppStore((s) => s.sidebarView)
+  const setSidebarView = useAppStore((s) => s.setSidebarView)
   // Opaque key of every provider's auth state: signing in (or switching
   // accounts) refetches the list.
   const authKey = scmAuth
@@ -156,84 +207,91 @@ export function Sidebar(): React.JSX.Element | null {
   return (
     <>
       {isDrawer && (
-        <div
-          className="absolute inset-0 z-30 bg-black/50"
-          onClick={closeSidebar}
-          aria-hidden
-        />
+        <div className="absolute inset-0 z-30 bg-black/50" onClick={closeSidebar} aria-hidden />
       )}
       <aside
         aria-label="Lista de pull requests"
         style={isDrawer ? undefined : { width: SIDEBAR_WIDTH[tier.w] }}
         className={asideClass}
       >
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
-        <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
-        <IconButton
-          icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
-          label="Actualizar"
-          onClick={refetch}
-          disabled={loading}
-          className="ml-auto"
-        />
-      </div>
-      {needsLogin ? (
-        <div className="flex flex-col items-center gap-3 p-6 text-center">
-          <span className="text-3xl" aria-hidden>
-            🔒
-          </span>
-          {/*
+        <div className="shrink-0 px-2 pt-2">
+          <SidebarViewSwitch value={sidebarView} onChange={setSidebarView} />
+        </div>
+        {sidebarView === 'stacks' ? (
+          <StacksView pullRequests={pullRequests} onSelectPr={handleSelectPr} />
+        ) : (
+          <>
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
+              <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
+              <IconButton
+                icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
+                label="Actualizar"
+                onClick={refetch}
+                disabled={loading}
+                className="ml-auto"
+              />
+            </div>
+            {needsLogin ? (
+              <div className="flex flex-col items-center gap-3 p-6 text-center">
+                <span className="text-3xl" aria-hidden>
+                  🔒
+                </span>
+                {/*
             If an account was picked by hand, name it: a bare "run gh auth
             login" would be wrong advice when the CLI is fine and only the
             choice is broken.
           */}
-          {githubAccount !== null ? (
-            <p className="text-sm text-muted">
-              The account <span className="font-mono text-text">{githubAccount}</span> has no
-              valid gh session. Pick another one in Settings, or renew it with{' '}
-              <span className="font-mono text-text">gh auth login</span>.
-            </p>
-          ) : (
-            <p className="text-sm text-muted">
-              Sign in with GitHub CLI: run{' '}
-              <span className="font-mono text-text">gh auth login</span> in a terminal.
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={openSettings}
-            className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-          >
-            Open settings
-          </button>
-        </div>
-      ) : error ? (
-        <p className="p-4 text-sm text-danger">No se pudo cargar la lista de PRs: {error}</p>
-      ) : otherErrors.length > 0 && pullRequests.length === 0 ? (
-        <ProviderErrors errors={otherErrors} />
-      ) : loading && pullRequests.length === 0 ? (
-        <p className="p-4 text-sm text-muted">Cargando PRs…</p>
-      ) : groups.length === 0 ? (
-        searchQuery.trim() ? (
-          <p className="p-4 text-sm text-muted">No hay PRs que coincidan con "{searchQuery}".</p>
-        ) : (
-          <div className="flex flex-col gap-2 p-4 text-sm text-muted">
-            <p>{emptyStateMessage(prStateFilter)}</p>
-            <p className="text-xs">
-              Tip: el buscador acepta cualificadores de GitHub, p. ej.{' '}
-              <code className="rounded bg-bg px-1">org:mi-org</code> o{' '}
-              <code className="rounded bg-bg px-1">repo:owner/nombre</code>.
-            </p>
-          </div>
-        )
-      ) : (
-        <>
-          {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
-          {groups.map((group) => (
-            <RepoGroup key={repoKey(group.repo)} group={group} onSelectPr={handleSelectPr} />
-          ))}
-        </>
-      )}
+                {githubAccount !== null ? (
+                  <p className="text-sm text-muted">
+                    The account <span className="font-mono text-text">{githubAccount}</span> has no
+                    valid gh session. Pick another one in Settings, or renew it with{' '}
+                    <span className="font-mono text-text">gh auth login</span>.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted">
+                    Sign in with GitHub CLI: run{' '}
+                    <span className="font-mono text-text">gh auth login</span> in a terminal.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={openSettings}
+                  className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
+                >
+                  Open settings
+                </button>
+              </div>
+            ) : error ? (
+              <p className="p-4 text-sm text-danger">No se pudo cargar la lista de PRs: {error}</p>
+            ) : otherErrors.length > 0 && pullRequests.length === 0 ? (
+              <ProviderErrors errors={otherErrors} />
+            ) : loading && pullRequests.length === 0 ? (
+              <p className="p-4 text-sm text-muted">Cargando PRs…</p>
+            ) : groups.length === 0 ? (
+              searchQuery.trim() ? (
+                <p className="p-4 text-sm text-muted">
+                  No hay PRs que coincidan con "{searchQuery}".
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2 p-4 text-sm text-muted">
+                  <p>{emptyStateMessage(prStateFilter)}</p>
+                  <p className="text-xs">
+                    Tip: el buscador acepta cualificadores de GitHub, p. ej.{' '}
+                    <code className="rounded bg-bg px-1">org:mi-org</code> o{' '}
+                    <code className="rounded bg-bg px-1">repo:owner/nombre</code>.
+                  </p>
+                </div>
+              )
+            ) : (
+              <>
+                {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
+                {groups.map((group) => (
+                  <RepoGroup key={repoKey(group.repo)} group={group} onSelectPr={handleSelectPr} />
+                ))}
+              </>
+            )}
+          </>
+        )}
       </aside>
     </>
   )
