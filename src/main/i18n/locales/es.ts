@@ -262,8 +262,14 @@ export const es: MessageShape<typeof en> = {
     missingExport:
       'electron-updater no expuso autoUpdater (ni como export nombrado ni en default); ' +
       'el auto-update no puede inicializarse.',
-    mockFeedError:
-      'No se pudo contactar al feed de actualizaciones (guion de prueba: MINERVA_MOCK_UPDATER=error).',
+    manifestMissing:
+      'La última release no tiene manifiesto de actualización para esta plataforma ({{file}}), ' +
+      'así que Minerva todavía no puede comparar versiones.',
+    noReleases: 'Todavía no hay ninguna release publicada en GitHub.',
+    feedUnreachable:
+      'No se pudo contactar a GitHub para buscar actualizaciones. Revisa tu conexión e intenta de nuevo.',
+    feedUnavailable: 'GitHub no respondió a la búsqueda de actualizaciones (HTTP {{status}}). Intenta más tarde.',
+    feedUnreadable: 'GitHub devolvió una lista de releases que Minerva no pudo leer.',
   },
   themes: {
     openVsx: {

@@ -152,6 +152,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # Invariante del feed: una release publicada tiene los 3 manifiestos
+      # (`latest.yml` win, `latest-linux.yml`, `latest-mac.yml`). El modo
+      # `auto` de electron-updater (Windows/AppImage) muere con un 404 si
+      # falta el suyo, y el modo `notify` (mac/Linux sin AppImage) ya no lo
+      # necesita (`src/main/updater/release-feed.ts`), pero sigue siendo el
+      # contrato de la release. Verificar ANTES de publicar: un draft roto se
+      # arregla re-corriendo `build`; una release publicada rota ya la vieron
+      # todos los clientes.
+      - name: Verify update manifests on the draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ASSETS="$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')"
+          MISSING=0
+          for MANIFEST in latest.yml latest-linux.yml latest-mac.yml; do
+            if ! grep -qx "$MANIFEST" <<<"$ASSETS"; then
+              echo "::error::$GITHUB_REF_NAME has no $MANIFEST — electron-builder did not upload the update manifest for that platform. Not publishing."
+              MISSING=1
+            fi
+          done
+          [ "$MISSING" -eq 0 ]
+
       - name: Publish release (draft=false)
         shell: bash
         env:

@@ -183,10 +183,19 @@ author's Spanish logs, not maintained)
 - `MINERVA_MOCK_UPDATER=1|notify|error` scripted updater UI · `MINERVA_UPDATER=off` kill switch (e2e default).
 - Packaging: `npm run dist:mac:dir` / `dist:mac`, `dist:dir` / `dist` (Linux).
 
-**Updater:** `electron-updater` on the fork's GitHub releases (`RELEASE_OWNER` in
-`src/main/updater/config.ts` must match `publish` in `electron-builder.yml`). Unpackaged ⇒
-disabled; macOS ⇒ notify-only (unsigned); release notes are never rendered; the release
-URL is built in main from a semver-validated version.
+**Updater:** two engines by capability (`src/main/updater/capability.ts`). `auto` (Windows,
+writable AppImage) = `electron-updater` on the fork's GitHub releases (`RELEASE_OWNER` in
+`src/main/updater/config.ts` must match `publish` in `electron-builder.yml`). `notify` (macOS,
+unsigned; Linux without a writable AppImage) never loads `electron-updater`: it compares
+`app.getVersion()` against the GitHub releases REST API (`release-feed.ts`, via `net.fetch`)
+because electron-updater demands `latest-<platform>.yml` even to compare versions, and on a
+repo with **zero releases** GitHub's `releases.atom` silently lists tags instead (the fork's
+inherited `v0.2.1` ⇒ a raw 404 dump in Settings, v0.8.1). Every error crosses IPC through
+`updaterErrorMessage` (`error-message.ts`): one translated/first line, never headers or a
+stack. Unpackaged ⇒ disabled; release notes are never rendered; the release URL is built in
+main from a semver-validated version. The fork needs at least one published release (push a
+`v<package.json version>` tag; `release.yml` refuses to publish a draft missing any of the
+three manifests).
 
 ## Verification (before calling anything done)
 

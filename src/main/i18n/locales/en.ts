@@ -260,7 +260,13 @@ export const en = {
     missingExport:
       'electron-updater exposed no autoUpdater (neither as a named export nor on default); ' +
       'auto-update cannot start.',
-    mockFeedError: 'Could not reach the update feed (test script: MINERVA_MOCK_UPDATER=error).',
+    manifestMissing:
+      'The latest release has no update manifest for this platform ({{file}}), ' +
+      'so Minerva cannot compare versions yet.',
+    noReleases: 'No published release was found on GitHub yet.',
+    feedUnreachable: 'Could not reach GitHub to check for updates. Check your connection and try again.',
+    feedUnavailable: 'GitHub did not answer the update check (HTTP {{status}}). Try again later.',
+    feedUnreadable: 'GitHub returned a release list Minerva could not read.',
   },
   themes: {
     openVsx: {
