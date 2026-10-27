@@ -1,236 +1,151 @@
-# 🦉 proj_minerva
+# 🦉 Minerva
 
-> Revisa Pull Requests de GitHub y **entiéndelos de verdad** antes de aprobarlos.
+> Review Pull Requests and **actually understand them** before you approve.
 
-**proj_minerva** es una aplicación de escritorio (Electron) para revisar Pull Requests
-de GitHub con un enfoque **didáctico**. Además del diff clásico estilo GitKraken,
-un agente de IA acompaña la revisión explicando el _impacto_ de los cambios:
-diagramas de arquitectura C4, documentación de endpoints nuevos con forma de probarlos
-en local, y visualización de cómo evolucionan las tablas y el diagrama ER.
+Minerva is a desktop app (Electron) for reviewing Pull Requests **didactically**. Next to
+the classic GitKraken-style diff, an AI agent explains the _impact_ of the change:
+architecture diagrams, docs for new endpoints with a way to try them locally, and how
+database tables evolve, with an ER diagram.
 
-El objetivo: que quien aprueba un PR lo haga **entendiendo** lo que aprueba.
+The goal: whoever approves a PR does it **understanding** what they approve.
 
----
-
-## ✨ Características
-
-### Revisión de PRs (base)
-- 🔐 Conexión con GitHub a través de tu **GitHub CLI (`gh`)** ya autenticado: nada que
-  autorizar por equipo, y si tenés varias cuentas en `gh` elegís con cuál revisar.
-- 📋 Listado de PRs abiertos en todos los repos accesibles, con filtros y búsqueda.
-- 💬 Ver hilos de comentarios (de PR y de líneas) y **comentar** desde la app.
-- ✅ Ver estado de checks/CI, reviewers y estado de aprobación.
-
-### Vista de diff (estilo GitKraken)
-- 🌳 Árbol de archivos con toggle **list / tree / auto**.
-- ↔️ **Split view** (original izquierda, cambios derecha) e **inline view**.
-- 🎨 Resaltado de sintaxis, word-wrap opcional y navegación archivo-a-archivo.
-
-### Panel didáctico con IA (el diferenciador)
-- 🏛️ **Diagramas C4 (Mermaid)**: cómo los cambios del PR afectan la arquitectura
-  (contexto, contenedores, componentes) de la app o de un servicio.
-- 🔌 **Endpoints nuevos**: documentación autogenerada + snippet/coleccion para
-  **probarlo en local** (curl / HTTPie / archivo `.http`).
-- 🗃️ **Cambios de esquema**: detalle de tablas y campos nuevos + **diagrama ER**
-  (Mermaid `erDiagram`) mostrando cómo cambia el modelo de datos.
-- 📚 **Resumen didáctico**: qué cambió, por qué importa, riesgos y qué mirar de cerca.
-- ⚡ **Streaming**: el análisis aparece en vivo, sección a sección, con los diagramas
-  renderizándose en cuanto su bloque Mermaid se completa.
-- 🤖 **Multi-proveedor**: proveedor y modelo configurables desde Settings (⚙️) — Claude
-  Code, Codex y OpenCode (con acceso, dentro de OpenCode, a upstreams como OpenRouter,
-  Anthropic u OpenAI vía `opencode auth login`). Minerva no gestiona ninguna API key:
-  usa la sesión que ya autenticaste con el CLI de cada proveedor.
-- 🪟 **Ventana desacoplable**: el análisis se abre en su propia ventana amplia (sin
-  re-pagar el LLM: cache en main) con botón **Re-analizar** para comparar modelos.
-- 🔍 **Visor de recursos**: cualquier diagrama se expande a un lightbox con zoom
-  (hacia el cursor), pan y ajuste automático; tablas y snippets en vista amplia.
+_Originally created by Edilson ([amiedygg](https://github.com/amiedygg)). This fork is
+maintained by Kelvin Rojas ([DevKelvin21](https://github.com/DevKelvin21))._
 
 ---
 
-## 🧱 Stack técnico
+## ✨ Features
 
-| Capa | Tecnología |
-|------|-----------|
-| Runtime desktop | Electron + [electron-vite](https://electron-vite.org/) 5 |
-| UI | React 19 + TypeScript estricto + Tailwind CSS v4 |
-| Estado | Zustand |
-| GitHub API | [Octokit](https://github.com/octokit) (GraphQL para listados, REST para acciones) — auth delegada al CLI `gh` (puente de token, solo en memoria de main) |
-| IA | Claude Code / Codex / [OpenCode](https://opencode.ai/) — CLIs oficiales, proveedor+modelo configurables desde la UI, streaming con protocolo de secciones tagged |
-| Diagramas | [Mermaid](https://mermaid.js.org/) (C4, `erDiagram`, flowchart) — import lazy, `securityLevel: strict` |
-| Diff | parser de patches propio + resaltado con Shiki |
-| Tests | vitest (229 unit) + suites e2e vía Chrome DevTools Protocol |
+### PR review
+- 🔐 **GitHub through your own `gh` CLI**: nothing to authorize per team, and if `gh` has
+  several accounts you pick which one Minerva uses (without touching your terminal's
+  active account). Azure DevOps through the `az` CLI is on the way (see Roadmap).
+- 📋 Open PRs across every repo you can access, with filters, search, unread markers and
+  a background watcher.
+- 💬 Read comment threads (PR-level and line-level) and **comment** from the app.
+- ✅ CI/check status, reviewers and approval state.
+
+### Diff view
+- 🌳 File tree with **list / tree / auto** toggle.
+- ↔️ **Split** and **inline** views, syntax highlighting, optional word wrap, file-to-file
+  navigation.
+- 📐 Responsive for tiled windows: half and quarter screens work.
+
+### Didactic AI panel (the differentiator)
+- 🏛️ **C4 diagrams (Mermaid)** showing how the PR affects the architecture.
+- 🔌 **New endpoints**: generated docs plus curl / HTTPie / `.http` snippets to try them locally.
+- 🗃️ **Schema changes**: new tables and fields, with an `erDiagram`.
+- ☁️ **Cloud infrastructure**: if the repo declares AWS/Cloudflare IaC (Terraform, CDK, SAM,
+  serverless.yml, wrangler…), an `architecture-beta` diagram of the system and what the PR touches.
+- 📚 **Didactic summary**: what changed, why it matters, risks, what to look at closely.
+- ⚡ **Streaming**: the analysis appears live, section by section.
+- 🤖 **Multi-provider AI**: Claude Code, Codex or OpenCode, chosen in Settings. The agent
+  explores a read-only snapshot of the repo at the PR's commit. Minerva holds no API keys:
+  it uses the session you already authenticated with each provider's CLI.
+- 🪟 **Detachable window** with a **Re-analyze** button to compare models, and a lightbox
+  with zoom/pan for diagrams.
 
 ---
 
-## 🚀 Puesta en marcha
+## 📋 Requirements
+
+- **Node.js 22+** (what CI uses) and npm.
+- **[`gh` CLI](https://cli.github.com/)**, logged in: `gh auth login`.
+- **For Azure DevOps** (in progress): the [`az` CLI](https://learn.microsoft.com/cli/azure/)
+  with the `azure-devops` extension (`az extension add --name azure-devops`), then
+  `az login` / `az devops login`. Configure the CLI once by hand; Minerva reads that session.
+- **At least one AI CLI**, logged in: `claude login` (Claude Code), `codex login` (Codex) or
+  `opencode auth login` (OpenCode, which also reaches OpenRouter, Anthropic, OpenAI…).
+  Without any, the didactic panel falls back to a mock.
+
+## 🚀 Getting started
 
 ```bash
-# 1. Instalar dependencias
 npm install
-# (si el binario de Electron no se descargó: node node_modules/electron/install.js)
+# if the Electron binary did not download: node node_modules/electron/install.js
 
-# 2. IA real (opcional — sin ningún CLI logueado, el panel didáctico usa un mock):
-#    corré el login del proveedor que prefieras en una terminal.
-claude login      # Claude Code (cuenta Pro/Max)
-codex login       # Codex (cuenta ChatGPT Plus/Pro)
-opencode auth login   # OpenCode (gateway propio + upstreams como OpenRouter/Anthropic/OpenAI)
+npm run dev                        # real GitHub through gh
+MINERVA_MOCK=1 npm run dev         # demo: mock PRs ("shopwave") + real AI if a CLI is logged in
 
-# 3. Desarrollo (hot reload)
-npm run dev              # GitHub real: login por Device Flow desde la app
-MINERVA_MOCK=1 npm run dev   # modo demo: PRs mock ("shopwave") + IA real si hay CLI logueado
-
-# 4. Calidad
-npm run typecheck && npm run lint && npm test
-
-# 5. Build de producción
-npm run build
+npm run verify                     # typecheck + lint + unit tests
+npm run build                      # production build
 ```
 
-- El **proveedor y modelo de IA** se cambian en la app (⚙️ Settings); default OpenCode
-  (`opencode/big-pickle`). Precedencia: settings > env `MINERVA_AI_PROVIDER`/
-  `MINERVA_AI_MODEL` > default. Minerva no gestiona ninguna API key: cada proveedor se
-  autentica solo, leyendo la sesión de su propio CLI.
-- La sesión de GitHub **persiste** entre arranques (token cifrado vía safeStorage).
-  En desktops Wayland no reconocidos por Chromium (Hyprland/sway) la app fuerza el
-  backend `gnome-libsecret`; override con `MINERVA_PASSWORD_STORE` si tu setup usa otro.
+### Environment flags
+
+| Flag | Effect |
+|------|--------|
+| `MINERVA_MOCK=1` | Mock source-control data (universe "shopwave", 8 PRs). Does not affect AI. |
+| `MINERVA_MOCK_AI=1` | Force the mock AI regardless of provider (deterministic demos and e2e). |
+| `MINERVA_MOCK_UPDATER=1\|notify\|error` | Scripted auto-updater states, to exercise that UI unpackaged. |
+| `MINERVA_UPDATER=off` | Kill switch for the auto-updater (the e2e default). |
+| `MINERVA_AI_PROVIDER` / `MINERVA_AI_MODEL` | Default AI provider/model when Settings has none (default `opencode/big-pickle`). |
+
+The AI provider and model are changed in the app (⚙️ Settings). Precedence: Settings > env > default.
 
 ---
 
-## 🧪 Desarrollo y verificación
+## 🧪 Development and verification
 
 - **Unit tests**: `npm test` (vitest).
-- **Suite e2e** (Playwright, `e2e/`): `npm run test:e2e` — lanza la app
-  construida con datos mock y userData aislado por test; no necesita la app
-  corriendo. Sin sesión gráfica:
+- **E2E** (Playwright, `e2e/`): `npm run test:e2e` builds the app and runs it with mock data
+  and an isolated userData per test. On Linux without a display:
   `npm run build && xvfb-run -a -s "-screen 0 1600x1000x24" npx playwright test`.
-  Las reglas para escribir specs sin falsos positivos están en
-  `CLAUDE.md` § Verificación.
-- **Verificación visual**: `scripts/screenshot-app.sh salida.png` captura la ventana
-  de la app (hyprctl + grim) — toda verificación de UI termina mirando una captura.
-- **Flujo multi-agente** (orquestador Fable 5 + subagentes Sonnet 5, planes y control
-  de tareas): ver `.agents/WORKFLOW.md`, `.agents/PLAN.md` y `.agents/TASKS.md`.
-
-### Empaquetado
-
-- `npm run dist` — build + AppImage en `dist/Minerva-<versión>.AppImage`
-  (`npm run dist:dir` genera solo `dist/linux-unpacked/`, más rápido para probar).
-
-> ⚠️ **Si venís de una versión anterior a la 0.7.0, tenés que reinstalar a mano
-> UNA vez.** El auto-updater se introdujo EN la 0.7.0: las versiones 0.6.x y
-> anteriores no tienen con qué enterarse de que hay algo nuevo, así que no van a
-> avisarte nunca. Bajá la 0.7.0 desde
-> [Releases](https://github.com/amiedygg/proj_minerva/releases) y a partir de ahí
-> las actualizaciones son automáticas (con tu confirmación para descargar).
->
-> El auto-update funciona sobre la **AppImage oficial** en Linux y sobre el
-> instalador NSIS en Windows. NO funciona si corrés `linux-unpacked/`, si el
-> AppImage está en un directorio donde Minerva no puede escribir, o en macOS
-> mientras no haya Developer ID: en esos casos la app te lo dice y te enlaza a la
-> release en vez de fallar en silencio.
-- **Los tres proveedores de IA (Claude Code, Codex, OpenCode) requieren su CLI
-  oficial instalado y logueado en la máquina donde corre Minerva** — Minerva ya
-  no gestiona ninguna API key propia (eliminado en T59: hasta entonces existía
-  un cuarto proveedor, OpenRouter, con key propia vía `.env`/safeStorage; hoy
-  quien quiera esos modelos los conecta DENTRO de OpenCode con `opencode auth
-  login`). La app NO bundlea los CLIs ni reimplementa su OAuth: usa la sesión
-  que ya autenticaste con `claude login` (Claude Pro/Max), `codex login`
-  (ChatGPT Plus/Pro) u `opencode auth login`. Sin el CLI instalado el selector
-  de proveedor en Settings muestra "No disponible"; instalado pero sin sesión
-  (o, en OpenCode, sin ningún upstream conectado), muestra "Instalado, sin
-  sesión". El paquete `@anthropic-ai/claude-agent-sdk` trae un binario nativo
-  por plataforma (~250MB) que tampoco se bundlea — `electron-builder.yml` lo
-  excluye explícitamente (`!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**`)
-  porque Minerva siempre apunta al `claude` del sistema vía
-  `pathToClaudeCodeExecutable` (resuelto por `src/main/ai/providers/resolve-cli.ts`,
-  que busca en `PATH` y en ubicaciones comunes como `~/.local/bin` — necesario
-  porque una app GUI lanzada desde el launcher no siempre hereda el `PATH`
-  completo de una terminal).
-- En sistemas sin `libfuse.so.2` (Arch trae fuse3): correr el AppImage con
-  `--appimage-extract-and-run`, instalar el paquete `fuse2`, o usar
-  `dist/linux-unpacked/minerva` directo.
-- Verificación del empaquetado: `npm run dist:dir` y luego la suite e2e — el
-  spec `e2e/packaged.spec.ts` lanza el binario de `dist/linux-unpacked/` con
-  mocks (se auto-skipea si el binario no existe).
-- **Release multi-OS**: al publicar un release en GitHub, el workflow
-  `.github/workflows/release.yml` construye AppImage (Linux), instalador NSIS
-  (Windows x64) y DMG (macOS arm64+x64) en runners hosteados de GitHub
-  (`ubuntu-latest` / `windows-latest` / `macos-latest`) y los adjunta al
-  release. Los binarios de macOS/Windows salen **sin firma de código**
-  (Gatekeeper/SmartScreen mostrarán aviso). Conviene bumpear `version` en
-  `package.json` antes de taggear.
-- **macOS: "«Minerva» está dañada y no se puede abrir"**: la app NO está rota —
-  es Gatekeeper rechazando una app sin firmar ni notarizar que llegó con el
-  atributo de cuarentena de la descarga (el CI empaqueta con
-  `CSC_IDENTITY_AUTO_DISCOVERY=false`, ver log "skipped macOS application code
-  signing"). Tras arrastrar `Minerva.app` a Aplicaciones, quitar la cuarentena:
-
+- **Visual check**: start the app with CDP and capture it, then look at the image:
   ```bash
-  xattr -cr /Applications/Minerva.app
+  MINERVA_MOCK=1 MINERVA_MOCK_AI=1 npm run dev -- -- --remote-debugging-port=9222
+  scripts/screenshot-app.sh /tmp/shot.png     # works on macOS and Linux (CDP)
   ```
+- Working conventions, architecture and gotchas: [`CLAUDE.md`](CLAUDE.md).
 
-  y abre normal (aplica igual al DMG arm64 y x64). El fix definitivo es firmar
-  con un certificado Developer ID + notarizar (requiere Apple Developer
-  Program); mientras tanto este workaround es esperado para toda descarga.
+### Packaging
+
+- macOS: `npm run dist:mac` (DMG + zip, arm64 and x64); `npm run dist:mac:dir` builds only the
+  unpacked `.app` under `dist/mac-arm64/`, faster for testing (`e2e/packaged.spec.ts` uses it).
+- Linux: `npm run dist` (AppImage) / `npm run dist:dir`. Windows is built in CI (NSIS).
+- **Releases** are built by `.github/workflows/release.yml` on tag push (AppImage, NSIS, DMG/zip)
+  and attached to a draft release on the fork, published once all three OSes uploaded. Binaries are
+  **unsigned**: macOS Gatekeeper may say "Minerva is damaged"; the app is fine. Remove the
+  quarantine flag with `xattr -cr /Applications/Minerva.app`.
+- **Auto-update** uses the fork's GitHub releases. It is real on the Linux AppImage and Windows;
+  on macOS (no Developer ID yet) Minerva tells you a new version exists and links to the release.
+  Downloads always need your confirmation and install on quit.
+- The AI CLIs are **not bundled**: Minerva calls the ones on your machine. The
+  `claude-agent-sdk` native binaries are excluded from the package (see `electron-builder.yml`).
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] Scaffolding Electron + React + TS (electron-vite)
-- [x] Autenticación GitHub (Device Flow) + token cifrado con safeStorage (sesión persistente)
-- [x] Listado de repos y PRs abiertos _(Octokit real; `MINERVA_MOCK=1` para el modo demo)_
-- [x] Vista de diff estilo GitKraken (split/inline, árbol de archivos, Shiki)
-- [x] Comentarios: leer y publicar (generales y por línea), **renderizados como Markdown**
-- [x] Panel de IA: resumen didáctico _(Claude Code/Codex/OpenCode reales vía CLI logueado; mock como fallback)_
-- [x] Panel de IA: diagramas C4 de impacto arquitectónico _(render Mermaid e2e)_
-- [x] Panel de IA: detección de endpoints + doc + probador local
-- [x] Panel de IA: detección de cambios de esquema + diagrama ER
-- [x] Settings UI: selector de proveedor+modelo (default OpenCode)
-- [x] Streaming del análisis (SSE + protocolo de secciones tagged)
-- [x] Ventana didáctica desacoplable + cache de análisis (sin re-pagar el LLM)
-- [x] Visor de recursos: lightbox con zoom/pan para diagramas, vista amplia para tablas/snippets
-- [x] CSP explícita + validación de payloads IPC por canal
-- [x] Panel de IA: sección "Cómo levantar la app" (Docker/local, env vars requeridas y NUEVAS del PR)
-- [x] Syntax highlighting (Shiki) en snippets del panel didáctico y fences de Markdown
-- [x] Empaquetado (electron-builder) — `npm run dist` → `dist/Minerva-<v>.AppImage` _(icono propio pendiente)_
-- [x] Lista de PRs v0.3.0: filtro de estado (Abiertos/Cerrados/Todos, badges `merged`/`closed`)
-- [x] Lista de PRs v0.3.0: refresh manual + watcher de cambios (polling 60s en main, evento push `prListChanged`)
-- [x] Lista de PRs v0.3.0: leído/no-leído por PR (dots rojos, contador de comentarios, persistido en userData)
-- [x] Análisis agéntico v0.4.0: snapshot local del commit del PR + exploración read-only (los hallazgos cruzan diff y árbol real)
-- [x] Proveedor OpenCode v0.4.0 (reemplaza a OpenRouter directo; sus modelos van DENTRO de OpenCode) + card guía si no hay CLIs
-- [x] Settings v0.4.1: rediseño — strip "En uso" (CLI/modelo/razonamiento activos), tabs por proveedor (ver ≠ activar), cards de modelo de un click y chip resumen en la TitleBar
-- [x] Mini-log de actividad del harness v0.4.2: mientras la IA analiza, el panel muestra en vivo qué está haciendo el agente ("Leyó src/api/routes.ts", "Buscó \"router\"", "Pensando…") — efímero, sutil, en los tres proveedores + mock
-- [x] Modo de acceso a GitHub v0.5.0: OAuth de Minerva o **GitHub CLI (`gh`)** — para orgs enterprise con *OAuth app access restrictions* que bloquean la OAuth App pero permiten gh; puente de token (`gh auth token` solo en memoria de main, datos por Octokit igual), toggle en Settings
-- [x] Panel de IA: sección "Infraestructura cloud" v0.6.0 — si el repo declara infra AWS/Cloudflare (Terraform, CDK, SAM, serverless.yml, wrangler.toml…), big picture del sistema desplegado + zoom a dónde incide el PR, en Mermaid `architecture-beta` con logos oficiales (icon packs locales: `@iconify-json/logos` + pack `cf` vendoreado con R2/D1/KV/Durable Objects/Pages/Queues) _(GCP/DO: pendiente)_
-- [x] Layout responsivo para tiling v0.6.3: la UI se adapta a la ventana partida (mitad vertical/horizontal, hasta 4 por monitor) — lista de PRs y árbol de archivos pasan a drawer cuando falta ancho, el diff cae a inline antes de volverse ilegible, y el modal de Settings deja de recortar contenido (scroll único; dos columnas en ventanas anchas)
-- [x] Auto-updater v0.7.0: Minerva avisa cuando hay versión nueva y se actualiza sola — chequeo al arrancar y cada 6 h (más un botón manual en Settings), **la descarga solo empieza con tu confirmación** y la instalación ocurre **al salir**, para no interrumpir una review a medias. En Linux (AppImage) y Windows el update es real; en macOS, mientras no haya Developer ID, la app avisa y enlaza a la release en vez de fingir que puede actualizarse sola
-- [x] Acceso a GitHub v0.8.0: **`gh` es el modo, sin toggle** — el Device Flow propio
-  resultó menos conveniente en el uso real y queda como escape hatch por entorno
-  (`MINERVA_GITHUB_ACCESS=oauth`). Y si tu `gh` tiene **varias cuentas**, Settings deja
-  elegir con cuál trabaja Minerva, sin tocar la cuenta activa de tu terminal
-- [x] Lista de modelos siempre al día v0.8.1: los tres proveedores le preguntan a su CLI
-  qué modelos tiene tu sesión, así que un modelo nuevo (Opus 5, un GPT nuevo, lo que
-  sumes a tu OpenCode) aparece en Settings **sin esperar una versión nueva de Minerva**.
-  El catálogo escrito en el código quedó como red de emergencia para cuando el CLI no
-  está. Incluye el arreglo de una fuga: cerrar Minerva mientras el server de OpenCode
-  arrancaba dejaba un proceso de ~300 MB huérfano para siempre
-- [ ] Comentar en un PR real de prueba (verificación con cuenta real)
+Done: Electron + React scaffold, GitHub through `gh` (multi-account), PR list with
+filters/watcher/unread, GitKraken-style diff, comments (read/write, Markdown), the whole
+didactic panel (summary, C4, endpoints, schema + ER, run-it-locally, cloud infra), streaming,
+detachable window with analysis cache, three AI providers with dynamic model catalogs,
+agentic read-only analysis over a repo snapshot, tiled-window layout, auto-updater,
+multi-OS releases.
 
-> Estado detallado, bitácora de gotchas y control de tareas: `.agents/TASKS.md`.
-> Estrategia multi-agente (Fable 5 orquesta, Sonnet 5 implementa): `.agents/WORKFLOW.md`.
+Next (see [`docs/plan-azure-devops.md`](docs/plan-azure-devops.md)):
+
+- [ ] **Azure DevOps provider** (read first): `az` token bridge, REST client, local patch
+      builder, comment threads, reviewers and policies. Needs the provider-neutral source-control
+      layer (`scm:*` channels, `RepoRef` union) underneath.
+- [ ] **Stacked PRs and retarget**: stack view in the sidebar, orphan detection when a parent PR
+      completes, one-click retarget with confirmation (GitHub and Azure DevOps).
+- [ ] **Comment review workflow**: work through threads, mark resolved, reply in place.
+- [ ] **AI chat about a PR**: multi-turn sessions in the didactic panel, with interrupt and model switch.
+- [ ] **English UI / i18n**: the UI strings are still Spanish.
 
 ---
 
-## 📄 Licencia
+## 📄 License
 
-Por definir.
+Not defined yet.
 
----
+_Named after **Minerva**, Roman goddess of wisdom, because reviewing code should teach you something._
 
-_Nombre en honor a **Minerva**, diosa romana de la sabiduría — porque revisar
-código debería enseñarte algo._
+Design references:
+[GitKraken diffs](https://help.gitkraken.com/gitkraken-desktop/diff/),
+[pull requests](https://help.gitkraken.com/gitkraken-desktop/pull-requests/),
+[interface layout](https://help.gitkraken.com/gitkraken-desktop/interface/).
 
-## Referencias de diseño
-- [GitKraken — Diffs & Split View](https://help.gitkraken.com/gitkraken-desktop/diff/)
-- [GitKraken — Pull Requests](https://help.gitkraken.com/gitkraken-desktop/pull-requests/)
-- [GitKraken — Interface Layout](https://help.gitkraken.com/gitkraken-desktop/interface/)
+Historical logs from the original author live in [`docs/archive/`](docs/archive/) (Spanish, unmaintained).

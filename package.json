@@ -1,11 +1,11 @@
 {
   "name": "proj-minerva",
   "version": "0.8.1",
-  "description": "Revisa Pull Requests de GitHub y entiendelos de verdad antes de aprobarlos.",
+  "description": "Review Pull Requests from GitHub and Azure DevOps, and actually understand them before approving.",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
-  "author": "Edilson",
+  "author": "Edilson, Kelvin Rojas",
   "license": "UNLICENSED",
   "scripts": {
     "dev": "electron-vite dev",
@@ -20,7 +20,9 @@
     "verify": "npm run typecheck && npm run lint && npm test",
     "test:e2e": "electron-vite build && playwright test",
     "dist": "electron-vite build && electron-builder --linux",
-    "dist:dir": "electron-vite build && electron-builder --linux dir"
+    "dist:dir": "electron-vite build && electron-builder --linux dir",
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "dist:mac:dir": "electron-vite build && electron-builder --mac dir"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.203",

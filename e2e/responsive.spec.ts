@@ -3,7 +3,7 @@ import type { Page } from './fixtures'
 
 /**
  * F16/T88 — layout responsivo con la ventana tileada. Los tamaños son los del
- * mapa de `.agents/PLAN.md` § F16: una ventana completa, las dos mitades y un
+ * mapa de `docs/archive/PLAN.md` § F16: una ventana completa, las dos mitades y un
  * cuarto de un monitor 1080p, que es como se usa la app en un WM de tiling.
  *
  * Lo que sella este spec (todo esto FALLABA antes de F16):
@@ -140,8 +140,13 @@ test('Settings: todo el contenido es alcanzable con la ventana tileada', async (
     await expect(tab).toBeVisible()
     await tab.click()
 
+    // With a real CLI session on the machine (Codex/Claude installed and logged in) the
+    // dynamic model catalog arrives mid-test and swaps the list, detaching the first
+    // card while Playwright waits for it to be stable; retry until the list settles.
     const firstModelCard = window.locator('[role="tabpanel"] button').first()
-    await firstModelCard.scrollIntoViewIfNeeded()
+    await expect(async () => {
+      await firstModelCard.scrollIntoViewIfNeeded({ timeout: 2_000 })
+    }).toPass({ timeout: 15_000 })
     await expect(firstModelCard).toBeVisible()
 
     await attachScreenshot(window, testInfo, `settings-${viewport.w}x${viewport.h}`)

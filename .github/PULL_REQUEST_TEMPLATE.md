@@ -1,119 +1,115 @@
 <!--
-  Plantilla de PR de proj_minerva. Borrá las secciones que de verdad no
-  apliquen (mejor una sección borrada a propósito que una llena de "N/A").
-  Los comentarios como este no se ven en el PR renderizado.
+  Pull request template for proj_minerva. Delete sections that truly do not
+  apply (a section deleted on purpose beats one filled with "N/A").
+  Comments like this one do not show in the rendered PR.
 -->
 
-## Resumen
+## Summary
 
 <!--
-  Dos o tres líneas: QUÉ cambia y POR QUÉ, en lenguaje de producto.
-  Quien revisa tiene que entender el impacto sin abrir el diff.
-  Principio rector del proyecto: el PR debe ENSEÑAR el cambio, no solo mostrarlo.
+  Two or three lines: WHAT changes and WHY, in product language.
+  A reviewer should understand the impact without opening the diff.
+  Guiding principle: the PR should TEACH the change, not just show it.
 -->
 
-## Cambios realizados
+## Changes
 
 <!--
-  Lista concreta por área. Mencioná el archivo/módulo cuando ayude a ubicarse.
-  Agrupá por proceso, que es como está partida la app (ver CLAUDE.md).
+  Concrete list per area. Mention the file/module when it helps.
+  Group by process, which is how the app is split (see CLAUDE.md).
 -->
 
 - **main** —
-- **preload / contrato IPC** —
+- **preload / IPC contract** —
 - **renderer** —
 - **infra / build / CI** —
 - **docs** —
 
-## Capturas
+## Screenshots
 
 <!--
-  OBLIGATORIO si el PR toca la UI. Un PR de UI sin imágenes no se revisa:
-  el DOM puede decir "visible" mientras el usuario ve un panel vacío.
+  REQUIRED if the PR touches the UI. The DOM can say "visible" while the user
+  sees an empty panel.
 
-  De dónde sacarlas:
-  - La suite Playwright ya deja un PNG por test en `test-results/` (ojo: los
-    borra al empezar cada corrida — copialos antes de volver a correr).
-  - App corriendo en dev: `scripts/screenshot-app.sh <salida.png> [patrón-título]`.
+  Where to get them:
+  - The Playwright suite already leaves one PNG per test in `test-results/`
+    (it deletes them at the start of each run, so copy them first).
+  - Running dev app: `scripts/screenshot-app.sh <out.png> [title-pattern]`.
 
-  CÓMO SUBIRLAS sin arrastrarlas a mano por la web (patrón de F16/PR #19):
-  una rama HUÉRFANA de evidencia con los PNGs, embebidos por raw.githubusercontent.
-  Así también funciona desde la terminal, y los MB no entran a la historia
-  del código:
+  How to upload them without dragging files through the web UI: an ORPHAN
+  evidence branch with the PNGs, embedded via raw.githubusercontent.com:
 
       git switch --orphan evidence-<slug>
-      # copiar los PNGs, escribir un README con la provenance
-      git add -A && git commit -m "docs: evidencia visual de <slug>"
+      # copy the PNGs, write a README with the provenance
+      git add -A && git commit -m "docs: visual evidence for <slug>"
       git push -u origin evidence-<slug>
 
-  y en el cuerpo del PR:
+  and in the PR body:
 
-      <img src="https://raw.githubusercontent.com/amiedygg/proj_minerva/evidence-<slug>/e2e/<archivo>.png" width="430">
+      <img src="https://raw.githubusercontent.com/DevKelvin21/proj_minerva/evidence-<slug>/e2e/<file>.png" width="430">
 
-  La rama se borra al cerrar el PR. El README de esa rama debe decir con qué
-  comando se generaron las capturas y sobre qué commit.
+  Delete the branch when the PR closes. The branch README must say which
+  command produced the screenshots and on which commit.
 
-  Minerva se usa TILEADA (media pantalla, un cuarto), así que si el cambio
-  toca layout, incluí al menos un tamaño tileado además del normal (F16).
+  Minerva is used TILED (half screen, a quarter), so if the change touches
+  layout, include at least one tiled size besides the normal one.
 -->
 
-|                            | Antes | Después |
-| -------------------------- | ----- | ------- |
-| <!-- pantalla / estado --> |       |         |
+|                            | Before | After |
+| -------------------------- | ------ | ----- |
+| <!-- screen / state -->    |        |       |
 
-**¿Toca UI?** <!-- Sí / No. Si es Sí y no hay capturas arriba, explicá por qué. -->
+**Touches UI?** <!-- Yes / No. If yes and there are no screenshots above, explain why. -->
 
-## Decisiones importantes (scope)
+## Key decisions (scope)
 
 <!--
-  Lo que define el alcance de este PR. Para cada decisión: qué se eligió,
-  qué se descartó y POR QUÉ. Esto es lo que evita re-litigar lo mismo en
-  tres meses — y lo que después se copia a la bitácora de `.agents/TASKS.md`.
+  What defines this PR's scope. For each decision: what was chosen, what was
+  discarded and WHY. This avoids re-litigating the same thing in three months.
 -->
 
-| Decisión | Alternativa descartada | Motivo |
-| -------- | ---------------------- | ------ |
-|          |                        |        |
+| Decision | Discarded alternative | Reason |
+| -------- | --------------------- | ------ |
+|          |                       |        |
 
-### Fuera de alcance (decidido, no olvidado)
+### Out of scope (decided, not forgotten)
 
 <!--
-  Lo que conscientemente NO entra. Un recorte explícito es una decisión;
-  un recorte silencioso parece un olvido.
+  What is consciously NOT included. An explicit cut is a decision;
+  a silent cut looks like an oversight.
 -->
 
 -
 
-## Verificación
+## Verification
 
-<!-- Marcá lo que CORRISTE de verdad. Un check sin correr es peor que un check vacío. -->
+<!-- Tick only what you actually RAN. An unrun check is worse than an empty one. -->
 
-- [ ] `npm run verify` (typecheck + lint + tests) en verde
-- [ ] `npm run test:e2e` en verde <!-- sin sesión gráfica: npm run build && xvfb-run -a -s "-screen 0 1600x1000x24" npx playwright test -->
-- [ ] Capturas **miradas**, no solo generadas (si toca UI)
-- [ ] Ejercitado tileado a 960×540 (si toca layout)
-- [ ] Probado contra datos reales, no solo mocks <!-- si aplica: PR real de GitHub, proveedor de IA logueado… -->
+- [ ] `npm run verify` (typecheck + lint + tests) green
+- [ ] `npm run test:e2e` green <!-- Linux without a display: npm run build && xvfb-run -a -s "-screen 0 1600x1000x24" npx playwright test -->
+- [ ] Screenshots **looked at**, not just generated (if it touches UI)
+- [ ] Exercised tiled at 960×540 (if it touches layout)
+- [ ] Tested against real data, not only mocks <!-- if applicable: real PR, logged-in AI provider… -->
 
-## Frontera de seguridad
+## Security boundary
 
-<!-- Ver CLAUDE.md § Frontera de seguridad. Si el PR no toca nada de esto, borrá la sección. -->
+<!-- See CLAUDE.md § Security boundary. If the PR touches none of this, delete the section. -->
 
-- [ ] Ningún secreto cruza al renderer (tokens y sesiones viven solo en `main`)
-- [ ] Canales IPC nuevos: tipados en `src/shared/` **y** con validator en `src/main/ipc/validators.ts`
-- [ ] Eventos push nuevos: método concreto en el preload, canal hardcodeado (nunca `on(channel, cb)` genérico)
-- [ ] El contenido no confiable (diffs, títulos, comentarios de PRs, feeds externos) se trata como tal al construir prompts y al renderizar
-- [ ] El snapshot del PR sigue siendo solo-lectura para las herramientas de IA
+- [ ] No secret crosses to the renderer (tokens and sessions live only in `main`)
+- [ ] New IPC channels: typed in `src/shared/` **and** validated in `src/main/ipc/validators.ts`
+- [ ] New push events: concrete preload method, hardcoded channel (never a generic `on(channel, cb)`)
+- [ ] Untrusted content (diffs, PR titles, comments, external feeds) is treated as such when building prompts and rendering
+- [ ] The PR snapshot stays read-only for the AI tools
 
-## Breaking changes / migración
+## Breaking changes / migration
 
 <!--
-  ¿Rompe algo para quien ya tiene Minerva instalada, o para settings/cache
-  ya persistidos? Decí exactamente qué tiene que hacer esa persona.
-  Si no rompe nada, poné "Ninguno".
+  Does it break anything for people who already have Minerva installed, or
+  for persisted settings/cache? Say exactly what they need to do.
+  If nothing breaks, write "None".
 -->
 
-## Referencias
+## References
 
-- Tareas: <!-- T##–T## de `.agents/TASKS.md` -->
-- Plan: <!-- sección de `.agents/PLAN.md` -->
+- Plan / design doc: <!-- e.g. docs/plan-azure-devops.md -->
 - Issues:

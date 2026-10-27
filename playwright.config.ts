@@ -9,6 +9,8 @@ import { defineConfig } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
+  // `*.test.ts` files in e2e/ are vitest unit tests of the harness helpers.
+  testMatch: '**/*.spec.ts',
   // Red de seguridad de recursos: mata los `opencode serve` que se hayan
   // escapado (timeout de un test, SIGKILL al worker, crash de Electron). Cada
   // uno pesa ~300 MB; ver `e2e/global-teardown.ts`.

@@ -1,15 +1,15 @@
 /**
- * Barrido final de servers `opencode serve` huérfanos (~300 MB cada uno).
+ * Final sweep of orphaned `opencode serve` servers (~300 MB each).
  *
- * `closeMinerva` (`./fixtures.ts`) ya barre después de cada test, así que acá
- * solo puede quedar lo de un test que ni llegó a su teardown (timeout, SIGKILL
- * al worker). Criterio y motivación: ver `./opencode-sweep.ts`.
+ * `closeMinerva` (`./fixtures.ts`) already sweeps after every test, so only what
+ * a test left that never reached its teardown (timeout, worker SIGKILL) can
+ * remain here. Rule and motivation: see `./opencode-sweep.ts`.
  */
 import { reportSwept, sweepOrphanedOpencodeServers, SWEEP_SUPPORTED } from './opencode-sweep'
 
 export default function globalTeardown(): void {
   if (!SWEEP_SUPPORTED) {
-    console.log('[teardown] barrido de opencode omitido: requiere /proc (solo Linux).')
+    console.log('[teardown] opencode sweep skipped: only supported on Linux (/proc) and macOS (ps).')
     return
   }
   reportSwept('teardown', sweepOrphanedOpencodeServers())

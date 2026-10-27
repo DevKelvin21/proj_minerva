@@ -102,9 +102,41 @@ shared/ipc-schema.ts  zod schema per channel -> validators, types and preload bi
 | 4 | AI sessions + chat | L | Session interface, chat tab in the didactic panel, interrupt, model switch, streamed tool activity |
 | 5 | Renderer data layer | M | TanStack Query replaces ~16 hand-written fetch hooks (can fold into phase 1–2) |
 
-## Open decisions
+## Decisions (2026-10-26)
 
-1. Fork or upstream: is this work going to `amiedygg/proj_minerva` or a fork?
-2. Delete the OAuth escape hatch: recommended.
-3. Code and docs language: today they are in Spanish. Switch to English?
-4. `az login` once, so the app can get Entra tokens. Without it, the fallback is the slow per-call `az devops invoke`.
+1. **Fork:** work lives on `DevKelvin21/proj_minerva`. The auto-updater and release workflow point at the fork.
+2. **OAuth escape hatch:** deleted. GitHub access is through the `gh` CLI only.
+3. **Language:** all new code, comments and docs are in English. Translating the existing Spanish UI is a follow-up PR, using a localization file.
+4. **Azure DevOps auth:** the user configures the CLI by hand with a PAT (`az devops login`).
+   - Minerva reads that PAT through the Azure CLI's own bundled Python `keyring`. This triggers no Keychain prompt (verified).
+   - The token stays in main-process memory.
+   - Fallback chain:
+     1. The `AZURE_DEVOPS_EXT_PAT` environment variable.
+     2. The PAT saved by `az devops login`.
+     3. A Microsoft Entra token from `az account get-access-token`.
+
+## Comment review (core requirement)
+
+The user wants to do all reviews in Minerva, not the Azure DevOps web UI. The comment workflow is first-class:
+
+- **Inline:**
+  - Show threads on the line they anchor to, in both split and inline diff.
+  - Show each thread's status (active, pending, resolved, won't fix, closed, by design).
+- **Outside the diff:** comments on lines the diff doesn't show still appear. Fetch the file at the PR's head/base commit (`scm:getFileContent`) and either show a code excerpt around the line or expand the hunk.
+- **Comments view:** a per-PR list of all threads, grouped by file. Filter by status ("open only"), and jump from a thread to its code.
+- **Actions:** reply, change a thread's status, start a new line comment, and insert a suggestion block.
+- **AI (phase 4):** "explain this thread" and "draft a reply", run in the PR's AI session.
+
+## Execution waves
+
+- **Wave 1 (parallel):**
+  - Phase 1, provider-neutral SCM layer: `feat/scm-layer`.
+  - Azure infrastructure modules: `feat/azure-infra`. Credentials, REST client, patch builder, safe zip extraction, stack algorithm, mappers, mock fixtures, live read-only probe.
+  - Docs, macOS dev loop, fork config: `chore/docs-macos-fork`.
+- **Wave 2:**
+  - Azure provider wired into the registry, plus Settings.
+  - New channels: `scm:setThreadStatus`, `scm:getFileContent`, `scm:retarget`, `scm:getStacks`, each implemented for both providers.
+  - Stack view and retarget UI.
+  - Comment review UI.
+- **Wave 3:** AI sessions and chat.
+- **Wave 4:** English UI and i18n.

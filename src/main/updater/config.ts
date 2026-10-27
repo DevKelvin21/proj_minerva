@@ -17,7 +17,7 @@ export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 export const STARTUP_DELAY_MS = 60 * 1000
 
 /** Dueño/repo del feed de GitHub releases — mismo owner/repo que la sección `publish` de `electron-builder.yml` (T89). */
-export const RELEASE_OWNER = 'amiedygg'
+export const RELEASE_OWNER = 'DevKelvin21'
 export const RELEASE_REPO = 'proj_minerva'
 
 /**
