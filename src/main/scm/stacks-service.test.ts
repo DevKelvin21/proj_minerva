@@ -118,6 +118,11 @@ describe('createStacksService', () => {
     await service.get()
     expect(listStackCandidates).toHaveBeenCalledTimes(2)
 
+    // A refresh right after a computation is served from the cache...
+    await service.get({ refresh: true })
+    expect(listStackCandidates).toHaveBeenCalledTimes(2)
+    // ...and recomputes once the last result is older than minRefreshMs.
+    clock += 10_000
     await service.get({ refresh: true })
     expect(listStackCandidates).toHaveBeenCalledTimes(3)
 
@@ -140,5 +145,40 @@ describe('createStacksService', () => {
     expect(result.errors).toEqual([
       { provider: 'azure', code: 'UNAUTHENTICATED', message: 'no PAT' },
     ])
+  })
+
+  it('refresh is single-flight: concurrent refreshes join one computation', async () => {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const listStackCandidates = vi.fn(async () => {
+      await gate
+      return fake().listStackCandidates()
+    })
+    const service = createStacksService(createScmRegistry([fake({ listStackCandidates })]))
+    const calls = [service.get({ refresh: true }), service.get({ refresh: true }), service.get()]
+    release()
+    const [a, b, c] = await Promise.all(calls)
+    expect(listStackCandidates).toHaveBeenCalledTimes(1)
+    expect(a).toBe(b)
+    expect(b).toBe(c)
+  })
+
+  it('caps orphan lookups and reports it', async () => {
+    const many = Array.from({ length: 5 }, (_, i) =>
+      open(10 + i, 'feature/x' + i, 'feature/gone' + i),
+    )
+    const listMergedBySourceBranch = vi.fn(async () => [] as StackInputPr[])
+    const service = createStacksService(
+      createScmRegistry([
+        fake({ listStackCandidates: async () => many, listMergedBySourceBranch }),
+      ]),
+      { maxLookups: 3 },
+    )
+    const result = await service.get()
+    expect(listMergedBySourceBranch).toHaveBeenCalledTimes(3)
+    expect(result.orphanLookupsCapped).toEqual({ checked: 3, total: 5 })
+
+    const uncapped = await createStacksService(createScmRegistry([fake()])).get()
+    expect(uncapped.orphanLookupsCapped).toBeUndefined()
   })
 })

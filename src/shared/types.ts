@@ -227,6 +227,11 @@ export interface ListPullRequestsResult {
 export interface GetStacksResult {
   stacks: PrStack[]
   errors: ScmListError[]
+  /**
+   * Set when orphan detection hit its lookup cap: only `checked` of `total`
+   * candidate base branches were looked up, so some orphans may be missing.
+   */
+  orphanLookupsCapped?: { checked: number; total: number }
 }
 
 /**
