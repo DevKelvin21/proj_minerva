@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setMainLocale } from '../../i18n'
 
 /**
  * `gh-cli-auth.ts` spawnea `gh` (`node:child_process`), resuelve su ruta
@@ -71,6 +72,22 @@ describe('GhCliAuth', () => {
     // Default de los tests heredados de F14: sin cuenta elegida a mano.
     getGithubAccountMock.mockReturnValue(null)
     auth = new GhCliAuth()
+  })
+
+  describe('detail follows the UI language', () => {
+    afterEach(() => setMainLocale('en'))
+
+    it('English by default, Spanish after setMainLocale("es")', async () => {
+      mockExecFileResult(new Error('exit status 1'))
+      await expect(auth.getStatus()).resolves.toMatchObject({
+        detail: "No gh session. Run 'gh auth login' in a terminal.",
+      })
+      setMainLocale('es')
+      auth.invalidate()
+      await expect(auth.getStatus()).resolves.toMatchObject({
+        detail: "No hay sesión de gh. Ejecuta 'gh auth login' en una terminal.",
+      })
+    })
   })
 
   describe('getStatus(): los 4 estados', () => {

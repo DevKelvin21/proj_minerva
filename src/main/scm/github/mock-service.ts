@@ -28,6 +28,7 @@ import {
   type RepoRef,
 } from '../../../shared/scm'
 import { ScmError } from '../errors'
+import { mt } from '../../i18n'
 import type { ListPullRequestsQuery, ScmDataSource, SnapshotRequest } from '../provider'
 import type { StackInputPr } from '../stacks'
 import { prFixtures } from './fixtures'
@@ -54,7 +55,7 @@ function delay(ms: number): Promise<void> {
 }
 
 function notFoundError(repo: RepoRef, number: number): ScmError {
-  return new ScmError('NOT_FOUND', `Pull request not found: ${repo.fullName}#${number}`)
+  return new ScmError('NOT_FOUND', mt('scm.prNotFound', { repo: repo.fullName, number }))
 }
 
 /**
@@ -162,7 +163,7 @@ export class MockGithubService implements ScmDataSource {
 
     if (req.threadId) {
       const thread = record.threads.find((t) => t.id === req.threadId)
-      if (!thread) throw new ScmError('NOT_FOUND', `Comment thread not found: ${req.threadId}`)
+      if (!thread) throw new ScmError('NOT_FOUND', mt('scm.threadNotFound', { id: req.threadId }))
       comment.htmlUrl = mockCommentUrl(repo, req.number, commentId, thread.isLineThread)
       thread.comments.push(comment)
     } else {
@@ -189,7 +190,7 @@ export class MockGithubService implements ScmDataSource {
     const record = this.getRecord(req.repo, req.number)
     const thread = record.threads.find((t) => t.id === req.threadId)
     if (!thread || !thread.isLineThread) {
-      throw new ScmError('NOT_FOUND', 'Comment thread not found: ' + req.threadId)
+      throw new ScmError('NOT_FOUND', mt('scm.threadNotFound', { id: req.threadId }))
     }
     thread.status = req.status
     thread.isResolved = !isThreadOpen(req.status)
@@ -206,14 +207,14 @@ export class MockGithubService implements ScmDataSource {
     const record = this.getRecord(req.repo, req.number)
     const diffFile = record.files.find((file) => file.path === req.path)
     if (req.side === 'base' && diffFile?.status === 'added') {
-      throw new ScmError('NOT_FOUND', req.path + ' does not exist at the base commit.')
+      throw new ScmError('NOT_FOUND', mt('github.mockMissingAtBase', { path: req.path }))
     }
     if (req.side === 'head' && diffFile?.status === 'removed') {
-      throw new ScmError('NOT_FOUND', req.path + ' does not exist at the head commit.')
+      throw new ScmError('NOT_FOUND', mt('github.mockMissingAtHead', { path: req.path }))
     }
     const files = snapshotFixturesByRepo[req.repo.fullName] ?? genericSnapshotFixture
     const file = files.find((entry) => entry.path === req.path)
-    if (!file) throw new ScmError('NOT_FOUND', 'File not found: ' + req.path)
+    if (!file) throw new ScmError('NOT_FOUND', mt('github.mockFileNotFound', { path: req.path }))
     return { content: file.content, isBinary: false, tooLarge: false }
   }
 

@@ -13,9 +13,7 @@ describe('main i18n', () => {
   it('follows the active locale and interpolates placeholders', () => {
     setMainLocale('es')
     expect(mt('common.cancel')).toBe('Cancelar')
-    expect(mt('windows.didacticTitle', { repo: 'a/b', number: 7 })).toBe(
-      'Minerva — Análisis a/b#7',
-    )
+    expect(mt('windows.didacticTitle', { repo: 'a/b', number: 7 })).toBe('Minerva — Análisis a/b#7')
     expect(mt('windows.didacticTitle', { repo: 'a/b', number: 7 }, 'en')).toBe(
       'Minerva — Analysis a/b#7',
     )

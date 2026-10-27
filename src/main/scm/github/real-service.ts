@@ -38,6 +38,7 @@ import {
 } from '../../../shared/scm'
 import { looksBinary } from '../azure/patch-builder'
 import { ScmError, isScmError } from '../errors'
+import { mt } from '../../i18n'
 import type { ListPullRequestsQuery, ScmDataSource, SnapshotRequest } from '../provider'
 import type { StackInputPr } from '../stacks'
 import { asGithubRepo } from './repo'
@@ -354,7 +355,7 @@ export async function assertReviewThreadOf(
   ) {
     throw new ScmError(
       'NOT_FOUND',
-      'Comment thread not found in ' + repo.fullName + '#' + number + ': ' + threadId.slice(0, 80),
+      mt('github.threadNotFoundInPr', { repo: repo.fullName, number, id: threadId.slice(0, 80) }),
     )
   }
 }
@@ -606,15 +607,11 @@ export function mapGithubError(error: unknown, repoFullName?: string): ScmError 
   if (isScmError(error)) return error
   const err = asGithubErrorLike(error)
   const status = typeof err.status === 'number' ? err.status : undefined
-  const repoLabel = repoFullName ?? 'this repository'
+  const repoLabel = repoFullName ?? mt('github.thisRepository')
   const options = { cause: error }
 
   if (status === 401) {
-    return new ScmError(
-      'UNAUTHENTICATED',
-      'Not authenticated: the GitHub token is invalid or expired.',
-      options,
-    )
+    return new ScmError('UNAUTHENTICATED', mt('github.tokenInvalid'), options)
   }
 
   if (status === 403 || status === 429) {
@@ -626,46 +623,34 @@ export function mapGithubError(error: unknown, repoFullName?: string): ScmError 
       const minutes = Number.isFinite(resetMs)
         ? Math.max(1, Math.ceil((resetMs - Date.now()) / 60000))
         : 1
-      return new ScmError(
-        'RATE_LIMITED',
-        `GitHub rate limit reached, try again in ${minutes} min`,
-        options,
-      )
+      return new ScmError('RATE_LIMITED', mt('github.rateLimited', { minutes }), options)
     }
-    return new ScmError('FORBIDDEN', `No permission for ${repoLabel}`, options)
+    return new ScmError('FORBIDDEN', mt('github.forbidden', { repo: repoLabel }), options)
   }
 
   if (status === 404) {
-    return new ScmError(
-      'NOT_FOUND',
-      `No permission for ${repoLabel} (or it doesn't exist)`,
-      options,
-    )
+    return new ScmError('NOT_FOUND', mt('github.notFoundOrForbidden', { repo: repoLabel }), options)
   }
 
   const graphqlErrorType = err.errors?.[0]?.type
   if (graphqlErrorType === 'FORBIDDEN') {
-    return new ScmError('FORBIDDEN', `No permission for ${repoLabel}`, options)
+    return new ScmError('FORBIDDEN', mt('github.forbidden', { repo: repoLabel }), options)
   }
   if (graphqlErrorType === 'NOT_FOUND') {
-    return new ScmError(
-      'NOT_FOUND',
-      `No permission for ${repoLabel} (or it doesn't exist)`,
-      options,
-    )
+    return new ScmError('NOT_FOUND', mt('github.notFoundOrForbidden', { repo: repoLabel }), options)
   }
 
   if (status) {
-    return new ScmError('UNKNOWN', `GitHub error (status ${status})`, options)
+    return new ScmError('UNKNOWN', mt('github.httpError', { status }), options)
   }
 
   if (error instanceof TypeError) {
-    return new ScmError('NETWORK', 'Could not reach GitHub: ' + error.message, options)
+    return new ScmError('NETWORK', mt('github.unreachable', { error: error.message }), options)
   }
 
   return new ScmError(
     'UNKNOWN',
-    error instanceof Error ? error.message : 'Unknown error talking to GitHub',
+    error instanceof Error ? error.message : mt('github.unknown'),
     options,
   )
 }
@@ -686,10 +671,7 @@ export class RealGithubService implements ScmDataSource {
   private requireToken(): string {
     const token = this.getToken()
     if (!token) {
-      throw new ScmError(
-        'UNAUTHENTICATED',
-        "Not authenticated: sign in with 'gh auth login' and retry.",
-      )
+      throw new ScmError('UNAUTHENTICATED', mt('github.signInRequired'))
     }
     return token
   }
@@ -755,7 +737,7 @@ export class RealGithubService implements ScmDataSource {
       })
       const pr = data.repository?.pullRequest
       if (!pr) {
-        throw new ScmError('NOT_FOUND', `Pull request not found: ${repo.fullName}#${number}`)
+        throw new ScmError('NOT_FOUND', mt('scm.prNotFound', { repo: repo.fullName, number }))
       }
       return mapDetailNode(pr, repo)
     } catch (error) {
@@ -810,7 +792,7 @@ export class RealGithubService implements ScmDataSource {
       })
       const pr = data.repository?.pullRequest
       if (!pr) {
-        throw new ScmError('NOT_FOUND', `Pull request not found: ${repo.fullName}#${number}`)
+        throw new ScmError('NOT_FOUND', mt('scm.prNotFound', { repo: repo.fullName, number }))
       }
 
       const lineThreads = pr.reviewThreads.nodes.map(mapReviewThreadNode)
@@ -882,7 +864,7 @@ export class RealGithubService implements ScmDataSource {
   async setThreadStatus(req: SetThreadStatusRequest): Promise<CommentThread> {
     const repo = asGithubRepo(req.repo)
     if (req.threadId.startsWith(ISSUE_THREAD_PREFIX)) {
-      throw new ScmError('NOT_FOUND', 'General PR comments cannot be resolved on GitHub.')
+      throw new ScmError('NOT_FOUND', mt('github.generalCommentsUnresolvable'))
     }
     const token = this.requireToken()
     try {
@@ -894,7 +876,7 @@ export class RealGithubService implements ScmDataSource {
         { threadId: req.threadId },
       )
       const thread = resolve ? data.resolveReviewThread?.thread : data.unresolveReviewThread?.thread
-      if (!thread) throw new ScmError('NOT_FOUND', 'Comment thread not found: ' + req.threadId)
+      if (!thread) throw new ScmError('NOT_FOUND', mt('scm.threadNotFound', { id: req.threadId }))
       return mapReviewThreadNode(thread)
     } catch (error) {
       throw mapGithubError(error, repo.fullName)
@@ -933,7 +915,7 @@ export class RealGithubService implements ScmDataSource {
         ref,
       })
       if (Array.isArray(data) || data.type !== 'file') {
-        throw new ScmError('NOT_FOUND', 'Not a file: ' + req.path)
+        throw new ScmError('NOT_FOUND', mt('github.notAFile', { path: req.path }))
       }
       if (data.size > MAX_FILE_CONTENT_BYTES || !('content' in data) || !data.content) {
         return { content: null, isBinary: false, tooLarge: data.size > 0 }
@@ -1093,11 +1075,9 @@ export class RealGithubService implements ScmDataSource {
         const maxMb = Math.floor(MAX_TARBALL_BYTES / (1024 * 1024))
         throw new ScmError(
           'UNKNOWN',
-          'Repository ' +
-            repo.fullName +
-            ' is too large to copy locally (tarball over ' +
-            maxMb +
-            ' MB). An agentic analysis cannot be generated for this PR.',
+          mt('github.tarballTooLarge', { repo: repo.fullName, mb: maxMb }) +
+            ' ' +
+            mt('scm.noAgenticAnalysis'),
         )
       }
 
@@ -1121,11 +1101,9 @@ export class RealGithubService implements ScmDataSource {
         const maxMb = Math.floor(MAX_EXTRACTED_BYTES / (1024 * 1024))
         throw new ScmError(
           'UNKNOWN',
-          'Repository ' +
-            repo.fullName +
-            ' is too large to copy locally (over ' +
-            maxMb +
-            ' MB uncompressed). An agentic analysis cannot be generated for this PR.',
+          mt('github.extractedTooLarge', { repo: repo.fullName, mb: maxMb }) +
+            ' ' +
+            mt('scm.noAgenticAnalysis'),
         )
       }
 

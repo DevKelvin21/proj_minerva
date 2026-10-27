@@ -1,5 +1,6 @@
 import type { UpdaterStatus, UpdateInfoLite } from '../../shared/types'
 import { buildReleaseUrl } from './config'
+import { mt } from '../i18n'
 
 /**
  * Guion determinista del auto-updater bajo `MINERVA_MOCK_UPDATER` (T92, F17).
@@ -116,7 +117,7 @@ export function createMockUpdaterEngine(mode: MockUpdaterMode, currentVersion: s
       if (mode === 'error') {
         setStatus({
           phase: 'error',
-          message: 'No se pudo contactar al feed de actualizaciones (guion de prueba: MINERVA_MOCK_UPDATER=error).',
+          message: mt('updater.mockFeedError'),
           lastCheckedAt: new Date().toISOString(),
         })
         return

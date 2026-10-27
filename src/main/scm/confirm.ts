@@ -10,6 +10,7 @@
  * real write into an unconfirmed one.
  */
 import type { WebContents } from 'electron'
+import { mt } from '../i18n'
 
 export interface ConfirmRequest {
   /** Short question, e.g. "Retarget PR #12?". */
@@ -75,7 +76,7 @@ export function nativeConfirm(sender: WebContents | null, deps: NativeConfirmDep
     const show = deps.showMessageBox ?? electronMessageBox
     const { response } = await show(sender, {
       type: 'question',
-      buttons: [request.confirmLabel, 'Cancel'],
+      buttons: [request.confirmLabel, mt('common.cancel')],
       defaultId: 1,
       cancelId: 1,
       noLink: true,

@@ -9,6 +9,7 @@
 import type { RepoRef, ScmAuthStatus, ScmProviderId } from '../../shared/scm'
 import type { ListPullRequestsResult, ScmListError } from '../../shared/types'
 import { ScmError, toScmError } from './errors'
+import { mt } from '../i18n'
 import type { ListPullRequestsQuery, ScmProvider } from './provider'
 
 export const ALL_SCM_PROVIDER_IDS: readonly ScmProviderId[] = ['github', 'azure']
@@ -40,7 +41,7 @@ export function createScmRegistry(
     forRepo(repo) {
       const provider = get(repo.provider)
       if (!provider) {
-        throw new ScmError('NOT_FOUND', 'Source-control provider not enabled: ' + repo.provider)
+        throw new ScmError('NOT_FOUND', mt('scm.providerDisabled', { provider: repo.provider }))
       }
       return provider
     },

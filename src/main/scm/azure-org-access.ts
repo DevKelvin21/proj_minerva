@@ -22,6 +22,7 @@ import type { SetProviderSettingsRequest } from '../../shared/types'
 import { organizationUrl } from './azure/credentials'
 import { dialogText, type ConfirmFn } from './confirm'
 import { ScmError } from './errors'
+import { mt } from '../i18n'
 
 export interface AzureOrgAccessDeps {
   current: () => ScmProviderSettings
@@ -121,9 +122,9 @@ export function createAzureOrgAccess(deps: AzureOrgAccessDeps): AzureOrgAccess {
   }
 
   const credentialLine = (organizations: string[]): string =>
-    'Minerva will use your Azure DevOps credential (from az) with ' +
-    organizations.map((org) => dialogText(organizationUrl(org))).join(', ') +
-    '.'
+    mt('dialogs.azureCredential', {
+      urls: organizations.map((org) => dialogText(organizationUrl(org))).join(', '),
+    })
 
   return {
     isTrusted,
@@ -132,16 +133,16 @@ export function createAzureOrgAccess(deps: AzureOrgAccessDeps): AzureOrgAccess {
       if (isTrusted(organization)) return
       const off = !deps.current().azure.enabled
       const answer = await ask([organization], confirm, {
-        message: 'Load the projects of Azure DevOps organization ' + dialogText(organization) + '?',
+        message: mt('dialogs.azureProjects.message', { organization: dialogText(organization) }),
         detail:
-          (off ? 'Azure DevOps is turned off in Settings.\n' : '') + credentialLine([organization]),
-        confirmLabel: 'Load projects',
+          (off ? mt('dialogs.azureProjects.azureOff') + '\n' : '') + credentialLine([organization]),
+        confirmLabel: mt('dialogs.azureProjects.confirm'),
       })
       if (answer === true) return
       if (answer === 'busy') {
-        throw new ScmError('RATE_LIMITED', 'Another confirmation is already open.')
+        throw new ScmError('RATE_LIMITED', mt('scm.orgAccess.busy'))
       }
-      throw new ScmError('FORBIDDEN', 'Loading projects of ' + organization + ' was not allowed.')
+      throw new ScmError('FORBIDDEN', mt('scm.orgAccess.projectsDenied', { organization }))
     },
 
     async saveSettings(req, confirm, saveDeps) {
@@ -153,16 +154,17 @@ export function createAzureOrgAccess(deps: AzureOrgAccessDeps): AzureOrgAccess {
         if (fresh.length > 0) {
           const plural = fresh.length > 1
           const answer = await ask(fresh, confirm, {
-            message:
-              'Add Azure DevOps organization' +
-              (plural ? 's ' : ' ') +
-              fresh.map((org) => dialogText(org)).join(', ') +
-              '?',
+            message: mt(
+              plural ? 'dialogs.azureAddOrg.messageMany' : 'dialogs.azureAddOrg.messageOne',
+              {
+                organizations: fresh.map((org) => dialogText(org)).join(', '),
+              },
+            ),
             detail:
-              (plural ? 'They are' : 'It is') +
-              ' not configured yet and not known to az.\n' +
+              mt(plural ? 'dialogs.azureAddOrg.unknownMany' : 'dialogs.azureAddOrg.unknownOne') +
+              '\n' +
               credentialLine(fresh),
-            confirmLabel: 'Add',
+            confirmLabel: mt('dialogs.azureAddOrg.confirm'),
           })
           if (answer !== true) return false
         }

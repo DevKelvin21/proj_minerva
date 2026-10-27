@@ -20,6 +20,7 @@
 import type { ScmProviderSettings } from '../../shared/scm'
 import type { ScmSettingsInfo, SetProviderSettingsRequest } from '../../shared/types'
 import { ScmError } from './errors'
+import { mt } from '../i18n'
 import type { AzDevopsDefaults } from './azure/credentials'
 import type { PersistedScmSettings } from '../settings/store'
 import { isPersistedScmSettings } from '../settings/store'
@@ -128,7 +129,7 @@ export function createScmSettings(deps: ScmSettingsDeps): ScmSettingsService {
         }
       }
       if (!isPersistedScmSettings(next)) {
-        throw new ScmError('UNKNOWN', 'Invalid source-control settings.')
+        throw new ScmError('UNKNOWN', mt('scm.invalidSettings'))
       }
       deps.store.setScmSettings(next)
       return current()

@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { setMainLocale } from '../i18n'
 import { githubRepo } from '../../shared/scm-guards'
 import type { PullRequestDetail, PullRequestSummary } from '../../shared/types'
 import type { ConfirmFn } from './confirm'
@@ -50,6 +51,28 @@ describe('retargetPullRequest', () => {
       message: 'Retarget PR #7?',
       detail: 'Repository: acme/api\nTitle: Child PR\n\nBase branch: feature/parent → main',
       confirmLabel: 'Retarget',
+    })
+  })
+
+  describe('in Spanish', () => {
+    afterEach(() => setMainLocale('en'))
+
+    it('the dialog and the CONFLICT messages follow the UI language', async () => {
+      setMainLocale('es')
+      const { provider } = fakeProvider({})
+      const confirm = vi.fn(accept)
+      await retargetPullRequest(provider, req, confirm)
+      expect(confirm).toHaveBeenCalledWith({
+        message: '¿Cambiar la rama base del PR #7?',
+        detail: 'Repositorio: acme/api\nTítulo: Child PR\n\nRama base: feature/parent → main',
+        confirmLabel: 'Cambiar base',
+      })
+      await expect(
+        retargetPullRequest(fakeProvider({ state: 'closed' }).provider, req, accept),
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'El pull request #7 ya no está abierto.',
+      })
     })
   })
 

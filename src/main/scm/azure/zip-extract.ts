@@ -27,6 +27,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import yauzl, { type Entry, type ZipFile } from 'yauzl'
+import { mt } from '../../i18n'
 
 /** Same budget as `MAX_TARBALL_BYTES` (GitHub path). */
 export const MAX_ZIP_BYTES = 150 * 1024 * 1024
@@ -120,7 +121,7 @@ async function readAllEntries(zip: ZipFile, maxEntries: number): Promise<Entry[]
   if (zip.entryCount > maxEntries) {
     throw new ZipExtractError(
       'too-many-entries',
-      'The repository archive has ' + zip.entryCount + ' entries (limit ' + maxEntries + ').',
+      mt('azure.zip.tooManyEntries', { count: zip.entryCount, limit: maxEntries }),
     )
   }
   const entries: Entry[] = []
@@ -147,9 +148,7 @@ function byteCounter(limit: number, already: () => number, add: (n: number) => v
     transform(chunk: Buffer, _encoding, callback) {
       add(chunk.length)
       if (already() > limit) {
-        callback(
-          new ZipExtractError('too-large', 'The repository archive expands past the size limit.'),
-        )
+        callback(new ZipExtractError('too-large', mt('azure.zip.expandsPastLimit')))
         return
       }
       callback(null, chunk)
@@ -174,7 +173,7 @@ export async function extractZipSafely(
   if (size > maxZipBytes) {
     throw new ZipExtractError(
       'too-large',
-      'The repository archive is larger than ' + Math.floor(maxZipBytes / (1024 * 1024)) + ' MB.',
+      mt('azure.zip.tooLarge', { mb: Math.floor(maxZipBytes / (1024 * 1024)) }),
     )
   }
 
@@ -182,10 +181,7 @@ export async function extractZipSafely(
   try {
     zip = await openZip(zipPath)
   } catch (error) {
-    throw new ZipExtractError(
-      'corrupt',
-      'The repository archive is not a valid zip: ' + errorText(error),
-    )
+    throw new ZipExtractError('corrupt', mt('azure.zip.corrupt', { error: errorText(error) }))
   }
 
   try {
@@ -195,29 +191,21 @@ export async function extractZipSafely(
     } catch (error) {
       if (error instanceof ZipExtractError) throw error
       // yauzl's own name validation (absolute / `..`) surfaces here.
-      throw new ZipExtractError(
-        'unsafe-path',
-        'The repository archive is unsafe: ' + errorText(error),
-      )
+      throw new ZipExtractError('unsafe-path', mt('azure.zip.unsafe', { error: errorText(error) }))
     }
 
     let declared = 0
     for (const entry of entries) {
       const reason = unsafePathReason(entry.fileName)
       if (reason) {
-        throw new ZipExtractError(
-          'unsafe-path',
-          'The repository archive has an unsafe path (' + reason + ').',
-        )
+        throw new ZipExtractError('unsafe-path', mt('azure.zip.unsafePath', { reason }))
       }
       declared += entry.uncompressedSize
     }
     if (declared > maxExtractedBytes) {
       throw new ZipExtractError(
         'too-large',
-        'The repository expands to more than ' +
-          Math.floor(maxExtractedBytes / (1024 * 1024)) +
-          ' MB uncompressed.',
+        mt('azure.zip.extractedTooLarge', { mb: Math.floor(maxExtractedBytes / (1024 * 1024)) }),
       )
     }
 
@@ -234,10 +222,7 @@ export async function extractZipSafely(
       const target = resolve(destRoot, cleanRel)
       const fromRoot = relative(destRoot, target)
       if (fromRoot === '..' || fromRoot.startsWith('..' + sep) || isAbsolute(fromRoot)) {
-        throw new ZipExtractError(
-          'unsafe-path',
-          'The repository archive has a path outside the snapshot.',
-        )
+        throw new ZipExtractError('unsafe-path', mt('azure.zip.pathOutside'))
       }
 
       const kind = classifyEntry(entry)
