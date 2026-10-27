@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
-import type { ScmAuthStatus } from '../../../../shared/scm'
+import type { ScmAuthStatus, ScmProviderId } from '../../../../shared/scm'
+import type { GhAccount } from '../../../../shared/types'
 import { useGhAccounts } from '../../hooks/use-gh-accounts'
 import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useScmSettings } from '../../hooks/use-scm-settings'
@@ -47,9 +48,7 @@ function GhCliStatusFeedback({
     return <p className="text-xs text-danger">{t('settings.github.cliNotFound')}</p>
   }
   if (status.state === 'cli_unauthenticated') {
-    return (
-      <p className="text-xs text-warning">{status.detail ?? t('settings.github.noSession')}</p>
-    )
+    return <p className="text-xs text-warning">{status.detail ?? t('settings.github.noSession')}</p>
   }
   if (status.state === 'signed_in') {
     return (
@@ -120,7 +119,7 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
   const { statuses } = useScmAuth()
   const { info, setGithubAccount, saveProviderSettings } = useScmSettings()
   const [togglingGithub, setTogglingGithub] = useState(false)
-  const { accounts, loading, reload } = useGhAccounts(true)
+  const { accounts, loading, reload } = useGhAccounts(info?.providers.github.enabled !== false)
   // `null` is a legitimate value ("follow gh's active account"), so "nothing
   // in flight" needs its own sentinel: `undefined`.
   const [saving, setSaving] = useState<string | null | undefined>(undefined)
@@ -179,6 +178,51 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
         </p>
       )}
 
+      {/* Turned off: no `gh` instructions or account picker (nothing to sign in to). */}
+      {info.providers.github.enabled && (
+        <GithubSessionDetails
+          statuses={statuses}
+          accounts={accounts}
+          loading={loading}
+          busy={busy}
+          saving={saving}
+          githubAccount={githubAccount}
+          activeInGh={activeInGh}
+          reload={reload}
+          select={select}
+        />
+      )}
+
+      {saveError && <p className="mt-2 text-xs text-danger">{saveError}</p>}
+    </div>
+  )
+}
+
+/** `gh` install guide, probe feedback and the account picker (GitHub turned on only). */
+function GithubSessionDetails({
+  statuses,
+  accounts,
+  loading,
+  busy,
+  saving,
+  githubAccount,
+  activeInGh,
+  reload,
+  select,
+}: {
+  statuses: Record<ScmProviderId, ScmAuthStatus> | null
+  accounts: GhAccount[]
+  loading: boolean
+  busy: boolean
+  saving: string | null | undefined
+  githubAccount: string | null
+  activeInGh: GhAccount | null
+  reload: () => Promise<void> | void
+  select: (login: string | null) => Promise<void>
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <>
       <div className="rounded-md border border-border bg-bg/40 px-2.5 py-2">
         <p className="mb-2 text-xs text-muted">
           <Trans
@@ -238,7 +282,11 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
             selected={githubAccount === account.login}
             busy={saving === account.login}
             disabled={busy}
-            badge={account.valid ? null : <Badge tone="warning">{t('settings.github.tokenExpired')}</Badge>}
+            badge={
+              account.valid ? null : (
+                <Badge tone="warning">{t('settings.github.tokenExpired')}</Badge>
+              )
+            }
             onSelect={() => void select(account.login)}
           />
         ))}
@@ -267,9 +315,7 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
           <p className="text-[11px] text-muted">{t('settings.github.listUnreadable')}</p>
         )}
       </div>
-
-      {saveError && <p className="mt-2 text-xs text-danger">{saveError}</p>}
-    </div>
+    </>
   )
 }
 

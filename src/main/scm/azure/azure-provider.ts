@@ -86,12 +86,15 @@ import {
   isThreadOutdated,
   latestDate,
   mapChangeEntry,
+  mapChecks,
   mapCiStatus,
   mapComment,
+  mapMergeStatus,
   mapPullRequestSummary,
   mapRepo,
   mapReviewer,
   mapThread,
+  mapUser,
   threadAnchor,
   threadStatusToAzure,
   toAzurePath,
@@ -742,6 +745,13 @@ export class AzureScmProvider implements ScmProvider {
       reviewers: (pr.reviewers ?? []).map(mapReviewer),
       commits,
       workItems,
+      checks: mapChecks(statuses, evaluations),
+    }
+    // Only for open PRs: a completed PR's last merge status is history, not a warning.
+    const mergeStatus = summary.state === 'open' ? mapMergeStatus(pr.mergeStatus) : undefined
+    if (mergeStatus) detail.mergeStatus = mergeStatus
+    if (summary.state === 'open' && pr.autoCompleteSetBy) {
+      detail.autoComplete = { setBy: mapUser(pr.autoCompleteSetBy) }
     }
     if (changes) {
       detail.changedFiles = changes.total

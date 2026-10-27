@@ -29,11 +29,23 @@ export const en = {
       searchPlaceholder: 'Search by title, repo, branch or #number',
       closeSearch: 'Close search',
       didacticPanel: 'Didactic panel',
-      connectionTitle: 'IPC connection to the main process: {{status}}',
+      connectionTitle: 'Source control: {{status}}',
+      connectionIpcError: 'No connection to the main process.',
       connection: {
         connected: 'Connected',
+        partial: 'Partially connected',
+        signed_out: 'Not signed in',
+        no_providers: 'No source enabled',
         error: 'Disconnected',
         checking: 'Checking…',
+      },
+      providerLine: '{{provider}}: {{state}}',
+      providerState: {
+        ready: 'signed in as {{who}}',
+        checking: 'checking…',
+        not_configured: 'no organization configured',
+        cli_unavailable: 'CLI not found',
+        signed_out: 'not signed in',
       },
     },
     settingsChip: {
@@ -52,8 +64,20 @@ export const en = {
       viaGhCli: 'via GitHub CLI',
       managedByGhCli: 'Access is managed by GitHub CLI; change the account in Settings',
       ghCliNotFound: 'GitHub CLI not found',
+      azCliNotFound: 'Azure CLI not found',
+      managedByAz:
+        'Access uses your Azure CLI credential; change the organization in Settings',
+      via: {
+        ghCli: 'via GitHub CLI',
+        envPat: 'via AZURE_DEVOPS_EXT_PAT',
+        azDevopsPat: 'via az devops PAT',
+        azEntra: 'via az login (Entra)',
+      },
+      notConfigured: 'No organization',
+      notConfiguredTitle: 'Azure DevOps is on but has no organization yet. Add one in Settings.',
       openSettings: 'Open settings',
       copyCommand: 'Copy command',
+      copyCommandNamed: 'Copy command: {{command}}',
       waitingForSession: 'Waiting for session…',
     },
     sidebar: {
@@ -77,13 +101,22 @@ export const en = {
         all: 'No PRs.',
       },
       noMatches: 'No PRs match "{{query}}".',
-      searchTip:
-        'Tip: search accepts GitHub qualifiers, e.g. <code>org:my-org</code> or <code>repo:owner/name</code>.',
+      searchTipGithub:
+        'Tip: GitHub search accepts qualifiers, e.g. <code>org:my-org</code> or <code>repo:owner/name</code>.',
+      searchTipAzure:
+        'Tip: Azure DevOps search matches the title, repository, branch, author or <code>#number</code>.',
+      azureNotConfigured: 'Azure DevOps is on but has no organization yet. Add one in Settings.',
+      noProvidersTitle: 'No source control is turned on',
+      noProvidersHint: 'Turn on GitHub or Azure DevOps in Settings to list pull requests.',
       loadFailed: 'Could not load the PR list: {{error}}',
       loading: 'Loading PRs…',
       accountNoSession:
         'The account <mono>{{account}}</mono> has no valid gh session. Pick another one in Settings, or renew it with <mono>{{command}}</mono>.',
       signInWithGhCli: 'Sign in with GitHub CLI: run <mono>{{command}}</mono> in a terminal.',
+      signInWithAz:
+        'Sign in with Azure CLI: run <cmd>{{command}}</cmd> in a terminal and paste a PAT with Code (Read & Write) scope.',
+      installAz:
+        'Install Azure CLI with the azure-devops extension, then run <cmd>{{command}}</cmd> (or set <mono>AZURE_DEVOPS_EXT_PAT</mono>).',
       openSettings: 'Open settings',
     },
     center: {
@@ -106,6 +139,8 @@ export const en = {
     review: {
       approved: 'Approved',
       changesRequested: 'Changes requested',
+      waitingForAuthor: 'Waiting for author',
+      rejected: 'Rejected',
       reviewRequired: 'Review required',
     },
     state: {
@@ -135,14 +170,35 @@ export const en = {
       reviewers: 'Reviewers',
       required: 'required',
       workItems: 'Work items',
+      labels: 'Labels',
+      tags: 'Tags',
       draft: 'Draft',
       details: 'Details',
+      autoComplete: 'Auto-complete set by {{name}}',
+      autoCompleteTitle: 'This pull request completes on its own once every required policy passes.',
+      mergeStatus: {
+        clean: 'No merge conflicts',
+        conflicts: 'Merge conflicts',
+        checking: 'Checking merge…',
+        blocked: 'Blocked by policy',
+        failed: 'Merge check failed',
+      },
+      branchPolicies: 'Branch policies',
+      checks: 'Checks',
+      optional: 'optional',
+      checkStatus: {
+        success: 'Passed',
+        failure: 'Failed',
+        pending: 'Pending',
+        not_applicable: 'Not applicable',
+      },
     },
     reviewerVote: {
       approved: 'Approved',
       approved_with_suggestions: 'Approved with suggestions',
       none: 'No vote yet',
       changes_requested: 'Changes requested',
+      waiting_for_author: 'Waiting for author',
       rejected: 'Rejected',
     },
     files: {

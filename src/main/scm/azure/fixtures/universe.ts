@@ -293,6 +293,10 @@ interface PrSpec {
   closed?: string
   isDraft?: boolean
   reviewers?: AzPullRequest['reviewers']
+  mergeStatus?: AzPullRequest['mergeStatus']
+  /** Tag names (Azure DevOps "tags" are labels on the wire). */
+  tags?: string[]
+  autoCompleteSetBy?: AzIdentityRef
 }
 
 function pullRequest(spec: PrSpec): AzPullRequest {
@@ -307,13 +311,17 @@ function pullRequest(spec: PrSpec): AzPullRequest {
     sourceRefName: 'refs/heads/' + spec.source,
     targetRefName: 'refs/heads/' + spec.target,
     isDraft: spec.isDraft ?? false,
-    mergeStatus: 'succeeded',
+    mergeStatus: spec.mergeStatus ?? 'succeeded',
     lastMergeSourceCommit: { commitId: commitId('src' + spec.id) },
     lastMergeTargetCommit: { commitId: commitId('tgt' + spec.id) },
     reviewers: spec.reviewers ?? [],
     repository: spec.repo,
   }
   if (spec.closed) pr.closedDate = spec.closed
+  if (spec.tags) {
+    pr.labels = spec.tags.map((name, index) => ({ id: 'tag-' + spec.id + '-' + index, name }))
+  }
+  if (spec.autoCompleteSetBy) pr.autoCompleteSetBy = spec.autoCompleteSetBy
   return pr
 }
 
@@ -348,6 +356,8 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     author: PEOPLE.ada,
     created: '2026-10-10T10:00:00Z',
     reviewers: [reviewer(PEOPLE.grace, 10, true), reviewer(PEOPLE.team, 0, true)],
+    tags: ['checkout-v2', 'api'],
+    autoCompleteSetBy: PEOPLE.ada,
   }),
   pullRequest({
     id: 102,
@@ -382,6 +392,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     author: PEOPLE.grace,
     created: '2026-10-03T12:00:00Z',
     reviewers: [reviewer(PEOPLE.ada, -10)],
+    mergeStatus: 'conflicts',
   }),
   // storefront-web: same feature chain, starting one branch lower.
   pullRequest({
@@ -417,6 +428,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     author: PEOPLE.grace,
     created: '2026-10-14T08:00:00Z',
     reviewers: [reviewer(PEOPLE.ada, 10), reviewer(PEOPLE.linus, 0)],
+    tags: ['bug'],
   }),
   // storefront-web: abandoned.
   pullRequest({

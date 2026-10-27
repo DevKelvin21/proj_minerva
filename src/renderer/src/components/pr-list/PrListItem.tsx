@@ -6,12 +6,12 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ParseKeys } from 'i18next'
 import type { PullRequestState, PullRequestSummary, ReviewDecision } from '../../../../shared/types'
 import { useAppStore } from '../../stores/app-store'
 import { Avatar } from '../ui/Avatar'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
 import { prKey } from '../../../../shared/scm'
+import { reviewDecisionLabelKey } from '../../lib/scm-labels'
 
 interface PrListItemProps {
   pr: PullRequestSummary
@@ -24,18 +24,13 @@ function reviewDecisionTone(decision: ReviewDecision): string {
     case 'approved':
       return 'bg-success'
     case 'changes_requested':
+    case 'rejected':
       return 'bg-danger'
     case 'review_required':
       return 'bg-warning'
     default:
       return ''
   }
-}
-
-const REVIEW_DECISION_LABEL: Record<NonNullable<ReviewDecision>, ParseKeys> = {
-  approved: 'prList.review.approved',
-  changes_requested: 'prList.review.changesRequested',
-  review_required: 'prList.review.reviewRequired',
 }
 
 /** Icono de estado (T52, F10): coherente con el tono del badge (merge morado, closed atenuado). */
@@ -148,8 +143,9 @@ export function PrListItem({ pr, onSelect }: PrListItemProps): React.JSX.Element
         <CiStatusIcon status={pr.ciStatus} size={12} />
         {pr.reviewDecision && (
           <span
+            data-review={pr.reviewDecision}
             className={`h-1.5 w-1.5 rounded-full ${reviewDecisionTone(pr.reviewDecision)}`}
-            title={t(REVIEW_DECISION_LABEL[pr.reviewDecision])}
+            title={t(reviewDecisionLabelKey(pr.reviewDecision, pr.repo.provider))}
           />
         )}
         {pr.commentCount !== null && pr.commentCount > 0 && (

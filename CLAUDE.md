@@ -144,6 +144,9 @@ author's Spanish logs, not maintained)
 - `npm run build | typecheck | lint | test`; `npm run verify` = typecheck + lint + test (the CI `checks` gate).
 - `npm run test:e2e` — build + Playwright (built app, mocks, isolated userData per test).
 - `MINERVA_MOCK=1` mock PRs + real AI · `MINERVA_MOCK=1 MINERVA_MOCK_AI=1` fully deterministic.
+- `MINERVA_MOCK_GH_AUTH` / `MINERVA_MOCK_AZURE_AUTH` = `signed_in|unauthenticated|cli_unavailable`
+  (mock only): force a provider's auth state. The `gh` probe is real even in mock mode, so e2e
+  that assert GitHub's header/sign-in state must set `MINERVA_MOCK_GH_AUTH` (`provider-aware.spec.ts`).
 - `MINERVA_MOCK_UPDATER=1|notify|error` scripted updater UI · `MINERVA_UPDATER=off` kill switch (e2e default).
 - Packaging: `npm run dist:mac:dir` / `dist:mac`, `dist:dir` / `dist` (Linux).
 

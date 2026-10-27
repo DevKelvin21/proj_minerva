@@ -76,6 +76,8 @@ export interface AzPullRequest {
   reviewers?: AzReviewer[]
   repository: AzGitRepository
   labels?: { id: string; name: string; active?: boolean }[]
+  /** Set when someone turned on auto-complete. */
+  autoCompleteSetBy?: AzIdentityRef
   url?: string
 }
 
@@ -244,6 +246,8 @@ export interface AzPolicyEvaluation {
     isBlocking: boolean
     isEnabled: boolean
     type: { id: string; displayName: string }
+    /** Build / status policies carry their own display name here. */
+    settings?: { displayName?: string | null }
   }
 }
 
