@@ -16,6 +16,12 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Minerva</title>
+    <!--
+      Re-applies the last painted theme before the first paint (no flash of
+      the wrong theme). Classic, parser-blocking, same-origin script: covered
+      by script-src 'self', no CSP change. See public/theme-boot.js.
+    -->
+    <script src="./theme-boot.js"></script>
   </head>
   <body>
     <div id="root"></div>

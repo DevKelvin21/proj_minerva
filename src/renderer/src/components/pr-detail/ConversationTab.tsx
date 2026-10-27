@@ -116,7 +116,7 @@ export function ConversationTab({
         <button
           type="submit"
           disabled={posting || draft.trim().length === 0}
-          className="self-end rounded-md border border-border bg-accent/90 px-3 py-1.5 text-sm font-medium text-bg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
+          className="self-end rounded-md border border-border bg-accent/90 px-3 py-1.5 text-sm font-medium text-accent-fg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
         >
           {posting ? t('comments.conversation.posting') : t('comments.conversation.submit')}
         </button>

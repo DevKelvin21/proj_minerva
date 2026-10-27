@@ -18,6 +18,7 @@ import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { REVIEWER_VOTE_TONE, reviewerVoteLabel, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import type { ScmTone } from '../../lib/scm-labels'
+import { labelStyle } from '../../lib/label-colors'
 
 interface PrHeaderProps {
   pr: PullRequestDetail
@@ -203,18 +204,21 @@ function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
       }
       className="flex flex-wrap gap-1.5"
     >
-      {pr.labels.map((label) => (
-        <span
-          key={label.name}
-          role="listitem"
-          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-            label.color ? 'text-bg' : 'bg-border/60 text-muted'
-          }`}
-          style={label.color ? { backgroundColor: `#${label.color}` } : undefined}
-        >
-          {label.name}
-        </span>
-      ))}
+      {pr.labels.map((label) => {
+        const style = labelStyle(label.color)
+        return (
+          <span
+            key={label.name}
+            role="listitem"
+            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+              style ? '' : 'bg-border/60 text-muted'
+            }`}
+            style={style ?? undefined}
+          >
+            {label.name}
+          </span>
+        )
+      })}
     </div>
   )
 

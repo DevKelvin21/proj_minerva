@@ -69,6 +69,12 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import { DEFAULT_AI_PROVIDER, isAiProviderId, type AiProviderId } from '../../shared/ai-providers'
 import { DEFAULT_LOCALE, isAppLocale, type AppLocale } from '../../shared/locale'
+import {
+  DEFAULT_APPEARANCE_SETTINGS,
+  isAppearanceSettings,
+  sanitizeAppearanceSettings,
+  type AppearanceSettings,
+} from '../../shared/theme/appearance'
 import type { AzureOrganizationSettings } from '../../shared/scm'
 import {
   isAzureOrganizationName,
@@ -128,6 +134,14 @@ export interface PersistedSettings {
    * invalid value is dropped on load without discarding the rest of the file.
    */
   language?: AppLocale
+  /**
+   * Appearance: mode (system/light/dark), the theme of each half, contrast
+   * and the user's own themes (`../../shared/theme/appearance.ts`). Absent =
+   * defaults (Minerva theme, follow the system). A damaged block is repaired
+   * piece by piece on load (bad custom themes dropped) without touching the
+   * rest of the file.
+   */
+  appearance?: AppearanceSettings
 }
 
 export interface PersistedScmSettings {
@@ -233,6 +247,21 @@ function dropInvalidLanguage(value: Record<string, unknown>): Record<string, unk
   return next
 }
 
+/**
+ * Repairs `appearance` piece by piece (`sanitizeAppearanceSettings`: invalid
+ * custom themes dropped, dangling theme ids reset) or drops it when it is not
+ * even an object, so one bad hand edit never resets the AI settings.
+ */
+function repairAppearance(value: Record<string, unknown>): Record<string, unknown> {
+  if (value.appearance === undefined || isAppearanceSettings(value.appearance)) return value
+  const repaired = sanitizeAppearanceSettings(value.appearance)
+  console.warn('[settings] settings.json has an invalid "appearance" block; repairing it.')
+  const next = { ...value }
+  if (repaired) next.appearance = repaired
+  else delete next.appearance
+  return next
+}
+
 function isNewPersistedSettings(value: unknown): value is PersistedSettings {
   if (!isPlainObject(value)) return false
   if (!isAiProviderId(value.aiProvider) || !isModelsMap(value.models)) return false
@@ -244,6 +273,7 @@ function isNewPersistedSettings(value: unknown): value is PersistedSettings {
   // debe colar basura que después termine en un argv de `gh`).
   if (value.scm !== undefined && !isPersistedScmSettings(value.scm)) return false
   if (value.language !== undefined && !isAppLocale(value.language)) return false
+  if (value.appearance !== undefined && !isAppearanceSettings(value.appearance)) return false
   return value.githubAccount === undefined || isGithubAccountLogin(value.githubAccount)
 }
 
@@ -342,7 +372,9 @@ function migrateRaw(parsed: unknown): MigrationResult | null {
 
   if (!isPlainObject(parsed)) return null
 
-  const migrated = dropInvalidLanguage(dropInvalidScm(migrateRawOpenRouterToOpenCode(parsed)))
+  const migrated = repairAppearance(
+    dropInvalidLanguage(dropInvalidScm(migrateRawOpenRouterToOpenCode(parsed))),
+  )
   if (!isNewPersistedSettings(migrated)) return null
   return { settings: migrated, changedFromDisk: migrated !== parsed }
 }
@@ -455,6 +487,16 @@ export class SettingsStore {
     this.persist({ ...this.baseSettings(), language })
   }
 
+  /** Appearance settings; the defaults when nothing (valid) is saved. */
+  getAppearance(): AppearanceSettings {
+    return this.load()?.appearance ?? DEFAULT_APPEARANCE_SETTINGS
+  }
+
+  /** Replaces the saved appearance (caller validated `next` with `isAppearanceSettings`). */
+  setAppearance(appearance: AppearanceSettings): void {
+    this.persist({ ...this.baseSettings(), appearance })
+  }
+
   /** Replaces the saved per-provider SCM settings (caller validated `next`). */
   setScmSettings(next: PersistedScmSettings): void {
     this.persist({ ...this.baseSettings(), scm: next })
@@ -477,6 +519,7 @@ export class SettingsStore {
       githubAccount: current.githubAccount,
       scm: current.scm,
       language: current.language,
+      appearance: current.appearance,
     }
   }
 

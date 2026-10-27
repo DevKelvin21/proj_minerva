@@ -55,7 +55,7 @@ function StateIcon({
     return (
       <GitMerge
         size={14}
-        className="mt-0.5 shrink-0 text-purple-400"
+        className="mt-0.5 shrink-0 text-merged"
         aria-label={t('prList.state.merged')}
       />
     )
@@ -83,7 +83,7 @@ function StateBadge({ state }: { state: PullRequestState }): React.JSX.Element |
   const { t } = useTranslation()
   if (state === 'merged') {
     return (
-      <span className="rounded border border-purple-400/40 px-1 text-[10px] text-purple-400">
+      <span className="rounded border border-merged/40 px-1 text-[10px] text-merged">
         {t('prList.state.mergedBadge')}
       </span>
     )

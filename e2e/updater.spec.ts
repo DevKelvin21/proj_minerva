@@ -66,7 +66,8 @@ test('camino feliz (MINERVA_MOCK_UPDATER=1): checkear, descargar e instalar al s
     // `mock-updater.ts`): al menos un frame de "Descargando v…" con un
     // porcentaje, antes de llegar a `downloaded`.
     await expect(window.getByText(/^Downloading v\d+\.\d+\.\d+…$/)).toBeVisible()
-    await expect(window.getByText(/^\d+%$/)).toBeVisible()
+    // Scoped to the progress line: Appearance shows a contrast percentage too.
+    await expect(window.locator('p').filter({ hasText: /^\d+%$/ })).toBeVisible()
     await attachScreenshot(window, testInfo, 'updater-downloading')
 
     await expect(window.getByText('It will be installed when you quit Minerva.')).toBeVisible()

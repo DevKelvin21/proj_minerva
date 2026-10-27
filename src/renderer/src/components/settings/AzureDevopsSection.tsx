@@ -196,7 +196,7 @@ function AzureSettingsForm({
           type="button"
           onClick={() => void save()}
           disabled={saving || !dirty || (organization.trim() !== '' && !orgValid)}
-          className="rounded-md bg-accent/90 px-3 py-1 text-xs font-medium text-bg transition-colors hover:bg-accent disabled:opacity-50"
+          className="rounded-md bg-accent/90 px-3 py-1 text-xs font-medium text-accent-fg transition-colors hover:bg-accent disabled:opacity-50"
         >
           {saving ? t('settings.azure.saving') : t('settings.azure.save')}
         </button>

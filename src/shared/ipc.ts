@@ -32,8 +32,11 @@ import type {
 import type { FileContent, ScmAuthStatus, ScmProviderId } from './scm'
 import type { AiModelOption, AiProviderId } from './ai-providers'
 import type { AppLocale } from './locale'
+import type { AppearanceSettings } from './theme/appearance'
+import type { OpenVsxExtension, OpenVsxSort, OpenVsxThemePackage } from './theme/open-vsx'
 import type {
   AnalysisProgressEvent,
+  AppearanceChangedEvent,
   LanguageChangedEvent,
   PrListChangedEvent,
   UpdaterStatusChangedEvent,
@@ -236,6 +239,30 @@ export interface IpcContract {
    */
   'settings:setLanguage': { req: { language: AppLocale }; res: AppLocale }
 
+  /** Appearance (mode, theme per half, contrast, custom themes) from settings.json, or the defaults. */
+  'settings:getAppearance': { req: void; res: AppearanceSettings }
+  /**
+   * Replaces the saved appearance (strictly validated: canonical colors only),
+   * syncs `nativeTheme.themeSource` and every window's background color, and
+   * pushes `appearanceChanged` to every window (main + detached didactic).
+   * Answers the saved settings.
+   */
+  'settings:setAppearance': { req: AppearanceSettings; res: AppearanceSettings }
+
+  /**
+   * Open VSX color theme search, done by main (the renderer CSP blocks the
+   * network). Only https://open-vsx.org; extensions with a permissive license
+   * and at least one color theme; at most 8 results.
+   */
+  'themes:searchOpenVsx': { req: { query: string; sortBy?: OpenVsxSort }; res: OpenVsxExtension[] }
+  /**
+   * Downloads one extension from Open VSX (by namespace/name, never a URL from
+   * the renderer), checks its checksum and package, and answers its color
+   * themes reduced to the workbench colors the importer reads. Nothing is
+   * saved: the renderer converts and stores the themes with `setAppearance`.
+   */
+  'themes:installOpenVsx': { req: { namespace: string; name: string }; res: OpenVsxThemePackage }
+
   /**
    * Abre (o enfoca, si ya hay una) la ventana didáctica desacoplada (T14,
    * `../main/windows/didactic-window.ts`) sincronizada con `repo`/`number`.
@@ -323,6 +350,10 @@ export const IPC_CHANNELS = [
   'settings:setModelOption',
   'settings:getLanguage',
   'settings:setLanguage',
+  'settings:getAppearance',
+  'settings:setAppearance',
+  'themes:searchOpenVsx',
+  'themes:installOpenVsx',
   'window:openDidactic',
   'updater:getStatus',
   'updater:check',
@@ -388,6 +419,8 @@ interface EventsApi {
   onUpdaterStatus(callback: (payload: UpdaterStatusChangedEvent) => void): () => void
   /** The UI language changed (from any window); same concrete-method pattern. */
   onLanguageChanged(callback: (payload: LanguageChangedEvent) => void): () => void
+  /** The appearance settings changed (from any window); same concrete-method pattern. */
+  onAppearanceChanged(callback: (payload: AppearanceChangedEvent) => void): () => void
 }
 
 export type MinervaApi = InvokeApi & { events: EventsApi }

@@ -18,11 +18,15 @@ import { retargetPullRequest } from '../scm/retarget'
 import { seenStore } from '../scm/seen-store'
 import { openDidacticWindow, refreshDidacticWindowTitle } from '../windows/didactic-window'
 import { getMainLocale, setMainLocale } from '../i18n'
+import { applyNativeAppearance } from '../theme/appearance-service'
+import { createOpenVsxClient } from '../theme/open-vsx'
+import { createFakeOpenVsxFetch } from '../theme/open-vsx-fake'
 import * as updaterService from '../updater/updater'
 import {
   MINERVA_EVENTS,
   type AnalysisActivityItem,
   type AnalysisProgressEvent,
+  type AppearanceChangedEvent,
   type DraftDidacticSection,
   type LanguageChangedEvent,
   type PrListChangedEvent,
@@ -54,6 +58,15 @@ function broadcastLanguageChanged(payload: LanguageChangedEvent): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
       win.webContents.send(MINERVA_EVENTS.languageChanged, payload)
+    }
+  }
+}
+
+/** Pushes the new appearance settings to every open window (main + detached didactic). */
+function broadcastAppearanceChanged(payload: AppearanceChangedEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(MINERVA_EVENTS.appearanceChanged, payload)
     }
   }
 }
@@ -426,6 +439,24 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     broadcastLanguageChanged({ language: req.language })
     return req.language
   })
+
+  handle('settings:getAppearance', () => settingsStore.getAppearance())
+  // Persist (the validator already checked every color), sync the native
+  // theme and window backgrounds, then repaint every window.
+  handle('settings:setAppearance', (req) => {
+    settingsStore.setAppearance(req)
+    applyNativeAppearance()
+    broadcastAppearanceChanged({ appearance: req })
+    return req
+  })
+
+  // Open VSX theme search/install. `MINERVA_MOCK_OPEN_VSX=1` (e2e) answers
+  // from an in-memory registry instead of the network.
+  const openVsx = createOpenVsxClient(
+    process.env.MINERVA_MOCK_OPEN_VSX === '1' ? createFakeOpenVsxFetch() : fetch,
+  )
+  handle('themes:searchOpenVsx', (req) => openVsx.search(req.query, req.sortBy ?? 'relevance'))
+  handle('themes:installOpenVsx', (req) => openVsx.install(req.namespace, req.name))
 
   // Ventana didáctica desacoplada (T14, `../windows/didactic-window.ts`): una
   // sola instancia a la vez, mismo preload/webPreferences que la principal.

@@ -1,0 +1,26 @@
+// A small VS Code color theme used by the theme import tests (made up for
+// Minerva, not copied from any extension). JSONC on purpose: comments and a
+// trailing comma, like real theme files.
+{
+  "name": "Harbor Night",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#0b1622",
+    "editor.foreground": "#d6deeb",
+    "focusBorder": "#f78c6c",
+    "button.background": "#f78c6c",
+    "button.foreground": "#0b1622",
+    "sideBar.background": "#08111b",
+    "sideBar.foreground": "#a8b4c4",
+    "panel.border": "#1d3b53",
+    "editorWidget.background": "#0e1d2c",
+    "descriptionForeground": "#7f8ea3",
+    "editorError.foreground": "#ef5350",
+    "editorWarning.foreground": "#ffca28",
+    "list.activeSelectionBackground": "#1d3b5380",
+    /* Ignored by the importer, and must never reach CSS: */
+    "statusBar.background": "url(https://example.invalid/x.png)",
+    "editor.lineHighlightBackground": "red; background: url(x)",
+  },
+  "tokenColors": [{ "scope": "comment", "settings": { "foreground": "#637777" } }],
+}

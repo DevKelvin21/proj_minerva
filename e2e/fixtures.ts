@@ -77,6 +77,9 @@ export async function launchMinerva(
     // `updater.spec.ts` vía `opts.env`) se resuelve ANTES que este kill switch
     // en `initUpdater()` (`main/updater/updater.ts`), así que no se pisan.
     MINERVA_UPDATER: 'off',
+    // Open VSX theme search/install answers from main's in-memory registry
+    // (`src/main/theme/open-vsx-fake.ts`): e2e never touches open-vsx.org.
+    MINERVA_MOCK_OPEN_VSX: '1',
     MINERVA_USER_DATA_DIR: userDataDir,
     // Terminals hosted inside an Electron app (VS Code, T3 Code…) export this, and it
     // turns the spawned Electron into plain Node ("does not provide an export named

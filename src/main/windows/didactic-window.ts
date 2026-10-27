@@ -23,6 +23,7 @@ import { buildDidacticHash } from '../../shared/didactic-route'
 import { mt } from '../i18n'
 import { secureWebPreferences } from './secure-web-preferences'
 import { installExternalLinkGuard } from './external-link-guard'
+import { currentWindowBackground } from '../theme/appearance-service'
 
 const DIDACTIC_WINDOW_WIDTH = 1000
 const DIDACTIC_WINDOW_HEIGHT = 900
@@ -79,7 +80,7 @@ export function openDidacticWindow(repo: RepoRef, number: number, title: string)
     minWidth: DIDACTIC_WINDOW_MIN_WIDTH,
     minHeight: DIDACTIC_WINDOW_MIN_HEIGHT,
     show: false,
-    backgroundColor: '#1a1d23',
+    backgroundColor: currentWindowBackground(),
     title: windowTitleFor(repo, number),
     webPreferences: secureWebPreferences(),
   })

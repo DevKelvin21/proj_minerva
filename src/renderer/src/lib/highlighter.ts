@@ -35,6 +35,8 @@
 import { createHighlighterCore, type HighlighterCore, type LanguageRegistration } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import githubDarkDefault from '@shikijs/themes/github-dark-default'
+import githubLightDefault from '@shikijs/themes/github-light-default'
+import type { CSSProperties } from 'react'
 import typescript from '@shikijs/langs/typescript'
 import tsx from '@shikijs/langs/tsx'
 import javascript from '@shikijs/langs/javascript'
@@ -52,7 +54,12 @@ import diff from '@shikijs/langs/diff'
 import python from '@shikijs/langs/python'
 import toml from '@shikijs/langs/toml'
 
-export const SHIKI_THEME = 'github-dark-default'
+/**
+ * Every token is colored for both appearances at once (Shiki's multi-theme
+ * tokens): the span carries `--shiki-light` / `--shiki-dark` and `styles.css`
+ * picks one by `data-appearance`, so switching themes never re-tokenizes.
+ */
+export const SHIKI_THEMES = { light: 'github-light-default', dark: 'github-dark-default' } as const
 
 const SUPPORTED_LANGS = [
   'typescript',
@@ -149,7 +156,7 @@ let highlighterPromise: Promise<HighlighterCore> | null = null
 export function getHighlighter(): Promise<HighlighterCore> {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighterCore({
-      themes: [githubDarkDefault],
+      themes: [githubDarkDefault, githubLightDefault],
       langs: SUPPORTED_LANGS.map((lang) => LANG_MODULES[lang]),
       engine: createJavaScriptRegexEngine(),
     })
@@ -159,7 +166,29 @@ export function getHighlighter(): Promise<HighlighterCore> {
 
 export interface HighlightToken {
   content: string
-  color?: string
+  light?: string
+  dark?: string
+}
+
+/** Inline style for a token span (custom properties only; paired with the `shiki-token` class). */
+export function tokenStyle(token: HighlightToken): CSSProperties | undefined {
+  if (!token.light && !token.dark) return undefined
+  return { '--shiki-light': token.light, '--shiki-dark': token.dark } as CSSProperties
+}
+
+export function tokenClass(token: HighlightToken): string | undefined {
+  return token.light || token.dark ? 'shiki-token' : undefined
+}
+
+function toHighlightToken(token: {
+  content: string
+  variants: Record<string, { color?: string }>
+}): HighlightToken {
+  return {
+    content: token.content,
+    light: token.variants.light?.color,
+    dark: token.variants.dark?.color,
+  }
 }
 
 /**
@@ -175,10 +204,10 @@ export async function highlightLine(
 
   const highlighter = await getHighlighter()
   try {
-    const tokenLines = highlighter.codeToTokensBase(content, { lang, theme: SHIKI_THEME })
+    const tokenLines = highlighter.codeToTokensWithThemes(content, { lang, themes: SHIKI_THEMES })
     const tokens = tokenLines[0] ?? []
     if (tokens.length === 0) return [{ content }]
-    return tokens.map((token) => ({ content: token.content, color: token.color }))
+    return tokens.map(toHighlightToken)
   } catch {
     // Contenido no tokenizable (p. ej. gramática que no soporta el fragmento
     // aislado) — se degrada a texto plano en vez de romper la vista de diff.
@@ -204,12 +233,10 @@ export async function highlightCode(
 
   const highlighter = await getHighlighter()
   try {
-    const tokenLines = highlighter.codeToTokensBase(code, { lang, theme: SHIKI_THEME })
+    const tokenLines = highlighter.codeToTokensWithThemes(code, { lang, themes: SHIKI_THEMES })
     if (tokenLines.length === 0) return toPlainLines(code)
     return tokenLines.map((line) =>
-      line.length === 0
-        ? [{ content: '' }]
-        : line.map((token) => ({ content: token.content, color: token.color })),
+      line.length === 0 ? [{ content: '' }] : line.map(toHighlightToken),
     )
   } catch {
     // Código raro que la gramática no puede tokenizar completo — se degrada

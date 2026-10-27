@@ -23,8 +23,8 @@ export interface DiffBodyProps {
 }
 
 export const KIND_BG: Partial<Record<DiffLineKind, string>> = {
-  add: 'bg-[#1d3a28]',
-  del: 'bg-[#3f1d24]',
+  add: 'bg-diff-add',
+  del: 'bg-diff-del',
 }
 
 /** Gutter marker for rows inside a thread's range, and the focused thread's highlight. */

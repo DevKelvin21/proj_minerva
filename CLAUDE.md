@@ -101,6 +101,29 @@ author's Spanish logs, not maintained)
 - Network/AI errors: visible loading and error state, never a silent throw. Show IPC errors
   with `errorText()` (`renderer/src/lib/error-text.ts`: drops Electron's wrapper and `[SCM:CODE]`).
 
+### Themes (Settings → Appearance)
+
+- Ported from T3 Code (MIT, `THIRD_PARTY_NOTICES.md`): T3 Code's color roles and built-in
+  palettes plus a Minerva palette (the default). Pure engine in `src/shared/theme/`
+  (strict color parser `color.ts`, `themes.ts`, `appearance.ts` = settings shape/validation/
+  resolution, `library.ts`, VS Code import). Saved in settings.json `appearance` via
+  `settings:getAppearance`/`setAppearance` + `appearanceChanged` push (like language); main
+  syncs `nativeTheme.themeSource` and window backgrounds (`main/theme/appearance-service.ts`).
+- **Never hard-code a color in the renderer.** Use the Tailwind tokens (`bg-bg`, `bg-panel`,
+  `text-text`, `text-muted`, `border-border`, `bg-code-bg`, `text-accent`, `text-accent-fg`
+  on accent fills, `text-success|danger|warning|merged|info`, `bg-diff-add|del`); they point
+  at `--theme-*` vars set on `<html>` (`styles.css`). Light/dark-only CSS keys off
+  `:root[data-appearance]`. Shiki tokens carry both colors (`tokenClass`/`tokenStyle`).
+  Mermaid re-renders with `theme/mermaid-theme.ts`; C4's hard-coded `#444444` is recolored.
+- Every theme color is untrusted: it must pass `toCanonicalThemeColor` (renderer) /
+  `isCanonicalThemeColor` (main validator) before it becomes a CSS value.
+- No flash on boot: `public/theme-boot.js` (classic same-origin script, no CSP change)
+  re-applies the localStorage boot cache; settings.json stays the source of truth.
+  `styles.css` defaults must equal the Minerva theme (unit test).
+- Open VSX: network + .vsix parsing in main only (`main/theme/open-vsx.ts`: open-vsx.org and
+  its CDN, byte caps, sha256, in-memory zip checks). `MINERVA_MOCK_OPEN_VSX=1` (set by the
+  e2e fixture) serves an in-memory registry; e2e never hits the network.
+
 ### UI text / i18n
 
 - English is the default; Spanish is the translation. The language lives in settings.json
@@ -144,6 +167,7 @@ author's Spanish logs, not maintained)
 - `npm run build | typecheck | lint | test`; `npm run verify` = typecheck + lint + test (the CI `checks` gate).
 - `npm run test:e2e` — build + Playwright (built app, mocks, isolated userData per test).
 - `MINERVA_MOCK=1` mock PRs + real AI · `MINERVA_MOCK=1 MINERVA_MOCK_AI=1` fully deterministic.
+- `MINERVA_MOCK_OPEN_VSX=1` in-memory Open VSX registry for theme search/install.
 - `MINERVA_MOCK_GH_AUTH` / `MINERVA_MOCK_AZURE_AUTH` = `signed_in|unauthenticated|cli_unavailable`
   (mock only): force a provider's auth state. The `gh` probe is real even in mock mode, so e2e
   that assert GitHub's header/sign-in state must set `MINERVA_MOCK_GH_AUTH` (`provider-aware.spec.ts`).

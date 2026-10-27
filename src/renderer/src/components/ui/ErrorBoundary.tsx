@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 {message}
               </pre>
               <button
-                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-bg transition-colors hover:opacity-90"
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg transition-colors hover:opacity-90"
                 onClick={() => this.setState({ error: null })}
               >
                 {t('errors.boundary.retry')}

@@ -14,8 +14,8 @@ interface SuggestionDiffProps {
 
 const ROW_CLASS = {
   context: 'text-text/80',
-  del: 'bg-[#3f1d24] text-text',
-  add: 'bg-[#1d3a28] text-text',
+  del: 'bg-diff-del text-text',
+  add: 'bg-diff-add text-text',
 } as const
 
 const ROW_MARK = { context: ' ', del: '-', add: '+' } as const

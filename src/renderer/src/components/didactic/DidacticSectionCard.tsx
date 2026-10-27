@@ -29,7 +29,7 @@ export function DidacticSectionCard({
   const { t } = useTranslation()
   return (
     <section className="rounded-md border border-border bg-bg">
-      <header className="flex items-center justify-between gap-1.5 border-b border-border bg-white/[0.04] px-3 py-2 text-sm font-semibold text-text">
+      <header className="flex items-center justify-between gap-1.5 border-b border-border bg-border/20 px-3 py-2 text-sm font-semibold text-text">
         <span className="flex items-center gap-1.5">
           <span className="text-accent" aria-hidden>
             {icon}

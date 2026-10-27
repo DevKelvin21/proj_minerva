@@ -4,6 +4,7 @@ import {
   MINERVA_EVENTS,
   type AnalysisActivityItem,
   type AnalysisProgressEvent,
+  type AppearanceChangedEvent,
   type LanguageChangedEvent,
   type PrChange,
   type PrListChangedEvent,
@@ -190,6 +191,36 @@ function onLanguageChanged(callback: (payload: LanguageChangedEvent) => void): (
   return () => ipcRenderer.removeListener(MINERVA_EVENTS.languageChanged, listener)
 }
 
+/**
+ * `appearanceChanged` must carry an object with the top-level shape of
+ * `AppearanceSettings`; main validated every color before saving, and the
+ * renderer re-sanitizes before painting (defense in depth).
+ */
+function isAppearanceChangedPayload(value: unknown): value is AppearanceChangedEvent {
+  if (typeof value !== 'object' || value === null) return false
+  const appearance = (value as Record<string, unknown>).appearance
+  if (typeof appearance !== 'object' || appearance === null) return false
+  const a = appearance as Record<string, unknown>
+  return (
+    (a.mode === 'system' || a.mode === 'light' || a.mode === 'dark') &&
+    typeof a.lightTheme === 'string' &&
+    typeof a.darkTheme === 'string' &&
+    typeof a.contrast === 'number' &&
+    Array.isArray(a.customThemes)
+  )
+}
+
+/** Appearance changes (`settings:setAppearance` from any window). Hardcoded channel, payload guard. */
+function onAppearanceChanged(callback: (payload: AppearanceChangedEvent) => void): () => void {
+  const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+    if (isAppearanceChangedPayload(payload)) {
+      callback(payload)
+    }
+  }
+  ipcRenderer.on(MINERVA_EVENTS.appearanceChanged, listener)
+  return () => ipcRenderer.removeListener(MINERVA_EVENTS.appearanceChanged, listener)
+}
+
 const minervaApi = {
   system: {
     ping: invoke('minerva:ping'),
@@ -228,6 +259,12 @@ const minervaApi = {
     setModelOption: invoke('settings:setModelOption'),
     getLanguage: invoke('settings:getLanguage'),
     setLanguage: invoke('settings:setLanguage'),
+    getAppearance: invoke('settings:getAppearance'),
+    setAppearance: invoke('settings:setAppearance'),
+  },
+  themes: {
+    searchOpenVsx: invoke('themes:searchOpenVsx'),
+    installOpenVsx: invoke('themes:installOpenVsx'),
   },
   window: {
     openDidactic: invoke('window:openDidactic'),
@@ -244,6 +281,7 @@ const minervaApi = {
     onPrListChanged,
     onUpdaterStatus,
     onLanguageChanged,
+    onAppearanceChanged,
   },
 } satisfies MinervaApi
 
