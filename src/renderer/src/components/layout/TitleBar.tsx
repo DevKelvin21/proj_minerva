@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { GraduationCap, PanelLeft, Search, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
-import { useConnectionStatus } from '../../hooks/use-connection-status'
-import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { sidebarIsDrawer } from '../../lib/layout'
 import { useSettings } from '../../hooks/use-settings'
@@ -11,7 +9,7 @@ import { useUpdater } from '../../hooks/use-updater'
 import { getModelOption } from '../../../../shared/ai-providers'
 import { resolveModelHintLabels } from '../../lib/model-labels'
 import { IconButton } from '../ui/IconButton'
-import { Badge } from '../ui/Badge'
+import { ScmAuthChips, ScmConnectionIndicator, type AuthChipDensity } from './ScmAuthChips'
 
 /**
  * Chip resumen "Proveedor · Modelo" en el engrane de Settings (T63, F12):
@@ -111,83 +109,16 @@ function SettingsChip({ compact }: { compact: boolean }): React.JSX.Element {
   )
 }
 
-/** CLI command shown and copied verbatim (not translated). */
-const GH_LOGIN_COMMAND = 'gh auth login'
-
-/**
- * GitHub auth chip, from `scm:getAuthStatus` (the `gh` token bridge):
- * - `signed_in`: login + discreet "via GitHub CLI" badge + Settings shortcut
- *   (there is no sign-out: the session belongs to `gh`, not Minerva).
- * - `cli_unavailable`: `gh` not on PATH — short text + Settings button.
- * - `cli_unauthenticated`: copyable `gh auth login` chip + spinner; the
- *   declarative poll in `use-scm-auth.ts` notices when the user finishes the
- *   login in a terminal.
- * Azure DevOps gets its own chip in Phase 2; today it's always `disabled`.
- */
-function AuthControls(): React.JSX.Element | null {
-  const { t } = useTranslation()
-  const { statuses } = useScmAuth()
-  const openSettings = useAppStore((s) => s.openSettings)
-  const status = statuses?.github
-
-  if (status === undefined || status.state === 'disabled') return null
-
-  if (status.state === 'signed_in') {
-    return (
-      <div className="flex min-w-0 items-center gap-2 text-xs">
-        <span className="max-w-[120px] truncate text-text">{status.user?.login}</span>
-        <Badge tone="neutral">{t('layout.auth.viaGhCli')}</Badge>
-        <IconButton
-          icon={<Settings size={13} />}
-          label={t('layout.auth.managedByGhCli')}
-          onClick={openSettings}
-        />
-      </div>
-    )
-  }
-
-  if (status.state === 'cli_unavailable') {
-    return (
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-muted">{t('layout.auth.ghCliNotFound')}</span>
-        <button
-          type="button"
-          onClick={openSettings}
-          className="rounded-md border border-border px-2 py-1 text-muted transition-colors duration-150 hover:border-accent hover:text-text"
-        >
-          {t('layout.auth.openSettings')}
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex items-center gap-2 text-xs" title={status.detail}>
-      <span
-        className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"
-        aria-hidden
-      />
-      <button
-        type="button"
-        title={t('layout.auth.copyCommand')}
-        onClick={() => void navigator.clipboard?.writeText(GH_LOGIN_COMMAND).catch(() => {})}
-        className="rounded-md border border-accent/50 bg-accent/10 px-2 py-1 font-mono text-sm font-semibold text-accent transition-colors duration-150 hover:bg-accent/20"
-      >
-        {GH_LOGIN_COMMAND}
-      </button>
-      <span className="text-muted">{t('layout.auth.waitingForSession')}</span>
-    </div>
-  )
-}
-
 /**
  * Barra superior. Divulgación progresiva por tier (F16/T83) — el orden en que
  * se sacrifica el contenido cuando la ventana se angosta al tilearla:
  *
- * 1. `lg`: el TEXTO del estado de conexión (queda el punto de color + title).
+ * 1. `lg`: el TEXTO del estado de conexión (queda el punto de color + title)
+ *    y el badge "via …" de cada proveedor (queda la identidad).
  * 2. `md`: el chip de Settings pierde su texto "Proveedor · Modelo" (queda el
  *    engrane) y aparece el botón de la lista
- *    de PRs (que en ese tier pasa a drawer, ver `Sidebar`).
+ *    de PRs (que en ese tier pasa a drawer, ver `Sidebar`); cada chip de
+ *    proveedor queda en su icono + punto de estado (todo lo demás en el title).
  * 3. `sm`: el buscador colapsa a un icono que despliega el campo sobre la
  *    barra, y el nombre "Minerva" cede el paso al logo.
  *
@@ -202,7 +133,6 @@ export function TitleBar(): React.JSX.Element {
   const toggleDidacticPanel = useAppStore((s) => s.toggleDidacticPanel)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
-  const connectionStatus = useConnectionStatus()
   const tier = useLayoutTier()
   const [searchExpanded, setSearchExpanded] = useState(false)
 
@@ -210,7 +140,8 @@ export function TitleBar(): React.JSX.Element {
   const compact = tier.w === 'md' || tier.w === 'sm'
   const collapseSearch = tier.w === 'sm'
   const showConnectionLabel = tier.w === 'xl'
-  const connectionLabel = t(`layout.titleBar.connection.${connectionStatus}`)
+  const authDensity: AuthChipDensity =
+    tier.w === 'xl' ? 'full' : tier.w === 'lg' ? 'identity' : 'icon'
 
   const searchInput = (
     <input
@@ -283,23 +214,9 @@ export function TitleBar(): React.JSX.Element {
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <SettingsChip compact={compact} />
 
-        <AuthControls />
+        <ScmAuthChips density={authDensity} />
 
-        <span
-          className="flex shrink-0 items-center gap-1.5 text-xs text-muted"
-          title={t('layout.titleBar.connectionTitle', { status: connectionLabel })}
-        >
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              connectionStatus === 'connected'
-                ? 'bg-success'
-                : connectionStatus === 'error'
-                  ? 'bg-danger'
-                  : 'bg-warning'
-            }`}
-          />
-          {showConnectionLabel && connectionLabel}
-        </span>
+        <ScmConnectionIndicator showLabel={showConnectionLabel} />
 
         <IconButton
           icon={<GraduationCap size={16} />}

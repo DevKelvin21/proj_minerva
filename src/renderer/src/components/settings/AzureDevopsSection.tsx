@@ -7,15 +7,8 @@ import type { ScmSettingsInfo } from '../../../../shared/types'
 import { useAzureProjects } from '../../hooks/use-azure-projects'
 import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useScmSettings } from '../../hooks/use-scm-settings'
+import { CREDENTIAL_SOURCE_KEY } from '../../lib/scm-labels'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
-
-/** Key of `settings.azure.credentialSource` per credential source. */
-const CREDENTIAL_SOURCE_KEY = {
-  'gh-cli': 'ghCli',
-  'env-pat': 'envPat',
-  'az-devops-pat': 'azDevopsPat',
-  'az-entra': 'azEntra',
-} as const satisfies Record<NonNullable<ScmAuthStatus['credentialSource']>, string>
 
 /** Auth feedback for Azure DevOps (`AzureScmProvider.getAuthStatus`). */
 function AzureStatusFeedback({
@@ -26,10 +19,11 @@ function AzureStatusFeedback({
   const { t } = useTranslation()
   if (status === undefined) return null
   if (status.state === 'signed_in') {
-    const name =
-      status.user?.displayName ?? status.user?.login ?? t('settings.azure.unknownUser')
+    const name = status.user?.displayName ?? status.user?.login ?? t('settings.azure.unknownUser')
     const who =
-      status.user?.login && status.user.login !== name ? name + ' (' + status.user.login + ')' : name
+      status.user?.login && status.user.login !== name
+        ? name + ' (' + status.user.login + ')'
+        : name
     const via = status.credentialSource
       ? t(`settings.azure.credentialSource.${CREDENTIAL_SOURCE_KEY[status.credentialSource]}`)
       : null
@@ -193,9 +187,7 @@ function AzureSettingsForm({
           </ul>
         )}
         {enabled && orgValid && selected.length === 0 && (
-          <p className="mt-1 text-[11px] text-warning">
-            {t('settings.azure.pickProject')}
-          </p>
+          <p className="mt-1 text-[11px] text-warning">{t('settings.azure.pickProject')}</p>
         )}
       </div>
 

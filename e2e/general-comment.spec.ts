@@ -11,7 +11,8 @@ test('flujo T4: lista → detalle → Archivos → publicar comentario general',
   window,
 }, testInfo) => {
   // Indicador de conexión IPC (ping ok) — check heredado de la suite legacy.
-  await expect(window.getByText('Connected').first()).toBeVisible()
+  // Ping ok; "Partially connected" on a machine without a gh session (GitHub's probe is real).
+  await expect(window.getByTestId('scm-connection')).toHaveText(/^(Connected|Partially connected)$/)
 
   await window.getByText('Add refunds table and migration').first().click()
   await expect(window.getByText('#479').first()).toBeVisible()
