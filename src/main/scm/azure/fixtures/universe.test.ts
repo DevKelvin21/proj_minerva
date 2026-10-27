@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildStacks, flattenStack, type StackInputPr } from '../../stacks'
-import { mapChangeEntry, mapPullRequestSummary, mapThreads } from '../mappers'
+import { mapChangeEntry, mapPullRequestSummary, mapRepo, mapThreads } from '../mappers'
 import { buildPatch } from '../patch-builder'
 import {
   BRANCHES,
@@ -110,14 +110,20 @@ describe('mock universe', () => {
   })
 
   it('covers every thread status, filtering system and deleted items', () => {
-    const threads = mapThreads(THREADS[108])
+    const pr108 = PULL_REQUESTS.find((pr) => pr.pullRequestId === 108)
+    if (!pr108) throw new Error('fixture #108 missing')
+    const threads = mapThreads(THREADS[108], mapRepo(pr108.repository, MOCK_ORG), 108)
     expect(threads.map((t) => t.status).sort()).toEqual(
       ['active', 'by_design', 'closed', 'pending', 'resolved', 'wont_fix'].sort(),
     )
-    expect(threads.find((t) => t.id === 5)?.comments).toHaveLength(1)
-    expect(threads.find((t) => t.id === 3)).toMatchObject({ side: 'LEFT', line: 2 })
-    expect(threads.find((t) => t.id === 1)?.comments.map((c) => c.parentId)).toEqual([null, 1, 1])
-    expect(threads.some((t) => t.id === 7 || t.id === 8)).toBe(false)
+    expect(threads.find((t) => t.id === '5')?.comments).toHaveLength(1)
+    expect(threads.find((t) => t.id === '3')).toMatchObject({ side: 'LEFT', line: 2 })
+    expect(threads.find((t) => t.id === '1')?.comments.map((c) => c.id)).toEqual([
+      '1/1',
+      '1/2',
+      '1/3',
+    ])
+    expect(threads.some((t) => t.id === '7' || t.id === '8')).toBe(false)
   })
 
   it('has states open, merged and closed', () => {

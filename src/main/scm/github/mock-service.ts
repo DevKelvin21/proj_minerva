@@ -11,14 +11,25 @@ import { dirname, join, sep } from 'node:path'
 import type {
   CommentThread,
   DiffFile,
+  FileContentRequest,
   PostCommentRequest,
   PrComment,
   PullRequestDetail,
   PullRequestSummary,
+  SetThreadStatusRequest,
 } from '../../../shared/types'
-import { prKey, type GithubRepoRef, type RepoRef } from '../../../shared/scm'
+import {
+  isThreadOpen,
+  prKey,
+  sameRepo,
+  shortRef,
+  type FileContent,
+  type GithubRepoRef,
+  type RepoRef,
+} from '../../../shared/scm'
 import { ScmError } from '../errors'
 import type { ListPullRequestsQuery, ScmDataSource, SnapshotRequest } from '../provider'
+import type { StackInputPr } from '../stacks'
 import { prFixtures } from './fixtures'
 import { genericSnapshotFixture, snapshotFixturesByRepo } from './fixtures-snapshot'
 import { asGithubRepo } from './repo'
@@ -171,6 +182,104 @@ export class MockGithubService implements ScmDataSource {
     record.detail.commentCount = (record.detail.commentCount ?? 0) + 1
 
     return comment
+  }
+
+  async setThreadStatus(req: SetThreadStatusRequest): Promise<CommentThread> {
+    await delay(LATENCY_MS.postComment)
+    const record = this.getRecord(req.repo, req.number)
+    const thread = record.threads.find((t) => t.id === req.threadId)
+    if (!thread || !thread.isLineThread) {
+      throw new ScmError('NOT_FOUND', 'Comment thread not found: ' + req.threadId)
+    }
+    thread.status = req.status
+    thread.isResolved = !isThreadOpen(req.status)
+    return { ...thread, comments: [...thread.comments] }
+  }
+
+  /**
+   * Head side: the file from the snapshot fixture. Base side: the same text
+   * (the fixtures carry no separate base tree), except for added files,
+   * which do not exist there. Good enough for the demo's context excerpts.
+   */
+  async getFileContent(req: FileContentRequest): Promise<FileContent> {
+    await delay(LATENCY_MS.getPullRequestDetail)
+    const record = this.getRecord(req.repo, req.number)
+    const diffFile = record.files.find((file) => file.path === req.path)
+    if (req.side === 'base' && diffFile?.status === 'added') {
+      throw new ScmError('NOT_FOUND', req.path + ' does not exist at the base commit.')
+    }
+    if (req.side === 'head' && diffFile?.status === 'removed') {
+      throw new ScmError('NOT_FOUND', req.path + ' does not exist at the head commit.')
+    }
+    const files = snapshotFixturesByRepo[req.repo.fullName] ?? genericSnapshotFixture
+    const file = files.find((entry) => entry.path === req.path)
+    if (!file) throw new ScmError('NOT_FOUND', 'File not found: ' + req.path)
+    return { content: file.content, isBinary: false, tooLarge: false }
+  }
+
+  private branchesOf(repo: RepoRef): Set<string> {
+    const branches = new Set<string>(['main'])
+    for (const record of this.records.values()) {
+      if (!sameRepo(record.detail.repo, repo)) continue
+      branches.add(record.detail.headRef)
+      branches.add(record.detail.baseRef)
+    }
+    return branches
+  }
+
+  async branchExists(repo: RepoRef, branch: string): Promise<boolean> {
+    asGithubRepo(repo)
+    return this.branchesOf(repo).has(shortRef(branch))
+  }
+
+  async updatePullRequestBase(
+    repo: RepoRef,
+    number: number,
+    newBase: string,
+  ): Promise<PullRequestSummary> {
+    await delay(LATENCY_MS.postComment)
+    const record = this.getRecord(repo, number)
+    record.detail.baseRef = shortRef(newBase)
+    record.detail.updatedAt = new Date().toISOString()
+    return { ...record.detail }
+  }
+
+  async listStackCandidates(): Promise<StackInputPr[]> {
+    return [...this.records.values()]
+      .filter((record) => record.detail.state === 'open')
+      .map(({ detail }) => ({
+        repo: detail.repo,
+        number: detail.number,
+        title: detail.title,
+        headRef: detail.headRef,
+        baseRef: detail.baseRef,
+        state: detail.state,
+        isDraft: detail.isDraft,
+        createdAt: detail.createdAt,
+      }))
+  }
+
+  async listMergedBySourceBranch(repo: RepoRef, branch: string): Promise<StackInputPr[]> {
+    asGithubRepo(repo)
+    return [...this.records.values()]
+      .filter(
+        ({ detail }) =>
+          detail.state === 'merged' &&
+          sameRepo(detail.repo, repo) &&
+          detail.headRef === shortRef(branch),
+      )
+      .map(({ detail }) => ({
+        repo: detail.repo,
+        number: detail.number,
+        title: detail.title,
+        headRef: detail.headRef,
+        baseRef: detail.baseRef,
+        state: 'merged' as const,
+        isDraft: detail.isDraft,
+        mergedInto: detail.baseRef,
+        createdAt: detail.createdAt,
+        closedAt: detail.updatedAt,
+      }))
   }
 
   /**

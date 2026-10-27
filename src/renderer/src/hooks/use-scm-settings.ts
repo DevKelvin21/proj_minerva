@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ScmSettingsInfo } from '../../../shared/types'
+import type { ScmSettingsInfo, SetProviderSettingsRequest } from '../../../shared/types'
 import { useAppStore } from '../stores/app-store'
 
 function toErrorMessage(error: unknown): string {
@@ -18,9 +18,16 @@ interface UseScmSettingsResult {
    * refresh is best-effort and doesn't affect the result.
    */
   setGithubAccount: (login: string | null) => Promise<boolean>
+  /**
+   * Saves per-provider settings (enabled flags, Azure orgs/projects) via
+   * `scm:setProviderSettings`, then refreshes the auth status so every
+   * consumer (and `usePullRequests`, which refetches on auth changes) sees
+   * the provider turn on/off. `false` on failure (see `error`).
+   */
+  saveProviderSettings: (req: SetProviderSettingsRequest) => Promise<boolean>
 }
 
-/** SCM settings (mock flag, chosen GitHub account), shared through the store. */
+/** SCM settings (mock flag, GitHub account, per-provider settings), shared through the store. */
 export function useScmSettings(): UseScmSettingsResult {
   const info = useAppStore((s) => s.scmSettings)
   const setInfo = useAppStore((s) => s.setScmSettings)
@@ -62,5 +69,24 @@ export function useScmSettings(): UseScmSettingsResult {
     [setInfo, setScmAuth],
   )
 
-  return { info, error, setGithubAccount }
+  const saveProviderSettings = useCallback(
+    async (req: SetProviderSettingsRequest): Promise<boolean> => {
+      setError(null)
+      try {
+        setInfo(await window.minerva.scm.setProviderSettings(req))
+        try {
+          setScmAuth(await window.minerva.scm.getAuthStatus())
+        } catch {
+          // Best-effort, same as above.
+        }
+        return true
+      } catch (err) {
+        setError(toErrorMessage(err))
+        return false
+      }
+    },
+    [setInfo, setScmAuth],
+  )
+
+  return { info, error, setGithubAccount, saveProviderSettings }
 }

@@ -4,7 +4,16 @@
  */
 import type { AnalysisActivityItem, DraftDidacticSection } from './events'
 import type { AiProviderCatalogEntry, AiProviderId } from './ai-providers'
-import type { RepoRef, ReviewerVote, ScmErrorCode, ScmProviderId, ThreadStatus } from './scm'
+import type {
+  FileContentSide,
+  PrStack,
+  RepoRef,
+  ReviewerVote,
+  ScmErrorCode,
+  ScmProviderId,
+  ScmProviderSettings,
+  ThreadStatus,
+} from './scm'
 
 export type { RepoRef } from './scm'
 
@@ -107,6 +116,15 @@ export interface DiffFile {
   /** Unified diff hunks for this file; absent for binaries. Always built in main. */
   patch?: string
   isBinary: boolean
+  /**
+   * Why a text file has no `patch` even though it changed:
+   * - `too_large`: one side is over the per-file cap, or its line diff timed out.
+   * - `diff_budget`: the PR as a whole went over the per-PR diff budget
+   *   (files, bytes or diff time), so later files were listed without a patch.
+   * Absent when there is a patch, for binaries, and for providers that send
+   * their own patch (GitHub).
+   */
+  patchOmitted?: 'too_large' | 'diff_budget'
 }
 
 export interface PrComment {
@@ -151,6 +169,38 @@ export interface PostCommentRequest {
   side?: 'LEFT' | 'RIGHT'
 }
 
+/** Request of `scm:setThreadStatus`. `status` must be in `SETTABLE_THREAD_STATUSES[repo.provider]`. */
+export interface SetThreadStatusRequest {
+  repo: RepoRef
+  number: number
+  threadId: string
+  status: ThreadStatus
+}
+
+/**
+ * Request of `scm:getFileContent`: `path` at the PR's merge base (`base`, what
+ * LEFT-side line numbers refer to) or at its head commit (`head`, RIGHT side).
+ */
+export interface FileContentRequest {
+  repo: RepoRef
+  number: number
+  path: string
+  side: FileContentSide
+}
+
+/**
+ * Request of `scm:retarget`. Branch names are short (`feature/x`). Main
+ * re-checks before writing: the PR is open, its base is still
+ * `expectedCurrentBase` (else `CONFLICT`), `newBase` exists and is not the
+ * PR's own head branch.
+ */
+export interface RetargetRequest {
+  repo: RepoRef
+  number: number
+  expectedCurrentBase: string
+  newBase: string
+}
+
 /** One provider that failed while listing PRs (the others still return items). */
 export interface ScmListError {
   provider: ScmProviderId
@@ -161,6 +211,12 @@ export interface ScmListError {
 /** Response of `scm:listPullRequests`: fan-out over every enabled provider. */
 export interface ListPullRequestsResult {
   items: PullRequestSummary[]
+  errors: ScmListError[]
+}
+
+/** Response of `scm:getStacks`: stacks of every enabled provider; failures land in `errors`. */
+export interface GetStacksResult {
+  stacks: PrStack[]
   errors: ScmListError[]
 }
 
@@ -179,17 +235,32 @@ export interface GhAccount {
 }
 
 /**
- * Source-control settings, returned by `scm:getSettings`/`scm:setGithubAccount`.
+ * Source-control settings, returned by `scm:getSettings`,
+ * `scm:setGithubAccount` and `scm:setProviderSettings`.
  *
- * - `mockScm`: `true` with `MINERVA_MOCK=1` (mock SCM data, the "shopwave"
- *   universe). The renderer needs it to hide the "you need an AI CLI" card:
- *   with mock data the demo works without any AI CLI (via `MockAiService`).
+ * - `mockScm`: `true` with `MINERVA_MOCK=1` (mock SCM data: the "shopwave"
+ *   GitHub universe and the "contoso" Azure DevOps one). The renderer needs it
+ *   to hide the "you need an AI CLI" card: with mock data the demo works
+ *   without any AI CLI (via `MockAiService`).
  * - `githubAccount`: the `gh` login picked by hand, or `null` to follow
  *   `gh`'s active account.
+ * - `providers`: effective per-provider settings (enabled flags, Azure orgs
+ *   and projects). In mock mode Azure always lists the "contoso" universe.
+ * - `azureSettingsSource`: `saved` when the user saved Azure settings;
+ *   `az-cli-defaults` when they come from `az devops configure --defaults`
+ *   (nothing saved yet); `none` when neither exists.
  */
 export interface ScmSettingsInfo {
   mockScm: boolean
   githubAccount: string | null
+  providers: ScmProviderSettings
+  azureSettingsSource: 'saved' | 'az-cli-defaults' | 'none'
+}
+
+/** Request of `scm:setProviderSettings`: each present provider block replaces the saved one. */
+export interface SetProviderSettingsRequest {
+  github?: ScmProviderSettings['github']
+  azure?: ScmProviderSettings['azure']
 }
 
 /** Panel didáctico: cada sección se autodescribe con un `kind` discriminante. */

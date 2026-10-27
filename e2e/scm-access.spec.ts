@@ -3,8 +3,8 @@ import type { Page } from './fixtures'
 
 /**
  * Source-control access. GitHub goes through the `gh` CLI token bridge only
- * (the OAuth device flow is gone); Azure DevOps is not implemented yet and
- * must report `disabled`.
+ * (the OAuth device flow is gone). Azure DevOps runs on its mock here
+ * (`azure-mock.spec.ts` covers it): signed in, org "contoso".
  *
  * With MINERVA_MOCK=1 the DATA is mock but the `gh` probe is REAL
  * (gh-cli-auth.ts: resolveCliPath + execFile + GET /user), so state checks
@@ -28,13 +28,24 @@ const openSettingsModal = async (page: Page) => {
 
 const card = (page: Page, label: string) => page.locator('button', { hasText: label }).first()
 
-test('gh-only GitHub access, Azure disabled, and the account picker', async ({
+test('gh-only GitHub access, Azure mock signed in, and the account picker', async ({
   window,
 }, testInfo) => {
   // 1. Contract: SCM settings expose the mock flag and the chosen account;
   //    the OAuth channels no longer exist.
   const initial = await window.evaluate(() => window.minerva.scm.getSettings())
-  expect(initial).toEqual({ mockScm: true, githubAccount: null })
+  expect(initial).toEqual({
+    mockScm: true,
+    githubAccount: null,
+    providers: {
+      github: { enabled: true },
+      azure: {
+        enabled: true,
+        organizations: [{ organization: 'contoso', projects: ['Platform'] }],
+      },
+    },
+    azureSettingsSource: 'none',
+  })
   const legacyChannels = await window.evaluate(() => ({
     auth: 'auth' in window.minerva,
     github: 'github' in window.minerva,
@@ -44,14 +55,14 @@ test('gh-only GitHub access, Azure disabled, and the account picker', async ({
     github: false,
   })
 
-  // 2. scm:getAuthStatus: GitHub on the gh branch, Azure disabled, no tokens.
+  // 2. scm:getAuthStatus: GitHub on the gh branch, Azure mock signed in, no tokens.
   const auth = await window.evaluate(() => window.minerva.scm.getAuthStatus())
   expect(auth.github.provider).toBe('github')
   expect(
     ['signed_in', 'cli_unavailable', 'cli_unauthenticated'],
     'valid gh state (real probe on this machine)',
   ).toContain(auth.github.state)
-  expect(auth.azure).toEqual({ provider: 'azure', state: 'disabled' })
+  expect(auth.azure).toMatchObject({ provider: 'azure', state: 'signed_in' })
   expect(JSON.stringify(auth), 'auth status NEVER carries a token').not.toMatch(/gh[pousr]_/)
 
   // 3. Settings "Source control": gh guide, probe feedback, picker, Azure line.
@@ -63,7 +74,9 @@ test('gh-only GitHub access, Azure disabled, and the account picker', async ({
     window.getByText(/via gh|GitHub CLI not found|No gh session|has no valid session/).first(),
     'real probe feedback',
   ).toBeVisible()
-  await expect(window.getByText('Azure DevOps: not configured')).toBeVisible()
+  await expect(window.getByTestId('azure-devops-settings')).toContainText(
+    'Signed in as Ada Lovelace',
+  )
   await expect(card(window, 'gh active account'), 'default marked Active').toContainText('Active')
   await attachScreenshot(window, testInfo, 'scm-access-settings')
 

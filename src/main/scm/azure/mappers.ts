@@ -1,14 +1,13 @@
 /**
- * Pure mappers from Azure DevOps wire types (`./api-types.ts`) to
- * provider-neutral shapes. The output interfaces here are LOCAL and minimal,
- * mirroring the planned neutral types; Phase 2 adapts them to the final
- * `shared/` types once the SCM layer refactor lands.
+ * Pure mappers from Azure DevOps wire types (`./api-types.ts`) to the
+ * provider-neutral shapes of `shared/types.ts`.
  *
  * Paths: Azure returns repo paths with a leading `/` (`/src/a.ts`); GitHub
  * (and the renderer) use `src/a.ts`. Every path leaving this module is
- * normalized with `toRepoPath`.
+ * normalized with `toRepoPath`; `toAzurePath` goes the other way.
  */
 import {
+  isThreadOpen,
   prKey,
   prWebUrl,
   shortRef,
@@ -17,94 +16,65 @@ import {
   type ThreadStatus,
 } from '../../../shared/scm'
 import type {
+  CiStatus,
+  CommentThread,
+  PrComment,
+  PrReviewer,
+  PullRequestState,
+  PullRequestSummary,
+  ReviewDecision,
+  UserRef,
+} from '../../../shared/types'
+import type {
   AzChangeEntry,
   AzComment,
   AzGitRepository,
   AzIdentityRef,
+  AzPolicyEvaluation,
   AzPullRequest,
   AzPullRequestStatus,
+  AzPullRequestStatusEntry,
   AzReviewer,
   AzThread,
   AzThreadStatus,
 } from './api-types'
 
-export interface AzureUserLite {
-  /** Unique name (usually the email); falls back to the display name. */
-  login: string
-  displayName: string
-  id: string
-  avatarUrl?: string
-}
-
-export interface AzureReviewerLite extends AzureUserLite {
-  vote: ReviewerVote
-  isRequired: boolean
-  /** A group/team added as reviewer, not a person. */
-  isGroup: boolean
-}
-
-export interface AzurePrSummaryLite {
-  /** `prKey(repo, number)` */
-  id: string
-  number: number
-  title: string
-  author: { login: string; displayName: string }
-  repo: AzureRepoRef
-  state: 'open' | 'closed' | 'merged'
-  isDraft: boolean
-  createdAt: string
-  updatedAt: string
-  headRef: string
-  baseRef: string
-  /** `lastMergeSourceCommit.commitId`; `null` while Azure has not computed it. */
-  headSha: string | null
-  webUrl: string
-  reviewers: AzureReviewerLite[]
-}
-
-export interface AzureCommentLite {
-  id: number
-  /** `null` for the first comment of a thread. */
-  parentId: number | null
-  author: AzureUserLite
-  body: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface AzureThreadLite {
-  id: number
-  status: ThreadStatus
-  /** Anchored to a line range (vs. file-level or PR-level). */
-  isLineThread: boolean
-  /** Repo-relative path; `null` for PR-level threads. */
-  path: string | null
-  line: number | null
-  lineEnd: number | null
-  /** RIGHT = head (new) side, LEFT = base (old) side. */
-  side: 'LEFT' | 'RIGHT' | null
-  /** Iteration pair the line numbers refer to (see Phase 2 notes on line drift). */
-  iteration: { first: number; second: number } | null
-  changeTrackingId: number | null
-  createdAt: string
-  updatedAt: string
-  comments: AzureCommentLite[]
-}
-
 export type AzureFileStatus = 'added' | 'removed' | 'modified' | 'renamed'
 
-export interface AzureChangeLite {
+/** One changed file of an iteration, with the blob ids the patch is built from (provider-internal). */
+export interface AzureChange {
   path: string
   previousPath: string | null
   status: AzureFileStatus
   /** Blob ids. `null` on the missing side (add/delete). */
   baseObjectId: string | null
   headObjectId: string | null
+  /** Stable per-file id across iterations; required to post a line comment. */
   changeTrackingId: number
+}
+
+/**
+ * Where a thread is anchored, beyond what `CommentThread` exposes. Used by the
+ * provider to decide `isOutdated` (see `isThreadOutdated`).
+ */
+export interface AzureThreadAnchor {
+  /** Iteration pair the thread was created against (`null` for PR-level threads). */
+  iteration: { first: number; second: number } | null
+  changeTrackingId: number | null
+  /**
+   * True when the server re-tracked the thread's position onto the iteration
+   * we asked for (`threads?$iteration=N` answers `trackingCriteria`).
+   */
+  tracked: boolean
 }
 
 export function toRepoPath(path: string): string {
   return path.replace(/^\/+/, '')
+}
+
+/** `src/a.ts` -> `/src/a.ts` (what Azure expects in `threadContext.filePath` and `items?path=`). */
+export function toAzurePath(path: string): string {
+  return '/' + toRepoPath(path)
 }
 
 export function mapRepo(repo: AzGitRepository, organization: string): AzureRepoRef {
@@ -118,15 +88,16 @@ export function mapRepo(repo: AzGitRepository, organization: string): AzureRepoR
   }
 }
 
-export function mapUser(identity: AzIdentityRef | undefined | null): AzureUserLite {
-  if (!identity) return { login: 'unknown', displayName: 'Unknown', id: '' }
-  const user: AzureUserLite = {
+/**
+ * No `avatarUrl`: Azure's `imageUrl` needs the credential, and the renderer
+ * must never get one, so the UI falls back to initials.
+ */
+export function mapUser(identity: AzIdentityRef | undefined | null): UserRef {
+  if (!identity) return { login: 'unknown', displayName: 'Unknown' }
+  return {
     login: identity.uniqueName || identity.displayName || identity.id,
     displayName: identity.displayName || identity.uniqueName || identity.id,
-    id: identity.id,
   }
-  if (identity.imageUrl) user.avatarUrl = identity.imageUrl
-  return user
 }
 
 /** 10 approved, 5 with suggestions, 0 none, -5 waiting for author, -10 rejected. */
@@ -138,16 +109,31 @@ export function mapVote(vote: number): ReviewerVote {
   return 'none'
 }
 
-export function mapReviewer(reviewer: AzReviewer): AzureReviewerLite {
+export function mapReviewer(reviewer: AzReviewer): PrReviewer {
   return {
-    ...mapUser(reviewer),
+    user: mapUser(reviewer),
     vote: mapVote(reviewer.vote),
     isRequired: reviewer.isRequired === true,
-    isGroup: reviewer.isContainer === true,
   }
 }
 
-export function mapPrState(status: AzPullRequestStatus): 'open' | 'closed' | 'merged' {
+/**
+ * Overall review decision from the votes (Azure has no single field):
+ * any "waiting for author" / "rejected" vote -> `changes_requested`; a
+ * required reviewer without an approval -> `review_required`; at least one
+ * approval -> `approved`; no votes at all -> `null`.
+ */
+export function mapReviewDecision(reviewers: AzReviewer[] | undefined): ReviewDecision {
+  const list = reviewers ?? []
+  if (list.some((reviewer) => reviewer.vote < 0)) return 'changes_requested'
+  if (list.some((reviewer) => reviewer.isRequired === true && reviewer.vote <= 0)) {
+    return 'review_required'
+  }
+  if (list.some((reviewer) => reviewer.vote > 0)) return 'approved'
+  return null
+}
+
+export function mapPrState(status: AzPullRequestStatus): PullRequestState {
   if (status === 'completed') return 'merged'
   if (status === 'abandoned') return 'closed'
   return 'open'
@@ -181,48 +167,99 @@ export function threadStatusToAzure(status: ThreadStatus): Exclude<AzThreadStatu
   return THREAD_STATUS_TO_AZURE[status]
 }
 
-function latest(dates: (string | undefined | null)[]): string {
-  let best = ''
+/** Latest of a set of ISO dates, normalized to `toISOString()` (`''` if none parses). */
+export function latestDate(dates: (string | undefined | null)[]): string {
   let bestTime = -Infinity
   for (const date of dates) {
     if (!date) continue
     const t = Date.parse(date)
-    if (Number.isFinite(t) && t > bestTime) {
-      best = date
-      bestTime = t
-    }
+    if (Number.isFinite(t) && t > bestTime) bestTime = t
   }
-  return best
+  return Number.isFinite(bestTime) ? new Date(bestTime).toISOString() : ''
 }
 
 /**
  * @param activityDates extra timestamps known to the caller (latest
- *   iteration `createdDate`, threads' `lastUpdatedDate`): Azure's PR object
- *   has no `updatedAt`, so it is derived as the max of everything we know.
+ *   iteration `createdDate`, the time a change was observed): Azure's PR
+ *   object has no `updatedAt`, so it is derived as the max of everything we
+ *   know. Always normalized ISO, so the seen-store's string compare is sound.
  */
 export function mapPullRequestSummary(
   pr: AzPullRequest,
   organization: string,
   activityDates: (string | undefined | null)[] = [],
-): AzurePrSummaryLite {
+): PullRequestSummary {
   const repo = mapRepo(pr.repository, organization)
-  const author = mapUser(pr.createdBy)
+  const createdAt = latestDate([pr.creationDate]) || pr.creationDate
   return {
+    // `prKey`: globally unique even across organizations (a bare number is not).
     id: prKey(repo, pr.pullRequestId),
     number: pr.pullRequestId,
     title: pr.title,
-    author: { login: author.login, displayName: author.displayName },
+    author: mapUser(pr.createdBy),
     repo,
     state: mapPrState(pr.status),
     isDraft: pr.isDraft === true,
-    createdAt: pr.creationDate,
-    updatedAt: latest([pr.creationDate, pr.closedDate, ...activityDates]) || pr.creationDate,
+    createdAt,
+    updatedAt: latestDate([pr.creationDate, pr.closedDate, ...activityDates]) || createdAt,
     headRef: shortRef(pr.sourceRefName),
     baseRef: shortRef(pr.targetRefName),
-    headSha: pr.lastMergeSourceCommit?.commitId ?? null,
+    headSha: pr.lastMergeSourceCommit?.commitId ?? '',
     webUrl: prWebUrl(repo, pr.pullRequestId),
-    reviewers: (pr.reviewers ?? []).map(mapReviewer),
+    commentCount: null,
+    reviewDecision: mapReviewDecision(pr.reviewers),
+    ciStatus: null,
+    additions: null,
+    deletions: null,
+    changedFiles: null,
   }
+}
+
+/**
+ * CI status from PR statuses (latest per context) and policy evaluations
+ * (blocking + enabled only; "required reviewers" style policies are not CI
+ * and are skipped by type name). Failure beats pending beats success.
+ */
+export function mapCiStatus(
+  statuses: AzPullRequestStatusEntry[],
+  evaluations: AzPolicyEvaluation[],
+): CiStatus {
+  const states: ('success' | 'failure' | 'pending')[] = []
+
+  const latestByContext = new Map<string, AzPullRequestStatusEntry>()
+  for (const status of statuses) {
+    const key = (status.context.genre ?? '') + '/' + status.context.name
+    const current = latestByContext.get(key)
+    const time = Date.parse(status.updatedDate ?? status.creationDate ?? '') || 0
+    const currentTime = current
+      ? Date.parse(current.updatedDate ?? current.creationDate ?? '') || 0
+      : -1
+    if (!current || time > currentTime || (time === currentTime && status.id > current.id)) {
+      latestByContext.set(key, status)
+    }
+  }
+  for (const status of latestByContext.values()) {
+    if (status.state === 'succeeded') states.push('success')
+    else if (status.state === 'failed' || status.state === 'error') states.push('failure')
+    else if (status.state === 'pending') states.push('pending')
+  }
+
+  for (const evaluation of evaluations) {
+    const config = evaluation.configuration
+    if (!config.isEnabled || !config.isBlocking) continue
+    const typeName = config.type.displayName.toLowerCase()
+    if (!/build|status/.test(typeName)) continue
+    if (evaluation.status === 'approved') states.push('success')
+    else if (evaluation.status === 'rejected' || evaluation.status === 'broken')
+      states.push('failure')
+    else if (evaluation.status === 'queued' || evaluation.status === 'running')
+      states.push('pending')
+  }
+
+  if (states.includes('failure')) return 'failure'
+  if (states.includes('pending')) return 'pending'
+  if (states.includes('success')) return 'success'
+  return null
 }
 
 function isUserComment(comment: AzComment): boolean {
@@ -233,31 +270,90 @@ function isUserComment(comment: AzComment): boolean {
   )
 }
 
-function mapComment(comment: AzComment): AzureCommentLite {
+/** Azure comment ids are per thread (1, 2, ...): the neutral id carries both. */
+export function commentKey(threadId: number, commentId: number): string {
+  return threadId + '/' + commentId
+}
+
+/** Web URL of a thread (Azure deep-links a discussion with `?discussionId=`). */
+export function threadWebUrl(repo: AzureRepoRef, prNumber: number, threadId: number): string {
+  return prWebUrl(repo, prNumber) + '?discussionId=' + threadId
+}
+
+export function mapComment(
+  comment: AzComment,
+  threadId: number,
+  repo: AzureRepoRef,
+  prNumber: number,
+): PrComment {
   return {
-    id: comment.id,
-    parentId: comment.parentCommentId > 0 ? comment.parentCommentId : null,
+    id: commentKey(threadId, comment.id),
     author: mapUser(comment.author),
-    body: comment.content ?? '',
-    createdAt: comment.publishedDate,
-    updatedAt: comment.lastContentUpdatedDate || comment.lastUpdatedDate || comment.publishedDate,
+    bodyMarkdown: comment.content ?? '',
+    createdAt: latestDate([comment.publishedDate]) || comment.publishedDate,
+    isMinimized: false,
+    htmlUrl: threadWebUrl(repo, prNumber, threadId),
   }
+}
+
+export function threadAnchor(thread: AzThread): AzureThreadAnchor {
+  const prContext = thread.pullRequestThreadContext ?? null
+  return {
+    iteration: prContext?.iterationContext
+      ? {
+          first: prContext.iterationContext.firstComparingIteration,
+          second: prContext.iterationContext.secondComparingIteration,
+        }
+      : null,
+    changeTrackingId: prContext?.changeTrackingId ?? null,
+    tracked: Boolean(prContext?.trackingCriteria),
+  }
+}
+
+/**
+ * Outdated rule (Azure has no `isOutdated` flag). A LINE thread is outdated
+ * when BOTH hold:
+ * 1. it was created against an older iteration than the latest one
+ *    (`iterationContext.secondComparingIteration < latestIteration`), and
+ * 2. its line can't be trusted on the latest diff: the server did NOT
+ *    re-track it (we read threads with `$iteration=latest`, and Azure answers
+ *    `trackingCriteria` when it moved the anchor onto that iteration), or the
+ *    file is no longer part of the latest changes.
+ * File-level and PR-level threads are never outdated.
+ */
+export function isThreadOutdated(
+  thread: CommentThread,
+  anchor: AzureThreadAnchor,
+  latestIteration: number | null,
+  latestPaths: ReadonlySet<string> | null,
+): boolean {
+  if (!thread.isLineThread || !anchor.iteration || latestIteration === null) return false
+  if (anchor.iteration.second >= latestIteration) return false
+  if (latestPaths && thread.path && !latestPaths.has(thread.path)) return true
+  return !anchor.tracked
 }
 
 /**
  * Maps one thread, or returns `null` for what a reviewer should not see as a
  * conversation: deleted threads, and system threads (vote changes, pushes,
  * policy updates) which only carry `commentType: 'system'` comments.
+ * `isOutdated` is left to the caller (it needs the latest iteration).
  */
-export function mapThread(thread: AzThread): AzureThreadLite | null {
+export function mapThread(
+  thread: AzThread,
+  repo: AzureRepoRef,
+  prNumber: number,
+): CommentThread | null {
   if (thread.isDeleted) return null
-  const comments = thread.comments.filter(isUserComment).map(mapComment)
+  const comments = thread.comments
+    .filter(isUserComment)
+    .map((comment) => mapComment(comment, thread.id, repo, prNumber))
   if (comments.length === 0) return null
 
   const context = thread.threadContext ?? null
-  let side: AzureThreadLite['side'] = null
-  let line: number | null = null
-  let lineEnd: number | null = null
+  let side: 'LEFT' | 'RIGHT' | undefined
+  let line: number | undefined
+  let lineEnd: number | undefined
   if (context?.rightFileStart) {
     side = 'RIGHT'
     line = context.rightFileStart.line
@@ -268,32 +364,31 @@ export function mapThread(thread: AzThread): AzureThreadLite | null {
     lineEnd = context.leftFileEnd?.line ?? line
   }
 
-  const prContext = thread.pullRequestThreadContext ?? null
-  const iteration = prContext?.iterationContext
-    ? {
-        first: prContext.iterationContext.firstComparingIteration,
-        second: prContext.iterationContext.secondComparingIteration,
-      }
-    : null
-
-  return {
-    id: thread.id,
-    status: mapThreadStatus(thread.status),
-    isLineThread: line !== null,
-    path: context?.filePath ? toRepoPath(context.filePath) : null,
-    line,
-    lineEnd,
-    side,
-    iteration,
-    changeTrackingId: prContext?.changeTrackingId ?? null,
-    createdAt: thread.publishedDate,
-    updatedAt: thread.lastUpdatedDate || thread.publishedDate,
+  const status = mapThreadStatus(thread.status)
+  const mapped: CommentThread = {
+    id: String(thread.id),
+    status,
+    isResolved: !isThreadOpen(status),
+    isLineThread: line !== undefined,
     comments,
   }
+  if (context?.filePath) mapped.path = toRepoPath(context.filePath)
+  if (line !== undefined) {
+    mapped.line = line
+    mapped.side = side
+    if (lineEnd !== undefined && lineEnd !== line) mapped.lineEnd = lineEnd
+  }
+  return mapped
 }
 
-export function mapThreads(threads: AzThread[]): AzureThreadLite[] {
-  return threads.map(mapThread).filter((thread): thread is AzureThreadLite => thread !== null)
+export function mapThreads(
+  threads: AzThread[],
+  repo: AzureRepoRef,
+  prNumber: number,
+): CommentThread[] {
+  return threads
+    .map((thread) => mapThread(thread, repo, prNumber))
+    .filter((thread): thread is CommentThread => thread !== null)
 }
 
 /** `changeType` is a flag set such as `edit, rename`. */
@@ -306,7 +401,7 @@ export function mapChangeStatus(changeType: string): AzureFileStatus {
 }
 
 /** Folder entries are dropped; they have no content to diff. */
-export function mapChangeEntry(entry: AzChangeEntry): AzureChangeLite | null {
+export function mapChangeEntry(entry: AzChangeEntry): AzureChange | null {
   if (entry.item.isFolder || entry.item.gitObjectType === 'tree') return null
   const status = mapChangeStatus(entry.changeType)
   return {

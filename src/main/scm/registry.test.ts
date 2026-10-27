@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 
-// The default registry pulls in the real GitHub provider (Octokit, gh, electron):
-// these tests build their own registries from fakes, so stub that import out.
-vi.mock('./github', () => ({ createGithubProvider: () => ({}) }))
-
 const { createScmRegistry, getAuthStatusMap, listAcrossProviders } = await import('./registry')
 const { ScmError } = await import('./errors')
 const { githubRepo } = await import('../../shared/scm-guards')
@@ -29,6 +25,12 @@ function fakeProvider(id: ScmProviderId, overrides: Partial<ScmProvider> = {}): 
     getCommentThreads: notUsed,
     postComment: notUsed,
     writeSnapshot: notUsed,
+    setThreadStatus: notUsed,
+    getFileContent: notUsed,
+    branchExists: notUsed,
+    updatePullRequestBase: notUsed,
+    listStackCandidates: notUsed,
+    listMergedBySourceBranch: notUsed,
     ...overrides,
   }
 }
@@ -114,5 +116,38 @@ describe('SCM registry', () => {
       github: { provider: 'github', state: 'signed_in' },
       azure: { provider: 'azure', state: 'disabled' },
     })
+  })
+
+  it('honors per-provider enabled flags on every call (toggle without restart)', async () => {
+    const enabled: Record<ScmProviderId, boolean> = { github: true, azure: false }
+    const registry = createScmRegistry(
+      [
+        fakeProvider('github', { listPullRequests: async () => [pr('g1', 'github')] }),
+        fakeProvider('azure', { listPullRequests: async () => [pr('a1', 'azure')] }),
+      ],
+      (id) => enabled[id],
+    )
+    const azureRepo = {
+      provider: 'azure' as const,
+      organization: 'o',
+      project: 'p',
+      name: 'r',
+      repositoryId: 'id',
+      fullName: 'o/p/r',
+    }
+
+    expect(registry.enabled().map((p) => p.id)).toEqual(['github'])
+    expect(registry.get('azure')).toBeNull()
+    expect(() => registry.forRepo(azureRepo)).toThrow(/not enabled/)
+    await expect(getAuthStatusMap(registry)).resolves.toMatchObject({
+      azure: { provider: 'azure', state: 'disabled' },
+    })
+
+    enabled.azure = true
+    enabled.github = false
+    expect(registry.enabled().map((p) => p.id)).toEqual(['azure'])
+    expect(registry.forRepo(azureRepo).id).toBe('azure')
+    const listed = await listAcrossProviders(registry, {})
+    expect(listed.items.map((item) => item.id)).toEqual(['a1'])
   })
 })

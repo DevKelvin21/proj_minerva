@@ -68,6 +68,13 @@ import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 
 import { join } from 'node:path'
 import { app } from 'electron'
 import { DEFAULT_AI_PROVIDER, isAiProviderId, type AiProviderId } from '../../shared/ai-providers'
+import type { AzureOrganizationSettings } from '../../shared/scm'
+import {
+  isAzureOrganizationName,
+  isAzureProjectName,
+  MAX_AZURE_ORGANIZATIONS,
+  MAX_AZURE_PROJECTS_PER_ORG,
+} from '../../shared/scm-guards'
 
 const SETTINGS_FILE_NAME = 'settings.json'
 
@@ -106,6 +113,19 @@ export interface PersistedSettings {
   models: Partial<Record<AiProviderId, string>>
   modelOptions?: Partial<Record<AiProviderId, Record<string, string>>>
   githubAccount?: string
+  /**
+   * Per-provider source-control settings. Each block is optional: absent =
+   * not saved yet (GitHub defaults to enabled; Azure DevOps defaults from
+   * `az devops configure --defaults`, see `../scm/scm-settings.ts`). An
+   * invalid `scm` block is dropped on load WITHOUT discarding the rest of
+   * the file.
+   */
+  scm?: PersistedScmSettings
+}
+
+export interface PersistedScmSettings {
+  github?: { enabled: boolean }
+  azure?: { enabled: boolean; organizations: AzureOrganizationSettings[] }
 }
 
 /** Forma pre-T26 (T12): la única que existía cuando solo había OpenRouter. Puede seguir en disco en instalaciones viejas. */
@@ -146,6 +166,57 @@ function isModelOptionsMap(
   )
 }
 
+function isAzureOrganizationsList(value: unknown): value is AzureOrganizationSettings[] {
+  if (!Array.isArray(value) || value.length > MAX_AZURE_ORGANIZATIONS) return false
+  const seen = new Set<string>()
+  return value.every((entry: unknown) => {
+    if (!isPlainObject(entry)) return false
+    if (Object.keys(entry).some((key) => key !== 'organization' && key !== 'projects')) return false
+    if (!isAzureOrganizationName(entry.organization)) return false
+    const key = entry.organization.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    const projects = entry.projects
+    return (
+      Array.isArray(projects) &&
+      projects.length <= MAX_AZURE_PROJECTS_PER_ORG &&
+      projects.every(isAzureProjectName) &&
+      new Set(projects.map((project) => project.toLowerCase())).size === projects.length
+    )
+  })
+}
+
+/** Shape of `scm` (also used by `scm:setProviderSettings` before persisting). */
+export function isPersistedScmSettings(value: unknown): value is PersistedScmSettings {
+  if (!isPlainObject(value)) return false
+  if (Object.keys(value).some((key) => key !== 'github' && key !== 'azure')) return false
+  if (value.github !== undefined) {
+    const github = value.github
+    if (!isPlainObject(github) || Object.keys(github).length !== 1) return false
+    if (typeof github.enabled !== 'boolean') return false
+  }
+  if (value.azure !== undefined) {
+    const azure = value.azure
+    if (!isPlainObject(azure)) return false
+    if (Object.keys(azure).some((key) => key !== 'enabled' && key !== 'organizations')) return false
+    if (typeof azure.enabled !== 'boolean') return false
+    if (!isAzureOrganizationsList(azure.organizations)) return false
+  }
+  return true
+}
+
+/**
+ * Drops an invalid `scm` block (logging it) so one bad hand edit there does
+ * not reset the AI settings too. Returns the same object when nothing changed.
+ */
+function dropInvalidScm(value: Record<string, unknown>): Record<string, unknown> {
+  if (value.scm === undefined || isPersistedScmSettings(value.scm)) return value
+  console.warn('[settings] settings.json has an invalid "scm" block; ignoring it.')
+  const next = { ...value }
+  delete next.scm
+  return next
+}
+
 function isNewPersistedSettings(value: unknown): value is PersistedSettings {
   if (!isPlainObject(value)) return false
   if (!isAiProviderId(value.aiProvider) || !isModelsMap(value.models)) return false
@@ -155,6 +226,7 @@ function isNewPersistedSettings(value: unknown): value is PersistedSettings {
   // `githubAccount` es ADITIVO (F18): ausente = "cuenta activa de gh"; presente pero
   // con algo que no es un login usable se rechaza (settings.json editado a mano no
   // debe colar basura que después termine en un argv de `gh`).
+  if (value.scm !== undefined && !isPersistedScmSettings(value.scm)) return false
   return value.githubAccount === undefined || isGithubAccountLogin(value.githubAccount)
 }
 
@@ -253,7 +325,7 @@ function migrateRaw(parsed: unknown): MigrationResult | null {
 
   if (!isPlainObject(parsed)) return null
 
-  const migrated = migrateRawOpenRouterToOpenCode(parsed)
+  const migrated = dropInvalidScm(migrateRawOpenRouterToOpenCode(parsed))
   if (!isNewPersistedSettings(migrated)) return null
   return { settings: migrated, changedFromDisk: migrated !== parsed }
 }
@@ -352,6 +424,35 @@ export class SettingsStore {
     return this.load()?.githubAccount ?? null
   }
 
+  /** Saved per-provider SCM settings (`{}` when nothing is saved). */
+  getScmSettings(): PersistedScmSettings {
+    return this.load()?.scm ?? {}
+  }
+
+  /** Replaces the saved per-provider SCM settings (caller validated `next`). */
+  setScmSettings(next: PersistedScmSettings): void {
+    this.persist({ ...this.baseSettings(), scm: next })
+  }
+
+  /**
+   * Current settings (KNOWN fields only, so legacy keys such as
+   * `githubAccessMode` disappear on the next write) or the defaults: the base
+   * every setter spreads. Listing the fields once, here, is what keeps one
+   * setter from silently erasing a field another one owns (the old F14/F18
+   * gotcha).
+   */
+  private baseSettings(): PersistedSettings {
+    const current = this.load()
+    if (!current) return { aiProvider: DEFAULT_AI_PROVIDER, models: {} }
+    return {
+      aiProvider: current.aiProvider,
+      models: current.models,
+      modelOptions: current.modelOptions,
+      githubAccount: current.githubAccount,
+      scm: current.scm,
+    }
+  }
+
   /**
    * Persiste la cuenta de `gh` a usar (F18), o la borra con `null` para
    * volver a "la cuenta activa de `gh`". No valida contra la lista real de
@@ -361,40 +462,18 @@ export class SettingsStore {
    * huérfano bloqueado.
    */
   setGithubAccount(login: string | null): void {
-    const current = this.load()
-    this.persist({
-      aiProvider: current?.aiProvider ?? DEFAULT_AI_PROVIDER,
-      models: current?.models ?? {},
-      modelOptions: current?.modelOptions,
-      githubAccount: login ?? undefined,
-    })
+    this.persist({ ...this.baseSettings(), githubAccount: login ?? undefined })
   }
 
   /** Cambia el proveedor ACTIVO, sin tocar los modelos ni las opciones ya elegidas por cada proveedor. */
   setAiProvider(provider: AiProviderId): void {
-    const current = this.load()
-    this.persist({
-      aiProvider: provider,
-      models: current?.models ?? {},
-      modelOptions: current?.modelOptions,
-      // GOTCHA (F14, sigue vigente en F18 con otra clave): este objeto se
-      // construye A MANO — si no se arrastra `githubAccount` del estado
-      // previo, un cambio de proveedor/modelo BORRARÍA en silencio la cuenta
-      // de GitHub que el usuario eligió.
-      githubAccount: current?.githubAccount,
-    })
+    this.persist({ ...this.baseSettings(), aiProvider: provider })
   }
 
   /** Guarda el modelo elegido para `provider` (no cambia el proveedor activo si `provider` no lo es, ver `setAiProvider`). */
   setProviderModel(provider: AiProviderId, modelId: string): void {
-    const current = this.load()
-    this.persist({
-      aiProvider: current?.aiProvider ?? DEFAULT_AI_PROVIDER,
-      models: { ...current?.models, [provider]: modelId },
-      modelOptions: current?.modelOptions,
-      // Ver el gotcha de `setAiProvider` de arriba: mismo riesgo, mismo fix.
-      githubAccount: current?.githubAccount,
-    })
+    const base = this.baseSettings()
+    this.persist({ ...base, models: { ...base.models, [provider]: modelId } })
   }
 
   /**
@@ -410,18 +489,15 @@ export class SettingsStore {
    * si el usuario vuelve a ese modelo.
    */
   setModelOption(provider: AiProviderId, optionId: string, value: string): void {
-    const current = this.load()
-    const currentModelOptions = current?.modelOptions ?? {}
+    const base = this.baseSettings()
+    const currentModelOptions = base.modelOptions ?? {}
     const currentProviderOptions = currentModelOptions[provider] ?? {}
     this.persist({
-      aiProvider: current?.aiProvider ?? DEFAULT_AI_PROVIDER,
-      models: current?.models ?? {},
+      ...base,
       modelOptions: {
         ...currentModelOptions,
         [provider]: { ...currentProviderOptions, [optionId]: value },
       },
-      // Ver el gotcha de `setAiProvider` (arriba): mismo riesgo, mismo fix.
-      githubAccount: current?.githubAccount,
     })
   }
 

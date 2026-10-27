@@ -160,3 +160,34 @@ export interface PrStack {
    */
   groupKey?: string
 }
+
+/** Which side of the PR diff a file read refers to (`scm:getFileContent`). */
+export type FileContentSide = 'base' | 'head'
+
+/** Largest file `scm:getFileContent` returns; over it, `tooLarge: true` and no content. */
+export const MAX_FILE_CONTENT_BYTES = 1024 * 1024
+
+/**
+ * Response of `scm:getFileContent`. `content` is `null` for binaries and for
+ * files over `MAX_FILE_CONTENT_BYTES`. A file missing on that side (added on
+ * head, deleted on base) is a `NOT_FOUND` error, not an empty result.
+ */
+export interface FileContent {
+  content: string | null
+  isBinary: boolean
+  tooLarge: boolean
+}
+
+/** One Azure DevOps organization and the projects Minerva lists PRs from. */
+export interface AzureOrganizationSettings {
+  /** Organization NAME (`Contoso`), never a URL. */
+  organization: string
+  /** Project names. Empty = nothing listed for this org until the user picks one. */
+  projects: string[]
+}
+
+/** Per-provider source-control settings (persisted in settings.json under `scm`). */
+export interface ScmProviderSettings {
+  github: { enabled: boolean }
+  azure: { enabled: boolean; organizations: AzureOrganizationSettings[] }
+}

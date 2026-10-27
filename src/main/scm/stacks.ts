@@ -54,6 +54,11 @@ export interface BuildStacksOptions {
 
 const DEFAULT_LONG_LIVED = /^(main|master|develop|development|dev|trunk)$/i
 
+/** The default "never stale" branch rule (`main`, `master`, `develop`, ...). */
+export function isDefaultLongLivedBranch(branch: string): boolean {
+  return DEFAULT_LONG_LIVED.test(shortRef(branch))
+}
+
 function normalize(pr: StackInputPr): StackInputPr {
   return {
     ...pr,
@@ -100,8 +105,7 @@ export function buildStacks(
   completedPrs: StackInputPr[],
   options: BuildStacksOptions = {},
 ): PrStack[] {
-  const isLongLived =
-    options.isLongLivedBranch ?? ((branch: string) => DEFAULT_LONG_LIVED.test(branch))
+  const isLongLived = options.isLongLivedBranch ?? isDefaultLongLivedBranch
   const open = openPrs.filter((pr) => pr.state === 'open').map(normalize)
   const merged = completedPrs.filter((pr) => pr.state === 'merged').map(normalize)
   const mergedByRepo = groupByRepo(merged)

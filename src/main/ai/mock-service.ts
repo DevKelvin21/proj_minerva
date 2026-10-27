@@ -34,6 +34,7 @@ import type { DidacticSection } from '../../shared/types'
 import { prFixtures } from '../scm/github/fixtures'
 import { genericSummarySection, richDidacticSections } from './fixtures'
 import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from './service'
+import type { PrContextSource } from './pr-context'
 import { StreamSectionParser, stringifySections } from './stream-parser'
 import { createActivityTracker, type ActivityTracker } from './activity-tracker'
 
@@ -133,7 +134,42 @@ async function streamFixture(
   return final
 }
 
+/**
+ * Summary for a PR the shopwave fixtures don't know (e.g. an Azure DevOps
+ * mock PR), built from what the SCM layer actually served: detail, files and
+ * the snapshot on disk. So `MINERVA_MOCK_AI=1` still runs the real context
+ * pipeline (provider -> patches -> snapshot-store) end to end.
+ */
+function contextSummarySection(
+  detail: Awaited<ReturnType<PrContextSource['getDetail']>>,
+  files: Awaited<ReturnType<PrContextSource['getFiles']>>,
+  snapshotDir: string | null,
+): DidacticSection {
+  const fileLines = files
+    .slice(0, 20)
+    .map((file) => '- `' + file.path + '` (' + file.status + ', +' + file.additions + ' / -' + file.deletions + ')')
+  return {
+    kind: 'summary',
+    markdown:
+      '## Summary\n\n**' +
+      detail.title +
+      '** (' +
+      detail.repo.fullName +
+      '#' +
+      detail.number +
+      ')\n\n' +
+      'Mock analysis built from the real SCM pipeline: ' +
+      files.length +
+      ' changed file(s), ' +
+      (snapshotDir ? 'repository snapshot ready' : 'no repository snapshot') +
+      '.\n\n' +
+      fileLines.join('\n'),
+  }
+}
+
 export class MockAiService implements AiService {
+  constructor(private readonly context?: PrContextSource) {}
+
   async analyzePullRequest(
     req: IpcRequest<'ai:analyzePullRequest'>,
     options?: AnalyzePullRequestOptions,
@@ -149,6 +185,19 @@ export class MockAiService implements AiService {
     if (rich) {
       const sections = await streamFixture(rich, options?.onProgress)
       return { prId, headSha, sections, generatedAt: new Date().toISOString() }
+    }
+
+    if (!fixture && this.context) {
+      const detail = await this.context.getDetail(req.repo, req.number)
+      const files = await this.context.getFiles(req.repo, req.number)
+      const snapshotDir = detail.headSha
+        ? await this.context.ensureSnapshot(req.repo, detail.headSha)
+        : null
+      const sections = await streamFixture(
+        [contextSummarySection(detail, files, snapshotDir)],
+        options?.onProgress,
+      )
+      return { prId, headSha: detail.headSha, sections, generatedAt: new Date().toISOString() }
     }
 
     if (!fixture) {

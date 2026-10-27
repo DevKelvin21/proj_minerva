@@ -6,6 +6,7 @@ import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { Badge } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
+import { AzureDevopsSection } from './AzureDevopsSection'
 
 /** External link consistent with the design system (see `CliLoginGuide.tsx`): main's link guard opens it in the system browser. */
 function ExternalLink({
@@ -115,7 +116,8 @@ function AccountCard({
  */
 function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Element | null {
   const { statuses } = useScmAuth()
-  const { info, setGithubAccount } = useScmSettings()
+  const { info, setGithubAccount, saveProviderSettings } = useScmSettings()
+  const [togglingGithub, setTogglingGithub] = useState(false)
   const { accounts, loading, reload } = useGhAccounts(true)
   // `null` is a legitimate value ("follow gh's active account"), so "nothing
   // in flight" needs its own sentinel: `undefined`.
@@ -150,6 +152,23 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
           usually allow GitHub CLI.
         </p>
       )}
+
+      <label className="mb-3 flex items-center gap-2 text-xs text-text">
+        <input
+          type="checkbox"
+          checked={info.providers.github.enabled}
+          disabled={togglingGithub}
+          aria-label="Enable GitHub"
+          onChange={(event) => {
+            const enabled = event.target.checked
+            setTogglingGithub(true)
+            void saveProviderSettings({ github: { enabled } }).finally(() =>
+              setTogglingGithub(false),
+            )
+          }}
+        />
+        Enable GitHub
+      </label>
 
       {info.mockScm && (
         <p className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
@@ -247,38 +266,16 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
   )
 }
 
-/** Azure DevOps arrives in Phase 2; for now the section only states its status. */
-function AzureDevopsStatus({ status }: { status: ScmAuthStatus | undefined }): React.JSX.Element {
-  const label =
-    status === undefined || status.state === 'disabled'
-      ? 'not configured'
-      : status.state === 'signed_in'
-        ? 'signed in' + (status.user ? ' as ' + status.user.login : '')
-        : status.state === 'cli_unavailable'
-          ? 'Azure CLI not found'
-          : 'not signed in'
-  return (
-    <div className="mt-4 border-t border-border pt-3">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-        <ScmProviderIcon provider="azure" size={12} />
-        Azure DevOps
-      </h3>
-      <p className="mt-1 text-xs text-muted">Azure DevOps: {label}</p>
-    </div>
-  )
-}
-
 /** Settings section with one block per source-control provider. */
 export function SourceControlSection({
   compact = false,
 }: {
   compact?: boolean
 }): React.JSX.Element {
-  const { statuses } = useScmAuth()
   return (
     <div className="p-4">
       <GithubAccessSection compact={compact} />
-      <AzureDevopsStatus status={statuses?.azure} />
+      <AzureDevopsSection compact={compact} />
     </div>
   )
 }

@@ -13,17 +13,23 @@ import type {
   CommentThread,
   DidacticAnalysis,
   DiffFile,
+  FileContentRequest,
+  GetStacksResult,
   GhAccount,
   ListPullRequestsResult,
   PostCommentRequest,
   PrComment,
   PrStateFilter,
   PullRequestDetail,
+  PullRequestSummary,
   RepoRef,
+  RetargetRequest,
   ScmSettingsInfo,
+  SetProviderSettingsRequest,
+  SetThreadStatusRequest,
   UpdaterStatus,
 } from './types'
-import type { ScmAuthStatus, ScmProviderId } from './scm'
+import type { FileContent, ScmAuthStatus, ScmProviderId } from './scm'
 import type { AiModelOption, AiProviderId } from './ai-providers'
 import type { AnalysisProgressEvent, PrListChangedEvent, UpdaterStatusChangedEvent } from './events'
 
@@ -51,8 +57,22 @@ export interface IpcContract {
    */
   'scm:listGhAccounts': { req: void; res: GhAccount[] }
 
-  /** SCM settings (mock flag + chosen GitHub account). */
+  /** SCM settings: mock flag, chosen GitHub account, per-provider enabled flags and Azure orgs/projects. */
   'scm:getSettings': { req: void; res: ScmSettingsInfo }
+
+  /**
+   * Saves per-provider settings (each block present replaces the saved one):
+   * enable/disable GitHub or Azure DevOps, and Azure's organizations +
+   * projects. Drops the provider caches that depend on them (identity,
+   * stacks) and answers the new effective settings.
+   */
+  'scm:setProviderSettings': { req: SetProviderSettingsRequest; res: ScmSettingsInfo }
+
+  /**
+   * Project names of an Azure DevOps organization, for the Settings picker.
+   * Read-only REST call with the org's own credential (the `az` CLI's).
+   */
+  'scm:listAzureProjects': { req: { organization: string }; res: { projects: string[] } }
 
   /**
    * Picks which `gh` account Minerva talks to, or `null` to follow `gh`'s
@@ -87,6 +107,34 @@ export interface IpcContract {
   'scm:getPullRequestFiles': { req: { repo: RepoRef; number: number }; res: DiffFile[] }
   'scm:getCommentThreads': { req: { repo: RepoRef; number: number }; res: CommentThread[] }
   'scm:postComment': { req: PostCommentRequest; res: PrComment }
+  /**
+   * Changes a comment thread's status and answers the updated thread. The
+   * validator only lets through `SETTABLE_THREAD_STATUSES[repo.provider]`
+   * (GitHub: active/resolved via resolve/unresolve; Azure: all six).
+   */
+  'scm:setThreadStatus': { req: SetThreadStatusRequest; res: CommentThread }
+  /**
+   * A file's text at the PR's merge base (`base`) or head commit (`head`),
+   * capped at `MAX_FILE_CONTENT_BYTES`. For comments anchored outside the
+   * diff hunks and for expanding context. `NOT_FOUND` when the file does not
+   * exist on that side.
+   */
+  'scm:getFileContent': { req: FileContentRequest; res: FileContent }
+  /**
+   * Changes the PR's target branch (the only "write" on a PR itself). Main
+   * re-validates first (see `RetargetRequest`); a base that moved since the
+   * UI read it is `[SCM:CONFLICT]`. Answers the updated summary and drops the
+   * stacks cache.
+   */
+  'scm:retarget': { req: RetargetRequest; res: PullRequestSummary }
+  /**
+   * Stacked PRs of every enabled provider, with orphan detection (a root that
+   * still targets the source branch of an already merged PR). Cached ~60 s in
+   * main; `{ refresh: true }` skips the cache. Covers every open PR of the
+   * configured Azure projects / of the GitHub repos you have PRs in, not only
+   * the PRs that involve you.
+   */
+  'scm:getStacks': { req: { refresh?: boolean } | void; res: GetStacksResult }
 
   'ai:analyzePullRequest': { req: { repo: RepoRef; number: number }; res: DidacticAnalysis }
   /**
@@ -232,6 +280,8 @@ export const IPC_CHANNELS = [
   'scm:getAuthStatus',
   'scm:listGhAccounts',
   'scm:getSettings',
+  'scm:setProviderSettings',
+  'scm:listAzureProjects',
   'scm:setGithubAccount',
   'scm:listPullRequests',
   'scm:markPrSeen',
@@ -239,6 +289,10 @@ export const IPC_CHANNELS = [
   'scm:getPullRequestFiles',
   'scm:getCommentThreads',
   'scm:postComment',
+  'scm:setThreadStatus',
+  'scm:getFileContent',
+  'scm:retarget',
+  'scm:getStacks',
   'ai:analyzePullRequest',
   'ai:getCachedAnalysis',
   'ai:invalidateAnalysis',

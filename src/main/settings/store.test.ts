@@ -22,7 +22,7 @@ vi.mock('electron', () => ({
   },
 }))
 
-const { SettingsStore } = await import('./store')
+const { SettingsStore, isPersistedScmSettings } = await import('./store')
 
 function settingsFilePath(): string {
   return join(userDataDir, 'settings.json')
@@ -527,6 +527,60 @@ describe('SettingsStore', () => {
 
       const raw = readFileSync(settingsFilePath(), 'utf-8')
       expect(JSON.parse(raw)).not.toHaveProperty('githubAccount')
+    })
+  })
+
+  describe('scm (per-provider settings)', () => {
+    const azure = {
+      enabled: true,
+      organizations: [{ organization: 'Skyllful', projects: ['Virtual Competency Builder'] }],
+    }
+
+    it('absent = {} (defaults are resolved in scm-settings)', () => {
+      expect(new SettingsStore().getScmSettings()).toEqual({})
+    })
+
+    it('roundtrips and survives the other setters', () => {
+      const store = new SettingsStore()
+      store.setScmSettings({ github: { enabled: false }, azure })
+      store.setAiProvider('codex')
+      store.setGithubAccount('octocat')
+      store.setModelOption('codex', 'effort', 'high')
+      const fresh = new SettingsStore()
+      expect(fresh.getScmSettings()).toEqual({ github: { enabled: false }, azure })
+      expect(fresh.getPersistedSettings()?.aiProvider).toBe('codex')
+      expect(fresh.getGithubAccount()).toBe('octocat')
+    })
+
+    it('an invalid scm block is dropped without discarding the AI settings', () => {
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({
+          aiProvider: 'codex',
+          models: { codex: 'gpt-5' },
+          scm: {
+            azure: { enabled: true, organizations: [{ organization: 'bad org!', projects: [] }] },
+          },
+        }),
+        'utf-8',
+      )
+      const store = new SettingsStore()
+      expect(store.getPersistedModel('codex')).toBe('gpt-5')
+      expect(store.getScmSettings()).toEqual({})
+      expect(JSON.parse(readFileSync(settingsFilePath(), 'utf-8'))).not.toHaveProperty('scm')
+    })
+
+    it('validates the scm shape strictly', () => {
+      expect(isPersistedScmSettings({})).toBe(true)
+      expect(isPersistedScmSettings({ azure })).toBe(true)
+      expect(isPersistedScmSettings({ github: { enabled: 1 } })).toBe(false)
+      expect(isPersistedScmSettings({ azure: { ...azure, extra: 1 } })).toBe(false)
+      expect(isPersistedScmSettings({ gitlab: {} })).toBe(false)
+      expect(
+        isPersistedScmSettings({
+          azure: { enabled: true, organizations: [{ organization: 'x', projects: ['p', 'P'] }] },
+        }),
+      ).toBe(false)
     })
   })
 })

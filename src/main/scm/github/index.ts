@@ -29,5 +29,12 @@ export function createGithubProvider(): ScmProvider {
     getCommentThreads: (repo, number) => data.getCommentThreads(repo, number),
     postComment: (req) => data.postComment(req),
     writeSnapshot: (req, destDir) => data.writeSnapshot(req, destDir),
+    setThreadStatus: (req) => data.setThreadStatus(req),
+    getFileContent: (req) => data.getFileContent(req),
+    branchExists: (repo, branch) => data.branchExists(repo, branch),
+    updatePullRequestBase: (repo, number, newBase) =>
+      data.updatePullRequestBase(repo, number, newBase),
+    listStackCandidates: () => data.listStackCandidates(),
+    listMergedBySourceBranch: (repo, branch) => data.listMergedBySourceBranch(repo, branch),
   }
 }

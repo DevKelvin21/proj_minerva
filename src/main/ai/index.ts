@@ -58,10 +58,10 @@ export type { AiService } from './service'
  * (credential-less demo); with real data, throw `reason` as is so the panel
  * shows the cause and the remedy instead of a misleading error.
  */
-function mockFallbackOrThrow(reason: string): AiService {
+function mockFallbackOrThrow(reason: string, context: PrContextSource): AiService {
   if (isMockScmMode()) {
     console.warn('[ai] ' + reason + ' SCM is in mock mode: using MockAiService.')
-    return new MockAiService()
+    return new MockAiService(context)
   }
   throw new Error(reason)
 }
@@ -100,14 +100,17 @@ async function createAiServiceForProvider(
       if (status.status === 'authenticated') {
         return new ClaudeCodeAiService(context)
       }
-      return mockFallbackOrThrow(cliUnavailableReason('Claude Code', 'claude', status.status))
+      return mockFallbackOrThrow(
+        cliUnavailableReason('Claude Code', 'claude', status.status),
+        context,
+      )
     }
     case 'codex': {
       const status = await getCliProviderStatus('codex')
       if (status.status === 'authenticated') {
         return new CodexAiService(context)
       }
-      return mockFallbackOrThrow(cliUnavailableReason('Codex', 'codex', status.status))
+      return mockFallbackOrThrow(cliUnavailableReason('Codex', 'codex', status.status), context)
     }
     case 'opencode': {
       // El probe de opencode (T57, `./providers/cli-probe.ts`) ya encapsula
@@ -125,6 +128,7 @@ async function createAiServiceForProvider(
             'Corré «opencode auth login» en una terminal para conectar uno (OpenRouter, ' +
             'Anthropic, etc.) y reintentá, o elegí otro proveedor en Settings (engrane de ' +
             'la barra de título).',
+          context,
         )
       }
       return mockFallbackOrThrow(
@@ -132,6 +136,7 @@ async function createAiServiceForProvider(
           'máquina (o su versión es más vieja que la mínima soportada). Instalalo o ' +
           'actualizalo (https://opencode.ai/docs/) y reintentá, o elegí otro proveedor en ' +
           'Settings (engrane de la barra de título).',
+        context,
       )
     }
   }
@@ -147,7 +152,7 @@ export async function createAiService(context: PrContextSource): Promise<AiServi
   // CLAUDE.md § comandos/e2e).
   if (process.env.MINERVA_MOCK_AI === '1') {
     console.warn('[ai] MINERVA_MOCK_AI=1: usando MockAiService (override explícito).')
-    return new MockAiService()
+    return new MockAiService(context)
   }
   const { provider } = getEffectiveAiSelection()
   return createAiServiceForProvider(provider, context)

@@ -16,7 +16,15 @@
  */
 import { isAiProviderId } from '../../shared/ai-providers'
 import type { IpcChannel } from '../../shared/ipc'
-import { isRepoRef } from '../../shared/scm-guards'
+import { SETTABLE_THREAD_STATUSES, type ThreadStatus } from '../../shared/scm'
+import {
+  isAzureOrganizationName,
+  isAzureProjectName,
+  isRepoRef,
+  isValidBranchName,
+  MAX_AZURE_ORGANIZATIONS,
+  MAX_AZURE_PROJECTS_PER_ORG,
+} from '../../shared/scm-guards'
 
 const MAX_SEARCH_LEN = 256
 const MAX_BODY_LEN = 65536
@@ -109,6 +117,100 @@ function isPostCommentPayload(value: unknown): boolean {
   return true
 }
 
+/**
+ * `scm:setThreadStatus`: the PR, a thread id, and a status the PROVIDER of
+ * that repo can set (`SETTABLE_THREAD_STATUSES`): GitHub only active/resolved.
+ */
+function isSetThreadStatusPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['repo', 'number', 'threadId', 'status'])) return false
+  if (!isRepoRef(value.repo)) return false
+  if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
+  if (!isNonEmptyString(value.threadId, MAX_THREAD_ID_LEN)) return false
+  const settable: readonly ThreadStatus[] = SETTABLE_THREAD_STATUSES[value.repo.provider]
+  return typeof value.status === 'string' && (settable as readonly string[]).includes(value.status)
+}
+
+/** A repo-relative file path: no leading `/`, no `..` / `.` / empty segments, no NUL/control chars. */
+function isRepoFilePath(value: unknown): value is string {
+  if (!isNonEmptyString(value, MAX_PATH_LEN)) return false
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f\\]/.test(value)) return false
+  return value.split('/').every((part) => part.length > 0 && part !== '.' && part !== '..')
+}
+
+function isGetFileContentPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['repo', 'number', 'path', 'side'])) return false
+  if (!isRepoRef(value.repo)) return false
+  if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
+  if (!isRepoFilePath(value.path)) return false
+  return value.side === 'base' || value.side === 'head'
+}
+
+/** `scm:retarget`: two valid, different short branch names. The rest is re-checked in main. */
+function isRetargetPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['repo', 'number', 'expectedCurrentBase', 'newBase'])) return false
+  if (Object.keys(value).length !== 4) return false
+  if (!isRepoRef(value.repo)) return false
+  if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
+  if (!isValidBranchName(value.expectedCurrentBase) || !isValidBranchName(value.newBase)) {
+    return false
+  }
+  return value.expectedCurrentBase !== value.newBase
+}
+
+/** `scm:getStacks`: nothing, or `{ refresh?: boolean }`. */
+function isGetStacksPayload(value: unknown): boolean {
+  if (value === undefined) return true
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['refresh'])) return false
+  return value.refresh === undefined || typeof value.refresh === 'boolean'
+}
+
+function isAzureOrganizationsPayload(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length > MAX_AZURE_ORGANIZATIONS) return false
+  const seen = new Set<string>()
+  return value.every((entry: unknown) => {
+    if (!isPlainObject(entry) || !hasOnlyKeys(entry, ['organization', 'projects'])) return false
+    if (!isAzureOrganizationName(entry.organization)) return false
+    if (seen.has(entry.organization.toLowerCase())) return false
+    seen.add(entry.organization.toLowerCase())
+    const projects = entry.projects
+    if (!Array.isArray(projects) || projects.length > MAX_AZURE_PROJECTS_PER_ORG) return false
+    if (!projects.every(isAzureProjectName)) return false
+    return (
+      new Set(projects.map((project: string) => project.toLowerCase())).size === projects.length
+    )
+  })
+}
+
+/** `scm:setProviderSettings`: at least one block; each with exactly its fields. */
+function isSetProviderSettingsPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['github', 'azure'])) return false
+  if (value.github === undefined && value.azure === undefined) return false
+  if (value.github !== undefined) {
+    const github = value.github
+    if (!isPlainObject(github) || !hasOnlyKeys(github, ['enabled'])) return false
+    if (typeof github.enabled !== 'boolean') return false
+  }
+  if (value.azure !== undefined) {
+    const azure = value.azure
+    if (!isPlainObject(azure) || !hasOnlyKeys(azure, ['enabled', 'organizations'])) return false
+    if (typeof azure.enabled !== 'boolean') return false
+    if (!isAzureOrganizationsPayload(azure.organizations)) return false
+  }
+  return true
+}
+
+function isListAzureProjectsPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['organization'])) return false
+  return isAzureOrganizationName(value.organization)
+}
+
 /** `ai:getProviderModels` (T35): un `provider` conocido del catálogo, sin claves extra. */
 function isGetProviderModelsPayload(value: unknown): boolean {
   if (!isPlainObject(value)) return false
@@ -185,6 +287,8 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:getAuthStatus': isVoidPayload,
   'scm:listGhAccounts': isVoidPayload,
   'scm:getSettings': isVoidPayload,
+  'scm:setProviderSettings': isSetProviderSettingsPayload,
+  'scm:listAzureProjects': isListAzureProjectsPayload,
   'scm:setGithubAccount': isSetGithubAccountPayload,
   'scm:listPullRequests': isListPullRequestsPayload,
   'scm:markPrSeen': isMarkPrSeenPayload,
@@ -192,6 +296,10 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:getPullRequestFiles': isRepoAndNumberPayload,
   'scm:getCommentThreads': isRepoAndNumberPayload,
   'scm:postComment': isPostCommentPayload,
+  'scm:setThreadStatus': isSetThreadStatusPayload,
+  'scm:getFileContent': isGetFileContentPayload,
+  'scm:retarget': isRetargetPayload,
+  'scm:getStacks': isGetStacksPayload,
   'ai:analyzePullRequest': isRepoAndNumberPayload,
   'ai:getCachedAnalysis': isRepoAndNumberPayload,
   'ai:invalidateAnalysis': isRepoAndNumberPayload,

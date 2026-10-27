@@ -10,17 +10,23 @@
  * - `writeSnapshot` writes HOSTILE content: no symlinks, no paths outside
  *   `destDir`, size caps. It is only read by jailed AI tools, never executed.
  * - Tokens never leave main and never appear in `ScmAuthStatus`.
+ * - Writes (comments, thread status, base branch) only happen on explicit
+ *   user actions routed through IPC; retarget validation lives in
+ *   `./retarget.ts` so it is the same for every provider.
  */
-import type { RepoRef, ScmAuthStatus, ScmProviderId } from '../../shared/scm'
+import type { FileContent, RepoRef, ScmAuthStatus, ScmProviderId } from '../../shared/scm'
 import type {
   CommentThread,
   DiffFile,
+  FileContentRequest,
   PostCommentRequest,
   PrComment,
   PrStateFilter,
   PullRequestDetail,
   PullRequestSummary,
+  SetThreadStatusRequest,
 } from '../../shared/types'
+import type { StackInputPr } from './stacks'
 
 export interface ListPullRequestsQuery {
   search?: string
@@ -46,6 +52,31 @@ export interface ScmProvider {
    * empty). The atomic rename and caching belong to `./snapshot-store.ts`.
    */
   writeSnapshot(req: SnapshotRequest, destDir: string): Promise<void>
+
+  /** Sets a thread's status; answers the updated thread. Status already validated per provider. */
+  setThreadStatus(req: SetThreadStatusRequest): Promise<CommentThread>
+  /** File text at the PR's merge base or head (capped, see `FileContent`). */
+  getFileContent(req: FileContentRequest): Promise<FileContent>
+
+  /** Exact branch match on the remote (`refs/heads/<branch>`). */
+  branchExists(repo: RepoRef, branch: string): Promise<boolean>
+  /**
+   * Raw base-branch change. Call it only through `retargetPullRequest`
+   * (`./retarget.ts`), which re-validates first.
+   */
+  updatePullRequestBase(repo: RepoRef, number: number, newBase: string): Promise<PullRequestSummary>
+
+  /**
+   * Open PRs stacks are built from: every open PR of the configured scope
+   * (Azure: configured projects; GitHub: repos the user has PRs in), not only
+   * the ones that involve the user, so a whole chain shows up.
+   */
+  listStackCandidates(): Promise<StackInputPr[]>
+  /**
+   * Merged PRs of `repo` whose SOURCE branch is exactly `branch` (exact
+   * server-side filter, never a capped "recent" list). Feeds orphan detection.
+   */
+  listMergedBySourceBranch(repo: RepoRef, branch: string): Promise<StackInputPr[]>
 }
 
 /** The data half of a provider (everything but identity and auth). Handy for decorators. */

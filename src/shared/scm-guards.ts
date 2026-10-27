@@ -63,3 +63,44 @@ export function isRepoRef(value: unknown): value is RepoRef {
 export function githubRepo(owner: string, name: string): GithubRepoRef {
   return { provider: 'github', owner, name, fullName: owner + '/' + name }
 }
+
+export const MAX_BRANCH_NAME_LEN = 250
+
+/**
+ * A short git branch name (`feature/x`, never `refs/heads/feature/x`), per
+ * `git check-ref-format --branch` rules: no spaces or control characters, no
+ * `~ ^ : ? * [ \`, no `..` or `@{`, no empty / dot-leading components, does
+ * not start with `-` or end with `/`, `.` or `.lock`.
+ */
+export function isValidBranchName(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_BRANCH_NAME_LEN) {
+    return false
+  }
+  if (value.startsWith('refs/') || value.startsWith('-') || value === '@') return false
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x20\x7f~^:?*[\\]/.test(value)) return false
+  if (value.includes('..') || value.includes('@{') || value.includes('//')) return false
+  if (value.endsWith('/') || value.endsWith('.') || value.endsWith('.lock')) return false
+  return value.split('/').every((part) => part.length > 0 && !part.startsWith('.'))
+}
+
+/** Azure DevOps organization name: letters, digits and hyphens, 1-50, no leading/trailing hyphen. */
+export function isAzureOrganizationName(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,48}[A-Za-z0-9])?$/.test(value)
+}
+
+/**
+ * Azure DevOps project name: 1-64 characters, none of the reserved
+ * `\ / : * ? " < > | ; # $ { } , + = [ ]` or control characters, not
+ * starting with `_` or `.`, not ending with `.`.
+ */
+export function isAzureProjectName(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 64) return false
+  if (value.trim() !== value) return false
+  if (value.startsWith('_') || value.startsWith('.') || value.endsWith('.')) return false
+  // eslint-disable-next-line no-control-regex
+  return !/[\x00-\x1f\x7f\\/:*?"<>|;#${},+=[\]]/.test(value)
+}
+
+export const MAX_AZURE_ORGANIZATIONS = 10
+export const MAX_AZURE_PROJECTS_PER_ORG = 50

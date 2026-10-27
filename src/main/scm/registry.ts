@@ -3,48 +3,49 @@
  * (`forRepo`) and fan list calls out over every enabled provider
  * (`listAcrossProviders`), so one failing provider never blanks the others.
  *
- * Phase 2 seam: register the Azure DevOps provider in
- * `createDefaultScmRegistry` next to GitHub. Nothing else needs to change.
+ * "Enabled" is evaluated on every call (`isEnabled`), so toggling a provider
+ * in Settings takes effect without restarting.
  */
 import type { RepoRef, ScmAuthStatus, ScmProviderId } from '../../shared/scm'
 import type { ListPullRequestsResult, ScmListError } from '../../shared/types'
 import { ScmError, toScmError } from './errors'
-import { createGithubProvider } from './github'
 import type { ListPullRequestsQuery, ScmProvider } from './provider'
 
 export const ALL_SCM_PROVIDER_IDS: readonly ScmProviderId[] = ['github', 'azure']
 
 export interface ScmRegistry {
-  /** The registered provider with that id, or `null` if it isn't registered. */
+  /** The ENABLED provider with that id, or `null` (not registered or turned off). */
   get(id: ScmProviderId): ScmProvider | null
-  /** Provider that owns `repo`. Throws `ScmError('NOT_FOUND')` if it isn't registered. */
+  /** Provider that owns `repo`. Throws `ScmError('NOT_FOUND')` if it isn't registered or is off. */
   forRepo(repo: RepoRef): ScmProvider
-  /** Every registered provider, in registration order. */
+  /** Every enabled provider, in registration order. */
   enabled(): ScmProvider[]
 }
 
-export function createScmRegistry(providers: readonly ScmProvider[]): ScmRegistry {
+export function createScmRegistry(
+  providers: readonly ScmProvider[],
+  isEnabled: (id: ScmProviderId) => boolean = () => true,
+): ScmRegistry {
   const byId = new Map<ScmProviderId, ScmProvider>()
   for (const provider of providers) {
     if (byId.has(provider.id)) throw new Error('SCM provider registered twice: ' + provider.id)
     byId.set(provider.id, provider)
   }
+  const get = (id: ScmProviderId): ScmProvider | null => {
+    const provider = byId.get(id)
+    return provider && isEnabled(id) ? provider : null
+  }
   return {
-    get: (id) => byId.get(id) ?? null,
+    get,
     forRepo(repo) {
-      const provider = byId.get(repo.provider)
+      const provider = get(repo.provider)
       if (!provider) {
         throw new ScmError('NOT_FOUND', 'Source-control provider not enabled: ' + repo.provider)
       }
       return provider
     },
-    enabled: () => [...byId.values()],
+    enabled: () => [...byId.values()].filter((provider) => isEnabled(provider.id)),
   }
-}
-
-/** The app's registry: GitHub only for now (mock or real, see `./github/index.ts`). */
-export function createDefaultScmRegistry(): ScmRegistry {
-  return createScmRegistry([createGithubProvider()])
 }
 
 export interface FanOutListResult extends ListPullRequestsResult {

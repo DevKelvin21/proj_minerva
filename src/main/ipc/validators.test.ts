@@ -516,4 +516,152 @@ describe('payloadValidators', () => {
       expect(validate([])).toBe(false)
     })
   })
+
+  describe('scm:setThreadStatus', () => {
+    const validate = payloadValidators['scm:setThreadStatus']
+    const base = { repo: validAzureRepo, number: 3, threadId: '12', status: 'wont_fix' }
+
+    it('accepts any Azure status, but only active/resolved for GitHub', () => {
+      for (const status of ['active', 'pending', 'resolved', 'wont_fix', 'closed', 'by_design']) {
+        expect(validate({ ...base, status })).toBe(true)
+      }
+      expect(validate({ ...base, repo: validRepo, status: 'resolved' })).toBe(true)
+      expect(validate({ ...base, repo: validRepo, status: 'active' })).toBe(true)
+      expect(validate({ ...base, repo: validRepo, status: 'wont_fix' })).toBe(false)
+      expect(validate({ ...base, repo: validRepo, status: 'pending' })).toBe(false)
+    })
+
+    it('rejects unknown statuses, empty thread ids and extra keys', () => {
+      expect(validate({ ...base, status: 'fixed' })).toBe(false)
+      expect(validate({ ...base, threadId: '' })).toBe(false)
+      expect(validate({ ...base, threadId: 'x'.repeat(201) })).toBe(false)
+      expect(validate({ ...base, extra: 1 })).toBe(false)
+      expect(validate({ ...base, status: undefined })).toBe(false)
+    })
+  })
+
+  describe('scm:getFileContent', () => {
+    const validate = payloadValidators['scm:getFileContent']
+    const base = { repo: validRepo, number: 1, path: 'src/a.ts', side: 'head' }
+
+    it('accepts a repo-relative path on either side', () => {
+      expect(validate(base)).toBe(true)
+      expect(validate({ ...base, side: 'base' })).toBe(true)
+      expect(validate({ ...base, repo: validAzureRepo, path: 'Dir With Spaces/a b.cs' })).toBe(true)
+    })
+
+    it('rejects traversal, absolute paths, control chars and bad sides', () => {
+      for (const path of [
+        '../etc/passwd',
+        'a/../b',
+        '/abs',
+        'a//b',
+        'a/./b',
+        'a\\b',
+        'a\u0000b',
+        '',
+      ]) {
+        expect(validate({ ...base, path })).toBe(false)
+      }
+      expect(validate({ ...base, side: 'LEFT' })).toBe(false)
+      expect(validate({ ...base, path: 'x'.repeat(501) })).toBe(false)
+    })
+  })
+
+  describe('scm:retarget', () => {
+    const validate = payloadValidators['scm:retarget']
+    const base = {
+      repo: validAzureRepo,
+      number: 12495,
+      expectedCurrentBase: 'task/23714',
+      newBase: 'main',
+    }
+
+    it('accepts two different valid short branch names', () => {
+      expect(validate(base)).toBe(true)
+    })
+
+    it('rejects same-branch, refs/ names, invalid git names and missing fields', () => {
+      expect(validate({ ...base, newBase: 'task/23714' })).toBe(false)
+      for (const bad of [
+        'refs/heads/main',
+        'a..b',
+        'has space',
+        '-x',
+        'x/',
+        'x.lock',
+        'a~1',
+        'a:b',
+        '',
+      ]) {
+        expect(validate({ ...base, newBase: bad })).toBe(false)
+      }
+      const { newBase: _drop, ...missing } = base
+      void _drop
+      expect(validate(missing)).toBe(false)
+      expect(validate({ ...base, extra: true })).toBe(false)
+    })
+  })
+
+  describe('scm:getStacks', () => {
+    const validate = payloadValidators['scm:getStacks']
+    it('accepts nothing or { refresh }', () => {
+      expect(validate(undefined)).toBe(true)
+      expect(validate({})).toBe(true)
+      expect(validate({ refresh: true })).toBe(true)
+      expect(validate({ refresh: 'yes' })).toBe(false)
+      expect(validate({ other: 1 })).toBe(false)
+      expect(validate('x')).toBe(false)
+    })
+  })
+
+  describe('scm:setProviderSettings', () => {
+    const validate = payloadValidators['scm:setProviderSettings']
+    const azure = {
+      enabled: true,
+      organizations: [{ organization: 'Skyllful', projects: ['Virtual Competency Builder'] }],
+    }
+
+    it('accepts either block or both', () => {
+      expect(validate({ github: { enabled: false } })).toBe(true)
+      expect(validate({ azure })).toBe(true)
+      expect(validate({ github: { enabled: true }, azure })).toBe(true)
+      expect(validate({ azure: { enabled: false, organizations: [] } })).toBe(true)
+    })
+
+    it('rejects empty payloads, bad names, duplicates and extra keys', () => {
+      expect(validate({})).toBe(false)
+      expect(validate({ github: { enabled: 'yes' } })).toBe(false)
+      expect(validate({ github: { enabled: true, x: 1 } })).toBe(false)
+      const org = (organization: string, projects: string[] = []) => ({
+        azure: { enabled: true, organizations: [{ organization, projects }] },
+      })
+      expect(validate(org('https://dev.azure.com/x'))).toBe(false)
+      expect(validate(org('-bad'))).toBe(false)
+      expect(validate(org('ok', ['a/b']))).toBe(false)
+      expect(validate(org('ok', ['_hidden']))).toBe(false)
+      expect(validate(org('ok', ['A', 'a']))).toBe(false)
+      expect(
+        validate({
+          azure: {
+            enabled: true,
+            organizations: [
+              { organization: 'Same', projects: [] },
+              { organization: 'same', projects: [] },
+            ],
+          },
+        }),
+      ).toBe(false)
+    })
+  })
+
+  describe('scm:listAzureProjects', () => {
+    const validate = payloadValidators['scm:listAzureProjects']
+    it('accepts an organization name only', () => {
+      expect(validate({ organization: 'Skyllful' })).toBe(true)
+      expect(validate({ organization: 'dev.azure.com/x' })).toBe(false)
+      expect(validate({ organization: '' })).toBe(false)
+      expect(validate({ organization: 'a', more: 1 })).toBe(false)
+    })
+  })
 })

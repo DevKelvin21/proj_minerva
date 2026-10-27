@@ -73,7 +73,7 @@ export function ConversationTab({
       <article className="rounded-md border border-border bg-panel p-3">
         <div className="mb-2 flex items-center gap-2 text-xs text-muted">
           <Avatar user={pr.author} size={18} />
-          <span className="font-medium text-text">{pr.author.login}</span>
+          <span className="font-medium text-text">{pr.author.displayName ?? pr.author.login}</span>
           <span>abrió este PR</span>
         </div>
         <Markdown content={pr.bodyMarkdown} />
