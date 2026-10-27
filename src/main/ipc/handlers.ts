@@ -144,9 +144,10 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
   // Re-validated in `retargetPullRequest` right before the write (open, base
   // unchanged, new base exists); a stale UI gets `[SCM:CONFLICT]`.
   handle('scm:retarget', async (req) => {
+    // TODO(hardening): native confirmation dialog in main before the write.
     const updated = await retargetPullRequest(scm.forRepo(req.repo), req)
     scmRoot.stacks.invalidate()
-    return updated
+    return { outcome: 'retargeted' as const, pr: updated }
   })
   handle('scm:getStacks', (req) => scmRoot.stacks.get({ refresh: req?.refresh === true }))
 

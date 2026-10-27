@@ -103,7 +103,17 @@ export interface PullRequestDetail extends PullRequestSummary {
   reviewers: PrReviewer[]
   commits: number
   workItems?: PrWorkItem[]
+  /**
+   * True when the provider capped the file list (e.g. 300 files): the Files tab
+   * and the AI prompt must say that some files are not shown. `changedFiles`
+   * stays the TRUE total when the provider knows it.
+   */
+  filesTruncated?: boolean
 }
+
+export type RetargetResult =
+  | { outcome: 'retargeted'; pr: PullRequestSummary }
+  | { outcome: 'cancelled' }
 
 export type DiffFileStatus = 'added' | 'modified' | 'removed' | 'renamed'
 

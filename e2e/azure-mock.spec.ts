@@ -189,7 +189,7 @@ test('Azure channels via the preload: stacks + orphan, file content, status, ret
       }),
     azureRepo,
   )
-  expect(retargeted).toMatchObject({ number: 105, baseRef: 'main' })
+  expect(retargeted).toMatchObject({ outcome: 'retargeted', pr: { number: 105, baseRef: 'main' } })
 
   const after = await window.evaluate(() => window.minerva.scm.getStacks())
   expect(

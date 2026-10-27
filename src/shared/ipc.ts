@@ -21,9 +21,9 @@ import type {
   PrComment,
   PrStateFilter,
   PullRequestDetail,
-  PullRequestSummary,
   RepoRef,
   RetargetRequest,
+  RetargetResult,
   ScmSettingsInfo,
   SetProviderSettingsRequest,
   SetThreadStatusRequest,
@@ -123,10 +123,12 @@ export interface IpcContract {
   /**
    * Changes the PR's target branch (the only "write" on a PR itself). Main
    * re-validates first (see `RetargetRequest`); a base that moved since the
-   * UI read it is `[SCM:CONFLICT]`. Answers the updated summary and drops the
-   * stacks cache.
+   * UI read it is `[SCM:CONFLICT]`. Main also asks the user to confirm with a
+   * native dialog before writing (a compromised renderer can't retarget on its
+   * own); declining answers `{ outcome: 'cancelled' }`. On success answers the
+   * updated summary and drops the stacks cache.
    */
-  'scm:retarget': { req: RetargetRequest; res: PullRequestSummary }
+  'scm:retarget': { req: RetargetRequest; res: RetargetResult }
   /**
    * Stacked PRs of every enabled provider, with orphan detection (a root that
    * still targets the source branch of an already merged PR). Cached ~60 s in
