@@ -1,5 +1,6 @@
 import type { AiService } from './service'
-import type { GithubService } from '../github/service'
+import type { PrContextSource } from './pr-context'
+import { isMockScmMode } from '../scm/mock-mode'
 import type { AiProviderId } from '../../shared/ai-providers'
 import { MockAiService } from './mock-service'
 import { ClaudeCodeAiService } from './providers/claude-code-service'
@@ -40,47 +41,26 @@ export type { AiService } from './service'
  *   reporta `'authenticated'` (binario+versión OK Y al menos un upstream
  *   `connected`, ver el comentario de `./providers/cli-probe.ts`).
  *
- * Cuando el proveedor activo NO puede inicializarse (CLI ausente o sin
- * sesión), el comportamiento depende del modo de GitHub:
- * - Con `MINERVA_MOCK=1` (GitHub mock, mismo criterio que
- *   `../github/index.ts`): cae a `MockAiService` con un `console.warn` — la
- *   demo/e2e sin credenciales sigue funcionando como siempre.
- * - Con GitHub REAL: se LANZA un error con la causa concreta y el remedio
- *   (configurar la key en Settings, instalar/loguear el CLI). Antes acá
- *   también se caía al mock, y como el mock solo conoce los PRs ficticios de
- *   shopwave, cualquier análisis de un PR real moría con un absurdo "Pull
- *   request no encontrado" que culpaba al PR en vez de a la configuración
- *   (visto en la 0.2.1 empaquetada en macOS). El mensaje viaja tal cual al
- *   panel didáctico (ver `../ipc/register.ts`), que ya tiene UI de error +
- *   "Reintentar".
+ * When the active provider can't be initialized (CLI missing or signed out),
+ * the behavior depends on the SCM mode:
+ * - With `MINERVA_MOCK=1` (mock SCM data): fall back to `MockAiService` with a
+ *   `console.warn`, so the credential-less demo/e2e keeps working.
+ * - With real SCM data: THROW with the concrete cause and the remedy. Falling
+ *   back to the mock there made every real PR fail with a misleading "not
+ *   found" (the mock only knows the shopwave PRs).
  *
- * A propósito, esto sigue siendo INDEPENDIENTE de `MINERVA_MOCK` (el flag que
- * decide si `GithubService` es mock o real, ver `../github/index.ts`): con
- * `MINERVA_MOCK=1` + un proveedor de IA real y autenticado, se puede probar
- * la IA real analizando PRs mock (útil para desarrollo sin necesitar una
- * cuenta de GitHub real). Por eso `createAiService` recibe el `GithubService`
- * ACTIVO como dependencia en vez de crear el suyo: la implementación real le
- * pide el detalle/archivos del PR a lo que sea que `registerIpcHandlers` haya
- * instanciado (mock o real), sin enterarse de cuál es.
+ * Independent of `MINERVA_MOCK`: mock SCM data + a real, signed-in AI provider
+ * is a valid combo (try the real AI on mock PRs). That's why the factory takes
+ * the active `PrContextSource` as a dependency instead of building its own.
  */
 /**
- * `true` si la capa GitHub activa es la mock — MISMO criterio que
- * `createGithubService` (`../github/index.ts`). Se lee el env directo en vez
- * de importar de ahí para no arrastrar el grafo de módulos de GitHub real
- * (Octokit, auth-manager/safeStorage) a este factory ni a sus tests.
- */
-function isMockGithubMode(): boolean {
-  return process.env.MINERVA_MOCK === '1'
-}
-
-/**
- * Proveedor activo no inicializable: con GitHub mock se degrada al mock de IA
- * (demo sin credenciales); con GitHub real se lanza `reason` tal cual, para
- * que el panel muestre la causa y el remedio en vez de un error engañoso.
+ * Active provider not usable: with mock SCM data, degrade to the AI mock
+ * (credential-less demo); with real data, throw `reason` as is so the panel
+ * shows the cause and the remedy instead of a misleading error.
  */
 function mockFallbackOrThrow(reason: string): AiService {
-  if (isMockGithubMode()) {
-    console.warn('[ai] ' + reason + ' GitHub está en modo mock: usando MockAiService.')
+  if (isMockScmMode()) {
+    console.warn('[ai] ' + reason + ' SCM is in mock mode: using MockAiService.')
     return new MockAiService()
   }
   throw new Error(reason)
@@ -112,20 +92,20 @@ function cliUnavailableReason(
 
 async function createAiServiceForProvider(
   provider: AiProviderId,
-  github: GithubService,
+  context: PrContextSource,
 ): Promise<AiService> {
   switch (provider) {
     case 'claude-code': {
       const status = await getCliProviderStatus('claude-code')
       if (status.status === 'authenticated') {
-        return new ClaudeCodeAiService(github)
+        return new ClaudeCodeAiService(context)
       }
       return mockFallbackOrThrow(cliUnavailableReason('Claude Code', 'claude', status.status))
     }
     case 'codex': {
       const status = await getCliProviderStatus('codex')
       if (status.status === 'authenticated') {
-        return new CodexAiService(github)
+        return new CodexAiService(context)
       }
       return mockFallbackOrThrow(cliUnavailableReason('Codex', 'codex', status.status))
     }
@@ -137,7 +117,7 @@ async function createAiServiceForProvider(
       // login del CLI en sí, sino conectar un proveedor DENTRO de OpenCode.
       const status = await getCliProviderStatus('opencode')
       if (status.status === 'authenticated') {
-        return new OpenCodeAiService(github)
+        return new OpenCodeAiService(context)
       }
       if (status.status === 'installed') {
         return mockFallbackOrThrow(
@@ -157,18 +137,18 @@ async function createAiServiceForProvider(
   }
 }
 
-export async function createAiService(github: GithubService): Promise<AiService> {
+export async function createAiService(context: PrContextSource): Promise<AiService> {
   // Override explícito para e2e/demo determinista (F11): hasta T59 las suites
   // forzaban el mock de IA dejando al proveedor default (openrouter) sin API
   // key; con los tres proveedores actuales siendo CLIs — que en una máquina de
   // desarrollo suelen estar instalados Y autenticados — ya no existía ninguna
   // forma de pedir el mock a propósito. `MINERVA_MOCK_AI=1` lo fuerza sin
-  // importar el proveedor seleccionado ni el modo de GitHub (documentado en
+  // importar el proveedor seleccionado ni el modo de SCM (documentado en
   // CLAUDE.md § comandos/e2e).
   if (process.env.MINERVA_MOCK_AI === '1') {
     console.warn('[ai] MINERVA_MOCK_AI=1: usando MockAiService (override explícito).')
     return new MockAiService()
   }
   const { provider } = getEffectiveAiSelection()
-  return createAiServiceForProvider(provider, github)
+  return createAiServiceForProvider(provider, context)
 }

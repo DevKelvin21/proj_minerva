@@ -11,10 +11,10 @@
  * Pipeline de `analyzePullRequest` (mismo contrato que el resto de los
  * proveedores de IA — `ClaudeCodeAiService`, `OpenCodeAiService` — ver
  * `../service.ts`):
- * 1. Pide el detalle y los archivos del PR al `GithubService` ACTIVO
+ * 1. Pide el detalle y los archivos del PR al `PrContextSource` (registro SCM)
  *    (inyectado por constructor).
- * 2. AGÉNTICO (F11/T58): `ensureSnapshot(this.github, req.repo, detail.headSha)`
- *    (`../../github/snapshot-store.ts`, T54) materializa una copia local del
+ * 2. AGÉNTICO (F11/T58): `this.context.ensureSnapshot(req.repo, detail.headSha)`
+ *    (`../../scm/snapshot-store.ts`, T54) materializa una copia local del
  *    repo AL COMMIT del PR; ese directorio va como `cwd` de `thread/start`
  *    (nombre del parámetro VERIFICADO contra el esquema real generado con
  *    `codex app-server generate-json-schema` en esta tarea —
@@ -80,10 +80,9 @@
  *    mata el cliente.
  * 6. El proceso hijo se mata SIEMPRE en el `finally` — nunca queda huérfano.
  */
-import type { AiService, AnalyzePullRequestOptions } from '../service'
-import type { GithubService } from '../../github/service'
+import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from '../service'
+import type { PrContextSource } from '../pr-context'
 import type { IpcRequest } from '../../../shared/ipc'
-import type { GeneratedAnalysis } from '../../../shared/types'
 import { getEffectiveAiSelection } from '../env'
 import { ANALYZE_PR_SYSTEM_PROMPT } from '../prompts/analyze-pr'
 import { buildAgenticUserMessage, prId } from '../analysis-prompt'
@@ -91,7 +90,6 @@ import { StreamSectionParser } from '../stream-parser'
 import { createThrottle } from '../throttle'
 import { createActivityTracker } from '../activity-tracker'
 import type { AnalysisActivityKind } from '../../../shared/events'
-import { ensureSnapshot } from '../../github/snapshot-store'
 import {
   AGENTIC_INACTIVITY_TIMEOUT_MS,
   AGENTIC_REQUEST_TIMEOUT_MS,
@@ -215,23 +213,23 @@ function turnFailureMessage(notification: JsonRpcNotification): string | null {
 }
 
 export class CodexAiService implements AiService {
-  constructor(private readonly github: GithubService) {}
+  constructor(private readonly context: PrContextSource) {}
 
   async analyzePullRequest(
     req: IpcRequest<'ai:analyzePullRequest'>,
     options?: AnalyzePullRequestOptions,
-  ): Promise<GeneratedAnalysis> {
+  ): Promise<AnalyzeResult> {
     const { model, options: modelOptions } = getEffectiveAiSelection()
 
     const [detail, files] = await Promise.all([
-      this.github.getPullRequestDetail(req),
-      this.github.getPullRequestFiles(req),
+      this.context.getDetail(req.repo, req.number),
+      this.context.getFiles(req.repo, req.number),
     ])
 
     // AGÉNTICO (F11/T58): copia local del repo al commit del PR — el `cwd`
     // que se le pasa a `thread/start` (ver el comentario del módulo).
     // Dedupeado/cacheado en disco por `ensureSnapshot` (T54).
-    const snapshotDir = await ensureSnapshot(this.github, req.repo, detail.headSha)
+    const snapshotDir = await this.context.ensureSnapshot(req.repo, detail.headSha)
 
     const userMessage = buildAgenticUserMessage(detail, files)
 
@@ -450,6 +448,7 @@ export class CodexAiService implements AiService {
 
     return {
       prId: prId(req),
+      headSha: detail.headSha,
       sections,
       generatedAt: new Date().toISOString(),
     }

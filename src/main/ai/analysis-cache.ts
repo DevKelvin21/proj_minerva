@@ -30,14 +30,11 @@
  * al singleton real) para poder testear con un fake en memoria sin tocar
  * disco.
  */
-import type { DidacticAnalysis, RepoRef } from '../../shared/types'
+import { prKey, type RepoRef } from '../../shared/scm'
+import type { DidacticAnalysis } from '../../shared/types'
 import { analysisStore, type AnalysisStoreLike } from './analysis-store'
 
 const MAX_ENTRIES = 20
-
-function prKey(repo: RepoRef, number: number): string {
-  return repo.owner + '/' + repo.name + '#' + number
-}
 
 export class AnalysisCache {
   private readonly entries = new Map<string, DidacticAnalysis>()

@@ -1,8 +1,10 @@
-import { GitBranch } from 'lucide-react'
+import { ExternalLink, GitBranch } from 'lucide-react'
 import type { PullRequestDetail } from '../../../../shared/types'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
+import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
+import { REVIEWER_VOTE_DISPLAY } from '../../lib/scm-labels'
 
 interface PrHeaderProps {
   pr: PullRequestDetail
@@ -31,7 +33,36 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
       <span>
         {pr.commits} {pr.commits === 1 ? 'commit' : 'commits'}
       </span>
+      <a
+        href={pr.webUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-1 underline decoration-dotted transition-colors hover:text-text"
+      >
+        <ExternalLink size={12} aria-hidden />
+        Open in {SCM_PROVIDER_LABEL[pr.repo.provider]}
+      </a>
     </div>
+  )
+
+  // Reviewer chips with their vote (approved / with suggestions / changes
+  // requested / rejected / no vote yet), provider-neutral.
+  const reviewers = pr.reviewers.length > 0 && (
+    <ul aria-label="Reviewers" className="flex flex-wrap gap-1.5">
+      {pr.reviewers.map((reviewer) => {
+        const vote = REVIEWER_VOTE_DISPLAY[reviewer.vote]
+        return (
+          <li key={reviewer.user.login} data-vote={reviewer.vote}>
+            <Badge tone={vote.tone}>
+              <Avatar user={reviewer.user} size={14} />
+              <span>{reviewer.user.displayName ?? reviewer.user.login}</span>
+              <span className="font-normal opacity-80">· {vote.label}</span>
+              {reviewer.isRequired && <span className="font-normal opacity-80">· required</span>}
+            </Badge>
+          </li>
+        )
+      })}
+    </ul>
   )
 
   const labels = pr.labels.length > 0 && (
@@ -39,8 +70,10 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
       {pr.labels.map((label) => (
         <span
           key={label.name}
-          className="rounded-full px-2 py-0.5 text-[11px] font-medium text-bg"
-          style={{ backgroundColor: `#${label.color}` }}
+          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            label.color ? 'text-bg' : 'bg-border/60 text-muted'
+          }`}
+          style={label.color ? { backgroundColor: `#${label.color}` } : undefined}
         >
           {label.name}
         </span>
@@ -61,6 +94,7 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
           </summary>
           <div className="absolute right-0 z-20 mt-1 flex w-72 flex-col gap-2 rounded-md border border-border bg-panel p-3 shadow-xl">
             {meta}
+            {reviewers}
             {labels}
           </div>
         </details>
@@ -78,6 +112,7 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
       </div>
 
       {meta}
+      {reviewers}
       {labels}
     </header>
   )

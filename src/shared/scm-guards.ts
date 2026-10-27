@@ -1,0 +1,65 @@
+/**
+ * Runtime guards for SCM shapes that cross a trust boundary: IPC payloads
+ * (`main/ipc/validators.ts`) and the detached didactic window's URL hash
+ * (`./didactic-route.ts`). Same rules in both places, so they live here.
+ */
+import type { AzureRepoRef, GithubRepoRef, RepoRef } from './scm'
+
+export const MAX_REPO_FIELD_LEN = 200
+/** `organization/project/name` can be longer than any single field. */
+export const MAX_REPO_FULL_NAME_LEN = 3 * MAX_REPO_FIELD_LEN + 2
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const own = Object.keys(value)
+  return own.length === keys.length && own.every((key) => keys.includes(key))
+}
+
+function isBoundedString(value: unknown, maxLen: number): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= maxLen
+}
+
+const GITHUB_KEYS = ['provider', 'owner', 'name', 'fullName'] as const
+const AZURE_KEYS = [
+  'provider',
+  'organization',
+  'project',
+  'name',
+  'repositoryId',
+  'fullName',
+] as const
+
+export function isGithubRepoRef(value: unknown): value is GithubRepoRef {
+  if (!isPlainObject(value) || value.provider !== 'github') return false
+  if (!hasExactKeys(value, GITHUB_KEYS)) return false
+  return (
+    isBoundedString(value.owner, MAX_REPO_FIELD_LEN) &&
+    isBoundedString(value.name, MAX_REPO_FIELD_LEN) &&
+    isBoundedString(value.fullName, MAX_REPO_FULL_NAME_LEN)
+  )
+}
+
+export function isAzureRepoRef(value: unknown): value is AzureRepoRef {
+  if (!isPlainObject(value) || value.provider !== 'azure') return false
+  if (!hasExactKeys(value, AZURE_KEYS)) return false
+  return (
+    isBoundedString(value.organization, MAX_REPO_FIELD_LEN) &&
+    isBoundedString(value.project, MAX_REPO_FIELD_LEN) &&
+    isBoundedString(value.name, MAX_REPO_FIELD_LEN) &&
+    isBoundedString(value.repositoryId, MAX_REPO_FIELD_LEN) &&
+    isBoundedString(value.fullName, MAX_REPO_FULL_NAME_LEN)
+  )
+}
+
+/** Strict: exact key set per variant, non-empty bounded strings. */
+export function isRepoRef(value: unknown): value is RepoRef {
+  return isGithubRepoRef(value) || isAzureRepoRef(value)
+}
+
+/** Builds a GitHub `RepoRef` with its derived `fullName`. */
+export function githubRepo(owner: string, name: string): GithubRepoRef {
+  return { provider: 'github', owner, name, fullName: owner + '/' + name }
+}

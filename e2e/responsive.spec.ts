@@ -131,7 +131,7 @@ test('Settings: todo el contenido es alcanzable con la ventana tileada', async (
     expect(Math.round(box!.y + box!.height)).toBeLessThanOrEqual(viewport.h)
 
     // Sección de GitHub: visible apenas se abre, sin desplegar nada.
-    await expect(window.getByText('Acceso a GitHub').first()).toBeVisible()
+    await expect(window.getByText('GitHub access').first()).toBeVisible()
 
     // Y el otro extremo del modal (tabs + lista de modelos + campo "Otro") se
     // alcanza scrolleando. Antes de F16 esto era IMPOSIBLE a 540px de alto.

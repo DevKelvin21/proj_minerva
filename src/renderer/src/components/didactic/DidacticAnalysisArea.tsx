@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
 import { useProviderStatus } from '../../hooks/use-provider-status'
-import { useSettings } from '../../hooks/use-settings'
+import { useScmSettings } from '../../hooks/use-scm-settings'
 import { isAnalysisStale } from '../../lib/staleness'
 import { DidacticSectionCard } from './DidacticSectionCard'
 import { Markdown } from '../ui/Markdown'
@@ -235,7 +235,7 @@ interface DidacticAnalysisAreaProps {
  * `checkingCache`/`loading`, con el texto "Explorando el repositorio…" en vez
  * de "Analizando PR con IA…". Si TODOS los proveedores reportan
  * `unavailable` (`useProviderStatus`) y la app no está en modo GitHub-mock
- * (`useSettings().info.mockGithub`), el placeholder final se reemplaza por
+ * (`useScmSettings().info.mockScm`), el placeholder final se reemplaza por
  * `NoCliProvidersCard` en vez de `DidacticPlaceholder`.
  *
  * T14: el toolbar (hint del modelo activo + botón "Re-analizar") se muestra
@@ -270,7 +270,7 @@ export function DidacticAnalysisArea({
   } = useDidacticAnalysis({ repo, number })
   const [viewerResource, setViewerResource] = useState<ViewerResource | null>(null)
   const providerStatus = useProviderStatus()
-  const settings = useSettings()
+  const scmSettings = useScmSettings().info
 
   // T60: mientras un proveedor agéntico está en fase "exploring" (usando
   // herramientas de solo lectura sobre el snapshot ANTES de escribir texto),
@@ -290,14 +290,14 @@ export function DidacticAnalysisArea({
 
   // T60: card "Necesitás al menos un CLI de IA" en vez del placeholder
   // normal cuando los TRES proveedores reportan `unavailable` y la app NO
-  // está en modo GitHub-mock (`settings.info.mockGithub` — con mock la demo
+  // está en modo SCM-mock (`scmSettings.mockScm` — con mock la demo
   // funciona sin ningún CLI vía `MockAiService`). `providerStatus.statuses`
-  // en `null` (todavía sin cargar) o `settings.info` en `null` deja la card
+  // en `null` (todavía sin cargar) o `scmSettings` en `null` deja la card
   // apagada: no hay suficiente información todavía para afirmarlo.
   const allProvidersUnavailable =
     providerStatus.statuses !== null &&
     Object.values(providerStatus.statuses).every((s) => s.status === 'unavailable')
-  const showNoCliCard = allProvidersUnavailable && settings.info !== null && !settings.info.mockGithub
+  const showNoCliCard = allProvidersUnavailable && scmSettings !== null && !scmSettings.mockScm
 
   let body: React.JSX.Element
   if (error) {

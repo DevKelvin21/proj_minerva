@@ -7,7 +7,7 @@ import { test, expect } from './fixtures'
  * invalidar cache (la trampa del cache-hit sin eventos de la suite legacy).
  */
 
-const PR_482 = { repo: { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
+const PR_482 = { repo: { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
 
 test('el análisis streamea eventos progresivos hasta done:true', async ({ window }) => {
   const result = await window.evaluate(async (pr) => {

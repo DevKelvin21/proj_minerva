@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GithubService } from '../../github/service'
+import type { PrContextSource } from '../pr-context'
 import type { DiffFile, PullRequestDetail } from '../../../shared/types'
 import type { DraftDidacticSection } from '../../../shared/events'
 import { AGENTIC_INACTIVITY_TIMEOUT_MS, AGENTIC_REQUEST_TIMEOUT_MS } from '../analysis-timeouts'
@@ -36,9 +36,6 @@ vi.mock('./resolve-cli', () => ({
  * devuelve como `cwd` (T58).
  */
 const ensureSnapshotMock = vi.fn()
-vi.mock('../../github/snapshot-store', () => ({
-  ensureSnapshot: (...args: unknown[]) => ensureSnapshotMock(...args),
-}))
 
 /**
  * `createAnalysisTimeouts` (T56) se envuelve (NO se reemplaza: se preserva
@@ -73,7 +70,12 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
 
 const { ClaudeCodeAiService, normalizeClaudeEffort } = await import('./claude-code-service')
 
-const repo = { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }
+const repo = {
+  provider: 'github' as const,
+  owner: 'shopwave',
+  name: 'api',
+  fullName: 'shopwave/api',
+}
 
 const detail: PullRequestDetail = {
   id: 'shopwave/api#482',
@@ -88,6 +90,7 @@ const detail: PullRequestDetail = {
   headRef: 'feat/apply-coupon',
   baseRef: 'main',
   headSha: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+  webUrl: 'https://github.com/shopwave/api/pull/482',
   commentCount: 0,
   reviewDecision: null,
   ciStatus: 'success',
@@ -111,14 +114,12 @@ const files: DiffFile[] = [
   },
 ]
 
-function makeGithubService(): GithubService {
+function makeGithubService(): PrContextSource {
   return {
-    listPullRequests: vi.fn(),
-    getPullRequestDetail: vi.fn().mockResolvedValue(detail),
-    getPullRequestFiles: vi.fn().mockResolvedValue(files),
-    getCommentThreads: vi.fn(),
-    postComment: vi.fn(),
-  } as unknown as GithubService
+    getDetail: vi.fn().mockResolvedValue(detail),
+    getFiles: vi.fn().mockResolvedValue(files),
+    ensureSnapshot: (...args: unknown[]) => ensureSnapshotMock(...args),
+  } as unknown as PrContextSource
 }
 
 interface FakeSdkMessage {
@@ -250,7 +251,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
       const service = new ClaudeCodeAiService(makeGithubService())
       const result = await service.analyzePullRequest({ repo, number: 482 })
 
-      expect(result.prId).toBe('shopwave/api#482')
+      expect(result.prId).toBe('github:shopwave/api#482')
       expect(result.sections).toEqual([{ kind: 'summary', markdown: 'Resumen del PR' }])
       expect(typeof result.generatedAt).toBe('string')
       expect(() => new Date(result.generatedAt).toISOString()).not.toThrow()
@@ -279,7 +280,7 @@ describe('ClaudeCodeAiService.analyzePullRequest', () => {
       expect(call.prompt).toContain(detail.title)
 
       // `ensureSnapshot` se llama con el headSha del detail (T58).
-      expect(ensureSnapshotMock).toHaveBeenCalledWith(expect.anything(), repo, detail.headSha)
+      expect(ensureSnapshotMock).toHaveBeenCalledWith(repo, detail.headSha)
 
       // Timeouts AGÉNTICOS (300s/60s), no los de generación directa (T58).
       expect(createAnalysisTimeoutsCalls).toEqual([

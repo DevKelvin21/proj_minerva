@@ -26,7 +26,7 @@ test('los eventos de progreso llevan el buffer activity y la UI lo pinta', async
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
 
   const result = await window.evaluate(async () => {
-    const repo = { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }
+    const repo = { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }
     const events: {
       done: boolean
       phase: string | null

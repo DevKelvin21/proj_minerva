@@ -4,6 +4,7 @@ import type { CommentThread } from '../../../../shared/types'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Markdown } from '../ui/Markdown'
+import { threadStatusBadge } from '../../lib/scm-labels'
 
 interface ThreadCardProps {
   thread: CommentThread
@@ -36,6 +37,7 @@ export function ThreadCard({
   extraHeaderContent,
 }: ThreadCardProps): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(collapsedByDefault)
+  const statusBadge = threadStatusBadge(thread.status)
   const [draft, setDraft] = useState('')
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -113,7 +115,12 @@ export function ThreadCard({
           </span>
         </button>
         <div className="flex shrink-0 items-center gap-2">
-          {thread.isResolved && <Badge tone="success">Resuelto</Badge>}
+          {statusBadge && (
+            <Badge tone={statusBadge.tone}>
+              <span data-thread-status={thread.status}>{statusBadge.label}</span>
+            </Badge>
+          )}
+          {thread.isOutdated && <Badge tone="neutral">Outdated</Badge>}
           {extraHeaderContent}
         </div>
       </div>

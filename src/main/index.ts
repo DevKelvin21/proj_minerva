@@ -1,10 +1,8 @@
-import { app, BrowserWindow, safeStorage } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { registerIpcHandlers } from './ipc/handlers'
-import { authManager } from './auth/auth-manager'
-import { ghCliAuth } from './auth/gh-cli-auth'
-import { settingsStore } from './settings/store'
-import { createSnapshotCleaner } from './github/snapshot-store'
+import { ghCliAuth } from './scm/github/gh-cli-auth'
+import { createSnapshotCleaner } from './scm/snapshot-store'
 import { stopOpencodeServer } from './ai/providers/opencode-runtime'
 import { secureWebPreferences } from './windows/secure-web-preferences'
 import { installExternalLinkGuard } from './windows/external-link-guard'
@@ -19,28 +17,6 @@ const isDev = !app.isPackaged
 // `app.getPath('userData')` en main son lazy, dentro de funciones).
 if (process.env.MINERVA_USER_DATA_DIR) {
   app.setPath('userData', process.env.MINERVA_USER_DATA_DIR)
-}
-
-/**
- * Password store de Chromium en Linux: en desktops que Chromium NO reconoce
- * (Hyprland/sway/wlroots en general, p. ej. Omarchy) cae a `basic_text`, con
- * el que `safeStorage.isEncryptionAvailable()` es `false` → el token de
- * GitHub nunca se persiste (`auth/token-store.ts` se niega, a propósito, a
- * guardarlo sin cifrar) y hay que loguearse en CADA arranque — en dev y en
- * producción por igual. Si el desktop es desconocido se fuerza
- * `gnome-libsecret` (el Secret Service de D-Bus: gnome-keyring, KeepassXC,
- * etc.), sobreescribible con MINERVA_PASSWORD_STORE. Debe correr ANTES de
- * `app.whenReady()`.
- */
-const CHROMIUM_KNOWN_DESKTOPS = /gnome|kde|xfce|cinnamon|pantheon|deepin|ukui|lxqt|unity/i
-if (process.platform === 'linux') {
-  const desktop = process.env.XDG_CURRENT_DESKTOP ?? ''
-  const override = process.env.MINERVA_PASSWORD_STORE
-  if (override) {
-    app.commandLine.appendSwitch('password-store', override)
-  } else if (!CHROMIUM_KNOWN_DESKTOPS.test(desktop)) {
-    app.commandLine.appendSwitch('password-store', 'gnome-libsecret')
-  }
 }
 
 function createWindow(): void {
@@ -75,18 +51,6 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(async () => {
-  // Diagnóstico permanente: si esto dice `basic_text` / `false`, el token de
-  // GitHub NO va a persistir y el login se pedirá en cada arranque (la causa
-  // del "siempre tengo que volver a loguearme" — ver el bloque de arriba).
-  if (process.platform === 'linux') {
-    console.log(
-      '[auth] safeStorage backend:',
-      safeStorage.getSelectedStorageBackend(),
-      '— cifrado disponible:',
-      safeStorage.isEncryptionAvailable(),
-    )
-  }
-
   // Enriquecer el PATH con el del shell de login del usuario ANTES de registrar
   // handlers (el probe de proveedores CLI y `resolve-cli.ts` cachean, así que
   // deben ver el PATH completo desde la primera resolución). Solo importa en el
@@ -96,25 +60,11 @@ void app.whenReady().then(async () => {
     hydratePathFromLoginShell()
   }
 
-  // Se espera antes de registrar los handlers para que la primera llamada a
-  // `auth:getStatus` del renderer ya refleje un token persistido válido (si
-  // lo hay), en vez de reportar `signed_out` un instante y luego "saltar" a
-  // `signed_in` sin que nada haya disparado ese cambio.
-  await authManager.init()
-
-  // F14/F18: calienta el probe de `gh` para que la primera `auth:getStatus`
-  // del renderer no tenga que esperar el spawn entero.
-  //
-  // SIN `await` (F18): hasta F14 esto era opt-in — solo lo pagaba quien había
-  // elegido `gh-cli` en Settings. Desde que ese modo es el DEFAULT lo paga
-  // TODO arranque, y el probe incluye una llamada de red (`GET /user`): con
-  // `await`, una red lenta o caída retrasaba la aparición de la ventana. El
-  // single-flight de `ghCliAuth` hace que esta llamada valga igual — la
-  // primera consulta del renderer se engancha a ESTA misma promesa en vuelo
-  // en vez de spawnear otro `gh`.
-  if (settingsStore.getGithubAccessMode() === 'gh-cli') {
-    void ghCliAuth.getStatus()
-  }
+  // Warm the `gh` probe so the renderer's first `scm:getAuthStatus` doesn't
+  // wait for the whole spawn. NOT awaited: the probe includes a network call
+  // (`GET /user`) and a slow network must not delay the window. The probe is
+  // single-flight, so the renderer's first query joins this same promise.
+  void ghCliAuth.getStatus()
 
   const { stopPrWatcher } = await registerIpcHandlers()
 

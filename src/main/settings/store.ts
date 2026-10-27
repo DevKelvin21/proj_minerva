@@ -1,7 +1,7 @@
 /**
  * Persistencia de settings de usuario (T12, reestructurado en T26), no
- * secreta (a diferencia del token de GitHub en `../auth/token-store.ts`, que
- * va cifrado con `safeStorage`): un `settings.json` plano en
+ * secreta (the GitHub token is never stored: it comes from `gh` and lives in memory,
+ * see `../scm/github/gh-cli-auth.ts`): un `settings.json` plano en
  * `app.getPath('userData')`.
  *
  * Forma en disco desde T26 (multi-proveedor): `{ "aiProvider": "opencode",
@@ -68,45 +68,6 @@ import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 
 import { join } from 'node:path'
 import { app } from 'electron'
 import { DEFAULT_AI_PROVIDER, isAiProviderId, type AiProviderId } from '../../shared/ai-providers'
-import type { GithubAccessMode } from '../../shared/types'
-
-/**
- * Modo de acceso a GitHub por defecto (F18): `gh-cli`. Hasta F14 el default
- * era `oauth` y el modo se elegía desde Settings; F18 retira ese toggle —
- * OAuth resultó menos conveniente que el CLI en el uso real (device flow
- * manual en cada equipo, y bloqueado de entrada en orgs con *OAuth app access
- * restrictions*).
- */
-const DEFAULT_GITHUB_ACCESS_MODE: GithubAccessMode = 'gh-cli'
-
-/** Env del escape hatch de OAuth (F18): ver `resolveGithubAccessMode`. */
-const GITHUB_ACCESS_ENV = 'MINERVA_GITHUB_ACCESS'
-
-function isGithubAccessMode(value: unknown): value is GithubAccessMode {
-  return value === 'oauth' || value === 'gh-cli'
-}
-
-/**
- * Modo VIGENTE (F18): env override, o `gh-cli`. NO consulta `settings.json` a
- * propósito — el modo dejó de ser una preferencia persistida cuando dejó de
- * tener UI. Si siguiera leyéndose del disco, un `githubAccessMode: "oauth"`
- * escrito por una versión ≤0.6.x dejaría a esa instalación en un modo que
- * ninguna pantalla muestra ni permite cambiar (estado invisible), justo el
- * bug que este resolver evita. Los `settings.json` viejos con esa clave se
- * siguen ACEPTANDO al leer (ver `isNewPersistedSettings`) para no invalidar
- * el archivo entero; simplemente se ignora y desaparece en la próxima
- * escritura.
- *
- * `MINERVA_GITHUB_ACCESS=oauth` es la única vía a OAuth: existe para quien no
- * puede instalar `gh` (equipo administrado, política de la org). Todo el
- * camino OAuth (`./auth/device-flow.ts`, `./auth/token-store.ts`, la máquina
- * de estados de `AuthManager` y sus vistas en TitleBar/Sidebar) sigue vivo y
- * probado detrás de este flag.
- */
-function resolveGithubAccessMode(): GithubAccessMode {
-  const override = process.env[GITHUB_ACCESS_ENV]
-  return isGithubAccessMode(override) ? override : DEFAULT_GITHUB_ACCESS_MODE
-}
 
 const SETTINGS_FILE_NAME = 'settings.json'
 
@@ -136,10 +97,9 @@ const ORPHANED_OPENROUTER_KEY_FILE_NAME = 'openrouter-key.bin'
  * el NOMBRE de la cuenta, jamás su token (ese lo sigue emitiendo `gh` y solo
  * vive en memoria de main).
  *
- * `githubAccessMode` ya NO se persiste (F18): el modo vigente lo decide
- * `resolveGithubAccessMode()` desde el entorno. La clave puede seguir en
- * disco en instalaciones ≤0.6.x y se tolera al leer, pero no se vuelve a
- * escribir.
+ * `githubAccessMode` (≤0.8.x) is no longer read or written: GitHub access is
+ * the `gh` token bridge only. The key may still be on disk in old installs;
+ * it is ignored (any value) and disappears on the next write.
  */
 export interface PersistedSettings {
   aiProvider: AiProviderId
@@ -191,11 +151,7 @@ function isNewPersistedSettings(value: unknown): value is PersistedSettings {
   if (!isAiProviderId(value.aiProvider) || !isModelsMap(value.models)) return false
   // `modelOptions` es ADITIVO (T34): ausente = settings pre-T34, sigue siendo válido.
   if (value.modelOptions !== undefined && !isModelOptionsMap(value.modelOptions)) return false
-  // `githubAccessMode` (F14) ya no se escribe (F18) pero puede seguir en disco: se
-  // TOLERA con su whitelist de siempre para no invalidar el archivo entero de una
-  // instalación ≤0.6.x; su valor se ignora (ver `resolveGithubAccessMode`).
-  if (value.githubAccessMode !== undefined && !isGithubAccessMode(value.githubAccessMode))
-    return false
+  // A legacy `githubAccessMode` key is ignored, whatever its value.
   // `githubAccount` es ADITIVO (F18): ausente = "cuenta activa de gh"; presente pero
   // con algo que no es un login usable se rechaza (settings.json editado a mano no
   // debe colar basura que después termine en un argv de `gh`).
@@ -391,18 +347,6 @@ export class SettingsStore {
     return this.load()?.modelOptions?.[provider] ?? {}
   }
 
-  /**
-   * Modo de acceso a GitHub VIGENTE (F18): `gh-cli`, salvo que
-   * `MINERVA_GITHUB_ACCESS=oauth` fuerce el escape hatch. Ya no consulta
-   * disco — ver `resolveGithubAccessMode` para el porqué. Sigue viviendo en
-   * este store (y no en un módulo de env aparte) porque todos sus
-   * consumidores — `../auth/auth-manager.ts`, `../github/gh-retry.ts`,
-   * `../ai/env.ts` — ya lo llaman por acá.
-   */
-  getGithubAccessMode(): GithubAccessMode {
-    return resolveGithubAccessMode()
-  }
-
   /** Cuenta de `gh` elegida a mano (F18), o `null` para seguir la cuenta activa del CLI. */
   getGithubAccount(): string | null {
     return this.load()?.githubAccount ?? null
@@ -413,7 +357,7 @@ export class SettingsStore {
    * volver a "la cuenta activa de `gh`". No valida contra la lista real de
    * cuentas a propósito (misma doctrina que `setModelOption`): si el usuario
    * borra esa cuenta de `gh` después, la LECTURA lo resuelve — el probe falla
-   * y `AuthStatus` lo reporta con `ghAccount`, en vez de dejar un valor
+   * y `ScmAuthStatus.detail` lo nombra, en vez de dejar un valor
    * huérfano bloqueado.
    */
   setGithubAccount(login: string | null): void {

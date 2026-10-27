@@ -7,6 +7,7 @@ const author = { login: 'dkumar', avatarUrl: '' }
 function makeThread(overrides: Partial<CommentThread>): CommentThread {
   return {
     id: 'thread-1',
+    status: 'active',
     isResolved: false,
     isLineThread: true,
     comments: [

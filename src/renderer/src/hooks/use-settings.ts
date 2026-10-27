@@ -31,16 +31,6 @@ interface UseSettingsResult {
    * `false` si falló (revisar `error`).
    */
   setModelOption: (provider: AiProviderId, optionId: string, value: string) => Promise<boolean>
-  /**
-   * Elige la cuenta de `gh` a usar (F18; patrón `selectProvider`), o `null`
-   * para volver a la cuenta activa del CLI: persiste vía
-   * `settings:setGithubAccount` y ADEMÁS refresca `auth:getStatus` al store
-   * (`setAuthStatus`) para que TitleBar/Sidebar muestren la identidad NUEVA de
-   * inmediato, sin esperar al polling declarativo de `use-auth.ts`. `true` si
-   * se guardó bien; `false` si falló (revisar `error`) — el refresco de auth
-   * es best-effort y no afecta este resultado.
-   */
-  setGithubAccount: (login: string | null) => Promise<boolean>
   reload: () => void
 }
 
@@ -51,20 +41,19 @@ interface UseSettingsResult {
  * (`aiModelInfo`), no en estado local: varios consumidores usan este mismo hook
  * (`SettingsModal`/`ProviderPicker`/`ModelPicker` y el hint sutil del panel
  * didáctico) y todos deben ver el mismo valor sin refetchear cada uno por su
- * lado — mismo patrón que `authStatus`/`useAuth`.
+ * lado — mismo patrón que `scmAuth`/`useScmAuth`.
  *
  * Carga automáticamente una vez si `aiModelInfo` todavía es `null` (primer
  * montaje de cualquier consumidor). El efecto de carga inicial lee el store
  * de forma imperativa (`useAppStore.getState()`) en vez de depender
  * reactivamente de `info`, y solo llama a `setState` dentro de callbacks de
  * la promesa (no de forma síncrona en el cuerpo del efecto): mismo criterio
- * que sigue `useAuth` (`use-auth.ts`) para su carga inicial, para no caer en
+ * que sigue `useScmAuth` (`use-scm-auth.ts`) para su carga inicial, para no caer en
  * el antipatrón que marca `react-hooks/set-state-in-effect`.
  */
 export function useSettings(): UseSettingsResult {
   const info = useAppStore((s) => s.aiModelInfo)
   const setInfo = useAppStore((s) => s.setAiModelInfo)
-  const setAuthStatus = useAppStore((s) => s.setAuthStatus)
   const [loading, setLoading] = useState(() => useAppStore.getState().aiModelInfo === null)
   const [error, setError] = useState<string | null>(null)
 
@@ -142,28 +131,6 @@ export function useSettings(): UseSettingsResult {
     [setInfo],
   )
 
-  const setGithubAccount = useCallback(
-    async (login: string | null): Promise<boolean> => {
-      setError(null)
-      try {
-        const result = await window.minerva.settings.setGithubAccount({ login })
-        setInfo(result)
-        try {
-          const authStatus = await window.minerva.auth.getStatus()
-          setAuthStatus(authStatus)
-        } catch {
-          // Best-effort: si este refresco puntual falla, el polling
-          // declarativo de `use-auth.ts` (T71) lo recupera en ≤3s.
-        }
-        return true
-      } catch (err) {
-        setError(toErrorMessage(err))
-        return false
-      }
-    },
-    [setInfo, setAuthStatus],
-  )
-
   return {
     info,
     loading,
@@ -171,7 +138,6 @@ export function useSettings(): UseSettingsResult {
     selectProvider,
     saveModel,
     setModelOption,
-    setGithubAccount,
     reload,
   }
 }

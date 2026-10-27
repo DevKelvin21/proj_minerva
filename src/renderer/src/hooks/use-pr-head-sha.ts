@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { RepoRef } from '../../../shared/types'
+import { repoKey } from '../../../shared/scm'
 
 interface UsePrHeadShaResult {
   /** `null` mientras carga o si el fetch falla (best-effort, T42). */
@@ -11,7 +12,7 @@ interface UsePrHeadShaResult {
  * 2): la ventana didáctica desacoplada no recibe el `PullRequestSummary`
  * completo (a diferencia de `DidacticPanel`, que ya tiene `selectedPr.headSha`
  * sin pedir nada) — este hook hace UN fetch liviano de
- * `github:getPullRequestDetail` al montar solo para conseguir ese SHA.
+ * `scm:getPullRequestDetail` al montar solo para conseguir ese SHA.
  *
  * Sigue el mismo patrón que `use-pull-request-detail.ts`: `setState` solo
  * dentro de callbacks de la promesa (nunca síncrono en el cuerpo del
@@ -21,14 +22,15 @@ interface UsePrHeadShaResult {
  * barra de staleness simplemente no aparece sin `currentHeadSha`).
  */
 export function usePrHeadSha(repo: RepoRef, number: number): UsePrHeadShaResult {
+  const repoIdentity = repoKey(repo)
   const [headSha, setHeadSha] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!repo.owner || !repo.name || !Number.isInteger(number) || number <= 0) return
+    if (!repo.name || !Number.isInteger(number) || number <= 0) return
 
     let cancelled = false
 
-    void window.minerva.github
+    void window.minerva.scm
       .getPullRequestDetail({ repo, number })
       .then((detail) => {
         if (!cancelled) setHeadSha(detail.headSha)
@@ -42,7 +44,7 @@ export function usePrHeadSha(repo: RepoRef, number: number): UsePrHeadShaResult 
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se depende de campos primitivos de `repo`, no de su identidad de objeto.
-  }, [repo.owner, repo.name, number])
+  }, [repoIdentity, number])
 
   return { headSha }
 }

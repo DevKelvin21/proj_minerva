@@ -76,11 +76,25 @@ describe('AnalysisStore', () => {
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
 
-    writeFileSync(analysesFilePath(), JSON.stringify({ version: 2, entries: [] }), 'utf-8')
+    writeFileSync(analysesFilePath(), JSON.stringify({ version: 99, entries: [] }), 'utf-8')
     expect(new AnalysisStore().loadEntries()).toEqual([])
 
     writeFileSync(analysesFilePath(), JSON.stringify(['not', 'an', 'object']), 'utf-8')
     expect(new AnalysisStore().loadEntries()).toEqual([])
+  })
+
+  it('drops a version 1 file (old owner/name#n keys) quietly, without crashing', () => {
+    const entries = [{ key: 'shopwave/api#1', analysis: analysis('shopwave/api#1') }]
+    writeFileSync(analysesFilePath(), JSON.stringify({ version: 1, entries }), 'utf-8')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const store = new AnalysisStore()
+    expect(store.loadEntries()).toEqual([])
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+
+    store.saveEntries([{ key: 'github:shopwave/api#1', analysis: analysis('x') }])
+    expect(JSON.parse(readFileSync(analysesFilePath(), 'utf-8')).version).toBe(2)
   })
 
   it('descarta entries con forma inválida pero conserva las válidas', () => {
@@ -101,7 +115,7 @@ describe('AnalysisStore', () => {
     writeFileSync(
       analysesFilePath(),
       JSON.stringify({
-        version: 1,
+        version: 2,
         entries: [valid, badKey, badAnalysisMissingHeadSha, badGeneratedWith, notAnObject],
       }),
       'utf-8',
@@ -137,7 +151,7 @@ describe('AnalysisStore', () => {
     new AnalysisStore().saveEntries(entries)
 
     const raw = readFileSync(analysesFilePath(), 'utf-8')
-    expect(JSON.parse(raw)).toEqual({ version: 1, entries })
+    expect(JSON.parse(raw)).toEqual({ version: 2, entries })
     expect(raw).toContain('\n') // pretty-printed
     expect(existsSync(analysesFilePath() + '.tmp')).toBe(false)
   })
@@ -163,7 +177,7 @@ describe('AnalysisStore', () => {
       key: 'shopwave/api#' + (i + 1),
       analysis: analysis('pr' + (i + 1)),
     }))
-    writeFileSync(analysesFilePath(), JSON.stringify({ version: 1, entries }), 'utf-8')
+    writeFileSync(analysesFilePath(), JSON.stringify({ version: 2, entries }), 'utf-8')
 
     const loaded = new AnalysisStore().loadEntries()
     expect(loaded).toHaveLength(20)

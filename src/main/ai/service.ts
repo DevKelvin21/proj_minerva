@@ -15,7 +15,7 @@
  *   Edilson (esos modelos se usan ahora DENTRO de OpenCode).
  *
  * `src/main/ipc/handlers.ts` delega el canal `ai:analyzePullRequest` a una
- * única instancia creada por `createAiService(githubService)` (`./index.ts`).
+ * única instancia creada por `createAiService(prContext)` (`./index.ts`).
  *
  * T13 (streaming): `analyzePullRequest` acepta un segundo parámetro opcional
  * con `onProgress`, invocado cero o más veces DURANTE el análisis con un
@@ -29,8 +29,9 @@
  * completo que recibe el renderer. El handler (`../ipc/handlers.ts`) es quien
  * enriquece ese contenido a `DidacticAnalysis` sellando `headSha` (SHA del
  * head del PR al generar) y `generatedWith` (proveedor/modelo/opciones
- * efectivos), antes de cachear/persistir/devolver — ver T40. Ninguna
- * implementación de `AiService` debe tocar esos dos campos.
+ * efectivos), antes de cachear/persistir/devolver — ver T40. Services only
+ * report the `headSha` they analyzed (`AnalyzeResult`); `generatedWith` is the
+ * handler's.
  */
 import type { IpcRequest } from '../../shared/ipc'
 import type { GeneratedAnalysis } from '../../shared/types'
@@ -71,9 +72,18 @@ export interface AnalyzePullRequestOptions {
   onProgress?: AnalyzeProgressCallback
 }
 
+/**
+ * What a service returns: the generated content plus the `headSha` of the
+ * commit it analyzed (the service already fetched the PR detail to build the
+ * snapshot, so the handler doesn't fetch it a second time).
+ */
+export interface AnalyzeResult extends GeneratedAnalysis {
+  headSha: string
+}
+
 export interface AiService {
   analyzePullRequest(
     req: IpcRequest<'ai:analyzePullRequest'>,
     options?: AnalyzePullRequestOptions,
-  ): Promise<GeneratedAnalysis>
+  ): Promise<AnalyzeResult>
 }

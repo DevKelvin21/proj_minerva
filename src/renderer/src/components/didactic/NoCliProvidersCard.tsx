@@ -10,8 +10,8 @@ interface NoCliProvidersCardProps {
 /**
  * Card que reemplaza el `DidacticPlaceholder` normal (T60) cuando
  * `useProviderStatus` reporta los TRES proveedores en `unavailable` Y la app
- * NO está en modo GitHub-mock (`AiSettingsInfo.mockGithub`, ver
- * `../../hooks/use-settings.ts` — con mock la demo funciona sin ningún CLI
+ * NO está en modo SCM-mock (`ScmSettingsInfo.mockScm`, ver
+ * `../../hooks/use-scm-settings.ts` — con mock la demo funciona sin ningún CLI
  * vía `MockAiService`, así que esta card no aplica). Vive en
  * `DidacticAnalysisArea.tsx`, no en `DidacticPlaceholder.tsx`: el caso "sin
  * PR seleccionado" (`DidacticPanel` sin `selectedPr`) no tiene sentido acá,

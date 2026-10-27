@@ -16,7 +16,7 @@
  * punta a punta con datos reales, así que un mock funcionando es evidencia
  * de que el parser funciona.
  *
- * Reutiliza `prFixtures` de `../github/fixtures` (mismo universo mock
+ * Reutiliza `prFixtures` de `../scm/github/fixtures` (mismo universo mock
  * "shopwave") para poder armar un resumen genérico con datos reales del PR
  * (título, contadores, labels) cuando no hay sección enriquecida para él.
  *
@@ -29,10 +29,11 @@
  * mini-log y el skeleton "Explorando el repositorio…" de forma determinista.
  */
 import type { IpcRequest } from '../../shared/ipc'
-import type { DidacticSection, GeneratedAnalysis, RepoRef } from '../../shared/types'
-import { prFixtures } from '../github/fixtures'
+import { prKey, sameRepo } from '../../shared/scm'
+import type { DidacticSection } from '../../shared/types'
+import { prFixtures } from '../scm/github/fixtures'
 import { genericSummarySection, richDidacticSections } from './fixtures'
-import type { AiService, AnalyzePullRequestOptions } from './service'
+import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from './service'
 import { StreamSectionParser, stringifySections } from './stream-parser'
 import { createActivityTracker, type ActivityTracker } from './activity-tracker'
 
@@ -43,10 +44,6 @@ const STREAM_CHUNK_DELAY_MS = 150
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function prKey(repo: RepoRef, number: number): string {
-  return `${repo.owner}/${repo.name}#${number}`
 }
 
 /** Trocea `text` en `~chunks` pedazos de tamaño parejo, cortando en cualquier punto (a propósito: ejercita la tolerancia del parser a marcadores partidos). */
@@ -140,16 +137,20 @@ export class MockAiService implements AiService {
   async analyzePullRequest(
     req: IpcRequest<'ai:analyzePullRequest'>,
     options?: AnalyzePullRequestOptions,
-  ): Promise<GeneratedAnalysis> {
+  ): Promise<AnalyzeResult> {
     const prId = prKey(req.repo, req.number)
     const rich = richDidacticSections[prId]
+    const fixture = prFixtures.find(
+      (f) => sameRepo(f.detail.repo, req.repo) && f.detail.number === req.number,
+    )
+    // Same head commit the mock SCM reports, so staleness checks line up.
+    const headSha = fixture?.detail.headSha ?? ''
 
     if (rich) {
       const sections = await streamFixture(rich, options?.onProgress)
-      return { prId, sections, generatedAt: new Date().toISOString() }
+      return { prId, headSha, sections, generatedAt: new Date().toISOString() }
     }
 
-    const fixture = prFixtures.find((f) => f.detail.id === prId)
     if (!fixture) {
       // Mensaje honesto: el PR existe perfectamente, es ESTE mock el que no
       // lo conoce. Decir "Pull request no encontrado" culpaba al PR cuando el
@@ -164,6 +165,6 @@ export class MockAiService implements AiService {
     }
 
     const sections = await streamFixture([genericSummarySection(fixture.detail)], options?.onProgress)
-    return { prId, sections, generatedAt: new Date().toISOString() }
+    return { prId, headSha, sections, generatedAt: new Date().toISOString() }
   }
 }

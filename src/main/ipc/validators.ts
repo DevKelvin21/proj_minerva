@@ -16,9 +16,9 @@
  */
 import { isAiProviderId } from '../../shared/ai-providers'
 import type { IpcChannel } from '../../shared/ipc'
+import { isRepoRef } from '../../shared/scm-guards'
 
 const MAX_SEARCH_LEN = 256
-const MAX_REPO_FIELD_LEN = 200
 const MAX_BODY_LEN = 65536
 const MAX_THREAD_ID_LEN = 200
 const MAX_PATH_LEN = 500
@@ -27,7 +27,6 @@ const MAX_AI_MODEL_LEN = 100
 const MAX_PR_TITLE_LEN = 300
 const MAX_OPTION_ID_LEN = 50
 const MAX_OPTION_VALUE_LEN = 50
-const MAX_PR_ID_LEN = 200
 const MAX_UPDATED_AT_LEN = 64
 /** Login de GitHub (F18): 39 en github.com, con holgura por GHES. */
 const MAX_GH_LOGIN_LEN = 64
@@ -59,16 +58,6 @@ function isOptionalIntGte(value: unknown, min: number): boolean {
   )
 }
 
-function isRepoRef(value: unknown): boolean {
-  if (!isPlainObject(value)) return false
-  if (!hasOnlyKeys(value, ['owner', 'name', 'fullName'])) return false
-  return (
-    isNonEmptyString(value.owner, MAX_REPO_FIELD_LEN) &&
-    isNonEmptyString(value.name, MAX_REPO_FIELD_LEN) &&
-    isNonEmptyString(value.fullName, MAX_REPO_FIELD_LEN)
-  )
-}
-
 /** Forma común a `getPullRequestDetail/Files/getCommentThreads` y `ai:analyzePullRequest`. */
 function isRepoAndNumberPayload(value: unknown): boolean {
   if (!isPlainObject(value)) return false
@@ -93,16 +82,16 @@ function isListPullRequestsPayload(value: unknown): boolean {
 }
 
 /**
- * `github:markPrSeen` (T50/T51, F10): `prId` no vacío (id opaco de GitHub,
- * puede no ser numérico), `updatedAt` no vacío (string ISO), `commentCount`
- * entero ≥0 — sin claves extra.
+ * `scm:markPrSeen`: the PR (`repo` + `number`), `updatedAt` non-empty (ISO
+ * string), `commentCount` integer ≥0 or `null` (provider didn't report it).
  */
 function isMarkPrSeenPayload(value: unknown): boolean {
   if (!isPlainObject(value)) return false
-  if (!hasOnlyKeys(value, ['prId', 'updatedAt', 'commentCount'])) return false
-  if (!isNonEmptyString(value.prId, MAX_PR_ID_LEN)) return false
+  if (!hasOnlyKeys(value, ['repo', 'number', 'updatedAt', 'commentCount'])) return false
+  if (!isRepoRef(value.repo)) return false
+  if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
   if (!isNonEmptyString(value.updatedAt, MAX_UPDATED_AT_LEN)) return false
-  return isIntInRange(value.commentCount, 0, Number.MAX_SAFE_INTEGER)
+  return value.commentCount === null || isIntInRange(value.commentCount, 0, Number.MAX_SAFE_INTEGER)
 }
 
 function isPostCommentPayload(value: unknown): boolean {
@@ -162,7 +151,7 @@ function isSetModelOptionPayload(value: unknown): boolean {
 }
 
 /**
- * `settings:setGithubAccount` (F18): `login` es el nombre de una cuenta de
+ * `scm:setGithubAccount` (F18): `login` es el nombre de una cuenta de
  * `gh`, o `null` para volver a la cuenta activa del CLI. Se exige sin
  * espacios y acotado (`MAX_GH_LOGIN_LEN`) porque este valor termina como
  * argumento de `gh auth token --user <login>` (`execFile`, sin shell — no hay
@@ -193,16 +182,16 @@ function isOpenDidacticWindowPayload(value: unknown): boolean {
 export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean> = {
   'minerva:ping': isVoidPayload,
   'minerva:getVersion': isVoidPayload,
-  'auth:getStatus': isVoidPayload,
-  'auth:startDeviceFlow': isVoidPayload,
-  'auth:signOut': isVoidPayload,
-  'auth:listGhAccounts': isVoidPayload,
-  'github:listPullRequests': isListPullRequestsPayload,
-  'github:markPrSeen': isMarkPrSeenPayload,
-  'github:getPullRequestDetail': isRepoAndNumberPayload,
-  'github:getPullRequestFiles': isRepoAndNumberPayload,
-  'github:getCommentThreads': isRepoAndNumberPayload,
-  'github:postComment': isPostCommentPayload,
+  'scm:getAuthStatus': isVoidPayload,
+  'scm:listGhAccounts': isVoidPayload,
+  'scm:getSettings': isVoidPayload,
+  'scm:setGithubAccount': isSetGithubAccountPayload,
+  'scm:listPullRequests': isListPullRequestsPayload,
+  'scm:markPrSeen': isMarkPrSeenPayload,
+  'scm:getPullRequestDetail': isRepoAndNumberPayload,
+  'scm:getPullRequestFiles': isRepoAndNumberPayload,
+  'scm:getCommentThreads': isRepoAndNumberPayload,
+  'scm:postComment': isPostCommentPayload,
   'ai:analyzePullRequest': isRepoAndNumberPayload,
   'ai:getCachedAnalysis': isRepoAndNumberPayload,
   'ai:invalidateAnalysis': isRepoAndNumberPayload,
@@ -213,10 +202,9 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'settings:setAiProvider': isSetAiProviderPayload,
   'settings:setProviderModel': isSetProviderModelPayload,
   'settings:setModelOption': isSetModelOptionPayload,
-  'settings:setGithubAccount': isSetGithubAccountPayload,
   'window:openDidactic': isOpenDidacticWindowPayload,
   // Auto-updater (T90, F17): los 5 canales son `req: void` — mismo guard que
-  // `minerva:ping`/`auth:getStatus`, rechaza cualquier cosa distinta de `undefined`.
+  // `minerva:ping`/`scm:getAuthStatus`, rechaza cualquier cosa distinta de `undefined`.
   'updater:getStatus': isVoidPayload,
   'updater:check': isVoidPayload,
   'updater:download': isVoidPayload,

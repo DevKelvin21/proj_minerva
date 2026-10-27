@@ -280,13 +280,5 @@ export function getAiSettingsInfo(): AiSettingsInfo {
     perProviderModel: persisted?.models ?? {},
     catalog: AI_PROVIDER_CATALOG,
     selectedOptions: { [provider]: options },
-    // T60: SOLO refleja el flag de GitHub mock (universo "shopwave"), nunca
-    // el estado de la IA — ver el comentario de `mockGithub` en
-    // `../../shared/types.ts`.
-    mockGithub: process.env.MINERVA_MOCK === '1',
-    // F14/F18: modo de acceso VIGENTE ('gh-cli' salvo el escape hatch por env)
-    // + la cuenta de `gh` elegida a mano (`null` = la activa del CLI).
-    githubAccessMode: settingsStore.getGithubAccessMode(),
-    githubAccount: settingsStore.getGithubAccount(),
   }
 }

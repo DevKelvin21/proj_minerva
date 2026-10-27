@@ -8,7 +8,7 @@ import type { AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
 import { IconButton } from '../ui/IconButton'
 import { ActiveConfigSummary } from './ActiveConfigSummary'
-import { GithubAccessSection } from './GithubAccessSection'
+import { SourceControlSection } from './SourceControlSection'
 import { ProviderTabs } from './ProviderTabs'
 import { ProviderModelPanel } from './ProviderModelPanel'
 import { UpdateSection } from './UpdateSection'
@@ -49,12 +49,12 @@ import { UpdateSection } from './UpdateSection'
  *   centrada y pasa a ocupar la ventana entera: a esa altura, los márgenes de
  *   un modal centrado son espacio que no sobra.
  * Las secciones SIEMPRE están montadas (nunca un switcher que desmonte): los
- * specs e2e abren el modal y esperan ver "Acceso a GitHub" y sus cards sin
+ * specs e2e abren el modal y esperan ver "GitHub access" y sus cards sin
  * dar ningún click.
  */
 export function SettingsModal(): React.JSX.Element {
   const closeSettings = useAppStore((s) => s.closeSettings)
-  const { info, error, selectProvider, saveModel, setModelOption, setGithubAccount } = useSettings()
+  const { info, error, selectProvider, saveModel, setModelOption } = useSettings()
   const providerStatus = useProviderStatus()
   const tier = useLayoutTier()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -109,7 +109,6 @@ export function SettingsModal(): React.JSX.Element {
             selectProvider={selectProvider}
             saveModel={saveModel}
             setModelOption={setModelOption}
-            setGithubAccount={setGithubAccount}
             twoColumn={twoColumn}
             compact={tier.h !== 'tall'}
           />
@@ -128,7 +127,6 @@ interface SettingsModalBodyProps {
   selectProvider: (provider: AiProviderId) => Promise<boolean>
   saveModel: (provider: AiProviderId, model: string) => Promise<boolean>
   setModelOption: (provider: AiProviderId, optionId: string, value: string) => Promise<boolean>
-  setGithubAccount: (login: string | null) => Promise<boolean>
   /** Reparte GitHub | IA en dos columnas con scroll propio (ventana ≥980px). */
   twoColumn: boolean
   /** Ventana baja (`short`/`xshort`): densidad reducida en las cabeceras de sección. */
@@ -154,7 +152,6 @@ function SettingsModalBody({
   selectProvider,
   saveModel,
   setModelOption,
-  setGithubAccount,
   twoColumn,
   compact,
 }: SettingsModalBodyProps): React.JSX.Element {
@@ -164,7 +161,7 @@ function SettingsModalBody({
   // nada relacionado a proveedor/modelo. En una columna va arriba con
   // `border-b`; en dos columnas pasa a ser la columna izquierda y el separador
   // es el `border-r` del contenedor (F16/T80).
-  const github = <GithubAccessSection info={info} setGithubAccount={setGithubAccount} compact={compact} />
+  const github = <SourceControlSection compact={compact} />
 
   // Sección "Actualizaciones" (T93, F17): en una columna va al final de todo
   // el scroll; en dos columnas (≥980px) va debajo de GitHub, la columna más

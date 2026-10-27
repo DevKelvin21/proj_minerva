@@ -75,7 +75,7 @@
  *    del modelo activo; se parte por el PRIMER `/` (`parseOpencodeModelSlug`)
  *    porque el `modelID` de OpenCode puede traer más barras (p. ej. ids de
  *    gateway anidados).
- * 2. `getPullRequestDetail`/`getPullRequestFiles` del `GithubService` activo +
+ * 2. `getPullRequestDetail`/`getPullRequestFiles` del `PrContextSource` (registro SCM) +
  *    `ensureSnapshot` (T54) materializan la copia local del repo al commit del
  *    PR; `getOpencodeServer()` (T55) da la URL del server compartido
  *    (ya lanzado con el config read-only, ver `./opencode-runtime.ts`).
@@ -123,10 +123,9 @@
  */
 import { createOpencodeClient } from '@opencode-ai/sdk/v2'
 import type { Event } from '@opencode-ai/sdk/v2'
-import type { AiService, AnalyzePullRequestOptions } from '../service'
-import type { GithubService } from '../../github/service'
+import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from '../service'
+import type { PrContextSource } from '../pr-context'
 import type { IpcRequest } from '../../../shared/ipc'
-import type { GeneratedAnalysis } from '../../../shared/types'
 import { getEffectiveAiSelection } from '../env'
 import { ANALYZE_PR_SYSTEM_PROMPT } from '../prompts/analyze-pr'
 import { buildAgenticUserMessage, prId } from '../analysis-prompt'
@@ -134,7 +133,6 @@ import { StreamSectionParser } from '../stream-parser'
 import { createThrottle } from '../throttle'
 import { createActivityTracker } from '../activity-tracker'
 import type { AnalysisActivityKind } from '../../../shared/events'
-import { ensureSnapshot } from '../../github/snapshot-store'
 import { getOpencodeServer } from './opencode-runtime'
 import {
   AGENTIC_INACTIVITY_TIMEOUT_MS,
@@ -255,12 +253,12 @@ function describeSessionErrorPayload(error: SessionErrorPayload): string {
 }
 
 export class OpenCodeAiService implements AiService {
-  constructor(private readonly github: GithubService) {}
+  constructor(private readonly context: PrContextSource) {}
 
   async analyzePullRequest(
     req: IpcRequest<'ai:analyzePullRequest'>,
     options?: AnalyzePullRequestOptions,
-  ): Promise<GeneratedAnalysis> {
+  ): Promise<AnalyzeResult> {
     const { model } = getEffectiveAiSelection()
     const parsedModel = parseOpencodeModelSlug(model)
     if (parsedModel === null) {
@@ -272,13 +270,13 @@ export class OpenCodeAiService implements AiService {
     }
 
     const [detail, files] = await Promise.all([
-      this.github.getPullRequestDetail(req),
-      this.github.getPullRequestFiles(req),
+      this.context.getDetail(req.repo, req.number),
+      this.context.getFiles(req.repo, req.number),
     ])
 
     // AGÉNTICO (F11/T56): copia local del repo al commit del PR — el
     // `directory` del cliente (ver comentario del módulo).
-    const snapshotDir = await ensureSnapshot(this.github, req.repo, detail.headSha)
+    const snapshotDir = await this.context.ensureSnapshot(req.repo, detail.headSha)
 
     // Server compartido (T55): ya accionable si el binario falta o no arranca.
     const server = await getOpencodeServer()
@@ -516,6 +514,7 @@ export class OpenCodeAiService implements AiService {
 
     return {
       prId: prId(req),
+      headSha: detail.headSha,
       sections,
       generatedAt: new Date().toISOString(),
     }

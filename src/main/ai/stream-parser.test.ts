@@ -354,7 +354,7 @@ describe('StreamSectionParser', () => {
 
 describe('stringifySections + StreamSectionParser (round-trip)', () => {
   it('serializar y volver a parsear una fixture real produce las mismas secciones', () => {
-    const original = richDidacticSections['shopwave/api#482']
+    const original = richDidacticSections['github:shopwave/api#482']
     const text = stringifySections(original)
 
     const parser = new StreamSectionParser()
@@ -365,7 +365,7 @@ describe('stringifySections + StreamSectionParser (round-trip)', () => {
   })
 
   it('round-trip también funciona repartiendo el texto en varios trozos', () => {
-    const original = richDidacticSections['shopwave/web#201']
+    const original = richDidacticSections['github:shopwave/web#201']
     const text = stringifySections(original)
 
     const parser = new StreamSectionParser()
@@ -376,7 +376,7 @@ describe('stringifySections + StreamSectionParser (round-trip)', () => {
   })
 
   it('round-trip de la fixture con schema/erDiagram', () => {
-    const original = richDidacticSections['shopwave/api#479']
+    const original = richDidacticSections['github:shopwave/api#479']
     const text = stringifySections(original)
 
     const parser = new StreamSectionParser()

@@ -10,18 +10,20 @@ import type {
   AiProviderStatus,
   AiSettingsInfo,
   AnalysisState,
-  AuthStatus,
   CommentThread,
   DidacticAnalysis,
   DiffFile,
   GhAccount,
+  ListPullRequestsResult,
+  PostCommentRequest,
   PrComment,
   PrStateFilter,
   PullRequestDetail,
-  PullRequestSummary,
   RepoRef,
+  ScmSettingsInfo,
   UpdaterStatus,
 } from './types'
+import type { ScmAuthStatus, ScmProviderId } from './scm'
 import type { AiModelOption, AiProviderId } from './ai-providers'
 import type { AnalysisProgressEvent, PrListChangedEvent, UpdaterStatusChangedEvent } from './events'
 
@@ -36,60 +38,55 @@ export interface IpcContract {
    */
   'minerva:getVersion': { req: void; res: string }
 
-  'auth:getStatus': { req: void; res: AuthStatus }
-  'auth:startDeviceFlow': { req: void; res: AuthStatus }
-  'auth:signOut': { req: void; res: AuthStatus }
+  /**
+   * Auth status of every SCM provider, keyed by provider id. Never includes a
+   * token. Providers not configured report `state: 'disabled'`.
+   */
+  'scm:getAuthStatus': { req: void; res: Record<ScmProviderId, ScmAuthStatus> }
 
   /**
-   * Cuentas que el CLI `gh` conoce en `github.com` (F18), para el selector de
-   * la sección "Acceso a GitHub" de Settings. LECTURA pura: spawnea
-   * `gh auth status` (cache TTL 5s + single-flight en
-   * `main/auth/gh-cli-auth.ts`) y no cambia nada. Devuelve `[]` si `gh` no
-   * está instalado, no tiene sesión, o su salida no se pudo interpretar — la
-   * UI lo trata como "no hay nada que elegir" y sigue con la cuenta activa
-   * del CLI. Nunca incluye tokens, solo logins.
+   * Accounts the `gh` CLI knows on github.com, for the Settings account
+   * picker. Read-only (`gh auth status`, cached 5s). `[]` when `gh` is missing,
+   * has no session, or its output can't be parsed. Logins only, never tokens.
    */
-  'auth:listGhAccounts': { req: void; res: GhAccount[] }
+  'scm:listGhAccounts': { req: void; res: GhAccount[] }
+
+  /** SCM settings (mock flag + chosen GitHub account). */
+  'scm:getSettings': { req: void; res: ScmSettingsInfo }
 
   /**
-   * `state` (T50, F10): filtro de estado (`PrStateFilter`, `./types.ts`),
-   * opcional — default `'open'` (comportamiento previo). La respuesta trae
-   * cada summary decorado con `unread` (`main/ipc/handlers.ts` contra
-   * `seen-store.ts`); los servicios `GithubService` no conocen ese campo.
+   * Picks which `gh` account Minerva talks to, or `null` to follow `gh`'s
+   * active account. Persists the login, drops the token-bridge caches, warms
+   * the probe with the new account. Never runs `gh auth switch`: the choice is
+   * local to Minerva.
    */
-  'github:listPullRequests': {
+  'scm:setGithubAccount': { req: { login: string | null }; res: ScmSettingsInfo }
+
+  /**
+   * Fans out over every enabled provider with `Promise.allSettled`: one
+   * failing provider lands in `errors` and doesn't drop the others' `items`.
+   * `state` defaults to `'open'`. Each summary is decorated with `unread`
+   * (seen-store) by the handler.
+   */
+  'scm:listPullRequests': {
     req: { search?: string; state?: PrStateFilter }
-    res: PullRequestSummary[]
+    res: ListPullRequestsResult
   }
   /**
-   * Sella el estado "visto" de un PR (T50/T51, F10) contra
-   * `main/github/seen-store.ts`: se llama al abrir el PR en el detalle, con
-   * el `updatedAt`/`commentCount` ACTUALES del summary (no valores futuros) —
-   * si luego el PR cambia, `computeUnread` vuelve a marcarlo no visto.
+   * Seals the "seen" state of a PR with the CURRENT `updatedAt`/`commentCount`
+   * of its summary; if the PR changes later, it shows as unread again.
    */
-  'github:markPrSeen': {
-    req: { prId: string; updatedAt: string; commentCount: number }
+  'scm:markPrSeen': {
+    req: { repo: RepoRef; number: number; updatedAt: string; commentCount: number | null }
     res: { ok: true }
   }
-  'github:getPullRequestDetail': {
+  'scm:getPullRequestDetail': {
     req: { repo: RepoRef; number: number }
     res: PullRequestDetail
   }
-  'github:getPullRequestFiles': { req: { repo: RepoRef; number: number }; res: DiffFile[] }
-  'github:getCommentThreads': { req: { repo: RepoRef; number: number }; res: CommentThread[] }
-  'github:postComment': {
-    req: {
-      repo: RepoRef
-      number: number
-      bodyMarkdown: string
-      threadId?: string
-      path?: string
-      line?: number
-      /** Lado del diff al que pertenece `line`; solo aplica a hilos nuevos por línea. */
-      side?: 'LEFT' | 'RIGHT'
-    }
-    res: PrComment
-  }
+  'scm:getPullRequestFiles': { req: { repo: RepoRef; number: number }; res: DiffFile[] }
+  'scm:getCommentThreads': { req: { repo: RepoRef; number: number }; res: CommentThread[] }
+  'scm:postComment': { req: PostCommentRequest; res: PrComment }
 
   'ai:analyzePullRequest': { req: { repo: RepoRef; number: number }; res: DidacticAnalysis }
   /**
@@ -174,27 +171,6 @@ export interface IpcContract {
   }
 
   /**
-   * Elige con QUÉ cuenta de `gh` habla Minerva (F18), o vuelve a "la cuenta
-   * activa de `gh`" con `login: null`. El handler persiste el login
-   * (`settingsStore.setGithubAccount`), invalida las caches del puente de
-   * token (`ghCliAuth.invalidate()`), calienta el probe con la cuenta nueva y
-   * responde el mismo `AiSettingsInfo` agregado que los canales
-   * `settings:set*` de IA (la UI refresca sin un roundtrip adicional).
-   *
-   * NO toca la cuenta activa del CLI: nunca se corre `gh auth switch`. La
-   * elección es local a Minerva, así que la terminal del usuario puede
-   * quedarse en otra cuenta sin conflicto.
-   *
-   * Reemplaza a `settings:setGithubAccessMode` (F14), retirado en F18 junto
-   * con el toggle OAuth ⇄ gh-cli de Settings: el modo ya no se elige desde la
-   * UI (ver `GithubAccessMode` en `./types.ts`).
-   */
-  'settings:setGithubAccount': {
-    req: { login: string | null }
-    res: AiSettingsInfo
-  }
-
-  /**
    * Abre (o enfoca, si ya hay una) la ventana didáctica desacoplada (T14,
    * `../main/windows/didactic-window.ts`) sincronizada con `repo`/`number`.
    * Solo existe UNA ventana didáctica a la vez: pedir este canal con un PR
@@ -202,7 +178,7 @@ export interface IpcContract {
    * abrir una segunda ventana. `title` es el título humano del PR (lo trae
    * quien ya lo tiene a mano, `selectedPr.title`): viaja en el hash de la URL
    * que carga la ventana para que el header se pinte al instante, sin
-   * depender de que la ventana pida `github:getPullRequestDetail` primero.
+   * depender de que la ventana pida `scm:getPullRequestDetail` primero.
    */
   'window:openDidactic': { req: { repo: RepoRef; number: number; title: string }; res: void }
 
@@ -253,16 +229,16 @@ export type IpcResponse<C extends IpcChannel> = IpcContract[C]['res']
 export const IPC_CHANNELS = [
   'minerva:ping',
   'minerva:getVersion',
-  'auth:getStatus',
-  'auth:startDeviceFlow',
-  'auth:signOut',
-  'auth:listGhAccounts',
-  'github:listPullRequests',
-  'github:markPrSeen',
-  'github:getPullRequestDetail',
-  'github:getPullRequestFiles',
-  'github:getCommentThreads',
-  'github:postComment',
+  'scm:getAuthStatus',
+  'scm:listGhAccounts',
+  'scm:getSettings',
+  'scm:setGithubAccount',
+  'scm:listPullRequests',
+  'scm:markPrSeen',
+  'scm:getPullRequestDetail',
+  'scm:getPullRequestFiles',
+  'scm:getCommentThreads',
+  'scm:postComment',
   'ai:analyzePullRequest',
   'ai:getCachedAnalysis',
   'ai:invalidateAnalysis',
@@ -273,7 +249,6 @@ export const IPC_CHANNELS = [
   'settings:setAiProvider',
   'settings:setProviderModel',
   'settings:setModelOption',
-  'settings:setGithubAccount',
   'window:openDidactic',
   'updater:getStatus',
   'updater:check',
@@ -324,7 +299,7 @@ interface EventsApi {
   onAnalysisProgress(callback: (payload: AnalysisProgressEvent) => void): () => void
   /**
    * Suscripción al watcher de PRs (T50/T51, F10): se dispara con los cambios
-   * detectados contra el snapshot anterior (`main/github/pr-watcher.ts`) —
+   * detectados contra el snapshot anterior (`main/scm/pr-watcher.ts`) —
    * nunca en el primer tick (baseline silencioso). Mismo patrón que
    * `onAnalysisProgress`: método concreto, no un `on(channel, cb)` genérico.
    */

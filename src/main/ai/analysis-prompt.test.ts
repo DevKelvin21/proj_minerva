@@ -11,7 +11,12 @@ import { buildUserMessage } from './analysis-prompt'
  * los tests de cada servicio agéntico, no acá.
  */
 
-const repo = { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }
+const repo = {
+  provider: 'github' as const,
+  owner: 'shopwave',
+  name: 'api',
+  fullName: 'shopwave/api',
+}
 
 const detail: PullRequestDetail = {
   id: 'shopwave/api#482',
@@ -26,6 +31,7 @@ const detail: PullRequestDetail = {
   headRef: 'feat/apply-coupon',
   baseRef: 'main',
   headSha: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+  webUrl: 'https://github.com/shopwave/api/pull/482',
   commentCount: 0,
   reviewDecision: null,
   ciStatus: 'success',

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DidacticAnalysis, RepoRef } from '../../../shared/types'
 import type { AnalysisActivityItem, DraftDidacticSection } from '../../../shared/events'
+import { repoKey, sameRepo } from '../../../shared/scm'
 
 interface DidacticAnalysisTarget {
   repo: RepoRef
@@ -117,6 +118,7 @@ function toErrorMessage(error: unknown): string {
  * cuerpo del render).
  */
 export function useDidacticAnalysis(target: DidacticAnalysisTarget): UseDidacticAnalysisResult {
+  const targetRepoKey = repoKey(target.repo)
   const [analysis, setAnalysis] = useState<DidacticAnalysis | null>(null)
   const [streamingSections, setStreamingSections] = useState<DraftDidacticSection[] | null>(null)
   const [phase, setPhase] = useState<'exploring' | 'writing' | null>(null)
@@ -151,11 +153,7 @@ export function useDidacticAnalysis(target: DidacticAnalysisTarget): UseDidactic
       // El flujo local de `analyze()` tiene prioridad mientras está en
       // vuelo: tiene su propio listener con su propio `requestSeq`.
       if (cancelled || localAnalysisActive.current) return
-      if (
-        event.repo.owner !== target.repo.owner ||
-        event.repo.name !== target.repo.name ||
-        event.number !== target.number
-      ) {
+      if (!sameRepo(event.repo, target.repo) || event.number !== target.number) {
         return
       }
 
@@ -233,7 +231,7 @@ export function useDidacticAnalysis(target: DidacticAnalysisTarget): UseDidactic
       unsubscribe()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- monta una sola vez por entidad (remount por key en DidacticPanel/DidacticWindowApp, ver comentario de cabecera); `target` es estable mientras el componente sigue montado.
-  }, [target.repo.owner, target.repo.name, target.number])
+  }, [targetRepoKey, target.number])
 
   const analyze = useCallback(() => {
     const seq = ++requestSeq.current
@@ -254,11 +252,7 @@ export function useDidacticAnalysis(target: DidacticAnalysisTarget): UseDidactic
     stopStreaming()
     unsubscribeRef.current = window.minerva.events.onAnalysisProgress((event) => {
       if (requestSeq.current !== seq) return
-      if (
-        event.repo.owner !== target.repo.owner ||
-        event.repo.name !== target.repo.name ||
-        event.number !== target.number
-      ) {
+      if (!sameRepo(event.repo, target.repo) || event.number !== target.number) {
         return
       }
       setStreamingSections(event.sections)
@@ -290,7 +284,7 @@ export function useDidacticAnalysis(target: DidacticAnalysisTarget): UseDidactic
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se depende de campos primitivos de `target`, no de su identidad de objeto.
-  }, [target.repo.owner, target.repo.name, target.number, stopStreaming])
+  }, [targetRepoKey, target.number, stopStreaming])
 
   const reanalyze = useCallback(() => {
     void (async () => {
@@ -303,7 +297,7 @@ export function useDidacticAnalysis(target: DidacticAnalysisTarget): UseDidactic
       analyze()
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se depende de campos primitivos de `target`, no de su identidad de objeto.
-  }, [target.repo.owner, target.repo.name, target.number, analyze])
+  }, [targetRepoKey, target.number, analyze])
 
   return {
     analysis,

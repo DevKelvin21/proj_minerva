@@ -27,7 +27,7 @@ function fileHeader(file: DiffFile): string {
 
 /**
  * Reparte `TOTAL_DIFF_BUDGET_CHARS` entre los archivos en el orden en que
- * vienen (se asume que `GithubService` ya los devuelve en un orden razonable,
+ * vienen (se asume que el `ScmProvider` ya los devuelve en un orden razonable,
  * p. ej. el de GitHub). Un archivo sin `patch` (binario, o sin diff de texto)
  * se incluye solo con su header, sin consumir presupuesto de patch.
  */

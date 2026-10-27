@@ -1,23 +1,21 @@
 import { useEffect, useMemo } from 'react'
 import { RefreshCw } from 'lucide-react'
-import type { PrStateFilter, PullRequestSummary } from '../../../../shared/types'
+import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
+import { repoKey } from '../../../../shared/scm'
+import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { groupByRepo } from '../../lib/pr-filters'
 import { usePullRequests } from '../../hooks/use-pull-requests'
-import { useAuth } from '../../hooks/use-auth'
+import { useScmSettings } from '../../hooks/use-scm-settings'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { SIDEBAR_WIDTH, sidebarIsDrawer } from '../../lib/layout'
 import { useAppStore } from '../../stores/app-store'
 import { RepoGroup } from '../pr-list/RepoGroup'
 import { IconButton } from '../ui/IconButton'
 
-/**
- * `RealGithubService` (T6) lanza exactamente este mensaje cuando no hay
- * sesión iniciada (`src/main/github/real-service.ts`); se detecta por texto
- * en vez de agregar un campo nuevo a `AuthStatus`/errores IPC solo para esto.
- * En modo mock (`MINERVA_MOCK=1`) el mock nunca lanza este error, así que
- * este CTA no reemplaza nada ahí aunque `auth` esté en `signed_out`.
- */
-const NOT_AUTHENTICATED_MARKER = 'No autenticado'
+/** A provider error that means "sign in first", not "something broke". */
+function isSignInError(error: ScmListError): boolean {
+  return error.code === 'UNAUTHENTICATED' || error.code === 'CLI_UNAVAILABLE'
+}
 
 const STATE_FILTER_OPTIONS: { value: PrStateFilter; label: string }[] = [
   { value: 'open', label: 'Abiertos' },
@@ -35,6 +33,23 @@ function emptyStateMessage(filter: PrStateFilter): string {
     case 'all':
       return 'No hay PRs.'
   }
+}
+
+/** One line per provider that failed while the others still listed (typed code + message). */
+function ProviderErrors({ errors }: { errors: ScmListError[] }): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-1 border-b border-border p-3">
+      {errors.map((providerError) => (
+        <p
+          key={providerError.provider}
+          data-error-code={providerError.code}
+          className="text-xs text-danger"
+        >
+          {SCM_PROVIDER_LABEL[providerError.provider]}: {providerError.message}
+        </p>
+      ))}
+    </div>
+  )
 }
 
 /** Segmented control de 3 opciones (T52, F10) para `prStateFilter`. */
@@ -81,20 +96,24 @@ function StateFilterControl({
  */
 export function Sidebar(): React.JSX.Element | null {
   const searchQuery = useAppStore((s) => s.searchQuery)
-  const authStatus = useAppStore((s) => s.authStatus)
+  const scmAuth = useAppStore((s) => s.scmAuth)
   const openSettings = useAppStore((s) => s.openSettings)
   const prStateFilter = useAppStore((s) => s.prStateFilter)
   const setPrStateFilter = useAppStore((s) => s.setPrStateFilter)
   const selectPr = useAppStore((s) => s.selectPr)
-  // Clave compuesta (F14/T71) en vez del `state` solo: cambiar de modo desde
-  // Settings (oauth ⇄ gh-cli) debe refetchear la lista igual que cambiar de
-  // `state` — `usePullRequests` trata este parámetro como un string opaco.
-  const { pullRequests, loading, error, refetch, markSeen } = usePullRequests(
+  // Opaque key of every provider's auth state: signing in (or switching
+  // accounts) refetches the list.
+  const authKey = scmAuth
+    ? Object.values(scmAuth)
+        .map((status) => status.provider + ':' + status.state + ':' + (status.user?.login ?? ''))
+        .join(',')
+    : ''
+  const { pullRequests, providerErrors, loading, error, refetch, markSeen } = usePullRequests(
     searchQuery,
-    authStatus.mode + ':' + authStatus.state,
+    authKey,
     prStateFilter,
   )
-  const { signIn } = useAuth()
+  const githubAccount = useScmSettings().info?.githubAccount ?? null
   const tier = useLayoutTier()
   const isDrawer = sidebarIsDrawer(tier.w)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
@@ -113,8 +132,15 @@ export function Sidebar(): React.JSX.Element | null {
   }, [isDrawer, sidebarOpen, settingsOpen, closeSidebar])
 
   const groups = useMemo(() => groupByRepo(pullRequests), [pullRequests])
-  const needsLogin = Boolean(error?.includes(NOT_AUTHENTICATED_MARKER))
-  const isGhCliMode = authStatus.mode === 'gh-cli'
+  const githubSignIn = providerErrors.find(
+    (providerError) => providerError.provider === 'github' && isSignInError(providerError),
+  )
+  // Full-panel sign-in CTA only when nothing could be listed at all.
+  const needsLogin = githubSignIn !== undefined && pullRequests.length === 0
+  // Everything else (or a sign-in error while other providers did list) is a banner.
+  const otherErrors = needsLogin
+    ? providerErrors.filter((providerError) => providerError !== githubSignIn)
+    : providerErrors
 
   const handleSelectPr = (pr: PullRequestSummary): void => {
     selectPr(pr)
@@ -156,49 +182,35 @@ export function Sidebar(): React.JSX.Element | null {
           <span className="text-3xl" aria-hidden>
             🔒
           </span>
-          {isGhCliMode ? (
-            // Modo gh-cli (F14/T71): `signIn()` arrancaría un device flow que
-            // `main` ignora en este modo (no-op) — el CTA guía a la terminal
-            // en vez de llamarlo. F18: si hay una cuenta elegida a mano, se la
-            // nombra — "corré gh auth login" a secas sería un consejo
-            // equivocado cuando el CLI está bien y lo que falla es la
-            // elección (mismo criterio que `GithubAccessSection`).
-            <>
-              {authStatus.ghAccount !== undefined ? (
-                <p className="text-sm text-muted">
-                  La cuenta <span className="font-mono text-text">{authStatus.ghAccount}</span> no
-                  tiene sesión válida en gh. Elegí otra en configuración, o renovala con{' '}
-                  <span className="font-mono text-text">gh auth login</span>.
-                </p>
-              ) : (
-                <p className="text-sm text-muted">
-                  Autentícate con GitHub CLI: ejecuta{' '}
-                  <span className="font-mono text-text">gh auth login</span> en una terminal.
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={openSettings}
-                className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-              >
-                Abrir configuración
-              </button>
-            </>
+          {/*
+            If an account was picked by hand, name it: a bare "run gh auth
+            login" would be wrong advice when the CLI is fine and only the
+            choice is broken.
+          */}
+          {githubAccount !== null ? (
+            <p className="text-sm text-muted">
+              The account <span className="font-mono text-text">{githubAccount}</span> has no
+              valid gh session. Pick another one in Settings, or renew it with{' '}
+              <span className="font-mono text-text">gh auth login</span>.
+            </p>
           ) : (
-            <>
-              <p className="text-sm text-muted">Inicia sesión con GitHub para ver tus pull requests.</p>
-              <button
-                type="button"
-                onClick={() => void signIn()}
-                className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-              >
-                Iniciar sesión con GitHub
-              </button>
-            </>
+            <p className="text-sm text-muted">
+              Sign in with GitHub CLI: run{' '}
+              <span className="font-mono text-text">gh auth login</span> in a terminal.
+            </p>
           )}
+          <button
+            type="button"
+            onClick={openSettings}
+            className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
+          >
+            Open settings
+          </button>
         </div>
       ) : error ? (
         <p className="p-4 text-sm text-danger">No se pudo cargar la lista de PRs: {error}</p>
+      ) : otherErrors.length > 0 && pullRequests.length === 0 ? (
+        <ProviderErrors errors={otherErrors} />
       ) : loading && pullRequests.length === 0 ? (
         <p className="p-4 text-sm text-muted">Cargando PRs…</p>
       ) : groups.length === 0 ? (
@@ -215,9 +227,12 @@ export function Sidebar(): React.JSX.Element | null {
           </div>
         )
       ) : (
-        groups.map((group) => (
-          <RepoGroup key={group.repo.fullName} group={group} onSelectPr={handleSelectPr} />
-        ))
+        <>
+          {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
+          {groups.map((group) => (
+            <RepoGroup key={repoKey(group.repo)} group={group} onSelectPr={handleSelectPr} />
+          ))}
+        </>
       )}
       </aside>
     </>

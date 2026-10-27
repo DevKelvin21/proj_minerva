@@ -14,20 +14,26 @@
  * app-server`): es puro armado de strings a partir de `PullRequestDetail`/
  * `DiffFile[]`, agnóstico de transporte.
  */
-import type { IpcRequest, IpcResponse } from '../../shared/ipc'
-import type { PullRequestDetail } from '../../shared/types'
+import type { IpcRequest } from '../../shared/ipc'
+import { prKey } from '../../shared/scm'
+import type { DiffFile, PullRequestDetail } from '../../shared/types'
 import { buildDiffBudget } from './diff-budget'
 
-/** Clave estable de un PR para el resultado de `ai:analyzePullRequest` (`DidacticAnalysis.prId`). */
+/** Stable PR id for the result of `ai:analyzePullRequest` (`DidacticAnalysis.prId`): `prKey`. */
 export function prId(req: IpcRequest<'ai:analyzePullRequest'>): string {
-  return req.repo.owner + '/' + req.repo.name + '#' + req.number
+  return prKey(req.repo, req.number)
+}
+
+/** `+a/-d` stats, falling back to the file list when the provider didn't report totals. */
+function changeStats(detail: PullRequestDetail, files: DiffFile[]): string {
+  const changed = detail.changedFiles ?? files.length
+  const additions = detail.additions ?? files.reduce((sum, file) => sum + file.additions, 0)
+  const deletions = detail.deletions ?? files.reduce((sum, file) => sum + file.deletions, 0)
+  return changed + ' (+' + additions + '/-' + deletions + ')'
 }
 
 /** Arma el mensaje de usuario: metadatos del PR + diffs presupuestados, delimitados como dato no confiable. */
-export function buildUserMessage(
-  detail: PullRequestDetail,
-  files: IpcResponse<'github:getPullRequestFiles'>,
-): string {
+export function buildUserMessage(detail: PullRequestDetail, files: DiffFile[]): string {
   const { blocks, omittedFiles } = buildDiffBudget(files)
 
   const labels = detail.labels.length > 0 ? detail.labels.map((l) => l.name).join(', ') : 'ninguna'
@@ -50,12 +56,8 @@ export function buildUserMessage(
     detail.baseRef +
     '\n' +
     'Archivos cambiados: ' +
-    detail.changedFiles +
-    ' (+' +
-    detail.additions +
-    '/-' +
-    detail.deletions +
-    ')\n' +
+    changeStats(detail, files) +
+    '\n' +
     'Etiquetas: ' +
     labels +
     '\n\n' +
@@ -96,10 +98,7 @@ export function buildUserMessage(
  * agentizados (OpenCode/Claude Code/Codex); `buildUserMessage` queda para
  * cualquier camino sin herramientas (p. ej. el mock).
  */
-export function buildAgenticUserMessage(
-  detail: PullRequestDetail,
-  files: IpcResponse<'github:getPullRequestFiles'>,
-): string {
+export function buildAgenticUserMessage(detail: PullRequestDetail, files: DiffFile[]): string {
   return (
     buildUserMessage(detail, files) +
     '\n\nADEMÁS: tenés el repositorio COMPLETO al commit de este PR en tu directorio de ' +

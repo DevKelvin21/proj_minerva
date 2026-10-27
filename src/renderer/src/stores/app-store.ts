@@ -3,7 +3,7 @@
  * datos de PRs viven en `main` y se piden vía IPC (T4, ver `src/renderer/src/hooks`).
  *
  * Se guarda el `PullRequestSummary` seleccionado completo (no solo su id):
- * los canales `github:getPullRequestDetail/Files/CommentThreads` piden
+ * los canales `scm:getPullRequestDetail/Files/CommentThreads` piden
  * `{ repo, number }`, no un id de string, así que el selector de la lista ya
  * tiene todo lo necesario para pedir el detalle sin tener que volver a buscarlo.
  *
@@ -18,10 +18,11 @@ import {
 } from '../lib/layout'
 import type {
   AiSettingsInfo,
-  AuthStatus,
   PrStateFilter,
   PullRequestSummary,
+  ScmSettingsInfo,
 } from '../../../shared/types'
+import type { ScmAuthStatus, ScmProviderId } from '../../../shared/scm'
 
 export type CenterTab = 'conversation' | 'files'
 export type DiffViewMode = 'split' | 'inline'
@@ -97,13 +98,15 @@ interface AppState {
   pendingThreadFocus: PendingThreadFocus | null
 
   /**
-   * Estado de auth compartido (T6): fuente única de verdad para TitleBar,
-   * Sidebar y los hooks de datos. Lo escribe `useAuth` (getStatus/polling);
-   * `usePullRequests` lo usa como dependencia para refetchear al iniciar o
-   * cerrar sesión (sin esto, la lista quedaba con el error 'No autenticado'
-   * de antes del login hasta recargar la app).
+   * Per-provider SCM auth status: single source of truth for TitleBar,
+   * Sidebar, Settings and the data hooks. Written by `useScmAuth`
+   * (initial fetch + polling). `null` until the first answer.
+   * `usePullRequests` refetches when it changes, so signing in clears the
+   * "not authenticated" list without reloading the app.
    */
-  authStatus: AuthStatus
+  scmAuth: Record<ScmProviderId, ScmAuthStatus> | null
+  /** Last `scm:getSettings` / `scm:setGithubAccount` answer; `null` until loaded. */
+  scmSettings: ScmSettingsInfo | null
 
   /**
    * Modal de settings (T12, engrane en TitleBar; forma multi-proveedor desde
@@ -135,7 +138,8 @@ interface AppState {
   /** Navega al tab Archivos, selecciona `path` y deja el hilo `threadId` expandido/enfocado. */
   openLineThread: (path: string, line: number, threadId: string) => void
   clearPendingThreadFocus: () => void
-  setAuthStatus: (status: AuthStatus) => void
+  setScmAuth: (statuses: Record<ScmProviderId, ScmAuthStatus>) => void
+  setScmSettings: (info: ScmSettingsInfo) => void
   openSettings: () => void
   closeSettings: () => void
   setAiModelInfo: (info: AiSettingsInfo) => void
@@ -160,10 +164,8 @@ export const useAppStore = create<AppState>((set) => ({
   expandedThreadId: null,
   pendingThreadFocus: null,
 
-  // `mode: 'oauth'` (F14): valor inicial mínimo para que el tipo compile —
-  // `AuthStatus.mode` pasó a requerido en F14/T67; el resto de la UI
-  // consciente del modo (polling, ramas de TitleBar/Sidebar) es T71.
-  authStatus: { mode: 'oauth', state: 'signed_out' },
+  scmAuth: null,
+  scmSettings: null,
 
   settingsOpen: false,
   aiModelInfo: null,
@@ -209,7 +211,8 @@ export const useAppStore = create<AppState>((set) => ({
       pendingThreadFocus: { path, line, threadId },
     }),
   clearPendingThreadFocus: () => set({ pendingThreadFocus: null }),
-  setAuthStatus: (status) => set({ authStatus: status }),
+  setScmAuth: (statuses) => set({ scmAuth: statuses }),
+  setScmSettings: (info) => set({ scmSettings: info }),
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
   setAiModelInfo: (info) => set({ aiModelInfo: info }),

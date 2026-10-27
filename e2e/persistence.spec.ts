@@ -11,7 +11,7 @@ import { test, expect, launchMinerva, closeMinerva, mainWindow } from './fixture
  * análisis queda sellado como opencode.
  */
 
-const PR_482 = { repo: { owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
+const PR_482 = { repo: { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
 
 // eslint-disable-next-line no-empty-pattern
 test('el análisis se sella (headSha/generatedWith) y sobrevive un reinicio de la app', async ({}, testInfo) => {
