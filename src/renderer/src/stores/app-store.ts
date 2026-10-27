@@ -178,6 +178,8 @@ interface AppState {
    * innecesariamente.
    */
   settingsOpen: boolean
+  /** The Cmd/Ctrl+K command palette (title bar "Jump to…" button). Session only. */
+  commandPaletteOpen: boolean
   aiModelInfo: AiSettingsInfo | null
 
   /** Left column: PR list or stacks. Session only. */
@@ -248,6 +250,8 @@ interface AppState {
   setScmSettings: (info: ScmSettingsInfo) => void
   openSettings: () => void
   closeSettings: () => void
+  openCommandPalette: () => void
+  closeCommandPalette: () => void
   setAiModelInfo: (info: AiSettingsInfo) => void
 }
 
@@ -275,6 +279,7 @@ export const useAppStore = create<AppState>((set) => ({
   scmSettings: null,
 
   settingsOpen: false,
+  commandPaletteOpen: false,
   aiModelInfo: null,
 
   sidebarView: 'list',
@@ -387,7 +392,9 @@ export const useAppStore = create<AppState>((set) => ({
   clearPendingThreadFocus: () => set({ pendingThreadFocus: null }),
   setScmAuth: (statuses) => set({ scmAuth: statuses }),
   setScmSettings: (info) => set({ scmSettings: info }),
-  openSettings: () => set({ settingsOpen: true }),
+  openSettings: () => set({ settingsOpen: true, commandPaletteOpen: false }),
+  openCommandPalette: () => set({ commandPaletteOpen: true }),
+  closeCommandPalette: () => set({ commandPaletteOpen: false }),
   closeSettings: () => set({ settingsOpen: false }),
   setAiModelInfo: (info) => set({ aiModelInfo: info }),
 }))

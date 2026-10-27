@@ -8,7 +8,13 @@ import { secureWebPreferences } from './windows/secure-web-preferences'
 import { installExternalLinkGuard } from './windows/external-link-guard'
 import { hydratePathFromLoginShell } from './system/shell-path'
 import { initUpdater, stop as stopUpdater } from './updater/updater'
-import { currentWindowBackground, initNativeAppearance } from './theme/appearance-service'
+import {
+  currentTitleBarOverlay,
+  currentWindowBackground,
+  initNativeAppearance,
+  trackTitleBarOverlay,
+} from './theme/appearance-service'
+import { frameOptions } from './windows/title-bar'
 
 const isDev = !app.isPackaged
 
@@ -33,11 +39,15 @@ function createWindow(): void {
     // The saved theme's canvas, so nothing flashes behind the first paint.
     backgroundColor: currentWindowBackground(),
     title: 'Minerva',
+    // The app draws its own title bar; the OS keeps the window controls.
+    ...frameOptions(currentTitleBarOverlay()),
     // `webPreferences`/guard de enlaces externos extraídos a `./windows/` en
     // T14 para que la ventana didáctica desacoplada (`./windows/didactic-window.ts`)
     // los reutilice sin poder divergir de la ventana principal.
     webPreferences: secureWebPreferences(),
   })
+
+  trackTitleBarOverlay(mainWindow)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()

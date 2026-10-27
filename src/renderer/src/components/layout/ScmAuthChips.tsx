@@ -1,4 +1,5 @@
-import { Settings } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Settings, UserRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import type { ScmProviderId } from '../../../../shared/scm'
@@ -15,6 +16,7 @@ import {
   type ScmConnection,
 } from '../../lib/scm-connection'
 import { CREDENTIAL_SOURCE_KEY, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
+import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { IconButton } from '../ui/IconButton'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
@@ -186,13 +188,27 @@ function ProviderAuthChip({
   )
 }
 
-/** One auth chip per ENABLED provider (a turned-off provider shows nothing at all). */
-export function ScmAuthChips({ density }: { density: AuthChipDensity }): React.JSX.Element | null {
+/** Providers whose state needs the user (CLI missing, signed out, no org): shown in the bar itself. */
+function needsAttention(view: ProviderAuthView): boolean {
+  return view.readiness !== 'ready' && view.readiness !== 'checking'
+}
+
+/**
+ * The actionable chips (login command to copy, "Open Settings") of the
+ * providers that need the user, right in the title bar. Signed-in providers
+ * live in the accounts menu instead.
+ */
+export function ScmAttentionChips({
+  density,
+}: {
+  density: AuthChipDensity
+}): React.JSX.Element | null {
   const views = useProviderAuthViews()
-  if (views === null || views.length === 0) return null
+  const attention = (views ?? []).filter(needsAttention)
+  if (attention.length === 0) return null
   return (
     <div className="flex min-w-0 items-center gap-2">
-      {views.map((view) => (
+      {attention.map((view) => (
         <ProviderAuthChip key={view.provider} view={view} density={density} />
       ))}
     </div>
@@ -209,14 +225,21 @@ const CONNECTION_DOT: Record<ScmConnection, string> = {
 }
 
 /**
- * Aggregate indicator: IPC to main AND every enabled provider. A partial
- * failure (Azure signed in, `gh` missing) reads "Partially connected", and
- * the `title` lists each provider's state.
+ * One button for every source-control account: the signed-in identities'
+ * avatars plus a dot with the aggregate state (IPC to main AND every enabled
+ * provider; a partial failure reads "Partially connected"). The
+ * `scm-connection` node keeps that state as text and the per-provider lines
+ * in its `title`. The menu lists each provider: the signed-in chip
+ * (identity, "via …", Settings shortcut), or why it is not ready.
  */
-export function ScmConnectionIndicator({ showLabel }: { showLabel: boolean }): React.JSX.Element {
+export function AccountsMenu(): React.JSX.Element {
   const { t } = useTranslation()
   const ipc = useConnectionStatus()
   const views = useProviderAuthViews()
+  const openSettings = useAppStore((s) => s.openSettings)
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
   const connection = scmConnection(ipc, views)
   const label = t(`layout.titleBar.connection.${connection}`)
   const lines =
@@ -224,16 +247,108 @@ export function ScmConnectionIndicator({ showLabel }: { showLabel: boolean }): R
       ? [t('layout.titleBar.connectionIpcError')]
       : (views ?? []).map((view) => providerStateText(view, t))
   const title = [t('layout.titleBar.connectionTitle', { status: label }), ...lines].join('\n')
+  const signedIn = (views ?? []).filter((view) => view.readiness === 'ready')
+
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(event: PointerEvent): void {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   return (
-    <span
-      data-testid="scm-connection"
-      data-connection={connection}
-      className="flex shrink-0 items-center gap-1.5 text-xs text-muted"
-      title={title}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${CONNECTION_DOT[connection]}`} />
-      {showLabel && label}
-    </span>
+    <div ref={rootRef} className="relative flex shrink-0">
+      <button
+        type="button"
+        data-testid="accounts-menu"
+        aria-expanded={open}
+        aria-controls="accounts-menu-panel"
+        aria-label={t('layout.accounts.button', { status: label })}
+        title={title}
+        onClick={() => setOpen((value) => !value)}
+        className={`relative flex h-8 items-center rounded-md px-1 transition-colors duration-150 hover:bg-border/60 ${
+          open ? 'bg-border/60' : ''
+        }`}
+      >
+        {signedIn.length > 0 ? (
+          <span className="flex items-center" aria-hidden>
+            {signedIn.slice(0, 2).map((view, index) => (
+              <span
+                key={view.provider}
+                className={`rounded-full ring-2 ring-panel ${index > 0 ? '-ml-1.5' : ''}`}
+              >
+                <Avatar user={{ login: identityLabel(view.status) || view.provider }} size={22} />
+              </span>
+            ))}
+          </span>
+        ) : (
+          <UserRound size={18} className="m-0.5 text-muted" aria-hidden />
+        )}
+        <span
+          data-testid="scm-connection"
+          data-connection={connection}
+          title={title}
+          className="absolute bottom-0.5 right-0.5"
+        >
+          <span
+            className={`block h-2 w-2 rounded-full ring-2 ring-panel ${CONNECTION_DOT[connection]}`}
+            aria-hidden
+          />
+          <span className="sr-only">{label}</span>
+        </span>
+      </button>
+      {open && (
+        <div
+          id="accounts-menu-panel"
+          role="dialog"
+          aria-label={t('layout.accounts.title')}
+          data-no-drag
+          className="absolute right-0 top-full z-50 mt-1.5 flex w-80 flex-col gap-3 rounded-lg border border-border bg-panel p-3 shadow-2xl"
+        >
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <span className={`h-2 w-2 rounded-full ${CONNECTION_DOT[connection]}`} aria-hidden />
+            <span className="font-semibold text-text">{label}</span>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {(views ?? []).map((view) => (
+              <li key={view.provider} className="flex min-w-0 items-center gap-2 text-xs">
+                {view.readiness === 'ready' ? (
+                  <ProviderAuthChip view={view} density="full" />
+                ) : (
+                  <>
+                    <ScmProviderIcon provider={view.provider} size={12} className="text-muted" />
+                    <span className="truncate text-muted">{providerStateText(view, t)}</span>
+                  </>
+                )}
+              </li>
+            ))}
+            {views !== null && views.length === 0 && (
+              <li className="text-xs text-muted">{t('layout.titleBar.connection.no_providers')}</li>
+            )}
+          </ul>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              openSettings()
+            }}
+            className="self-start rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors duration-150 hover:border-accent hover:text-text"
+          >
+            {t('layout.accounts.manage')}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

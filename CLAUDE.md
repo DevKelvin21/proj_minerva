@@ -42,6 +42,11 @@ unified patches built in main.
   watcher's changes, retargets and settings drop it via `invalidateListCaches`). Composition
   root: `default-scm.ts`. `viewer` (author / required / optional reviewer + own vote) is
   matched by identity in main, never by display login in the renderer.
+- **Title bar** (`components/layout/TitleBar.tsx`): where you are (`TitleBarLocation`: repo or
+  feature › #n Title), the Cmd/Ctrl+K `CommandPalette` (PRs from the dashboard cache, files of
+  the PR under review, commands; filter in `lib/command-palette.ts`), `AiStatusChip` (model +
+  that PR's analysis state), `AccountsMenu` (signed-in providers; ones needing the user stay
+  inline as chips) and Settings. The PR search field lives in the Sidebar.
 - **Home dashboard** (`renderer/src/components/home/`): the app opens on `mainView: 'home'`
   (overview → repo page with viewer filters + full-width `StackBoard` → feature page);
   selecting a PR switches to `'review'`. The review subtree stays MOUNTED but `hidden` +
@@ -180,6 +185,7 @@ author's Spanish logs, not maintained)
 11. A `detached: true` child outlives its parent: register its pid in the same tick as `spawn` and make async work before it cancelable (`opencode-runtime.ts`), or quitting during startup leaks a ~300 MB `opencode serve`. Every launch starts one, even with `MINERVA_MOCK_AI=1`; `e2e/opencode-sweep.ts` reaps test orphans only (never the user's opencode) and logs if it finds any. After fixing main, rebuild `dist/` (`npm run build` does not).
 12. Electron-hosted terminals (VS Code, T3 Code) export `ELECTRON_RUN_AS_NODE=1`, which makes Electron run as plain Node and die on `import … from 'electron'`: `unset` it before `npm run dev` (the e2e fixture strips it).
 13. Resize windows in tests with `setViewport` in `e2e/fixtures.ts` (CDP `Emulation.setDeviceMetricsOverride`), not `page.setViewportSize()`.
+14. The main window is frameless (`main/windows/title-bar.ts`): `TitleBar.tsx` is `app-drag`, and the OS controls' band comes from `env(titlebar-area-*)` (macOS traffic lights, Windows/Linux overlay recolored with the theme). Anything clickable or a popover opened from the bar needs `no-drag` (`button`/`a`/`input` get it from `styles.css`; containers take `data-no-drag`), or clicks move the window instead.
 
 ## Commands
 

@@ -111,8 +111,10 @@ test('gh-only GitHub access, Azure mock signed in, and the account picker', asyn
   )
   expect(cleared, 'the chosen account was cleared').toBeNull()
 
-  // 7. Close the modal: the TitleBar is on the gh branch, with no OAuth UI left.
+  // 7. Close the modal: the TitleBar is on the gh branch, with no OAuth UI left
+  //    (a signed-in provider shows in the accounts menu, a missing one in the bar).
   await window.keyboard.press('Escape')
+  await window.getByTestId('accounts-menu').click()
   await expect
     .poll(
       () =>

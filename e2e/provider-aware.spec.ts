@@ -61,6 +61,12 @@ async function launch(
 const chip = (page: Page, provider: 'github' | 'azure') =>
   page.locator('header [data-auth-provider="' + provider + '"]')
 const indicator = (page: Page) => page.getByTestId('scm-connection')
+/** Signed-in providers live in the title bar's accounts menu; this opens it. */
+async function openAccounts(page: Page): Promise<void> {
+  const button = page.getByTestId('accounts-menu')
+  if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click()
+  await expect(page.locator('#accounts-menu-panel')).toBeVisible()
+}
 const aside = (page: Page) => page.locator('aside[aria-label]')
 /** Rendered text only (not aria-labels or titles). */
 const visibleText = (page: Page) => page.evaluate(() => document.body.innerText)
@@ -81,7 +87,11 @@ test('Azure only: Azure identity in the header, no GitHub text, Azure parity in 
       timeout: 20_000,
     })
 
-    // Header: one chip, Azure, signed in, with how the credential was obtained.
+    // Accounts menu: one chip, Azure, signed in, with how the credential was obtained.
+    await expect(indicator(page)).toHaveAttribute('data-connection', 'connected', {
+      timeout: 20_000,
+    })
+    await openAccounts(page)
     await expect(chip(page, 'azure')).toHaveAttribute('data-auth-state', 'ready')
     await expect(chip(page, 'azure')).toContainText('Ada Lovelace')
     await expect(chip(page, 'azure')).toContainText('via az devops PAT')
@@ -93,6 +103,8 @@ test('Azure only: Azure identity in the header, no GitHub text, Azure parity in 
       /Azure DevOps: signed in as Ada Lovelace/,
     )
     await expect(indicator(page)).not.toHaveAttribute('title', /GitHub/)
+    await page.keyboard.press('Escape')
+    await expect(page.locator('#accounts-menu-panel')).toHaveCount(0)
 
     // PR list chip in Azure terms: #105 has a -10 vote.
     const pr105 = aside(page).locator('button', { hasText: 'Refund ledger' })
@@ -137,6 +149,7 @@ test('Azure only: Azure identity in the header, no GitHub text, Azure parity in 
 
     // Spanish.
     await page.evaluate(() => window.minerva.settings.setLanguage({ language: 'es' }))
+    await openAccounts(page)
     await expect(chip(page, 'azure')).toContainText('vía PAT de az devops')
     await expect(indicator(page)).toHaveText('Conectado')
     await expect(page.getByRole('list', { name: 'Revisores' })).toContainText('Rechazado')
@@ -158,6 +171,7 @@ test('both providers: one chip each; a missing gh CLI reads as a partial connect
   })
   try {
     await expect(both.page.getByText('apply-coupon').first()).toBeVisible({ timeout: 20_000 })
+    await openAccounts(both.page)
     await expect(chip(both.page, 'github')).toHaveAttribute('data-auth-state', 'ready')
     await expect(chip(both.page, 'github')).toContainText('mgarcia')
     await expect(chip(both.page, 'github')).toContainText('via GitHub CLI')
@@ -166,13 +180,16 @@ test('both providers: one chip each; a missing gh CLI reads as a partial connect
     await expect(indicator(both.page)).toHaveText('Connected')
     await attachScreenshot(both.page, testInfo, 'both-signed-in-en')
 
-    // Tiled (md tier): chips collapse to provider icons, the state stays in the title.
+    // Tiled (md tier): the bar keeps only the accounts button; its title names everyone.
+    await both.page.keyboard.press('Escape')
     await setViewport(both.page, 900, 800)
-    await expect(chip(both.page, 'azure')).toHaveAttribute(
+    await expect(chip(both.page, 'azure')).toHaveCount(0)
+    await expect(indicator(both.page)).toHaveAttribute(
       'title',
       /Azure DevOps: signed in as Ada Lovelace via az devops PAT/,
     )
-    await expect(chip(both.page, 'azure')).not.toContainText('Ada Lovelace')
+    await openAccounts(both.page)
+    await expect(chip(both.page, 'azure')).toContainText('Ada Lovelace')
     await attachScreenshot(both.page, testInfo, 'both-signed-in-md')
   } finally {
     await closeMinerva(both.app)
@@ -188,7 +205,11 @@ test('both providers: one chip each; a missing gh CLI reads as a partial connect
     })
     await expect(chip(partial.page, 'github')).toHaveAttribute('data-auth-state', 'cli_unavailable')
     await expect(chip(partial.page, 'github')).toContainText('GitHub CLI not found')
+    // GitHub needs the user, so its chip stays in the bar; Azure is in the menu.
+    await expect(chip(partial.page, 'azure')).toHaveCount(0)
+    await openAccounts(partial.page)
     await expect(chip(partial.page, 'azure')).toHaveAttribute('data-auth-state', 'ready')
+    await expect(partial.page.locator('#accounts-menu-panel')).toContainText('GitHub: CLI not found')
     await expect(indicator(partial.page)).toHaveAttribute('data-connection', 'partial')
     await expect(indicator(partial.page)).toHaveText('Partially connected')
     await expect(indicator(partial.page)).toHaveAttribute('title', /GitHub: CLI not found/)
@@ -196,6 +217,7 @@ test('both providers: one chip each; a missing gh CLI reads as a partial connect
       aside(partial.page).locator('[data-error-code="CLI_UNAVAILABLE"]').first(),
     ).toContainText('GitHub')
     await attachScreenshot(partial.page, testInfo, 'partial-gh-missing-en')
+    await partial.page.keyboard.press('Escape')
 
     await partial.page.evaluate(() => window.minerva.settings.setLanguage({ language: 'es' }))
     await expect(indicator(partial.page)).toHaveText('Conectado en parte')
