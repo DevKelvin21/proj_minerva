@@ -12,13 +12,11 @@ import { analysisCache } from '../ai/analysis-cache'
 import { settingsStore } from '../settings/store'
 import { ghCliAuth } from '../scm/github/gh-cli-auth'
 import { isMockScmMode } from '../scm/mock-mode'
+import { createDefaultScm, type DefaultScm } from '../scm/default-scm'
 import { createPrContextSource } from '../scm/pr-context-source'
 import { createPrWatcher, type PrWatcher } from '../scm/pr-watcher'
-import {
-  createDefaultScmRegistry,
-  getAuthStatusMap,
-  listAcrossProviders,
-} from '../scm/registry'
+import { getAuthStatusMap, listAcrossProviders } from '../scm/registry'
+import { retargetPullRequest } from '../scm/retarget'
 import { seenStore } from '../scm/seen-store'
 import { openDidacticWindow } from '../windows/didactic-window'
 import * as updaterService from '../updater/updater'
@@ -63,8 +61,12 @@ function resolveWatchIntervalMs(): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
 }
 
-function getScmSettings(): ScmSettingsInfo {
-  return { mockScm: isMockScmMode(), githubAccount: settingsStore.getGithubAccount() }
+function getScmSettings(root: DefaultScm): ScmSettingsInfo {
+  return {
+    mockScm: isMockScmMode(),
+    githubAccount: settingsStore.getGithubAccount(),
+    ...root.settings.current(),
+  }
 }
 
 /**
@@ -81,13 +83,25 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
   handle('minerva:ping', () => 'pong from main @ electron ' + process.versions.electron)
   handle('minerva:getVersion', () => app.getVersion())
 
-  const scm = createDefaultScmRegistry()
+  const scmRoot = await createDefaultScm()
+  const scm = scmRoot.registry
   const prContext = createPrContextSource(scm)
 
   handle('scm:getAuthStatus', () => getAuthStatusMap(scm))
   // `gh` accounts for the Settings picker. Read-only, cached 5s; logins only.
   handle('scm:listGhAccounts', () => ghCliAuth.listAccounts())
-  handle('scm:getSettings', () => getScmSettings())
+  handle('scm:getSettings', () => getScmSettings(scmRoot))
+  // Enabled flags + Azure orgs/projects. Drops what depended on the old
+  // values: Azure identity/auth caches and the stacks cache.
+  handle('scm:setProviderSettings', (req) => {
+    scmRoot.settings.save(req)
+    scmRoot.azure.invalidate()
+    scmRoot.stacks.invalidate()
+    return getScmSettings(scmRoot)
+  })
+  handle('scm:listAzureProjects', async (req) => ({
+    projects: await scmRoot.azure.listProjects(req.organization),
+  }))
   // Persists the chosen `gh` login (`null` = follow gh's active account) and
   // DROPS the token-bridge caches — otherwise the next status would serve
   // the previous account's probe for up to 5s and, worse, `getToken()` would
@@ -96,7 +110,7 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     settingsStore.setGithubAccount(req.login)
     ghCliAuth.invalidate()
     await ghCliAuth.getStatus()
-    return getScmSettings()
+    return getScmSettings(scmRoot)
   })
 
   // `unread` is decorated HERE, not in providers: they stay unaware of read
@@ -125,6 +139,16 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     scm.forRepo(req.repo).getCommentThreads(req.repo, req.number),
   )
   handle('scm:postComment', (req) => scm.forRepo(req.repo).postComment(req))
+  handle('scm:setThreadStatus', (req) => scm.forRepo(req.repo).setThreadStatus(req))
+  handle('scm:getFileContent', (req) => scm.forRepo(req.repo).getFileContent(req))
+  // Re-validated in `retargetPullRequest` right before the write (open, base
+  // unchanged, new base exists); a stale UI gets `[SCM:CONFLICT]`.
+  handle('scm:retarget', async (req) => {
+    const updated = await retargetPullRequest(scm.forRepo(req.repo), req)
+    scmRoot.stacks.invalidate()
+    return updated
+  })
+  handle('scm:getStacks', (req) => scmRoot.stacks.get({ refresh: req?.refresh === true }))
 
   // Background PR watcher: lists `{ state: 'all' }` across providers on an
   // interval and pushes `prListChanged` when something changed. Not decorated

@@ -84,6 +84,14 @@ export class AzureApiError extends AzureScmError {
   }
 }
 
+/** A download that went over its `maxBytes` cap (so callers can degrade instead of failing). */
+export class AzureTooLargeError extends AzureApiError {
+  constructor(message: string, extra: { method: string; endpoint: string }) {
+    super('UNKNOWN', message, extra)
+    this.name = 'AzureTooLargeError'
+  }
+}
+
 export function statusToErrorCode(status: number): ScmErrorCode {
   if (status === 401 || status === 203) return 'UNAUTHENTICATED'
   if (status === 403) return 'FORBIDDEN'
@@ -374,8 +382,7 @@ export class AzureDevOpsClient {
   }
 
   private tooLarge(target: URL, maxBytes: number): AzureApiError {
-    return new AzureApiError(
-      'UNKNOWN',
+    return new AzureTooLargeError(
       'Download larger than ' +
         Math.floor(maxBytes / (1024 * 1024)) +
         ' MB [' +

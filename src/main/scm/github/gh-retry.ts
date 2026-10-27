@@ -52,5 +52,13 @@ export function withGhCliTokenRetry(inner: ScmDataSource): ScmDataSource {
     getCommentThreads: (repo, number) => guarded(() => inner.getCommentThreads(repo, number)),
     postComment: (req) => guarded(() => inner.postComment(req)),
     writeSnapshot: (req, destDir) => guarded(() => inner.writeSnapshot(req, destDir)),
+    setThreadStatus: (req) => guarded(() => inner.setThreadStatus(req)),
+    getFileContent: (req) => guarded(() => inner.getFileContent(req)),
+    branchExists: (repo, branch) => guarded(() => inner.branchExists(repo, branch)),
+    updatePullRequestBase: (repo, number, newBase) =>
+      guarded(() => inner.updatePullRequestBase(repo, number, newBase)),
+    listStackCandidates: () => guarded(() => inner.listStackCandidates()),
+    listMergedBySourceBranch: (repo, branch) =>
+      guarded(() => inner.listMergedBySourceBranch(repo, branch)),
   }
 }

@@ -15,6 +15,7 @@ import type {
   CommentThread,
   DiffFile,
   DiffFileStatus,
+  FileContentRequest,
   PostCommentRequest,
   PrComment,
   PrReviewer,
@@ -22,11 +23,23 @@ import type {
   PullRequestState,
   PullRequestSummary,
   ReviewDecision,
+  SetThreadStatusRequest,
   UserRef,
 } from '../../../shared/types'
-import { prWebUrl, type GithubRepoRef, type RepoRef, type ReviewerVote } from '../../../shared/scm'
+import {
+  MAX_FILE_CONTENT_BYTES,
+  prWebUrl,
+  repoKey,
+  shortRef,
+  type FileContent,
+  type GithubRepoRef,
+  type RepoRef,
+  type ReviewerVote,
+} from '../../../shared/scm'
+import { looksBinary } from '../azure/patch-builder'
 import { ScmError, isScmError } from '../errors'
 import type { ListPullRequestsQuery, ScmDataSource, SnapshotRequest } from '../provider'
+import type { StackInputPr } from '../stacks'
 import { asGithubRepo } from './repo'
 
 /** Prefijo sintético para hilos generales (issue comments, sin línea): ver `mapIssueCommentToThread`. */
@@ -273,6 +286,36 @@ const ADD_REVIEW_THREAD_REPLY_MUTATION = `
     }
   }
 `
+
+const REVIEW_THREAD_FIELDS =
+  ' id isResolved isOutdated path line originalLine diffSide' +
+  ' comments(first: 100) {' +
+  '   nodes { id body createdAt isMinimized url author { login avatarUrl } }' +
+  ' }'
+
+const RESOLVE_REVIEW_THREAD_MUTATION =
+  'mutation ResolveReviewThread($threadId: ID!) {' +
+  '  resolveReviewThread(input: { threadId: $threadId }) { thread {' +
+  REVIEW_THREAD_FIELDS +
+  '  } }' +
+  '}'
+
+const UNRESOLVE_REVIEW_THREAD_MUTATION =
+  'mutation UnresolveReviewThread($threadId: ID!) {' +
+  '  unresolveReviewThread(input: { threadId: $threadId }) { thread {' +
+  REVIEW_THREAD_FIELDS +
+  '  } }' +
+  '}'
+
+interface ReviewThreadMutationResponse {
+  resolveReviewThread?: { thread: ReviewThreadNode }
+  unresolveReviewThread?: { thread: ReviewThreadNode }
+}
+
+/** Repos per stack-candidate search query (GitHub search caps query length). */
+const STACK_REPOS_PER_QUERY = 10
+/** Repos considered for stacks at most (the ones with the most recent PRs win). */
+const MAX_STACK_REPOS = 30
 
 // ---------------------------------------------------------------------------
 // Mapeos GraphQL -> tipos de dominio, con cuidado explícito de los `null`.
@@ -766,6 +809,194 @@ export class RealGithubService implements ScmDataSource {
         body: req.bodyMarkdown,
       })
       return mapRestCommentToPrComment(comment)
+    } catch (error) {
+      throw mapGithubError(error, repo.fullName)
+    }
+  }
+
+  /**
+   * GitHub threads only know resolved/unresolved: `resolved` resolves,
+   * `active` unresolves (the validator lets nothing else through). PR-level
+   * comments (`issue-…` ids) have no resolve state on GitHub.
+   */
+  async setThreadStatus(req: SetThreadStatusRequest): Promise<CommentThread> {
+    const repo = asGithubRepo(req.repo)
+    if (req.threadId.startsWith(ISSUE_THREAD_PREFIX)) {
+      throw new ScmError('NOT_FOUND', 'General PR comments cannot be resolved on GitHub.')
+    }
+    const token = this.requireToken()
+    try {
+      const client = this.client(token)
+      const resolve = req.status === 'resolved'
+      const data = await client.graphql<ReviewThreadMutationResponse>(
+        resolve ? RESOLVE_REVIEW_THREAD_MUTATION : UNRESOLVE_REVIEW_THREAD_MUTATION,
+        { threadId: req.threadId },
+      )
+      const thread = resolve ? data.resolveReviewThread?.thread : data.unresolveReviewThread?.thread
+      if (!thread) throw new ScmError('NOT_FOUND', 'Comment thread not found: ' + req.threadId)
+      return mapReviewThreadNode(thread)
+    } catch (error) {
+      throw mapGithubError(error, repo.fullName)
+    }
+  }
+
+  /**
+   * `base` = the merge base (what LEFT-side line numbers refer to, the same
+   * commit GitHub diffs against), `head` = the PR head. Contents API JSON
+   * form: base64 up to 1 MB, empty `content` above (reported as `tooLarge`).
+   */
+  async getFileContent(req: FileContentRequest): Promise<FileContent> {
+    const repo = asGithubRepo(req.repo)
+    const token = this.requireToken()
+    try {
+      const client = this.client(token)
+      const { data: pr } = await client.rest.pulls.get({
+        owner: repo.owner,
+        repo: repo.name,
+        pull_number: req.number,
+      })
+      let ref = pr.head.sha
+      if (req.side === 'base') {
+        const { data: compare } = await client.rest.repos.compareCommitsWithBasehead({
+          owner: repo.owner,
+          repo: repo.name,
+          basehead: pr.base.sha + '...' + pr.head.sha,
+          per_page: 1,
+        })
+        ref = compare.merge_base_commit.sha
+      }
+      const { data } = await client.rest.repos.getContent({
+        owner: repo.owner,
+        repo: repo.name,
+        path: req.path,
+        ref,
+      })
+      if (Array.isArray(data) || data.type !== 'file') {
+        throw new ScmError('NOT_FOUND', 'Not a file: ' + req.path)
+      }
+      if (data.size > MAX_FILE_CONTENT_BYTES || !('content' in data) || !data.content) {
+        return { content: null, isBinary: false, tooLarge: data.size > 0 }
+      }
+      const bytes = Buffer.from(data.content, 'base64')
+      if (looksBinary(bytes)) return { content: null, isBinary: true, tooLarge: false }
+      return { content: new TextDecoder('utf-8').decode(bytes), isBinary: false, tooLarge: false }
+    } catch (error) {
+      throw mapGithubError(error, repo.fullName)
+    }
+  }
+
+  async branchExists(repoRef: RepoRef, branch: string): Promise<boolean> {
+    const repo = asGithubRepo(repoRef)
+    const token = this.requireToken()
+    try {
+      // `git/ref/{ref}` is an EXACT match (unlike `git/matching-refs`).
+      await this.client(token).rest.git.getRef({
+        owner: repo.owner,
+        repo: repo.name,
+        ref: 'heads/' + shortRef(branch),
+      })
+      return true
+    } catch (error) {
+      if (asGithubErrorLike(error).status === 404) return false
+      throw mapGithubError(error, repo.fullName)
+    }
+  }
+
+  async updatePullRequestBase(
+    repoRef: RepoRef,
+    number: number,
+    newBase: string,
+  ): Promise<PullRequestSummary> {
+    const repo = asGithubRepo(repoRef)
+    const token = this.requireToken()
+    try {
+      await this.client(token).rest.pulls.update({
+        owner: repo.owner,
+        repo: repo.name,
+        pull_number: number,
+        base: shortRef(newBase),
+      })
+    } catch (error) {
+      throw mapGithubError(error, repo.fullName)
+    }
+    return this.getPullRequestDetail(repo, number)
+  }
+
+  /**
+   * Open PRs of the repos the user has open PRs in (from the usual
+   * `involves:@me` listing), so a whole chain shows up even where the user
+   * only reviews one link. Capped at `MAX_STACK_REPOS` repos.
+   */
+  async listStackCandidates(): Promise<StackInputPr[]> {
+    const mine = await this.listPullRequests({ state: 'open' })
+    const repos: GithubRepoRef[] = []
+    const seen = new Set<string>()
+    for (const pr of mine) {
+      if (pr.repo.provider !== 'github' || seen.has(repoKey(pr.repo))) continue
+      seen.add(repoKey(pr.repo))
+      repos.push(pr.repo)
+    }
+    const token = this.requireToken()
+    const out: StackInputPr[] = []
+    try {
+      const client = this.client(token)
+      const selected = repos.slice(0, MAX_STACK_REPOS)
+      for (let i = 0; i < selected.length; i += STACK_REPOS_PER_QUERY) {
+        const chunk = selected.slice(i, i + STACK_REPOS_PER_QUERY)
+        const searchQuery =
+          'is:pr is:open archived:false ' +
+          chunk.map((repo) => 'repo:' + repo.fullName).join(' ') +
+          ' sort:updated-desc'
+        const data = await client.graphql<SearchPullRequestsResponse>(SEARCH_PULL_REQUESTS_QUERY, {
+          searchQuery,
+        })
+        for (const node of data.search.nodes) {
+          if (node.__typename !== 'PullRequest') continue
+          const pr = mapSearchNodeToSummary(node)
+          out.push({
+            repo: pr.repo,
+            number: pr.number,
+            title: pr.title,
+            headRef: pr.headRef,
+            baseRef: pr.baseRef,
+            state: pr.state,
+            isDraft: pr.isDraft,
+            createdAt: pr.createdAt,
+          })
+        }
+      }
+      return out
+    } catch (error) {
+      throw mapGithubError(error)
+    }
+  }
+
+  /** Exact `head=owner:branch` filter (same-repo stacks), merged only. */
+  async listMergedBySourceBranch(repoRef: RepoRef, branch: string): Promise<StackInputPr[]> {
+    const repo = asGithubRepo(repoRef)
+    const token = this.requireToken()
+    try {
+      const { data } = await this.client(token).rest.pulls.list({
+        owner: repo.owner,
+        repo: repo.name,
+        state: 'closed',
+        head: repo.owner + ':' + shortRef(branch),
+        per_page: 20,
+      })
+      return data
+        .filter((pr) => pr.merged_at)
+        .map((pr) => ({
+          repo,
+          number: pr.number,
+          title: pr.title,
+          headRef: pr.head.ref,
+          baseRef: pr.base.ref,
+          state: 'merged' as const,
+          isDraft: Boolean(pr.draft),
+          mergedInto: pr.base.ref,
+          createdAt: pr.created_at,
+          closedAt: pr.merged_at ?? undefined,
+        }))
     } catch (error) {
       throw mapGithubError(error, repo.fullName)
     }

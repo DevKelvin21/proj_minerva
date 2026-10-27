@@ -38,6 +38,12 @@ function makeFakeService(overrides: Partial<ScmDataSource> = {}): ScmDataSource 
     getCommentThreads: vi.fn().mockResolvedValue([]),
     postComment: vi.fn().mockResolvedValue({}),
     writeSnapshot: vi.fn().mockResolvedValue(undefined),
+    setThreadStatus: vi.fn().mockResolvedValue({}),
+    getFileContent: vi.fn().mockResolvedValue({ content: '', isBinary: false, tooLarge: false }),
+    branchExists: vi.fn().mockResolvedValue(true),
+    updatePullRequestBase: vi.fn().mockResolvedValue({}),
+    listStackCandidates: vi.fn().mockResolvedValue([]),
+    listMergedBySourceBranch: vi.fn().mockResolvedValue([]),
     ...overrides,
   }
 }
@@ -105,7 +111,7 @@ describe('withGhCliTokenRetry', () => {
     expect(refetchTokenAfter401Mock).not.toHaveBeenCalled()
   })
 
-  it('wraps all 6 data methods with the same retry', async () => {
+  it('wraps every data method with the same retry', async () => {
     refetchTokenAfter401Mock.mockResolvedValue('ghp_new_token')
     const calls: Record<keyof ScmDataSource, (w: ScmDataSource) => Promise<unknown>> = {
       listPullRequests: (w) => w.listPullRequests({}),
@@ -114,6 +120,14 @@ describe('withGhCliTokenRetry', () => {
       getCommentThreads: (w) => w.getCommentThreads(validRepo, 1),
       postComment: (w) => w.postComment({ repo: validRepo, number: 1, bodyMarkdown: 'hi' }),
       writeSnapshot: (w) => w.writeSnapshot({ repo: validRepo, headSha: 'abc' }, '/tmp/x'),
+      setThreadStatus: (w) =>
+        w.setThreadStatus({ repo: validRepo, number: 1, threadId: 't', status: 'resolved' }),
+      getFileContent: (w) =>
+        w.getFileContent({ repo: validRepo, number: 1, path: 'a.ts', side: 'head' }),
+      branchExists: (w) => w.branchExists(validRepo, 'main'),
+      updatePullRequestBase: (w) => w.updatePullRequestBase(validRepo, 1, 'main'),
+      listStackCandidates: (w) => w.listStackCandidates(),
+      listMergedBySourceBranch: (w) => w.listMergedBySourceBranch(validRepo, 'feature/x'),
     }
 
     for (const [method, call] of Object.entries(calls)) {

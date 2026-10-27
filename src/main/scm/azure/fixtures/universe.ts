@@ -1,6 +1,8 @@
 /**
  * Deterministic Azure DevOps mock universe (org "contoso", project
- * "Platform") for the future mock provider and e2e tests. Shapes are the
+ * "Platform") behind the mock provider (`./fake-server.ts`) and e2e tests.
+ * The signed-in user is Ada (`MOCK_ME`): she created or reviews every PR, so
+ * the whole universe shows up in her list. Shapes are the
  * WIRE types (`../api-types.ts`), so the mock exercises the same mappers and
  * patch builder as the real provider.
  *
@@ -60,6 +62,9 @@ export const PEOPLE = {
     isContainer: true,
   },
 } satisfies Record<string, AzIdentityRef>
+
+/** The signed-in user of the mock (`connectionData`). */
+export const MOCK_ME = PEOPLE.ada
 
 // ---------------------------------------------------------------------------
 // Repos
@@ -330,6 +335,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     author: PEOPLE.grace,
     created: '2026-10-01T09:00:00Z',
     closed: '2026-10-06T16:00:00Z',
+    reviewers: [reviewer(PEOPLE.ada, 10)],
   }),
   // orders-api: 3-deep stack.
   pullRequest({
@@ -387,6 +393,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     status: 'active',
     author: PEOPLE.linus,
     created: '2026-10-10T11:00:00Z',
+    reviewers: [reviewer(PEOPLE.ada, 0)],
   }),
   pullRequest({
     id: 104,
@@ -397,6 +404,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     status: 'active',
     author: PEOPLE.linus,
     created: '2026-10-11T11:00:00Z',
+    reviewers: [reviewer(PEOPLE.ada, 0)],
   }),
   // storefront-web: standalone PR carrying every thread status.
   pullRequest({
@@ -421,6 +429,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     author: PEOPLE.linus,
     created: '2026-09-20T08:00:00Z',
     closed: '2026-09-25T08:00:00Z',
+    reviewers: [reviewer(PEOPLE.ada, 0)],
   }),
   // platform-infra: rename + binary.
   pullRequest({
@@ -432,6 +441,7 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     status: 'active',
     author: PEOPLE.grace,
     created: '2026-10-15T08:00:00Z',
+    reviewers: [reviewer(PEOPLE.ada, 5), reviewer(PEOPLE.team, 0, true)],
   }),
 ]
 
