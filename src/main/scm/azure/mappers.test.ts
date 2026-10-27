@@ -5,7 +5,9 @@ import {
   isThreadOutdated,
   mapChangeEntry,
   mapChangeStatus,
+  mapChecks,
   mapCiStatus,
+  mapMergeStatus,
   mapPrState,
   mapPullRequestSummary,
   mapReviewDecision,
@@ -119,6 +121,12 @@ describe('mapPullRequestSummary', () => {
       mapReviewDecision([
         { id: 'a', displayName: 'A', vote: 10, isRequired: true },
         { id: 'b', displayName: 'B', vote: -10 },
+      ]),
+    ).toBe('rejected')
+    expect(
+      mapReviewDecision([
+        { id: 'a', displayName: 'A', vote: 10, isRequired: true },
+        { id: 'b', displayName: 'B', vote: -5 },
       ]),
     ).toBe('changes_requested')
   })
@@ -344,6 +352,49 @@ describe('ci status', () => {
     expect(mapCiStatus([], [evaluation('rejected', 'Minimum number of reviewers')])).toBeNull()
     expect(mapCiStatus([], [evaluation('rejected', 'Build', false)])).toBeNull()
     expect(mapCiStatus([], [evaluation('running', 'Status')])).toBe('pending')
+  })
+
+  it('lists enabled policies (blocking first, own display name) and the latest statuses', () => {
+    const named = {
+      ...evaluation('running', 'Build'),
+      configuration: {
+        ...evaluation('running', 'Build').configuration,
+        settings: { displayName: '  orders-api CI  ' },
+      },
+    }
+    const disabled = {
+      ...evaluation('rejected', 'Work item linking'),
+      configuration: {
+        ...evaluation('rejected', 'Work item linking').configuration,
+        isEnabled: false,
+      },
+    }
+    expect(
+      mapChecks(
+        [
+          status(1, 'failed', '2026-10-01T00:00:00Z'),
+          status(2, 'succeeded', '2026-10-02T00:00:00Z'),
+        ],
+        [evaluation('approved', 'Comment requirements', false), named, disabled],
+      ),
+    ).toEqual([
+      { name: 'orders-api CI', status: 'pending', isBlocking: true, kind: 'policy' },
+      { name: 'Comment requirements', status: 'success', isBlocking: false, kind: 'policy' },
+      { name: 'ci/build', status: 'success', isBlocking: false, kind: 'status' },
+    ])
+    expect(mapChecks([], [])).toEqual([])
+  })
+})
+
+describe('merge status', () => {
+  it('maps what the reviewer should see and drops the unknown', () => {
+    expect(mapMergeStatus('succeeded')).toBe('clean')
+    expect(mapMergeStatus('conflicts')).toBe('conflicts')
+    expect(mapMergeStatus('queued')).toBe('checking')
+    expect(mapMergeStatus('rejectedByPolicy')).toBe('blocked')
+    expect(mapMergeStatus('failure')).toBe('failed')
+    expect(mapMergeStatus('notSet')).toBeUndefined()
+    expect(mapMergeStatus(undefined)).toBeUndefined()
   })
 })
 

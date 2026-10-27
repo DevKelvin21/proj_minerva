@@ -26,7 +26,12 @@ export interface UserRef {
 
 export type PullRequestState = 'open' | 'closed' | 'merged'
 
-export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required' | null
+/**
+ * Overall review state of a PR. `rejected` is Azure DevOps only (a -10 vote);
+ * on Azure `changes_requested` means "waiting for author" (a -5 vote).
+ */
+export type ReviewDecision =
+  'approved' | 'changes_requested' | 'rejected' | 'review_required' | null
 
 export type CiStatus = 'success' | 'failure' | 'pending' | null
 
@@ -98,12 +103,35 @@ export interface PrWorkItem {
   state?: string
 }
 
+/**
+ * Whether the PR can merge cleanly, as the provider reports it. Only set by
+ * providers that compute it (Azure DevOps `mergeStatus`); absent = unknown.
+ */
+export type PrMergeStatus = 'clean' | 'conflicts' | 'checking' | 'blocked' | 'failed'
+
+/** One merge requirement (Azure DevOps branch policy or PR status), provider-neutral. */
+export interface PrCheck {
+  /** Display name (`Build`, `Minimum number of reviewers`, `ci/build`). */
+  name: string
+  status: 'success' | 'failure' | 'pending' | 'not_applicable'
+  /** Blocking = required to complete the PR; otherwise optional. */
+  isBlocking: boolean
+  /** `policy`: a branch policy evaluation; `status`: a status posted on the PR. */
+  kind: 'policy' | 'status'
+}
+
 export interface PullRequestDetail extends PullRequestSummary {
   bodyMarkdown: string
   labels: { name: string; color?: string }[]
   reviewers: PrReviewer[]
   commits: number
   workItems?: PrWorkItem[]
+  /** See `PrMergeStatus`. */
+  mergeStatus?: PrMergeStatus
+  /** Azure DevOps auto-complete: the PR completes on its own once its policies pass. */
+  autoComplete?: { setBy: UserRef }
+  /** Branch policies / statuses (Azure DevOps). Absent = the provider does not list them. */
+  checks?: PrCheck[]
   /**
    * True when the provider capped the file list (e.g. 300 files): the Files tab
    * and the AI prompt must say that some files are not shown. `changedFiles`

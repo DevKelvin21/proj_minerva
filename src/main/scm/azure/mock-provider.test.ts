@@ -32,6 +32,31 @@ describe('MockAzureScmProvider', () => {
     )
   })
 
+  it('fails like a signed-out machine when MINERVA_MOCK_AZURE_AUTH asks for it', async () => {
+    const saved = { mock: process.env.MINERVA_MOCK, auth: process.env.MINERVA_MOCK_AZURE_AUTH }
+    process.env.MINERVA_MOCK = '1'
+    try {
+      for (const [value, state, code] of [
+        ['unauthenticated', 'cli_unauthenticated', 'UNAUTHENTICATED'],
+        ['cli_unavailable', 'cli_unavailable', 'CLI_UNAVAILABLE'],
+      ] as const) {
+        process.env.MINERVA_MOCK_AZURE_AUTH = value
+        const provider = createMockAzureProvider(() => ({ enabled: true, organizations: [] }), 0)
+        const status = await provider.getAuthStatus()
+        expect(status.state).toBe(state)
+        expect(status.detail).toContain(
+          'az devops login --organization https://dev.azure.com/contoso',
+        )
+        await expect(provider.listPullRequests({})).rejects.toMatchObject({ code })
+      }
+    } finally {
+      if (saved.mock === undefined) delete process.env.MINERVA_MOCK
+      else process.env.MINERVA_MOCK = saved.mock
+      if (saved.auth === undefined) delete process.env.MINERVA_MOCK_AZURE_AUTH
+      else process.env.MINERVA_MOCK_AZURE_AUTH = saved.auth
+    }
+  })
+
   it('writes the fixture files straight into the snapshot dir', async () => {
     const provider = createMockAzureProvider(() => ({ enabled: true, organizations: [] }), 0)
     const detail = await provider.getPullRequestDetail(apiRepo, 102)

@@ -271,6 +271,29 @@ describe('detail', () => {
     expect((await p.getPullRequestDetail(apiRepo, 100)).state).toBe('merged')
   })
 
+  it('carries merge status, auto-complete, tags and branch policies', async () => {
+    const p = provider()
+    const pr101 = await p.getPullRequestDetail(apiRepo, 101)
+    expect(pr101.labels).toEqual([{ name: 'checkout-v2' }, { name: 'api' }])
+    expect(pr101.autoComplete).toEqual({
+      setBy: { login: PEOPLE.ada.uniqueName, displayName: 'Ada Lovelace' },
+    })
+    expect(pr101.mergeStatus).toBe('clean')
+    expect(pr101.checks?.map((check) => [check.name, check.status, check.isBlocking])).toEqual([
+      ['Minimum number of reviewers', 'pending', true],
+      ['orders-api CI', 'pending', true],
+      ['Work item linking', 'success', true],
+      ['Comment requirements', 'success', false],
+      ['ci/build', 'pending', false],
+    ])
+    const pr105 = await p.getPullRequestDetail(apiRepo, 105)
+    expect(pr105.mergeStatus).toBe('conflicts')
+    expect(pr105.reviewDecision).toBe('rejected')
+    expect(pr105.autoComplete).toBeUndefined()
+    // A completed PR's merge status is history: not reported.
+    expect((await p.getPullRequestDetail(apiRepo, 100)).mergeStatus).toBeUndefined()
+  })
+
   it('counts the files up front and fills the line stats once the files were built', async () => {
     const p = provider()
     const first = await p.getPullRequestDetail(webRepo, 108)
