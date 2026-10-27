@@ -15,6 +15,12 @@ function azRepo(name: string): AzureRepoRef {
 
 const api = azRepo('api')
 const web = azRepo('web')
+const ghRepo = (): GithubRepoRef => ({
+  provider: 'github',
+  owner: 'someone',
+  name: 'template',
+  fullName: 'someone/template',
+})
 
 function pr(
   repo: AzureRepoRef | GithubRepoRef,
@@ -186,5 +192,46 @@ describe('buildStacks', () => {
       ['web', 6, 'azure:contoso:feat/a'],
       ['web', 1, undefined], // fabrikam: another org
     ])
+  })
+
+  it('never stacks a PR into main on a fork PR whose head is also named main', () => {
+    const repo = ghRepo()
+    const forks = [1, 2, 3].map((n) => ({
+      repo,
+      number: n,
+      title: 'Fork ' + n,
+      headRef: 'main',
+      baseRef: 'main',
+      state: 'open' as const,
+      isDraft: false,
+      headIsFork: true,
+    }))
+    expect(buildStacks(forks, [])).toEqual([])
+  })
+
+  it('does not use a fork head as a stack parent', () => {
+    const repo = ghRepo()
+    const prs = [
+      {
+        repo,
+        number: 1,
+        title: 'Fork',
+        headRef: 'feature/a',
+        baseRef: 'main',
+        state: 'open' as const,
+        isDraft: false,
+        headIsFork: true,
+      },
+      {
+        repo,
+        number: 2,
+        title: 'Local',
+        headRef: 'feature/b',
+        baseRef: 'feature/a',
+        state: 'open' as const,
+        isDraft: false,
+      },
+    ]
+    expect(buildStacks(prs, []).some((s) => s.size > 1)).toBe(false)
   })
 })

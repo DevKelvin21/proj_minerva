@@ -95,6 +95,7 @@ interface SearchPullRequestNode {
   createdAt?: string
   updatedAt?: string
   headRefName?: string
+  isCrossRepository?: boolean
   baseRefName?: string
   additions?: number
   deletions?: number
@@ -192,6 +193,7 @@ const SEARCH_PULL_REQUESTS_QUERY = `
           createdAt
           updatedAt
           headRefName
+          isCrossRepository
           baseRefName
           additions
           deletions
@@ -1021,6 +1023,7 @@ export class RealGithubService implements ScmDataSource {
             state: pr.state,
             isDraft: pr.isDraft,
             createdAt: pr.createdAt,
+            headIsFork: node.isCrossRepository === true,
           })
         }
       }
