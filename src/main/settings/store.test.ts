@@ -23,6 +23,8 @@ vi.mock('electron', () => ({
 }))
 
 const { SettingsStore, isPersistedScmSettings } = await import('./store')
+const { DEFAULT_APPEARANCE_SETTINGS } = await import('../../shared/theme/appearance')
+const { getBuiltInThemes, getThemeColorsForMode } = await import('../../shared/theme/themes')
 
 function settingsFilePath(): string {
   return join(userDataDir, 'settings.json')
@@ -623,6 +625,79 @@ describe('SettingsStore', () => {
       expect(store.getLanguage()).toBe('en')
       expect(store.getPersistedModel('codex')).toBe('gpt-5')
       expect(JSON.parse(readFileSync(settingsFilePath(), 'utf-8'))).not.toHaveProperty('language')
+    })
+  })
+  describe('appearance', () => {
+    const custom = {
+      id: 'my-theme',
+      label: 'My theme',
+      appearance: 'dark' as const,
+      colors: getThemeColorsForMode(getBuiltInThemes()[2], 'dark')!,
+    }
+
+    it('defaults to Minerva following the system', () => {
+      expect(new SettingsStore().getAppearance()).toEqual(DEFAULT_APPEARANCE_SETTINGS)
+    })
+
+    it('persists appearance with custom themes and keeps the other fields', () => {
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({ aiProvider: 'codex', models: { codex: 'gpt-5' }, language: 'es' }),
+        'utf-8',
+      )
+      const next = {
+        mode: 'dark' as const,
+        lightTheme: 'grove',
+        darkTheme: 'my-theme',
+        contrast: 130,
+        customThemes: [custom],
+      }
+      new SettingsStore().setAppearance(next)
+      const reloaded = new SettingsStore()
+      expect(reloaded.getAppearance()).toEqual(next)
+      expect(reloaded.getLanguage()).toBe('es')
+      reloaded.setLanguage('en')
+      expect(new SettingsStore().getAppearance()).toEqual(next)
+    })
+
+    it('repairs a damaged block: drops the bad custom theme and resets the dangling half', () => {
+      const hostile = { ...custom, id: 'evil', colors: { ...custom.colors, canvas: 'red;x:url(y)' } }
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({
+          aiProvider: 'codex',
+          models: { codex: 'gpt-5' },
+          appearance: {
+            mode: 'light',
+            lightTheme: 'ocean',
+            darkTheme: 'evil',
+            contrast: 999,
+            customThemes: [custom, hostile],
+          },
+        }),
+        'utf-8',
+      )
+      const store = new SettingsStore()
+      expect(store.getAppearance()).toEqual({
+        mode: 'light',
+        lightTheme: 'ocean',
+        darkTheme: 'minerva',
+        contrast: 100,
+        customThemes: [custom],
+      })
+      expect(store.getPersistedModel('codex')).toBe('gpt-5')
+      expect(readFileSync(settingsFilePath(), 'utf-8')).not.toContain('url(y)')
+    })
+
+    it('drops an appearance block that is not an object', () => {
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({ aiProvider: 'codex', models: { codex: 'gpt-5' }, appearance: 'dark' }),
+        'utf-8',
+      )
+      const store = new SettingsStore()
+      expect(store.getAppearance()).toEqual(DEFAULT_APPEARANCE_SETTINGS)
+      expect(store.getPersistedModel('codex')).toBe('gpt-5')
     })
   })
 })

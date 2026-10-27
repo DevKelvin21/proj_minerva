@@ -13,6 +13,7 @@
  * acceso a `ipcRenderer` por una vía no prevista.
  */
 import type { AppLocale } from './locale'
+import type { AppearanceSettings } from './theme/appearance'
 import type { DidacticSnippet, RepoRef, UpdaterStatus } from './types'
 
 interface DraftSectionCommon {
@@ -183,11 +184,21 @@ export interface LanguageChangedEvent {
   language: AppLocale
 }
 
+/**
+ * Payload of `minerva:event:appearanceChanged`: the appearance settings just
+ * saved by `settings:setAppearance`, pushed to every window so the main and
+ * the detached didactic window repaint together.
+ */
+export interface AppearanceChangedEvent {
+  appearance: AppearanceSettings
+}
+
 export interface EventContract {
   'minerva:event:analysisProgress': AnalysisProgressEvent
   'minerva:event:prListChanged': PrListChangedEvent
   'minerva:event:updaterStatusChanged': UpdaterStatusChangedEvent
   'minerva:event:languageChanged': LanguageChangedEvent
+  'minerva:event:appearanceChanged': AppearanceChangedEvent
 }
 
 export type EventChannel = keyof EventContract
@@ -203,4 +214,5 @@ export const MINERVA_EVENTS = {
   prListChanged: 'minerva:event:prListChanged',
   updaterStatusChanged: 'minerva:event:updaterStatusChanged',
   languageChanged: 'minerva:event:languageChanged',
+  appearanceChanged: 'minerva:event:appearanceChanged',
 } satisfies Record<string, EventChannel>

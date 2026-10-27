@@ -265,4 +265,22 @@ export const es: MessageShape<typeof en> = {
     mockFeedError:
       'No se pudo contactar al feed de actualizaciones (guion de prueba: MINERVA_MOCK_UPDATER=error).',
   },
+  themes: {
+    openVsx: {
+      tooLarge: 'Open VSX envi\u00f3 m\u00e1s datos de los que Minerva acepta para un tema.',
+      unreachable:
+        'No se pudo conectar con Open VSX. Revisa tu conexi\u00f3n e int\u00e9ntalo de nuevo.',
+      untrustedRedirect:
+        'Open VSX redirigi\u00f3 a una direcci\u00f3n inesperada, as\u00ed que se detuvo la descarga.',
+      unavailable:
+        'Open VSX no est\u00e1 disponible en este momento. Int\u00e9ntalo m\u00e1s tarde.',
+      unreadable: 'Open VSX devolvi\u00f3 un tema que Minerva no pudo leer.',
+      license: 'La licencia de esa extensi\u00f3n no permite importar sus temas aqu\u00ed.',
+      checksum: 'La extensi\u00f3n descargada no pas\u00f3 la verificaci\u00f3n de integridad.',
+      unsafePackage: 'No es seguro abrir el paquete de la extensi\u00f3n.',
+      mismatch: 'El paquete descargado no coincide con la extensi\u00f3n elegida.',
+      noThemes: 'Esa extensi\u00f3n no contiene temas de color.',
+      tooManyThemes: 'Esa extensi\u00f3n tiene demasiados temas de color para importarlos.',
+    },
+  },
 }

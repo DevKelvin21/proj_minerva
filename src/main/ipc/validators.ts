@@ -17,6 +17,12 @@
 import { isAiProviderId } from '../../shared/ai-providers'
 import type { IpcChannel } from '../../shared/ipc'
 import { isAppLocale } from '../../shared/locale'
+import { isAppearanceSettings } from '../../shared/theme/appearance'
+import {
+  isOpenVsxIdentifier,
+  MAX_OPEN_VSX_QUERY_LENGTH,
+  OPEN_VSX_SORTS,
+} from '../../shared/theme/open-vsx'
 import { SETTABLE_THREAD_STATUSES, type ThreadStatus } from '../../shared/scm'
 import {
   isAzureOrganizationName,
@@ -271,6 +277,26 @@ function isSetLanguagePayload(value: unknown): boolean {
   return isAppLocale(value.language)
 }
 
+/** `settings:setAppearance`: the full settings, strictly (canonical colors only, see `isAppearanceSettings`). */
+function isSetAppearancePayload(value: unknown): boolean {
+  return isAppearanceSettings(value)
+}
+
+/** `themes:searchOpenVsx`: a short non-empty query and an optional known sort. */
+function isSearchOpenVsxPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['query', 'sortBy'])) return false
+  if (!isNonEmptyString(value.query, MAX_OPEN_VSX_QUERY_LENGTH)) return false
+  return value.sortBy === undefined || (OPEN_VSX_SORTS as readonly unknown[]).includes(value.sortBy)
+}
+
+/** `themes:installOpenVsx`: an extension identity (never a URL). */
+function isInstallOpenVsxPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['namespace', 'name'])) return false
+  return isOpenVsxIdentifier(value.namespace) && isOpenVsxIdentifier(value.name)
+}
+
 /** `window:openDidactic` (T14): mismo `repo`/`number` que `isRepoAndNumberPayload`, más el título humano del PR. */
 function isOpenDidacticWindowPayload(value: unknown): boolean {
   if (!isPlainObject(value)) return false
@@ -316,6 +342,10 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'settings:setModelOption': isSetModelOptionPayload,
   'settings:getLanguage': isVoidPayload,
   'settings:setLanguage': isSetLanguagePayload,
+  'settings:getAppearance': isVoidPayload,
+  'settings:setAppearance': isSetAppearancePayload,
+  'themes:searchOpenVsx': isSearchOpenVsxPayload,
+  'themes:installOpenVsx': isInstallOpenVsxPayload,
   'window:openDidactic': isOpenDidacticWindowPayload,
   // Auto-updater (T90, F17): los 5 canales son `req: void` — mismo guard que
   // `minerva:ping`/`scm:getAuthStatus`, rechaza cualquier cosa distinta de `undefined`.

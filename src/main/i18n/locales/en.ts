@@ -262,4 +262,20 @@ export const en = {
       'auto-update cannot start.',
     mockFeedError: 'Could not reach the update feed (test script: MINERVA_MOCK_UPDATER=error).',
   },
+  themes: {
+    openVsx: {
+      tooLarge: 'Open VSX sent more data than Minerva accepts for a theme.',
+      unreachable: 'Could not reach Open VSX. Check your connection and try again.',
+      untrustedRedirect:
+        'Open VSX redirected to an unexpected address, so the download was stopped.',
+      unavailable: 'Open VSX is unavailable right now. Try again later.',
+      unreadable: 'Open VSX returned a theme Minerva could not read.',
+      license: "That extension's license does not allow importing its themes here.",
+      checksum: 'The downloaded extension failed its integrity check.',
+      unsafePackage: 'The extension package is not safe to open.',
+      mismatch: 'The downloaded package does not match the selected extension.',
+      noThemes: 'That extension does not contain color themes.',
+      tooManyThemes: 'That extension contains too many color themes to import.',
+    },
+  },
 }

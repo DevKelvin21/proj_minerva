@@ -5,6 +5,8 @@ directories:
 files:
   - out/**/*
   - package.json
+  # MIT notice for the theme code adapted from T3 Code.
+  - THIRD_PARTY_NOTICES.md
   - '!**/.env'
   - '!**/.env.*'
   # `@anthropic-ai/claude-agent-sdk` ships a native binary per platform (~250MB

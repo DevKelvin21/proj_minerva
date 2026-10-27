@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { payloadValidators } from './validators'
+import { DEFAULT_APPEARANCE_SETTINGS } from '../../shared/theme/appearance'
+import { getBuiltInTheme, getThemeColorsForMode } from '../../shared/theme/themes'
 
 const validRepo = {
   provider: 'github',
@@ -24,6 +26,7 @@ describe('payloadValidators', () => {
       'scm:listGhAccounts',
       'scm:getSettings',
       'settings:get',
+      'settings:getAppearance',
     ] as const
 
     it.each(channels)('acepta undefined para %s', (channel) => {
@@ -720,6 +723,62 @@ describe('payloadValidators', () => {
       expect(validate({ organization: 'dev.azure.com/x' })).toBe(false)
       expect(validate({ organization: '' })).toBe(false)
       expect(validate({ organization: 'a', more: 1 })).toBe(false)
+    })
+  })
+  describe('settings:setAppearance', () => {
+    const validate = payloadValidators['settings:setAppearance']
+    it('accepts full, canonical appearance settings only', () => {
+      expect(validate(DEFAULT_APPEARANCE_SETTINGS)).toBe(true)
+      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, mode: 'dim' })).toBe(false)
+      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, contrast: 500 })).toBe(false)
+      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, darkTheme: 'missing' })).toBe(false)
+      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, extra: true })).toBe(false)
+      const { contrast: _contrast, ...withoutContrast } = DEFAULT_APPEARANCE_SETTINGS
+      expect(validate(withoutContrast)).toBe(false)
+      expect(validate(undefined)).toBe(false)
+    })
+
+    it('refuses a custom theme with a color that is not canonical', () => {
+      const colors = getThemeColorsForMode(getBuiltInTheme('grove')!, 'dark')!
+      const theme = { id: 'mine', label: 'Mine', appearance: 'dark', colors }
+      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, customThemes: [theme] })).toBe(true)
+      for (const canvas of ['#000', 'red', 'oklch(0 0 0); background: url(x)', 'var(--x)']) {
+        const bad = { ...theme, colors: { ...colors, canvas } }
+        expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, customThemes: [bad] })).toBe(false)
+      }
+    })
+
+    it('caps the number of custom themes', () => {
+      const colors = getThemeColorsForMode(getBuiltInTheme('grove')!, 'dark')!
+      const many = Array.from({ length: 65 }, (_, i) => ({
+        id: 'theme-' + i,
+        label: 'Theme ' + i,
+        appearance: 'dark',
+        colors,
+      }))
+      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, customThemes: many })).toBe(false)
+      expect(validate({ ...DEFAULT_APPEARANCE_SETTINGS, customThemes: many.slice(0, 64) })).toBe(true)
+    })
+  })
+
+  describe('themes:searchOpenVsx / themes:installOpenVsx', () => {
+    const search = payloadValidators['themes:searchOpenVsx']
+    const install = payloadValidators['themes:installOpenVsx']
+    it('search takes a short query and a known sort', () => {
+      expect(search({ query: 'night owl' })).toBe(true)
+      expect(search({ query: 'x', sortBy: 'downloadCount' })).toBe(true)
+      expect(search({ query: '' })).toBe(false)
+      expect(search({ query: 'x'.repeat(101) })).toBe(false)
+      expect(search({ query: 'x', sortBy: 'evil' })).toBe(false)
+      expect(search({ query: 'x', url: 'https://evil.example' })).toBe(false)
+    })
+
+    it('install takes an extension identity, never a URL', () => {
+      expect(install({ namespace: 'sdras', name: 'night-owl' })).toBe(true)
+      expect(install({ namespace: 'sdras', name: '../../etc' })).toBe(false)
+      expect(install({ namespace: 'https://evil.example', name: 'x' })).toBe(false)
+      expect(install({ namespace: 'sdras', name: 'night-owl', url: 'x' })).toBe(false)
+      expect(install({ namespace: 'sdras' })).toBe(false)
     })
   })
 })

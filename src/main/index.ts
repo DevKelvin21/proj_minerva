@@ -8,6 +8,7 @@ import { secureWebPreferences } from './windows/secure-web-preferences'
 import { installExternalLinkGuard } from './windows/external-link-guard'
 import { hydratePathFromLoginShell } from './system/shell-path'
 import { initUpdater, stop as stopUpdater } from './updater/updater'
+import { currentWindowBackground, initNativeAppearance } from './theme/appearance-service'
 
 const isDev = !app.isPackaged
 
@@ -29,7 +30,8 @@ function createWindow(): void {
     minWidth: 560,
     minHeight: 420,
     show: false,
-    backgroundColor: '#1a1d23',
+    // The saved theme's canvas, so nothing flashes behind the first paint.
+    backgroundColor: currentWindowBackground(),
     title: 'Minerva',
     // `webPreferences`/guard de enlaces externos extraídos a `./windows/` en
     // T14 para que la ventana didáctica desacoplada (`./windows/didactic-window.ts`)
@@ -65,6 +67,10 @@ void app.whenReady().then(async () => {
   // (`GET /user`) and a slow network must not delay the window. The probe is
   // single-flight, so the renderer's first query joins this same promise.
   void ghCliAuth.getStatus()
+
+  // Native theme (dialogs, menus, `prefers-color-scheme`) follows the saved
+  // appearance before any window exists.
+  initNativeAppearance()
 
   const { stopPrWatcher } = await registerIpcHandlers()
 
