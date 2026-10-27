@@ -11,7 +11,7 @@ import type { DiffFile } from '../../shared/types'
 /** ~60k chars total repartidos entre todos los patches del PR. */
 export const TOTAL_DIFF_BUDGET_CHARS = 60_000
 
-const TRUNCATION_NOTE = '\n[truncado por límite de tamaño del prompt]'
+const TRUNCATION_NOTE = '\n[truncated by the prompt size limit]'
 
 export interface DiffBudgetResult {
   /** Un bloque de texto por archivo incluido (con o sin truncar), en el orden original. */
@@ -21,7 +21,7 @@ export interface DiffBudgetResult {
 }
 
 function fileHeader(file: DiffFile): string {
-  const rename = file.previousPath ? ' (antes: ' + file.previousPath + ')' : ''
+  const rename = file.previousPath ? ' (was: ' + file.previousPath + ')' : ''
   return '### ' + file.path + rename + ' — ' + file.status + ' (+' + file.additions + '/-' + file.deletions + ')\n'
 }
 
@@ -40,7 +40,7 @@ export function buildDiffBudget(files: DiffFile[]): DiffBudgetResult {
     const header = fileHeader(file)
 
     if (file.isBinary || !file.patch) {
-      blocks.push(header + '(sin patch de texto — archivo binario u omitido por GitHub)\n')
+      blocks.push(header + '(no text patch — binary file or omitted by the provider)\n')
       continue
     }
 

@@ -42,23 +42,23 @@ describe('sanitizeDetail', () => {
 
 describe('deriveActivityLabel', () => {
   it('cubre la tabla de verbos por kind/status', () => {
-    expect(deriveActivityLabel('read', 'running', 'src/a.ts')).toBe('Leyendo src/a.ts')
-    expect(deriveActivityLabel('read', 'running')).toBe('Leyendo un archivo…')
-    expect(deriveActivityLabel('read', 'done', 'src/a.ts')).toBe('Leyó src/a.ts')
-    expect(deriveActivityLabel('read', 'done')).toBe('Leyó un archivo')
-    expect(deriveActivityLabel('read', 'error', 'src/a.ts')).toBe('Falló al leer src/a.ts')
-    expect(deriveActivityLabel('search', 'running', 'router')).toBe('Buscando "router"')
-    expect(deriveActivityLabel('search', 'done', 'router')).toBe('Buscó "router"')
-    expect(deriveActivityLabel('search', 'done')).toBe('Buscó en el repo')
-    expect(deriveActivityLabel('search', 'error')).toBe('Falló una búsqueda')
-    expect(deriveActivityLabel('list', 'running')).toBe('Listando la estructura…')
-    expect(deriveActivityLabel('list', 'done', 'src/')).toBe('Listó src/')
-    expect(deriveActivityLabel('list', 'done')).toBe('Listó la estructura')
-    expect(deriveActivityLabel('thinking', 'running')).toBe('Pensando…')
-    expect(deriveActivityLabel('thinking', 'done')).toBe('Pensó')
-    expect(deriveActivityLabel('tool', 'running', 'webfetch')).toBe('Usando webfetch')
-    expect(deriveActivityLabel('tool', 'running')).toBe('Explorando el repositorio…')
-    expect(deriveActivityLabel('tool', 'done', 'webfetch')).toBe('Usó webfetch')
+    expect(deriveActivityLabel('read', 'running', 'src/a.ts')).toBe('Reading src/a.ts')
+    expect(deriveActivityLabel('read', 'running')).toBe('Reading a file…')
+    expect(deriveActivityLabel('read', 'done', 'src/a.ts')).toBe('Read src/a.ts')
+    expect(deriveActivityLabel('read', 'done')).toBe('Read a file')
+    expect(deriveActivityLabel('read', 'error', 'src/a.ts')).toBe('Failed to read src/a.ts')
+    expect(deriveActivityLabel('search', 'running', 'router')).toBe('Searching "router"')
+    expect(deriveActivityLabel('search', 'done', 'router')).toBe('Searched "router"')
+    expect(deriveActivityLabel('search', 'done')).toBe('Searched the repo')
+    expect(deriveActivityLabel('search', 'error')).toBe('A search failed')
+    expect(deriveActivityLabel('list', 'running')).toBe('Listing the structure…')
+    expect(deriveActivityLabel('list', 'done', 'src/')).toBe('Listed src/')
+    expect(deriveActivityLabel('list', 'done')).toBe('Listed the structure')
+    expect(deriveActivityLabel('thinking', 'running')).toBe('Thinking…')
+    expect(deriveActivityLabel('thinking', 'done')).toBe('Thought')
+    expect(deriveActivityLabel('tool', 'running', 'webfetch')).toBe('Using webfetch')
+    expect(deriveActivityLabel('tool', 'running')).toBe('Exploring the repository…')
+    expect(deriveActivityLabel('tool', 'done', 'webfetch')).toBe('Used webfetch')
   })
 })
 
@@ -68,7 +68,7 @@ describe('createActivityTracker', () => {
     tracker.begin('t1', 'read', 'src/a.ts')
     expect(edges()).toBe(1)
     expect(tracker.buffer()).toEqual([
-      { id: 't1', kind: 'read', label: 'Leyendo src/a.ts', status: 'running' },
+      { id: 't1', kind: 'read', label: 'Reading src/a.ts', status: 'running' },
     ])
   })
 
@@ -78,7 +78,7 @@ describe('createActivityTracker', () => {
     tracker.complete('t1', 'src/a.ts')
     expect(edges()).toBe(2)
     expect(tracker.buffer()).toEqual([
-      { id: 't1', kind: 'read', label: 'Leyó src/a.ts', status: 'done' },
+      { id: 't1', kind: 'read', label: 'Read src/a.ts', status: 'done' },
     ])
   })
 
@@ -94,7 +94,7 @@ describe('createActivityTracker', () => {
     tracker.begin('t1', 'search', 'router')
     tracker.fail('t1')
     expect(tracker.buffer()).toEqual([
-      { id: 't1', kind: 'search', label: 'Falló una búsqueda', status: 'error' },
+      { id: 't1', kind: 'search', label: 'A search failed', status: 'error' },
     ])
   })
 
@@ -121,7 +121,7 @@ describe('createActivityTracker', () => {
     tracker.thinking('think-1')
     expect(edges()).toBe(1)
     expect(tracker.buffer()).toEqual([
-      { id: 'think-1', kind: 'thinking', label: 'Pensando…', status: 'running' },
+      { id: 'think-1', kind: 'thinking', label: 'Thinking…', status: 'running' },
     ])
   })
 
@@ -141,7 +141,7 @@ describe('createActivityTracker', () => {
     tracker.thinking('think-1')
     tracker.begin('t1', 'read', 'src/a.ts')
     const buffer = tracker.buffer()
-    expect(buffer[0]).toEqual({ id: 'think-1', kind: 'thinking', label: 'Pensó', status: 'done' })
+    expect(buffer[0]).toEqual({ id: 'think-1', kind: 'thinking', label: 'Thought', status: 'done' })
     expect(buffer[1].status).toBe('running')
   })
 
@@ -151,7 +151,7 @@ describe('createActivityTracker', () => {
     const before = edges()
     tracker.settleThinking()
     expect(edges()).toBe(before)
-    expect(tracker.buffer()[0].label).toBe('Pensó')
+    expect(tracker.buffer()[0].label).toBe('Thought')
   })
 
   it('sanea el detalle: relativiza contra basePath y trunca hostiles', () => {
@@ -159,7 +159,7 @@ describe('createActivityTracker', () => {
     tracker.begin('t1', 'read', '/snap/x/src/api/routes.ts')
     tracker.begin('t2', 'search', 'patrón\ncon\u0000control' + 'z'.repeat(100))
     const buffer = tracker.buffer()
-    expect(buffer[0].label).toBe('Leyendo src/api/routes.ts')
+    expect(buffer[0].label).toBe('Reading src/api/routes.ts')
     // eslint-disable-next-line no-control-regex -- verificar que NO quedan control chars es el punto
     expect(buffer[1].label).not.toMatch(/[\u0000-\u001f]/)
     expect(buffer[1].label.length).toBeLessThan(80)
@@ -172,7 +172,22 @@ describe('createActivityTracker', () => {
     buffer[0].label = 'mutado'
     buffer.pop()
     expect(tracker.buffer()).toEqual([
-      { id: 't1', kind: 'read', label: 'Leyendo src/a.ts', status: 'running' },
+      { id: 't1', kind: 'read', label: 'Reading src/a.ts', status: 'running' },
     ])
+  })
+})
+
+describe('activity labels follow the analysis language', () => {
+  it('derives Spanish labels for an es analysis and English ones by default', () => {
+    expect(deriveActivityLabel('read', 'done', 'src/a.ts', 'es')).toBe('Leyó src/a.ts')
+    expect(deriveActivityLabel('thinking', 'running', undefined, 'es')).toBe('Pensando…')
+    expect(deriveActivityLabel('search', 'running', 'x')).toBe('Searching "x"')
+    const tracker = createActivityTracker({ language: 'es', onEdge: () => {} })
+    tracker.begin('t1', 'list')
+    expect(tracker.buffer()[0].label).toBe('Listando la estructura…')
+  })
+
+  it('never re-expands placeholders that come from the hostile detail', () => {
+    expect(deriveActivityLabel('read', 'running', '{{detail}}')).toBe('Reading {{detail}}')
   })
 })

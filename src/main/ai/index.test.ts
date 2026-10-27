@@ -113,7 +113,7 @@ describe('createAiService (T27, factory multi-proveedor; async desde T28)', () =
     getEffectiveAiSelectionMock.mockReturnValue({ provider: 'claude-code', model: 'claude-sonnet-5' })
     getCliProviderStatusMock.mockResolvedValue({ status: 'installed' })
 
-    await expect(createAiService(makeGithub())).rejects.toThrow(/sin sesión.*claude login/s)
+    await expect(createAiService(makeGithub())).rejects.toThrow(/not logged in.*claude login/s)
     expect(mockServiceCtor).not.toHaveBeenCalled()
     expect(claudeCodeCtor).not.toHaveBeenCalled()
   })
@@ -122,7 +122,7 @@ describe('createAiService (T27, factory multi-proveedor; async desde T28)', () =
     getEffectiveAiSelectionMock.mockReturnValue({ provider: 'claude-code', model: 'claude-sonnet-5' })
     getCliProviderStatusMock.mockResolvedValue({ status: 'unavailable' })
 
-    await expect(createAiService(makeGithub())).rejects.toThrow(/No se encontró el CLI «claude»/)
+    await expect(createAiService(makeGithub())).rejects.toThrow(/The "claude" CLI/)
     expect(mockServiceCtor).not.toHaveBeenCalled()
     expect(claudeCodeCtor).not.toHaveBeenCalled()
   })
@@ -154,7 +154,7 @@ describe('createAiService (T27, factory multi-proveedor; async desde T28)', () =
     getEffectiveAiSelectionMock.mockReturnValue({ provider: 'codex', model: 'gpt-5.5' })
     getCliProviderStatusMock.mockResolvedValue({ status: 'unavailable' })
 
-    await expect(createAiService(makeGithub())).rejects.toThrow(/No se encontró el CLI «codex»/)
+    await expect(createAiService(makeGithub())).rejects.toThrow(/The "codex" CLI/)
     expect(mockServiceCtor).not.toHaveBeenCalled()
     expect(codexCtor).not.toHaveBeenCalled()
   })
@@ -184,7 +184,7 @@ describe('createAiService (T27, factory multi-proveedor; async desde T28)', () =
     getEffectiveAiSelectionMock.mockReturnValue({ provider: 'opencode', model: 'opencode/big-pickle' })
     getCliProviderStatusMock.mockResolvedValue({ status: 'unavailable' })
 
-    await expect(createAiService(makeGithub())).rejects.toThrow(/No se encontró el CLI «opencode»/)
+    await expect(createAiService(makeGithub())).rejects.toThrow(/The "opencode" CLI/)
     expect(mockServiceCtor).not.toHaveBeenCalled()
     expect(opencodeCtor).not.toHaveBeenCalled()
   })

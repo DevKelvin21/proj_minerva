@@ -1,4 +1,7 @@
 /**
+ * English fixtures (the Spanish copy is `./fixtures.es.ts`; `mock-service.ts`
+ * picks by analysis language).
+ *
  * Fixtures de `DidacticAnalysis` para el universo mock "shopwave" (mismos PRs
  * que `src/main/scm/github/fixtures.ts`). Cuatro PRs tienen contenido enriquecido
  * (secciones `endpoint`/`schema`/`architecture`/`cloud` con diagramas
@@ -20,30 +23,30 @@ import type { DidacticSection, PullRequestDetail } from '../../shared/types'
 /** Resumen genérico para PRs sin sección enriquecida en esta demo mock. */
 export function genericSummarySection(detail: PullRequestDetail): DidacticSection {
   const labels =
-    detail.labels.length > 0 ? detail.labels.map((l) => l.name).join(', ') : 'sin etiquetas'
+    detail.labels.length > 0 ? detail.labels.map((l) => l.name).join(', ') : 'no labels'
 
   return {
     kind: 'summary',
     markdown:
-      '## Resumen\n\n**' +
+      '## Summary\n\n**' +
       detail.title +
       '** (' +
       detail.repo.fullName +
       '#' +
       detail.number +
       ')\n\n' +
-      'Cambia ' +
+      'Changes ' +
       (detail.changedFiles ?? '?') +
-      ' archivo(s): +' +
+      ' file(s): +' +
       (detail.additions ?? '?') +
       ' / -' +
       (detail.deletions ?? '?') +
-      '. Etiquetas: ' +
+      '. Labels: ' +
       labels +
       '.\n\n' +
-      'Este PR no disparó ninguna sección enriquecida (arquitectura, endpoint o esquema) en esta ' +
-      'demo con datos mock: en el pipeline real, el clasificador de IA decide automáticamente qué ' +
-      'secciones generar a partir del diff (ver `.claude/skills/` y `src/main/ai/prompts/README.md`).',
+      'This PR did not trigger any enriched section (architecture, endpoint or schema) in this ' +
+      'demo with mock data: in the real pipeline, the AI classifier decides automatically which ' +
+      'sections to generate from the diff (see `.claude/skills/` and `src/main/ai/prompts/README.md`).',
   }
 }
 
@@ -51,40 +54,40 @@ const pr482Sections: DidacticSection[] = [
   {
     kind: 'summary',
     markdown:
-      '## Qué cambia\n\n' +
-      'Este PR agrega el endpoint `POST /api/v1/carts/:id/apply-coupon`: valida un código de cupón ' +
-      'y, si es válido, recalcula el total del carrito activo.\n\n' +
-      '**Por qué importa:** es el primer punto donde un cliente puede modificar el total del carrito ' +
-      'con un código externo. Un bug aquí puede traducirse en descuentos no acotados (pérdida de ' +
-      'ingresos) o en cupones legítimos rechazados (mala experiencia).\n\n' +
-      '**Qué revisar:**\n' +
-      '- El clamp del descuento: en el hilo de comentarios se señala que `coupon.discountRate` sin ' +
-      'tope podía llegar a 100%; confirmar que el fix (clamp a 0.9) está en este diff.\n' +
-      '- El caso "cupón ya aplicado" (409) todavía no tiene test, según el último comentario de revisión.\n' +
-      '- Que toda la validación viva en `CouponService` y no se duplique en el handler de la ruta.',
+      '## What changes\n\n' +
+      'This PR adds the `POST /api/v1/carts/:id/apply-coupon` endpoint: it validates a coupon code ' +
+      'and, if it is valid, recalculates the total of the active cart.\n\n' +
+      '**Why it matters:** it is the first point where a customer can change the cart total with ' +
+      'an external code. A bug here can turn into unbounded discounts (lost revenue) or legitimate ' +
+      'coupons being rejected (bad experience).\n\n' +
+      '**What to review:**\n' +
+      '- The discount clamp: the comment thread points out that an uncapped `coupon.discountRate` ' +
+      'could reach 100%; confirm the fix (clamp to 0.9) is in this diff.\n' +
+      '- The "coupon already applied" case (409) still has no test, according to the last review comment.\n' +
+      '- That all the validation lives in `CouponService` and is not duplicated in the route handler.',
   },
   {
     kind: 'setup',
     markdown:
-      '## Cómo probar este PR\n\n' +
-      'El diff de este PR no muestra un `Dockerfile` ni un `docker-compose.yml` entre los archivos ' +
-      'tocados, así que no hay evidencia directa de un flujo Docker para esta demo — si `shopwave/api` ' +
-      'tiene uno para levantar la base de datos, no aparece en estos archivos.\n\n' +
-      '**En local:** el archivo tocado usa `express` (`import { Router } from \'express\'`), así que ' +
-      'es la API Node.js/Express habitual del repo:\n\n' +
+      '## How to try this PR\n\n' +
+      'The diff of this PR shows no `Dockerfile` or `docker-compose.yml` among the touched files, ' +
+      'so there is no direct evidence of a Docker flow for this demo — if `shopwave/api` has one ' +
+      'to start the database, it does not appear in these files.\n\n' +
+      '**Locally:** the touched file uses `express` (`import { Router } from \'express\'`), so ' +
+      'it is the repo\'s usual Node.js/Express API:\n\n' +
       '1. `npm install`\n' +
-      '2. `npm run dev` (o `npm start`, según el `package.json` del repo)\n\n' +
-      '**Variables de entorno necesarias para correr la API:** `DATABASE_URL` (conexión a Postgres, ' +
-      'usada por `CartService`/`OrderRepository`) y `PORT` (puerto HTTP).\n\n' +
-      '**Variables de entorno NUEVAS de este PR:** sí — `CouponService` introduce un tope ' +
-      'configurable para el descuento máximo (ver "Qué revisar" arriba, el clamp a 0.9):\n\n' +
-      '| Variable | Propósito | Valor de ejemplo |\n' +
+      '2. `npm run dev` (or `npm start`, depending on the repo\'s `package.json`)\n\n' +
+      '**Environment variables needed to run the API:** `DATABASE_URL` (Postgres connection, ' +
+      'used by `CartService`/`OrderRepository`) and `PORT` (HTTP port).\n\n' +
+      '**NEW environment variables in this PR:** yes — `CouponService` introduces a configurable ' +
+      'cap for the maximum discount (see "What to review" above, the clamp to 0.9):\n\n' +
+      '| Variable | Purpose | Example value |\n' +
       '|---|---|---|\n' +
-      '| `COUPON_MAX_DISCOUNT_RATE` | Tope superior del `discountRate` que `CouponService.apply` ' +
-      'acepta de un cupón (evita descuentos no acotados) | `0.9` |',
+      '| `COUPON_MAX_DISCOUNT_RATE` | Upper bound of the `discountRate` that `CouponService.apply` ' +
+      'accepts from a coupon (prevents unbounded discounts) | `0.9` |',
     snippets: [
       {
-        label: 'arranque-local',
+        label: 'local-start',
         language: 'bash',
         code: 'npm install\nnpm run dev',
       },
@@ -101,13 +104,13 @@ const pr482Sections: DidacticSection[] = [
       '### `POST /api/v1/carts/:id/apply-coupon`\n\n' +
       '| | |\n' +
       '|---|---|\n' +
-      '| **Path param** | `id` — id del carrito activo |\n' +
+      '| **Path param** | `id` — id of the active cart |\n' +
       '| **Body** | `{ "code": string }` |\n' +
-      '| **200 OK** | `{ "ok": true, "total": number }` — cupón aplicado, total recalculado |\n' +
-      '| **409 Conflict** | `{ "ok": false, "reason": "already_applied" }` — el carrito ya tenía cupón |\n' +
-      '| **200 con `ok:false`** | `{ "ok": false, "reason": "expired_or_missing" }` — código inválido o vencido |\n\n' +
-      'El handler delega toda la lógica a `CouponService.apply(cart, code)` (servicio nuevo, ver ' +
-      'diagrama de arquitectura más abajo).',
+      '| **200 OK** | `{ "ok": true, "total": number }` — coupon applied, total recalculated |\n' +
+      '| **409 Conflict** | `{ "ok": false, "reason": "already_applied" }` — the cart already had a coupon |\n' +
+      '| **200 with `ok:false`** | `{ "ok": false, "reason": "expired_or_missing" }` — invalid or expired code |\n\n' +
+      'The handler delegates all the logic to `CouponService.apply(cart, code)` (new service, see ' +
+      'the architecture diagram below).',
     snippets: [
       {
         label: 'curl',
@@ -132,26 +135,26 @@ const pr482Sections: DidacticSection[] = [
   {
     kind: 'architecture',
     markdown:
-      '`CouponService` es un servicio nuevo, independiente de `CartService`: la ruta ' +
-      '`POST /carts/:id/apply-coupon` lo invoca para mantener la validación de cupones fuera del ' +
-      'handler HTTP.',
+      '`CouponService` is a new service, independent from `CartService`: the ' +
+      '`POST /carts/:id/apply-coupon` route calls it to keep coupon validation out of the HTTP ' +
+      'handler.',
     mermaid:
       'C4Container\n' +
       // Sin '#' en el título: el lexer C4 de mermaid (11.16) lanza "Lexical
       // error" con '#' dentro del DSL (descubierto en T16; misma regla en el
       // prompt real y en la skill mermaid-c4-diagram).
-      '  title Impacto arquitectónico del PR 482 (apply-coupon)\n' +
-      '  Person(customer, "Cliente", "Compra en Shopwave")\n' +
+      '  title Architectural impact of PR 482 (apply-coupon)\n' +
+      '  Person(customer, "Customer", "Shops on Shopwave")\n' +
       '  System_Boundary(shopwave, "Shopwave") {\n' +
-      '    Container(api, "API", "Node.js / Express", "Expone REST a clientes")\n' +
-      '    Container(couponService, "CouponService (NUEVO)", "TypeScript", "Valida y aplica cupones a un carrito")\n' +
-      '    ContainerDb(db, "Base de datos", "PostgreSQL", "Carritos, cupones, órdenes")\n' +
+      '    Container(api, "API", "Node.js / Express", "Exposes REST to customers")\n' +
+      '    Container(couponService, "CouponService (NEW)", "TypeScript", "Validates and applies coupons to a cart")\n' +
+      '    ContainerDb(db, "Database", "PostgreSQL", "Carts, coupons, orders")\n' +
       '  }\n' +
       '  Rel(customer, api, "POST /carts/:id/apply-coupon")\n' +
       // Etiquetas de Rel ≤4 palabras (misma regla que el prompt real, T16):
       // las largas se enciman con las cajas vecinas en el layout C4.
-      '  Rel(api, couponService, "delega validación")\n' +
-      '  Rel(couponService, db, "lee y guarda")\n',
+      '  Rel(api, couponService, "delegates validation")\n' +
+      '  Rel(couponService, db, "reads and writes")\n',
   },
 ]
 
@@ -159,37 +162,37 @@ const pr479Sections: DidacticSection[] = [
   {
     kind: 'summary',
     markdown:
-      '## Qué cambia\n\n' +
-      'Introduce la tabla `refunds` (migración aditiva) para soportar reembolsos parciales por ' +
-      'línea de orden, junto al modelo `Refund` y un campo `refundedAmount` calculado en `Order`.\n\n' +
-      '**Por qué importa:** es un cambio de esquema en producción. Aunque la migración no toca ' +
-      'datos existentes, define una relación nueva (`Order` 1—N `Refund`) de la que otros servicios ' +
-      'empezarán a depender.\n\n' +
-      '**Qué revisar:**\n' +
-      '- El `CHECK (amount_cents > 0)` no impide reembolsar más de lo que vale la línea de orden ' +
-      '(ver comentario de @mgarcia); falta un tope contra `order_lines.amount_cents`.\n' +
-      '- `refundedAmount` se recalcula en la capa de aplicación, no con un trigger de base de datos ' +
-      '— confirmar que todo camino que crea un `Refund` pasa por ese recálculo.',
+      '## What changes\n\n' +
+      'Introduces the `refunds` table (additive migration) to support partial refunds per order ' +
+      'line, together with the `Refund` model and a computed `refundedAmount` field on `Order`.\n\n' +
+      '**Why it matters:** it is a schema change in production. Although the migration does not ' +
+      'touch existing data, it defines a new relation (`Order` 1—N `Refund`) that other services ' +
+      'will start depending on.\n\n' +
+      '**What to review:**\n' +
+      '- The `CHECK (amount_cents > 0)` does not prevent refunding more than the order line is ' +
+      'worth (see @mgarcia\'s comment); a cap against `order_lines.amount_cents` is missing.\n' +
+      '- `refundedAmount` is recalculated in the application layer, not with a database trigger ' +
+      '— confirm that every path that creates a `Refund` goes through that recalculation.',
   },
   {
     kind: 'setup',
     markdown:
-      '## Cómo probar este PR\n\n' +
-      'Es una migración (`migrations/2026070401_create_refunds.sql`) más un modelo nuevo; el diff no ' +
-      'muestra `Dockerfile` ni `docker-compose.yml`, así que no hay evidencia de un flujo Docker en ' +
-      'esta demo.\n\n' +
-      '**En local:** misma API Node.js de `shopwave/api`:\n\n' +
+      '## How to try this PR\n\n' +
+      'It is a migration (`migrations/2026070401_create_refunds.sql`) plus a new model; the diff ' +
+      'shows no `Dockerfile` or `docker-compose.yml`, so there is no evidence of a Docker flow in ' +
+      'this demo.\n\n' +
+      '**Locally:** the same Node.js API of `shopwave/api`:\n\n' +
       '1. `npm install`\n' +
-      '2. Correr la migración nueva contra la base (el repo no expone en este diff el comando exacto ' +
-      'del runner de migraciones — buscar el script `migrate` en `package.json`).\n' +
+      '2. Run the new migration against the database (this diff does not show the exact command ' +
+      'of the migration runner — look for the `migrate` script in `package.json`).\n' +
       '3. `npm run dev`\n\n' +
-      '**Variables de entorno necesarias para correr la API:** `DATABASE_URL` (Postgres, es contra ' +
-      'esa misma base que corre la migración de `refunds`).\n\n' +
-      '**Variables de entorno NUEVAS de este PR:** este PR no agrega ni cambia variables de entorno ' +
-      '— es una migración de esquema pura, sin código de aplicación que lea `process.env`.',
+      '**Environment variables needed to run the API:** `DATABASE_URL` (Postgres, the same ' +
+      'database the `refunds` migration runs against).\n\n' +
+      '**NEW environment variables in this PR:** this PR adds or changes no environment variables ' +
+      '— it is a pure schema migration, with no application code reading `process.env`.',
     snippets: [
       {
-        label: 'arranque-local',
+        label: 'local-start',
         language: 'bash',
         code: 'npm install\nnpm run dev',
       },
@@ -198,19 +201,19 @@ const pr479Sections: DidacticSection[] = [
   {
     kind: 'schema',
     markdown:
-      '### Tabla `refunds`\n\n' +
-      '| Campo | Tipo | Notas |\n' +
+      '### Table `refunds`\n\n' +
+      '| Field | Type | Notes |\n' +
       '|---|---|---|\n' +
       '| `id` | `uuid` | PK, `gen_random_uuid()` |\n' +
       '| `order_id` | `uuid` | FK -> `orders.id` |\n' +
       '| `order_line_id` | `uuid` | FK -> `order_lines.id` |\n' +
-      '| `amount_cents` | `integer` | `CHECK (amount_cents > 0)`, sin tope superior aún |\n' +
-      '| `reason` | `text` | opcional |\n' +
+      '| `amount_cents` | `integer` | `CHECK (amount_cents > 0)`, no upper bound yet |\n' +
+      '| `reason` | `text` | optional |\n' +
       '| `created_at` | `timestamptz` | default `now()` |\n\n' +
-      'Índice `idx_refunds_order_id` sobre `order_id` para listar reembolsos por orden.',
+      'Index `idx_refunds_order_id` on `order_id` to list refunds per order.',
     mermaid:
       'erDiagram\n' +
-      '    ORDER ||--o{ REFUND : tiene\n' +
+      '    ORDER ||--o{ REFUND : has\n' +
       '    ORDER {\n' +
       '        string id PK\n' +
       '        string status\n' +
@@ -218,12 +221,12 @@ const pr479Sections: DidacticSection[] = [
       '        int refundedAmount\n' +
       '    }\n' +
       '    REFUND {\n' +
-      '        string id PK "NUEVO"\n' +
-      '        string orderId FK "NUEVO"\n' +
-      '        string orderLineId FK "NUEVO"\n' +
-      '        int amountCents "NUEVO"\n' +
-      '        string reason "NUEVO"\n' +
-      '        string createdAt "NUEVO"\n' +
+      '        string id PK "NEW"\n' +
+      '        string orderId FK "NEW"\n' +
+      '        string orderLineId FK "NEW"\n' +
+      '        int amountCents "NEW"\n' +
+      '        string reason "NEW"\n' +
+      '        string createdAt "NEW"\n' +
       '    }\n',
   },
 ]
@@ -232,38 +235,38 @@ const pr201Sections: DidacticSection[] = [
   {
     kind: 'summary',
     markdown:
-      '## Qué cambia\n\n' +
-      'Reemplaza la máquina de estados imperativa de checkout (`CheckoutMachine`, clase con estado ' +
-      'mutable) por un reducer puro (`checkoutReducer` + `useReducer`), y convierte ' +
-      '`CheckoutValidator` (clase) en funciones puras de validación. Sin cambios de comportamiento ' +
-      'visible para el usuario.\n\n' +
-      '**Por qué importa:** es un refactor grande (243 líneas agregadas, 273 eliminadas) que toca el ' +
-      'flujo central de compra. El riesgo no es "qué se ve distinto" sino "qué transición dejó de ' +
-      'cubrirse" al migrar la lógica.\n\n' +
-      '**Qué revisar:**\n' +
-      '- El reducer no cubre explícitamente `shipping -> payment` con eventos distintos de ' +
-      '`CONTINUE`, ni la transición `payment -> confirmation` (ver comentario de @sfontaine).\n' +
-      '- Que `validateCheckout` combine los mismos casos que antes cubrían ' +
-      '`CheckoutValidator.validateCart/validateShipping/validatePayment` por separado.',
+      '## What changes\n\n' +
+      'Replaces the imperative checkout state machine (`CheckoutMachine`, a class with mutable ' +
+      'state) with a pure reducer (`checkoutReducer` + `useReducer`), and turns ' +
+      '`CheckoutValidator` (a class) into pure validation functions. No behavior change visible ' +
+      'to the user.\n\n' +
+      '**Why it matters:** it is a large refactor (243 lines added, 273 removed) that touches the ' +
+      'core purchase flow. The risk is not "what looks different" but "which transition stopped ' +
+      'being covered" while migrating the logic.\n\n' +
+      '**What to review:**\n' +
+      '- The reducer does not explicitly cover `shipping -> payment` with events other than ' +
+      '`CONTINUE`, nor the `payment -> confirmation` transition (see @sfontaine\'s comment).\n' +
+      '- That `validateCheckout` combines the same cases that ' +
+      '`CheckoutValidator.validateCart/validateShipping/validatePayment` used to cover separately.',
   },
   {
     kind: 'architecture',
     markdown:
-      'El componente `CheckoutPage` pasa de orquestar una instancia de clase (`CheckoutMachine`) a ' +
-      'despachar eventos contra un reducer puro. `checkout-validation.ts` deja de depender de estado ' +
-      'mutable (`this.errors`) y expone funciones independientes por paso.',
+      'The `CheckoutPage` component goes from orchestrating a class instance (`CheckoutMachine`) to ' +
+      'dispatching events against a pure reducer. `checkout-validation.ts` no longer depends on ' +
+      'mutable state (`this.errors`) and exposes independent functions per step.',
     mermaid:
       'C4Component\n' +
-      '  title Checkout (web) - antes y despues del refactor a reducer\n' +
-      '  Container_Boundary(checkout, "Modulo checkout") {\n' +
-      '    Component(page, "CheckoutPage", "Componente React", "Orquesta el flujo de compra")\n' +
-      '    Component(machineOld, "CheckoutMachine (ELIMINADO)", "Clase con estado mutable", "Logica de transicion imperativa, ~130 lineas")\n' +
-      '    Component(reducerNew, "checkoutReducer (NUEVO)", "Funcion pura", "Reemplaza a CheckoutMachine")\n' +
-      '    Component(validation, "checkout-validation", "Funciones puras", "Antes: clase CheckoutValidator con estado mutable")\n' +
+      '  title Checkout (web) - before and after the reducer refactor\n' +
+      '  Container_Boundary(checkout, "Checkout module") {\n' +
+      '    Component(page, "CheckoutPage", "React component", "Orchestrates the purchase flow")\n' +
+      '    Component(machineOld, "CheckoutMachine (REMOVED)", "Class with mutable state", "Imperative transition logic, ~130 lines")\n' +
+      '    Component(reducerNew, "checkoutReducer (NEW)", "Pure function", "Replaces CheckoutMachine")\n' +
+      '    Component(validation, "checkout-validation", "Pure functions", "Before: CheckoutValidator class with mutable state")\n' +
       '  }\n' +
-      '  Rel(page, machineOld, "usaba (antes del refactor)")\n' +
-      '  Rel(page, reducerNew, "usa useReducer (despues del refactor)")\n' +
-      '  Rel(page, validation, "valida con validateCheckout")\n',
+      '  Rel(page, machineOld, "used (before refactor)")\n' +
+      '  Rel(page, reducerNew, "uses useReducer (after)")\n' +
+      '  Rel(page, validation, "validates with validateCheckout")\n',
   },
 ]
 
@@ -271,39 +274,39 @@ const pr77Sections: DidacticSection[] = [
   {
     kind: 'summary',
     markdown:
-      '## Qué cambia\n\n' +
-      'Este PR agrega un lock optimista por `orderId` en `handlePaymentWebhook` para evitar que dos ' +
-      'webhooks de pago casi simultáneos marquen la misma orden como pagada dos veces (y disparen ' +
-      'doble notificación al cliente).\n\n' +
-      '**Por qué importa:** el handler corre como una función serverless invocada por el gateway de ' +
-      'webhooks del proveedor de pago; el proveedor puede reintentar (y de hecho reintenta) la ' +
-      'misma notificación, y varias invocaciones concurrentes de la misma función pueden procesar ' +
-      'el mismo `orderId` en paralelo.\n\n' +
-      '**Qué revisar:**\n' +
-      '- El comentario de @mgarcia sigue abierto: `acquireOrderLock` — ¿es un lock en memoria del ' +
-      'proceso o uno distribuido? Con varias instancias concurrentes de la función (el caso normal ' +
-      'en producción), un lock en memoria no alcanza: cada invocación ve su propia copia y no se ' +
-      'bloquean entre sí.\n' +
-      '- El job de CI falla intermitentemente (ver descripción del PR) — confirmar si es el fix o ' +
-      'un flake del entorno de test antes de aprobar.',
+      '## What changes\n\n' +
+      'This PR adds an optimistic lock per `orderId` in `handlePaymentWebhook` so that two almost ' +
+      'simultaneous payment webhooks do not mark the same order as paid twice (and trigger a ' +
+      'double notification to the customer).\n\n' +
+      '**Why it matters:** the handler runs as a serverless function invoked by the payment ' +
+      'provider\'s webhook gateway; the provider can retry (and does retry) the same ' +
+      'notification, and several concurrent invocations of the same function can process the ' +
+      'same `orderId` in parallel.\n\n' +
+      '**What to review:**\n' +
+      '- @mgarcia\'s comment is still open: `acquireOrderLock` — is it an in-process memory lock ' +
+      'or a distributed one? With several concurrent instances of the function (the normal case ' +
+      'in production), an in-memory lock is not enough: each invocation sees its own copy and ' +
+      'they do not block each other.\n' +
+      '- The CI job fails intermittently (see the PR description) — confirm whether it is the fix ' +
+      'or a flake of the test environment before approving.',
   },
   {
     kind: 'setup',
     markdown:
-      '## Cómo probar este PR\n\n' +
-      'El diff no muestra `Dockerfile` ni `docker-compose.yml`, así que no hay evidencia de un flujo ' +
-      'Docker en esta demo.\n\n' +
-      '**En local:** `handlePaymentWebhook` es una función Node.js invocada por el gateway de ' +
-      'webhooks de pago:\n\n' +
+      '## How to try this PR\n\n' +
+      'The diff shows no `Dockerfile` or `docker-compose.yml`, so there is no evidence of a Docker ' +
+      'flow in this demo.\n\n' +
+      '**Locally:** `handlePaymentWebhook` is a Node.js function invoked by the payment webhook ' +
+      'gateway:\n\n' +
       '1. `npm install`\n' +
-      '2. `npm run dev` (invoca el handler contra un evento de prueba simulado)\n\n' +
-      '**Variables de entorno necesarias:** `DATABASE_URL` (Postgres, vía `OrderRepository`) y las ' +
-      'credenciales del lock distribuido (ver sección de infra más abajo).\n\n' +
-      '**Variables de entorno NUEVAS de este PR:** este PR no agrega variables de entorno propias ' +
-      '— el lock que introduce reutiliza la conexión existente a la base de datos.',
+      '2. `npm run dev` (invokes the handler against a simulated test event)\n\n' +
+      '**Environment variables needed:** `DATABASE_URL` (Postgres, via `OrderRepository`) and the ' +
+      'credentials of the distributed lock (see the infra section below).\n\n' +
+      '**NEW environment variables in this PR:** this PR adds no environment variables of its own ' +
+      '— the lock it introduces reuses the existing database connection.',
     snippets: [
       {
-        label: 'arranque-local',
+        label: 'local-start',
         language: 'bash',
         code: 'npm install\nnpm run dev',
       },
@@ -317,21 +320,22 @@ const pr77Sections: DidacticSection[] = [
   {
     kind: 'cloud',
     markdown:
-      '## Cómo funciona el sistema desplegado\n\n' +
-      '`payment-webhook-handler` no es un servidor persistente: es una función Lambda detrás de un ' +
-      'API Gateway que el proveedor de pago invoca por cada evento (pago confirmado, reembolso, ' +
-      'etc.). La Lambda lee y actualiza la orden en DynamoDB y, si el pago se confirma, encola un ' +
-      'evento en SQS para que otra Lambda (`order-notifier`) le mande el email de confirmación al ' +
-      'cliente por SES. Al ser serverless, el proveedor de pago puede disparar varias invocaciones ' +
-      'concurrentes de la MISMA Lambda para el mismo `orderId` (reintentos de webhook, picos de ' +
-      'tráfico) — no hay una única instancia de proceso que las sirva a todas.\n\n' +
-      '## Dónde incide este PR\n\n' +
-      'El lock que agrega este PR vive en `payment-webhook-handler` y debe coordinar esas ' +
-      'invocaciones concurrentes entre sí. Si `acquireOrderLock` fuera un lock en memoria (la duda ' +
-      'de @mgarcia en los comentarios), cada invocación de la Lambda vería su propio estado y el fix ' +
-      'no serviría de nada en producción: el lock necesita vivir afuera de la función, en un sitio ' +
-      'compartido por todas las invocaciones — por ejemplo una escritura condicional contra la ' +
-      'tabla `Orders` de DynamoDB (que ya está en el camino) o una tabla de locks aparte.',
+      '## How the deployed system works\n\n' +
+      '`payment-webhook-handler` is not a long-running server: it is a Lambda function behind an ' +
+      'API Gateway that the payment provider invokes for every event (payment confirmed, refund, ' +
+      'etc.). The Lambda reads and updates the order in DynamoDB and, if the payment is ' +
+      'confirmed, queues an event in SQS so that another Lambda (`order-notifier`) sends the ' +
+      'confirmation email to the customer through SES. Being serverless, the payment provider ' +
+      'can trigger several concurrent invocations of the SAME Lambda for the same `orderId` ' +
+      '(webhook retries, traffic spikes) — there is no single process instance serving all of ' +
+      'them.\n\n' +
+      '## Where this PR has an effect\n\n' +
+      'The lock this PR adds lives in `payment-webhook-handler` and must coordinate those ' +
+      'concurrent invocations with each other. If `acquireOrderLock` were an in-memory lock ' +
+      '(@mgarcia\'s question in the comments), each Lambda invocation would see its own state and ' +
+      'the fix would be useless in production: the lock needs to live outside the function, in a ' +
+      'place shared by every invocation — for example a conditional write against the DynamoDB ' +
+      '`Orders` table (already on the path) or a separate locks table.',
     mermaids: [
       'architecture-beta\n' +
         'group aws(logos:aws)[AWS]\n' +

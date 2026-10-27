@@ -122,7 +122,7 @@ async function* pendingInput(signal: AbortSignal): AsyncGenerator<SDKUserMessage
 function openRealSession(): ClaudeModelSession {
   const claudeCliPath = resolveCliPath('claude')
   if (claudeCliPath === null) {
-    throw new Error('El CLI «claude» no está en el PATH.')
+    throw new Error('The "claude" CLI is not on the PATH.')
   }
 
   const controller = new AbortController()
@@ -198,7 +198,7 @@ export async function fetchClaudeCodeModelCatalog(
 
     const timeout = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(
-        () => reject(new Error('supportedModels() no respondió a tiempo.')),
+        () => reject(new Error('supportedModels() did not answer in time.')),
         SUPPORTED_MODELS_TIMEOUT_MS,
       )
     })

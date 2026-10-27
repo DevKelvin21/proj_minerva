@@ -82,7 +82,7 @@ describe('fetchClaudeCodeModelCatalog', () => {
     ])
     expect(effort?.choices.find((choice) => choice.isDefault)?.value).toBe('high')
     // Etiquetas/descripciones compartidas con el catálogo curado (no las manda el SDK).
-    expect(effort?.choices[0]).toMatchObject({ label: 'Bajo', description: expect.any(String) })
+    expect(effort?.choices[0]).toMatchObject({ label: 'Low', description: expect.any(String) })
   })
 
   it('un modelo sin soporte de effort (Haiku hoy) queda sin options', async () => {

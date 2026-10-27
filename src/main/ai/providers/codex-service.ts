@@ -36,7 +36,7 @@
  *        el server EXIGE auth de OpenAI, no que falte) — la señal real de "hay
  *        sesión" es `account != null`. Sin cuenta → mensaje accionable.
  *      - `thread/start` (request) con `model`, `baseInstructions` (= nuestro
- *        `ANALYZE_PR_SYSTEM_PROMPT`; es el análogo de Codex al `systemPrompt`
+ *        `buildAnalyzeSystemPrompt(language)`; es el análogo de Codex al `systemPrompt`
  *        custom del Agent SDK), `cwd: snapshotDir` (arriba) y `sandbox:
  *        'read-only'` + `approvalPolicy: 'never'` SIN CAMBIOS (T29): Codex es
  *        un agente de código; sin acotarlo intentaría ejecutar comandos y
@@ -84,7 +84,8 @@ import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from '../ser
 import type { PrContextSource } from '../pr-context'
 import type { IpcRequest } from '../../../shared/ipc'
 import { getEffectiveAiSelection } from '../env'
-import { ANALYZE_PR_SYSTEM_PROMPT } from '../prompts/analyze-pr'
+import { buildAnalyzeSystemPrompt } from '../prompts/analyze-pr'
+import { getMainLocale, mt } from '../../i18n'
 import { buildAgenticUserMessage, prId } from '../analysis-prompt'
 import { StreamSectionParser } from '../stream-parser'
 import { createThrottle } from '../throttle'
@@ -104,9 +105,9 @@ import {
 } from './codex-app-server-client'
 
 /** Mensaje accionable único para "no hay sesión de Codex". */
-const CODEX_LOGIN_HINT =
-  'Codex no tiene una sesión válida: corré «codex login» en una terminal (con tu cuenta ' +
-  'ChatGPT Plus/Pro) y volvé a intentar el análisis.'
+function codexLoginHint(): string {
+  return mt('ai.codex.loginHint')
+}
 
 /** Info de cliente que se envía en `initialize` (aparece en el `userAgent` que arma el server). */
 const CLIENT_INFO = { name: 'minerva', title: 'Minerva', version: '0.1.0' }
@@ -139,7 +140,7 @@ function isUnauthenticated(result: unknown): boolean {
 function extractThreadId(result: unknown): string {
   const id = (result as ThreadStartResult | null)?.thread?.id
   if (typeof id === 'string' && id.length > 0) return id
-  throw new Error('codex app-server no devolvió un id de thread en la respuesta a "thread/start".')
+  throw new Error(mt('ai.codex.noThreadId'))
 }
 
 /**
@@ -196,7 +197,7 @@ function turnFailureMessage(notification: JsonRpcNotification): string | null {
   const params = notification.params as Record<string, unknown> | undefined
   if (notification.method === 'error') {
     const message = params?.message
-    return typeof message === 'string' ? message : 'Codex devolvió un error durante el turno.'
+    return typeof message === 'string' ? message : mt('ai.codex.turnError')
   }
   if (notification.method === 'turn/completed') {
     const turn = params?.turn as { status?: string; error?: unknown } | undefined
@@ -206,7 +207,7 @@ function turnFailureMessage(notification: JsonRpcNotification): string | null {
         const m = (err as Record<string, unknown>).message
         if (typeof m === 'string') return m
       }
-      return 'El turno de Codex terminó en estado "failed".'
+      return mt('ai.codex.turnFailed')
     }
   }
   return null
@@ -220,6 +221,7 @@ export class CodexAiService implements AiService {
     options?: AnalyzePullRequestOptions,
   ): Promise<AnalyzeResult> {
     const { model, options: modelOptions } = getEffectiveAiSelection()
+    const language = options?.language ?? getMainLocale()
 
     const [detail, files] = await Promise.all([
       this.context.getDetail(req.repo, req.number),
@@ -253,6 +255,7 @@ export class CodexAiService implements AiService {
     // onProgress SIN throttle.
     const activity = createActivityTracker({
       basePath: snapshotDir,
+      language,
       onEdge: () => {
         if (onProgress) {
           onProgress(parser.snapshot(), { done: false, phase, activity: activity.buffer() })
@@ -266,14 +269,16 @@ export class CodexAiService implements AiService {
     const abortErrorMessage = (): string | null => {
       const reason = timeouts.getAbortReason()
       if (reason === 'inactivity-timeout') {
-        return (
-          'Codex dejó de enviar datos: sin ningún fragmento nuevo por más de ' +
-          AGENTIC_INACTIVITY_TIMEOUT_MS / 1000 +
-          's (timeout de inactividad).'
-        )
+        return mt('ai.errors.inactivityTimeout', {
+          provider: 'Codex',
+          seconds: AGENTIC_INACTIVITY_TIMEOUT_MS / 1000,
+        })
       }
       if (reason === 'total-timeout') {
-        return 'Codex no respondió a tiempo (timeout total de ' + AGENTIC_REQUEST_TIMEOUT_MS / 1000 + 's).'
+        return mt('ai.errors.totalTimeout', {
+          provider: 'Codex',
+          seconds: AGENTIC_REQUEST_TIMEOUT_MS / 1000,
+        })
       }
       return null
     }
@@ -293,15 +298,15 @@ export class CodexAiService implements AiService {
       try {
         account = await client.request('account/read', { refreshToken: false })
       } catch (error) {
-        throw new Error(CODEX_LOGIN_HINT, { cause: error })
+        throw new Error(codexLoginHint(), { cause: error })
       }
       if (isUnauthenticated(account)) {
-        throw new Error(CODEX_LOGIN_HINT)
+        throw new Error(codexLoginHint())
       }
 
       const threadResult = await client.request('thread/start', {
         model,
-        baseInstructions: ANALYZE_PR_SYSTEM_PROMPT,
+        baseInstructions: buildAnalyzeSystemPrompt(language),
         // AGÉNTICO (F11/T58): apunta el thread al snapshot local del PR.
         // Nombre de param VERIFICADO contra `ThreadStartParams` del esquema
         // real (`codex app-server generate-json-schema`, T58): `cwd: string
@@ -390,7 +395,7 @@ export class CodexAiService implements AiService {
 
         const failure = turnFailureMessage(notification)
         if (failure !== null) {
-          rejectTurn(new Error('Codex devolvió un error: ' + failure))
+          rejectTurn(new Error(mt('ai.errors.providerError', { provider: 'Codex', detail: failure })))
           return
         }
         if (notification.method === 'turn/completed') {
@@ -422,10 +427,12 @@ export class CodexAiService implements AiService {
       const abortMessage = abortErrorMessage()
       if (abortMessage) throw new Error(abortMessage, { cause: error })
       if (error instanceof CodexSpawnError) {
-        throw new Error('Codex no se pudo lanzar: ' + error.message, { cause: error })
+        throw new Error(mt('ai.codex.spawnFailed', { detail: error.message }), { cause: error })
       }
       if (error instanceof JsonRpcRemoteError) {
-        throw new Error('Codex devolvió un error: ' + error.message, { cause: error })
+        throw new Error(mt('ai.errors.providerError', { provider: 'Codex', detail: error.message }), {
+          cause: error,
+        })
       }
       throw error
     } finally {
@@ -435,9 +442,7 @@ export class CodexAiService implements AiService {
     timeouts.clearAll()
 
     if (!sawAnyDelta) {
-      throw new Error(
-        'Codex no devolvió contenido de streaming (revisá que la sesión siga activa: «codex login»).',
-      )
+      throw new Error(mt('ai.codex.noStreamingContent'))
     }
 
     const sections = parser.finalize((m) => console.warn(m))

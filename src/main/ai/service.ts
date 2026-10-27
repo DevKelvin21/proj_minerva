@@ -34,6 +34,7 @@
  * handler's.
  */
 import type { IpcRequest } from '../../shared/ipc'
+import type { AppLocale } from '../../shared/locale'
 import type { GeneratedAnalysis } from '../../shared/types'
 import type { AnalysisActivityItem, DraftDidacticSection } from '../../shared/events'
 
@@ -70,6 +71,13 @@ export type AnalyzeProgressCallback = (
 
 export interface AnalyzePullRequestOptions {
   onProgress?: AnalyzeProgressCallback
+  /**
+   * Language the analysis is written in (system prompt rule, mock fixtures,
+   * activity labels). The handler passes the UI language captured at start,
+   * the same value it seals as `DidacticAnalysis.language`. Absent = the
+   * current main locale (`getMainLocale()`).
+   */
+  language?: AppLocale
 }
 
 /**

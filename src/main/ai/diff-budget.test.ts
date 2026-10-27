@@ -31,7 +31,7 @@ describe('buildDiffBudget', () => {
 
     expect(result.omittedFiles).toEqual([])
     expect(result.blocks[0]).toContain('image.png')
-    expect(result.blocks[0]).toContain('sin patch de texto')
+    expect(result.blocks[0]).toContain('no text patch')
   })
 
   it('trunca el patch de un archivo que excede el presupuesto disponible', () => {
@@ -41,7 +41,7 @@ describe('buildDiffBudget', () => {
 
     expect(result.omittedFiles).toEqual([])
     expect(result.blocks).toHaveLength(1)
-    expect(result.blocks[0]).toContain('[truncado')
+    expect(result.blocks[0]).toContain('[truncated')
     expect(result.blocks[0].length).toBeLessThan(hugePatch.length)
   })
 

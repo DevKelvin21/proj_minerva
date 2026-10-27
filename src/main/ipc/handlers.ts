@@ -276,6 +276,7 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
         const languageAtStart = getMainLocale()
         const aiService = await createAiService(prContext)
         const generated = await aiService.analyzePullRequest(req, {
+          language: languageAtStart,
           onProgress: (sections, meta) => {
             snapshotBox.current = sections
             // El `{ done: true }` que emite el servicio en éxito se SUPRIME

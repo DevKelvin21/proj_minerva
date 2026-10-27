@@ -112,17 +112,17 @@ describe('fetchCodexModelCatalog', () => {
         options: [
           {
             id: 'effort',
-            label: 'Razonamiento',
+            label: 'Reasoning',
             choices: [
               {
                 value: 'low',
-                label: 'Bajo',
+                label: 'Low',
                 description: 'Rápido, menos razonamiento.',
                 isDefault: false,
               },
               {
                 value: 'high',
-                label: 'Alto',
+                label: 'High',
                 description: 'Razonamiento profundo.',
                 isDefault: false,
               },
@@ -133,7 +133,7 @@ describe('fetchCodexModelCatalog', () => {
     ])
   })
 
-  it('etiqueta los niveles de la familia GPT-5.6: "max" → "Máximo", "ultra" → "Ultra", y un nivel desconocido cae a capitalizado', async () => {
+  it('etiqueta los niveles de la familia GPT-5.6: "max" → "Max", "ultra" → "Ultra", y un nivel desconocido cae a capitalizado', async () => {
     const { createClient } = withFakeClient({
       pages: [
         {
@@ -159,7 +159,7 @@ describe('fetchCodexModelCatalog', () => {
     expect(models[0]!.options![0]!.choices).toEqual([
       {
         value: 'max',
-        label: 'Máximo',
+        label: 'Max',
         description: 'Maximum reasoning depth for the hardest problems',
         isDefault: false,
       },
@@ -201,8 +201,8 @@ describe('fetchCodexModelCatalog', () => {
     const models = await fetchCodexModelCatalog(createClient)
 
     expect(models[0]!.options![0]!.choices).toEqual([
-      { value: 'low', label: 'Bajo', description: 'low', isDefault: false },
-      { value: 'medium', label: 'Medio', description: 'medium', isDefault: true },
+      { value: 'low', label: 'Low', description: 'low', isDefault: false },
+      { value: 'medium', label: 'Medium', description: 'medium', isDefault: true },
     ])
   })
 

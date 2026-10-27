@@ -41,6 +41,7 @@
 import type { DidacticSection, DidacticSnippet } from '../../shared/types'
 import type { DraftDidacticSection } from '../../shared/events'
 import { mapRawSection, mapSnippet } from './section-mapper'
+import { mt } from '../i18n'
 
 const KNOWN_KINDS = ['summary', 'setup', 'architecture', 'endpoint', 'schema', 'cloud'] as const
 type KnownKind = (typeof KNOWN_KINDS)[number]
@@ -183,7 +184,7 @@ export class StreamSectionParser {
     })
 
     if (sections.length === 0) {
-      throw new Error('Ninguna sección del stream del modelo tuvo un formato válido.')
+      throw new Error(mt('ai.errors.noValidSection'))
     }
 
     return sections

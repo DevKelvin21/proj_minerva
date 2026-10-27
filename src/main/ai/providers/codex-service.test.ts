@@ -358,13 +358,13 @@ describe('CodexAiService.analyzePullRequest', () => {
     // La PRIMERA llamada a onProgress es el EDGE del mini-log (F13): el
     // `item/started` abre una fila running y eso emite SIN throttle, ANTES
     // de que llegue ningún delta de texto: fase "exploring" con secciones
-    // todavía vacías. El label es el genérico ("Leyendo un archivo…"):
+    // todavía vacías. El label es el genérico ("Reading a file…"):
     // los items verificados solo traen { id, type }, sin ruta.
     const [firstSections, firstMeta] = progressCalls[0]
     expect(firstMeta).toEqual({
       done: false,
       phase: 'exploring',
-      activity: [{ id: 'x', kind: 'read', label: 'Leyendo un archivo…', status: 'running' }],
+      activity: [{ id: 'x', kind: 'read', label: 'Reading a file…', status: 'running' }],
     })
     expect(firstSections).toEqual([])
 
@@ -397,11 +397,11 @@ describe('CodexAiService.analyzePullRequest', () => {
     // Edge 1 (begin) y edge 2 (complete), ambos SIN throttle aunque lleguen
     // pegados: MISMA fila (mismo id, colapso por identidad).
     expect(progressCalls[0][1].activity).toEqual([
-      { id: 'x', kind: 'read', label: 'Leyendo un archivo…', status: 'running' },
+      { id: 'x', kind: 'read', label: 'Reading a file…', status: 'running' },
     ])
     const doneCall = progressCalls.find(([, meta]) => meta.activity?.[0]?.status === 'done')
     expect(doneCall?.[1].activity).toEqual([
-      { id: 'x', kind: 'read', label: 'Leyó un archivo', status: 'done' },
+      { id: 'x', kind: 'read', label: 'Read a file', status: 'done' },
     ])
     const [, lastMeta] = progressCalls[progressCalls.length - 1]
     expect(lastMeta.done).toBe(true)
@@ -434,7 +434,7 @@ describe('CodexAiService.analyzePullRequest', () => {
     expect(withActivity.length).toBeGreaterThan(0)
     for (const [, meta] of withActivity) {
       expect(meta.activity).toHaveLength(1)
-      expect(meta.activity?.[0].label).toMatch(/^Pens/)
+      expect(meta.activity?.[0].label).toMatch(/^Th(inking|ought)/)
     }
   })
 
@@ -509,7 +509,7 @@ describe('CodexAiService.analyzePullRequest', () => {
 
     const service = new CodexAiService(makeGithubService())
     await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow(
-      'no devolvió contenido de streaming',
+      'returned no streaming content',
     )
   })
 
@@ -520,7 +520,7 @@ describe('CodexAiService.analyzePullRequest', () => {
     })
 
     const service = new CodexAiService(makeGithubService())
-    await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow('Ninguna sección')
+    await expect(service.analyzePullRequest({ repo, number: 482 })).rejects.toThrow('None of the sections')
   })
 
   it('agrega "effort" a los params de turn/start cuando la selección efectiva trae uno (T36)', async () => {

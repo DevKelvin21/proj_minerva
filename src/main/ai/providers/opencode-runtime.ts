@@ -33,6 +33,7 @@
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
+import { mt } from '../../i18n'
 import { resolveCliPath } from './resolve-cli'
 import { buildSanitizedSpawnEnv } from './spawn-env'
 
@@ -83,24 +84,17 @@ export interface OpencodeVersionCheck {
 
 /** Mensaje accionable cuando `resolveCliPath('opencode')` no encuentra el binario en ninguna ubicación conocida. */
 function describeUnresolvedOpencodeBinary(): string {
-  return (
-    'No se encontró el binario "opencode" instalado. Instalá OpenCode ' +
-    '(ver https://opencode.ai/docs/) y volvé a intentar.'
-  )
+  return mt('ai.opencode.binaryNotInstalled')
 }
 
 /** Mensaje accionable para un fallo de `spawn`/`execFile` (ENOENT u otra causa). */
 function describeSpawnFailure(binary: string, error: unknown): string {
   const code = (error as NodeJS.ErrnoException | undefined)?.code
   if (code === 'ENOENT') {
-    return (
-      'No se encontró el binario "' +
-      binary +
-      '" en el PATH. Instalá OpenCode (https://opencode.ai/docs/) y volvé a intentar.'
-    )
+    return mt('ai.opencode.binaryNotInPath', { binary })
   }
   const message = error instanceof Error ? error.message : String(error)
-  return 'No se pudo lanzar el server de OpenCode ("' + binary + '"): ' + message
+  return mt('ai.opencode.serverSpawnFailed', { binary, detail: message })
 }
 
 /** Extrae los tres números de un string de versión tipo "1.17.18" (o con prefijo/sufijo alrededor); `null` si no matchea. */
@@ -140,7 +134,7 @@ export function checkOpencodeVersion(): Promise<OpencodeVersionCheck> {
         resolve({
           ok: false,
           version: raw.length > 0 ? raw : null,
-          error: 'No se pudo interpretar la versión de OpenCode a partir de la salida "' + raw + '".',
+          error: mt('ai.opencode.versionUnparseable', { output: raw }),
         })
         return
       }
@@ -154,11 +148,7 @@ export function checkOpencodeVersion(): Promise<OpencodeVersionCheck> {
         version: raw,
         error: ok
           ? undefined
-          : 'La versión instalada de OpenCode (' +
-            raw +
-            ') es menor a la mínima requerida (' +
-            MIN_OPENCODE_VERSION +
-            '). Actualizala con tu gestor de paquetes o `opencode upgrade` y volvé a intentar.',
+          : mt('ai.opencode.versionTooOld', { version: raw, min: MIN_OPENCODE_VERSION }),
       })
     })
   })
@@ -173,7 +163,7 @@ function findEphemeralPort(): Promise<number> {
       const address = probe.address()
       if (address === null || typeof address === 'string') {
         probe.close()
-        reject(new Error('No se pudo obtener un puerto TCP libre para el server de OpenCode.'))
+        reject(new Error(mt('ai.opencode.noFreePort')))
         return
       }
       const port = address.port
@@ -255,7 +245,7 @@ function spawnOpencodeServer(): Promise<OpencodeServerHandle> {
     (port) =>
       new Promise<OpencodeServerHandle>((resolve, reject) => {
         if (generation !== spawnGeneration) {
-          reject(new Error('El arranque del server de OpenCode se canceló antes de lanzarlo.'))
+          reject(new Error(mt('ai.opencode.startCancelled')))
           return
         }
 
@@ -304,9 +294,7 @@ function spawnOpencodeServer(): Promise<OpencodeServerHandle> {
           unregister()
           reject(
             new Error(
-              'El server de OpenCode no arrancó dentro de ' +
-                String(SERVER_READY_TIMEOUT_MS) +
-                'ms.' +
+              mt('ai.opencode.serverStartTimeout', { ms: SERVER_READY_TIMEOUT_MS }) +
                 describeOutputTail(stdout, stderr),
             ),
           )
@@ -335,7 +323,7 @@ function spawnOpencodeServer(): Promise<OpencodeServerHandle> {
           // `null` y este server ya está condenado (recibió el SIGTERM del
           // grupo): no se lo re-publica como el singleton vivo.
           if (serverChild !== child) {
-            reject(new Error('El server de OpenCode se detuvo mientras arrancaba.'))
+            reject(new Error(mt('ai.opencode.serverStoppedWhileStarting')))
             return
           }
           resolve({ url })
@@ -361,11 +349,7 @@ function spawnOpencodeServer(): Promise<OpencodeServerHandle> {
           unregister()
           reject(
             new Error(
-              'El proceso de OpenCode terminó antes de quedar listo (code=' +
-                String(code) +
-                ', signal=' +
-                String(signal) +
-                ').' +
+              mt('ai.opencode.processExitedEarly', { code: String(code), signal: String(signal) }) +
                 describeOutputTail(stdout, stderr),
             ),
           )

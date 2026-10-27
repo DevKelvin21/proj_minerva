@@ -101,12 +101,12 @@ interface OpencodeProviderListData {
  * valor crudo en vez de romper.
  */
 const KNOWN_VARIANT_LABELS: Record<string, string> = {
-  none: 'Ninguna',
-  low: 'Bajo',
-  medium: 'Medio',
-  high: 'Alto',
-  xhigh: 'Muy alto',
-  max: 'Máximo',
+  none: 'None',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Very high',
+  max: 'Max',
   ultra: 'Ultra',
 }
 
@@ -149,7 +149,7 @@ function buildVariantDescriptor(providerId: string, model: OpencodeModel): Model
     isDefault: variant === defaultVariant,
   }))
 
-  return { id: 'variant', label: 'Variante', choices }
+  return { id: 'variant', label: 'Variant', choices }
 }
 
 /** Cuenta cuántas veces aparece cada `name` de modelo entre TODOS los providers conectados, para saber cuándo el sub-proveedor "aporta" (desambigua un choque de nombres). */

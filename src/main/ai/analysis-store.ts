@@ -27,11 +27,17 @@
  * `headSha` string y `generatedWith` con `provider`/`model`/`options`) —
  * entries que no validan se DESCARTAN sin tumbar las demás (defensivo ante,
  * p. ej., una versión vieja de la app que persistió una forma distinta).
+ *
+ * `analysis.language` (i18n): entries written before it existed have no field
+ * and were generated with the Spanish prompt, so they load as `es` (the
+ * renderer then offers to regenerate in English). A present but unknown
+ * value makes the entry invalid (dropped like any other malformed entry).
  */
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 import { isAiProviderId } from '../../shared/ai-providers'
+import { isAppLocale } from '../../shared/locale'
 import type { AnalysisGenerationInfo, DidacticAnalysis, DidacticSection } from '../../shared/types'
 
 const ANALYSES_FILE_NAME = 'analyses.json'
@@ -87,8 +93,14 @@ function isDidacticSection(value: unknown): value is DidacticSection {
   return typeof v.kind === 'string' && typeof v.markdown === 'string'
 }
 
-/** Forma COMPLETA de `DidacticAnalysis` (T39): incluye `headSha` y `generatedWith`, no solo `GeneratedAnalysis`. */
-function isDidacticAnalysis(value: unknown): value is DidacticAnalysis {
+/**
+ * Forma COMPLETA de `DidacticAnalysis` (T39): incluye `headSha` y
+ * `generatedWith`, no solo `GeneratedAnalysis`. `language` may be absent
+ * (legacy entry, see `withLanguage`) but never an unknown value.
+ */
+function isPersistedAnalysis(value: unknown): value is Omit<DidacticAnalysis, 'language'> & {
+  language?: DidacticAnalysis['language']
+} {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
   return (
@@ -97,14 +109,17 @@ function isDidacticAnalysis(value: unknown): value is DidacticAnalysis {
     v.sections.every(isDidacticSection) &&
     typeof v.generatedAt === 'string' &&
     typeof v.headSha === 'string' &&
-    isAnalysisGenerationInfo(v.generatedWith)
+    isAnalysisGenerationInfo(v.generatedWith) &&
+    (v.language === undefined || isAppLocale(v.language))
   )
 }
 
-function isValidEntry(value: unknown): value is AnalysisStoreEntry {
-  if (typeof value !== 'object' || value === null) return false
+/** Valid persisted entry, normalized (legacy entries without `language` were Spanish); `null` otherwise. */
+function toValidEntry(value: unknown): AnalysisStoreEntry | null {
+  if (typeof value !== 'object' || value === null) return null
   const v = value as Record<string, unknown>
-  return isNonEmptyString(v.key) && isDidacticAnalysis(v.analysis)
+  if (!isNonEmptyString(v.key) || !isPersistedAnalysis(v.analysis)) return null
+  return { key: v.key, analysis: { ...v.analysis, language: v.analysis.language ?? 'es' } }
 }
 
 /** Forma superficial del archivo (antes de validar cada entry individualmente). */
@@ -160,7 +175,9 @@ export class AnalysisStore implements AnalysisStoreLike {
         return this.cache
       }
 
-      const valid = parsed.entries.filter(isValidEntry)
+      const valid = parsed.entries
+        .map(toValidEntry)
+        .filter((entry): entry is AnalysisStoreEntry => entry !== null)
       // Defensivo: si el archivo trajera más de MAX_ENTRIES (no debería, ver
       // `saveEntries`), nos quedamos con las más recientes (el final del
       // array, mismo orden LRU que el resto del módulo).

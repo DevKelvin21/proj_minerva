@@ -189,7 +189,7 @@ describe('CodexAppServerClient', () => {
     lastChild!.emit('error', enoent)
 
     await expect(promise).rejects.toBeInstanceOf(CodexSpawnError)
-    await expect(promise).rejects.toThrow('No se encontró el binario')
+    await expect(promise).rejects.toThrow('binary was not found')
   })
 
   it('rechaza requests pendientes con CodexProcessExitError si el proceso termina inesperadamente', async () => {
