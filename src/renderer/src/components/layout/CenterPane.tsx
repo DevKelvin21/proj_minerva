@@ -6,7 +6,7 @@ import { PrHeader } from '../pr-detail/PrHeader'
 import { ConversationTab } from '../pr-detail/ConversationTab'
 import { FilesTab } from '../pr-detail/FilesTab'
 import { EmptyState } from '../ui/EmptyState'
-import type { RepoRef } from '../../../../shared/scm'
+import { prKey, type RepoRef } from '../../../../shared/scm'
 
 function TabButton({
   active,
@@ -42,7 +42,7 @@ export function CenterPane(): React.JSX.Element {
   // `usePullRequestDetail` necesita un repo/number válidos incluso cuando no
   // hay selección: se le pasa un placeholder y se ignora su resultado (ver
   // guard de `!selectedPr` más abajo) para no romper las reglas de hooks.
-  const { detail, loading, error } = usePullRequestDetail(
+  const { detail, error } = usePullRequestDetail(
     selectedPr?.repo ?? NO_REPO,
     selectedPr?.number ?? 0,
   )
@@ -76,7 +76,12 @@ export function CenterPane(): React.JSX.Element {
     )
   }
 
-  if (loading || !detail) {
+  // A reload of the SAME PR (after a retarget) keeps the old detail on screen;
+  // only a detail of another PR (or none yet) shows the loading state.
+  const detailIsCurrent =
+    detail !== null &&
+    prKey(detail.repo, detail.number) === prKey(selectedPr.repo, selectedPr.number)
+  if (!detail || !detailIsCurrent) {
     return (
       <section className="flex flex-1 flex-col bg-bg">
         <EmptyState
@@ -101,7 +106,8 @@ export function CenterPane(): React.JSX.Element {
           {detail.changedFiles === null ? 'Archivos' : `Archivos (${detail.changedFiles})`}
         </TabButton>
       </nav>
-      <div className="flex-1 overflow-hidden">
+      {/* Keyed on the base: a retarget changes the diff, so the tabs refetch. */}
+      <div key={detail.baseRef} className="flex-1 overflow-hidden">
         {centerTab === 'conversation' ? (
           <ConversationTab
             pr={detail}

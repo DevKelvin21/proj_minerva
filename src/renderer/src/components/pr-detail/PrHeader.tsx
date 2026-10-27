@@ -1,5 +1,10 @@
+import { useState } from 'react'
 import { ExternalLink, GitBranch } from 'lucide-react'
+import { prKey } from '../../../../shared/scm'
 import type { PullRequestDetail } from '../../../../shared/types'
+import { RetargetNote } from '../stacks/RetargetNote'
+import { RetargetPanel } from '../stacks/RetargetPanel'
+import { StackContext, StackOrphanFlag } from '../stacks/StackContext'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
@@ -11,14 +16,23 @@ interface PrHeaderProps {
 }
 
 /**
+ * Remounted per PR (`key`), so the "Change target branch…" form never
+ * carries over to another PR.
+ */
+export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
+  return <PrHeaderBody key={prKey(pr.repo, pr.number)} pr={pr} />
+}
+
+/**
  * Cabecera del PR. Con la ventana baja (`short`/`xshort`, p. ej. una mitad
  * horizontal de 1920x540) pasa a UNA línea y manda autor/rama/commits/labels a
  * un `<details>` "Detalles" (F16/T84): en el layout completo esta cabecera come
  * ~110px de los ~490px útiles, y lo que el usuario vino a leer está debajo.
  * El `<details>` nativo evita sumar estado y cierra con Esc por sí solo.
  */
-export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
+function PrHeaderBody({ pr }: PrHeaderProps): React.JSX.Element {
   const tier = useLayoutTier()
+  const [editingBase, setEditingBase] = useState(false)
 
   const meta = (
     <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
@@ -28,8 +42,19 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
       </span>
       <span className="flex items-center gap-1 font-mono">
         <GitBranch size={12} />
-        {pr.headRef} → {pr.baseRef}
+        <span data-testid="pr-branches">
+          {pr.headRef} → {pr.baseRef}
+        </span>
       </span>
+      {pr.state === 'open' && !editingBase && (
+        <button
+          type="button"
+          onClick={() => setEditingBase(true)}
+          className="underline decoration-dotted transition-colors hover:text-text"
+        >
+          Change target branch…
+        </button>
+      )}
       <span>
         {pr.commits} {pr.commits === 1 ? 'commit' : 'commits'}
       </span>
@@ -43,6 +68,27 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
         Open in {SCM_PROVIDER_LABEL[pr.repo.provider]}
       </a>
     </div>
+  )
+
+  // Stack map + orphan warning, the "Change target branch…" form and the
+  // note after a retarget: what this PR is built on, and fixing it.
+  const branchContext = (
+    <>
+      <RetargetNote onlyFor={prKey(pr.repo, pr.number)} />
+      {editingBase && (
+        <RetargetPanel
+          key={pr.baseRef}
+          repo={pr.repo}
+          number={pr.number}
+          currentBase={pr.baseRef}
+          headRef={pr.headRef}
+          mode={{ kind: 'manual' }}
+          onClose={() => setEditingBase(false)}
+          onRetargeted={() => setEditingBase(false)}
+        />
+      )}
+      <StackContext pr={pr} />
+    </>
   )
 
   // Reviewer chips with their vote (approved / with suggestions / changes
@@ -112,12 +158,14 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
           {pr.title} <span className="font-normal text-muted">#{pr.number}</span>
         </h1>
         {pr.isDraft && <Badge tone="neutral">Draft</Badge>}
+        <StackOrphanFlag pr={pr} />
         <details className="relative ml-auto shrink-0">
           <summary className="cursor-pointer list-none rounded border border-border px-2 py-0.5 text-xs text-muted transition-colors hover:border-accent hover:text-text">
             Detalles
           </summary>
-          <div className="absolute right-0 z-20 mt-1 flex w-72 flex-col gap-2 rounded-md border border-border bg-panel p-3 shadow-xl">
+          <div className="absolute right-0 z-20 mt-1 flex max-h-[70vh] w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto rounded-md border border-border bg-panel p-3 shadow-xl">
             {meta}
+            {branchContext}
             {reviewers}
             {workItems}
             {labels}
@@ -137,6 +185,7 @@ export function PrHeader({ pr }: PrHeaderProps): React.JSX.Element {
       </div>
 
       {meta}
+      {branchContext}
       {reviewers}
       {workItems}
       {labels}
