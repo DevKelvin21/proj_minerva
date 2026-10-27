@@ -29,5 +29,5 @@ test('vista de diff del PR #201: árbol, hunks, toggles y renamed', async ({ win
 
   // Archivo renombrado sin patch → mensaje sin vista previa.
   await window.getByText('checkout-state.ts').first().click()
-  await expect(window.getByText(/[Ss]in vista previa/).first()).toBeVisible()
+  await expect(window.getByText(/No preview available|[Ss]in vista previa/).first()).toBeVisible()
 })

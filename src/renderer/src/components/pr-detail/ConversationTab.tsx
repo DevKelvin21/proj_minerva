@@ -51,16 +51,6 @@ export function ConversationTab({
     }
   }
 
-  async function handleReply(threadId: string, bodyMarkdown: string): Promise<void> {
-    await window.minerva.scm.postComment({
-      repo: pr.repo,
-      number: pr.number,
-      bodyMarkdown,
-      threadId,
-    })
-    await reload()
-  }
-
   return (
     // Columna de lectura centrada (F16/T87): sin el `max-w`, en una ventana
     // completa de 1920px los comentarios se estiraban a líneas de 1200px+.
@@ -82,10 +72,12 @@ export function ConversationTab({
       {error && (
         <p className="text-sm text-danger">No se pudieron cargar los comentarios: {error}</p>
       )}
-      {!error && loading && <p className="text-sm text-muted">Cargando comentarios…</p>}
+      {!error && loading && threads.length === 0 && (
+        <p className="text-sm text-muted">Cargando comentarios…</p>
+      )}
 
       {!error &&
-        !loading &&
+        !(loading && threads.length === 0) &&
         (threads.length === 0 ? (
           <p className="text-sm text-muted">Todavía no hay comentarios.</p>
         ) : (
@@ -93,8 +85,6 @@ export function ConversationTab({
             <ThreadCard
               key={thread.id}
               thread={thread}
-              onReply={handleReply}
-              collapsedByDefault={thread.isResolved}
               onNavigateToLine={
                 thread.isLineThread && thread.path && thread.line !== undefined
                   ? () => openLineThread(thread.path!, thread.line!, thread.id)

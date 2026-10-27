@@ -1,37 +1,39 @@
-import { X } from 'lucide-react'
+import { EyeOff } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
 import { ThreadCard } from './ThreadCard'
 
 interface InlineThreadCardProps {
   thread: CommentThread
-  onReply: (threadId: string, bodyMarkdown: string) => Promise<void>
-  onClose: () => void
+  highlighted: boolean
+  /** Hides the threads of this line (the gutter icon shows them again). */
+  onHide: () => void
 }
 
 /**
- * Hilo de línea expandido inline, debajo de la fila del diff que lo originó
- * (`SplitDiff`/`InlineDiff`). Envuelve `ThreadCard` agregando el `id` que usa
- * `DiffView` para hacer scroll-into-view cuando se llega acá navegando desde
- * un chip de `ConversationTab`, y el botón para cerrar el hilo expandido.
+ * A line thread under the diff row it belongs to (`SplitDiff`/`InlineDiff`).
+ * Carries the `thread-<id>` anchor `DiffView` scrolls to when the user jumps
+ * here from the Comments view or a `path:line` chip.
  */
 export function InlineThreadCard({
   thread,
-  onReply,
-  onClose,
+  highlighted,
+  onHide,
 }: InlineThreadCardProps): React.JSX.Element {
   return (
-    <div id={`thread-${thread.id}`} className="border-y border-border bg-bg px-2 py-2">
+    <div id={`thread-${thread.id}`} className="border-y border-border bg-bg px-2 py-2 font-sans">
       <ThreadCard
         thread={thread}
-        onReply={onReply}
+        showPath={false}
+        highlighted={highlighted}
         extraHeaderContent={
           <button
             type="button"
-            onClick={onClose}
-            aria-label="Cerrar hilo"
+            onClick={onHide}
+            aria-label="Hide comments on this line"
+            title="Hide comments on this line (the gutter icon shows them again)"
             className="inline-flex h-5 w-5 items-center justify-center rounded text-muted hover:text-text"
           >
-            <X size={13} />
+            <EyeOff size={13} />
           </button>
         }
       />

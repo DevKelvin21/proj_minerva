@@ -13,6 +13,12 @@ interface UseCommentThreadsResult {
    * crear/actualizar sin esperar al próximo render (p. ej. para expandirlo).
    */
   reload: () => Promise<CommentThread[]>
+  /**
+   * Merges a thread's new status (the answer of `scm:setThreadStatus`) into
+   * the list without refetching everything. Only status fields are taken:
+   * providers may answer without the derived fields (`isOutdated`).
+   */
+  applyThreadStatus: (updated: CommentThread) => void
 }
 
 function toErrorMessage(error: unknown): string {
@@ -57,5 +63,15 @@ export function useCommentThreads(repo: RepoRef, number: number): UseCommentThre
     })()
   }, [reload])
 
-  return { threads, loading, error, reload }
+  const applyThreadStatus = useCallback((updated: CommentThread) => {
+    setThreads((current) =>
+      current.map((thread) =>
+        thread.id === updated.id
+          ? { ...thread, status: updated.status, isResolved: updated.isResolved }
+          : thread,
+      ),
+    )
+  }, [])
+
+  return { threads, loading, error, reload, applyThreadStatus }
 }

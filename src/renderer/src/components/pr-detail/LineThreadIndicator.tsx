@@ -1,18 +1,18 @@
 import { MessageSquare } from 'lucide-react'
 
 interface LineThreadIndicatorProps {
-  active: boolean
+  /** The line's threads are hidden (the user hid them from the card). */
+  hidden: boolean
   count: number
   onClick: () => void
 }
 
 /**
- * Icono pequeño en el gutter de una línea del diff que ya tiene un hilo de
- * comentarios. Click expande/colapsa el hilo inline debajo de la fila
- * (`InlineThreadCard`, controlado por `DiffView` vía `expandedThreadId`).
+ * Small icon in the gutter of a line that has comment threads. Threads show
+ * under their line by default; the icon hides/shows them.
  */
 export function LineThreadIndicator({
-  active,
+  hidden,
   count,
   onClick,
 }: LineThreadIndicatorProps): React.JSX.Element {
@@ -20,13 +20,13 @@ export function LineThreadIndicator({
     <button
       type="button"
       onClick={onClick}
-      aria-label={active ? 'Cerrar hilo de comentarios' : `Ver hilo de comentarios (${count})`}
-      title={`${count} ${count === 1 ? 'comentario' : 'comentarios'}`}
+      aria-label={hidden ? `Show comments on this line (${count})` : 'Hide comments on this line'}
+      title={`${count} ${count === 1 ? 'comment' : 'comments'}`}
       className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded ${
-        active ? 'text-accent' : 'text-muted hover:text-accent'
+        hidden ? 'text-muted hover:text-accent' : 'text-accent'
       }`}
     >
-      <MessageSquare size={12} fill={active ? 'currentColor' : 'none'} />
+      <MessageSquare size={12} fill={hidden ? 'none' : 'currentColor'} />
     </button>
   )
 }

@@ -1,16 +1,34 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { MessageSquareWarning } from 'lucide-react'
 import type { CommentThread, DiffFile, RepoRef } from '../../../../shared/types'
 import type { DiffViewMode } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
 import { parsePatch } from '../../lib/diff-parser'
-import { indexLineThreads, type LineSide } from '../../lib/line-threads'
+import { indexLineThreads, threadSide, type LineSide } from '../../lib/line-threads'
+import {
+  autoRevealRanges,
+  buildDiffSections,
+  classifyAnchor,
+  expandRange,
+  type HiddenGap,
+  type LineRange,
+} from '../../lib/expand-context'
+import {
+  linePositions,
+  threadRangeKeys,
+  unplacedThreads,
+  type DiffThreadsModel,
+} from '../../lib/diff-threads'
 import { useElementWidth } from '../../hooks/use-element-width'
+import { useFileLines } from '../../hooks/use-file-content'
+import { useThreadActions } from '../../hooks/thread-actions'
 import { SPLIT_DIFF_MIN_WIDTH } from '../../lib/layout'
 import { noPatchMessage } from '../../lib/scm-labels'
 import { useLineHighlights } from '../../hooks/use-line-highlights'
 import { DiffToolbar } from './DiffToolbar'
 import { SplitDiff } from './SplitDiff'
 import { InlineDiff } from './InlineDiff'
+import { ThreadCard } from './ThreadCard'
 
 interface DiffViewProps {
   file: DiffFile
@@ -20,23 +38,29 @@ interface DiffViewProps {
   onToggleWordWrap: () => void
   repo: RepoRef
   number: number
-  /** Hilos del PR completo; se filtran acá a los que son de línea y de este archivo. */
+  /** Every thread of the PR; filtered here to this file's. */
   threads: CommentThread[]
   reloadThreads: () => Promise<CommentThread[]>
-  /** Presente solo cuando el árbol de archivos es drawer (F16/T85): botón "N archivos" en la toolbar. */
+  /** Only when the file tree is a drawer (F16/T85): "N files" button in the toolbar. */
   fileTreeToggle?: { open: boolean; count: number; onToggle: () => void }
 }
 
 /**
- * Panel principal: toolbar + diff (split o inline) del archivo seleccionado.
+ * Main panel: toolbar + diff (split or inline) of the selected file, with its
+ * comment threads always next to the code they talk about.
  *
- * F16/T86 — `effectiveMode`: por debajo de `SPLIT_DIFF_MIN_WIDTH` (560px de
- * panel REAL) la vista split deja de ser legible (dos columnas de ~190px con
- * los gutters puestos), así que se renderiza inline aunque la preferencia
- * guardada sea split. La preferencia NO se pisa en el store: al ensanchar el
- * panel (cerrar el didáctico, agrandar la ventana) el split vuelve solo. La
- * toolbar deshabilita el botón split y explica por qué en el tooltip — sin eso,
- * el usuario clickearía split y "no pasaría nada".
+ * Expand context: hidden lines (before, between and after hunks) come from
+ * the head file (`scm:getFileContent`), fetched on the first expand click, or
+ * right away when a thread sits on a hidden line: those lines are revealed
+ * automatically (`autoRevealRanges`) so the thread shows in place. Threads no
+ * row can host (file-level, past the end of the file, or the file could not
+ * be fetched) render above the diff with a code excerpt.
+ *
+ * F16/T86 — `effectiveMode`: under `SPLIT_DIFF_MIN_WIDTH` (560px of REAL panel)
+ * split is unreadable, so inline renders even if split is the saved
+ * preference. The preference is not overwritten in the store.
+ *
+ * Mounted with `key={file.path}`: expanded ranges and hidden threads reset per file.
  */
 export function DiffView({
   file,
@@ -50,34 +74,111 @@ export function DiffView({
   reloadThreads,
   fileTreeToggle,
 }: DiffViewProps): React.JSX.Element {
+  const actions = useThreadActions()
   const { ref, width } = useElementWidth<HTMLElement>()
   const splitTooNarrow = width !== null && width < SPLIT_DIFF_MIN_WIDTH
   const effectiveMode: DiffViewMode = mode === 'split' && splitTooNarrow ? 'inline' : mode
   const hunks = useMemo(() => parsePatch(file.patch ?? ''), [file.patch])
   const { getTokens } = useLineHighlights(file.path, file.patch)
-  const threadsByPosition = useMemo(
-    () => indexLineThreads(threads, file.path),
-    [threads, file.path],
-  )
+
+  const [userRanges, setUserRanges] = useState<LineRange[]>([])
+  const [wantContent, setWantContent] = useState(false)
+  const [hiddenKeys, setHiddenKeys] = useState<ReadonlySet<string>>(() => new Set())
 
   const expandedThreadId = useAppStore((s) => s.expandedThreadId)
   const setExpandedThreadId = useAppStore((s) => s.setExpandedThreadId)
   const pendingThreadFocus = useAppStore((s) => s.pendingThreadFocus)
   const clearPendingThreadFocus = useAppStore((s) => s.clearPendingThreadFocus)
 
-  // Al llegar acá navegando desde un chip `path:line` de ConversationTab, el
-  // hilo ya quedó expandido (`openLineThread` setea `expandedThreadId`); acá
-  // solo hace falta el scroll hasta la card una vez que el diff renderizó.
+  const fileThreads = useMemo(
+    () => threads.filter((t) => t.path === file.path),
+    [threads, file.path],
+  )
+  const lineThreads = useMemo(() => fileThreads.filter((t) => t.line !== undefined), [fileThreads])
+  const byPosition = useMemo(() => indexLineThreads(threads, file.path), [threads, file.path])
+
+  const hasDiff = !file.isBinary && Boolean(file.patch) && hunks.length > 0
+  const canExpand = hasDiff && file.status !== 'removed'
+  const threadsInHiddenLines = useMemo(
+    () =>
+      lineThreads.some(
+        (t) => classifyAnchor(hunks, t.line!, threadSide(t), null).placement === 'gap',
+      ),
+    [lineThreads, hunks],
+  )
+  const head = useFileLines(
+    canExpand && (wantContent || threadsInHiddenLines)
+      ? { repo, number, headSha: actions.headSha, path: file.path, side: 'head' }
+      : null,
+  )
+  const headLines = head.status === 'ready' ? head.lines : null
+
+  const sections = useMemo(() => {
+    const auto = headLines
+      ? autoRevealRanges(
+          hunks,
+          lineThreads.map((t) => ({ line: t.line!, lineEnd: t.lineEnd, side: threadSide(t) })),
+          headLines.length,
+        )
+      : []
+    return buildDiffSections(hunks, headLines, [...userRanges, ...auto])
+  }, [hunks, headLines, lineThreads, userRanges])
+
+  const visibleKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const section of sections) {
+      const lines =
+        section.type === 'hunk'
+          ? section.hunk.lines
+          : section.type === 'context'
+            ? section.lines
+            : []
+      for (const line of lines) for (const key of linePositions(line)) keys.add(key)
+    }
+    return keys
+  }, [sections])
+
+  const unplaced = useMemo(
+    () => unplacedThreads(fileThreads, visibleKeys),
+    [fileThreads, visibleKeys],
+  )
+  const placingThreads = head.status === 'loading'
+
+  const toggleHidden = useCallback((key: string) => {
+    setHiddenKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  const model: DiffThreadsModel = useMemo(() => {
+    const focused = lineThreads.find((t) => t.id === expandedThreadId)
+    return {
+      byPosition,
+      hiddenKeys,
+      toggleHidden,
+      focusedThreadId: expandedThreadId,
+      rangeKeys: threadRangeKeys(lineThreads),
+      focusedKeys: focused ? threadRangeKeys([focused]) : new Set<string>(),
+    }
+  }, [byPosition, hiddenKeys, toggleHidden, expandedThreadId, lineThreads])
+
+  // Arriving from the Comments view or a `path:line` chip: scroll to the
+  // thread once its row exists. While the file is still being fetched to
+  // reveal hidden lines, wait (the effect re-runs when it lands).
   useEffect(() => {
     if (!pendingThreadFocus || pendingThreadFocus.path !== file.path) return
     const el = document.getElementById(`thread-${pendingThreadFocus.threadId}`)
-    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    if (!el && head.status === 'loading') return
+    el?.scrollIntoView({ block: 'center' })
     clearPendingThreadFocus()
-  }, [pendingThreadFocus, file.path, clearPendingThreadFocus])
+  }, [pendingThreadFocus, file.path, head.status, sections, clearPendingThreadFocus])
 
-  async function handleReply(threadId: string, bodyMarkdown: string): Promise<void> {
-    await window.minerva.scm.postComment({ repo, number, bodyMarkdown, threadId })
-    await reloadThreads()
+  function handleExpand(gap: HiddenGap, direction: 'up' | 'down' | 'all'): void {
+    setUserRanges((prev) => [...prev, expandRange(gap, direction)])
+    setWantContent(true)
   }
 
   async function handleCreateThread(
@@ -104,6 +205,49 @@ export function DiffView({
     if (created) setExpandedThreadId(created.id)
   }
 
+  const unplacedBlock =
+    unplaced.length > 0 ? (
+      <div
+        data-testid="unplaced-threads"
+        className="flex flex-col gap-2 border-b border-border bg-panel/40 p-2"
+      >
+        <p className="flex items-center gap-1.5 text-xs text-muted">
+          <MessageSquareWarning size={13} className="shrink-0" />
+          {placingThreads
+            ? `Loading the code around ${unplaced.length} ${unplaced.length === 1 ? 'comment' : 'comments'}…`
+            : head.status === 'error'
+              ? `Could not load the file to show these comments in place (${head.error}). Each one shows the code it refers to.`
+              : `${unplaced.length} ${unplaced.length === 1 ? 'comment is' : 'comments are'} not on a line this diff shows.`}
+        </p>
+        {!placingThreads &&
+          unplaced.map((thread) => (
+            <div key={thread.id} id={`thread-${thread.id}`}>
+              <ThreadCard
+                thread={thread}
+                showPath={false}
+                showExcerpt
+                highlighted={thread.id === expandedThreadId}
+              />
+            </div>
+          ))}
+      </div>
+    ) : null
+
+  const bodyProps = {
+    sections,
+    hunkCount: hunks.length,
+    wordWrap,
+    getTokens,
+    threads: model,
+    expander: {
+      loading: head.status === 'loading',
+      error:
+        head.status === 'error' ? head.error : head.status === 'unavailable' ? head.reason : null,
+      onExpand: handleExpand,
+    },
+    onCreateThread: handleCreateThread,
+  }
+
   return (
     <section ref={ref} className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <DiffToolbar
@@ -117,37 +261,23 @@ export function DiffView({
         compact={width !== null && width < 520}
       />
 
-      <div className="flex-1 overflow-auto">
-        {file.isBinary || !file.patch || hunks.length === 0 ? (
-          <p className="p-4 text-sm text-muted" data-patch-omitted={file.patchOmitted}>
-            {file.isBinary ? 'Sin vista previa disponible.' : noPatchMessage(file.patchOmitted)}
-          </p>
-        ) : effectiveMode === 'split' ? (
-          <SplitDiff
-            hunks={hunks}
-            wordWrap={wordWrap}
-            getTokens={getTokens}
-            threadsByPosition={threadsByPosition}
-            expandedThreadId={expandedThreadId}
-            onToggleExpand={(threadId) =>
-              setExpandedThreadId(expandedThreadId === threadId ? null : threadId)
-            }
-            onReply={handleReply}
-            onCreateThread={handleCreateThread}
-          />
+      <div className="flex-1 overflow-auto" data-testid="diff-scroll">
+        {!hasDiff ? (
+          <>
+            <p className="p-4 text-sm text-muted" data-patch-omitted={file.patchOmitted}>
+              {file.isBinary ? 'No preview available.' : noPatchMessage(file.patchOmitted)}
+            </p>
+            {unplacedBlock}
+          </>
         ) : (
-          <InlineDiff
-            hunks={hunks}
-            wordWrap={wordWrap}
-            getTokens={getTokens}
-            threadsByPosition={threadsByPosition}
-            expandedThreadId={expandedThreadId}
-            onToggleExpand={(threadId) =>
-              setExpandedThreadId(expandedThreadId === threadId ? null : threadId)
-            }
-            onReply={handleReply}
-            onCreateThread={handleCreateThread}
-          />
+          <>
+            {unplacedBlock}
+            {effectiveMode === 'split' ? (
+              <SplitDiff {...bodyProps} />
+            ) : (
+              <InlineDiff {...bodyProps} />
+            )}
+          </>
         )}
       </div>
     </section>
