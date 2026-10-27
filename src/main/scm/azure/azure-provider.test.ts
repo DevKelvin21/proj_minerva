@@ -10,12 +10,19 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AzureRepoRef, RepoRef } from '../../../shared/scm'
 import { ScmError } from '../errors'
 import { stacksForProvider } from '../stacks-service'
-import { AzureScmProvider, type AzureProviderConfig } from './azure-provider'
+import {
+  AzureScmProvider,
+  createLimiter,
+  MAX_CHANGES_COUNTED,
+  type AzureProviderConfig,
+} from './azure-provider'
 import { AzureDevOpsClient, type CredentialProvider } from './client'
 import { AzureScmError } from './errors'
 import { createFakeAzureServer, type FakeAzureServer } from './fixtures/fake-server'
 import { buildZip } from './fixtures/test-zip'
 import { MOCK_ORG, MOCK_PROJECT, PEOPLE, REPOS } from './fixtures/universe'
+import type { AzChangeEntry, AzThread } from './api-types'
+import type { DiffBudget } from './diff-files'
 import { mapRepo } from './mappers'
 
 const okCredentials: CredentialProvider = {
@@ -40,16 +47,53 @@ function provider(
     config?: AzureProviderConfig
     credentials?: CredentialProvider
     client?: AzureDevOpsClient
+    fetch?: typeof fetch
+    diffBudget?: Partial<DiffBudget>
+    filesCacheMaxBytes?: number
   } = {},
 ): AzureScmProvider {
   const credentials = options.credentials ?? okCredentials
   return new AzureScmProvider({
-    client: options.client ?? new AzureDevOpsClient({ credentials, fetch: server.fetch }),
+    client:
+      options.client ??
+      new AzureDevOpsClient({ credentials, fetch: options.fetch ?? server.fetch }),
     credentials,
     getConfig: () => options.config ?? enabledConfig,
     now: () => clock,
+    diffBudget: options.diffBudget,
+    filesCacheMaxBytes: options.filesCacheMaxBytes,
   })
 }
+
+/** `server.fetch`, with `extra` change entries prepended to PR `prId`'s changes. */
+function withExtraChanges(prId: number, extra: AzChangeEntry[]): typeof fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const response = await server.fetch(input, init)
+    const url = new URL(String(input instanceof Request ? input.url : input))
+    if (
+      !new RegExp('/pullRequests/' + prId + '/iterations/[0-9]+/changes$', 'i').test(url.pathname)
+    ) {
+      return response
+    }
+    const data = (await response.json()) as { changeEntries: AzChangeEntry[] }
+    const skip = Number(url.searchParams.get('$skip') ?? '0')
+    return new Response(
+      JSON.stringify({ changeEntries: skip === 0 ? [...extra, ...data.changeEntries] : [] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )
+  }) as typeof fetch
+}
+
+const pngChange = (index: number): AzChangeEntry => ({
+  changeTrackingId: 9000 + index,
+  changeId: 9000 + index,
+  item: {
+    path: '/assets/extra-' + index + '.png',
+    gitObjectType: 'blob',
+    objectId: 'f'.repeat(40),
+  },
+  changeType: 'add',
+})
 
 function writes(): { method: string; path: string; body?: unknown }[] {
   return server.log.filter((entry) => entry.method !== 'GET')
@@ -227,15 +271,41 @@ describe('detail', () => {
     expect((await p.getPullRequestDetail(apiRepo, 100)).state).toBe('merged')
   })
 
-  it('fills the diff stats once the files were built', async () => {
+  it('counts the files up front and fills the line stats once the files were built', async () => {
     const p = provider()
-    expect((await p.getPullRequestDetail(webRepo, 108)).changedFiles).toBeNull()
+    const first = await p.getPullRequestDetail(webRepo, 108)
+    expect(first).toMatchObject({ changedFiles: 1, additions: null, deletions: null })
+    expect(first.filesTruncated).toBeUndefined()
     await p.getPullRequestFiles(webRepo, 108)
     expect(await p.getPullRequestDetail(webRepo, 108)).toMatchObject({
       changedFiles: 1,
       additions: 2,
       deletions: 1,
     })
+  })
+
+  it('refuses a project that is not configured, a non-GUID id and dot segments, before any request', async () => {
+    const p = provider()
+    const cases: [AzureRepoRef, string][] = [
+      [{ ...apiRepo, project: 'Secret', fullName: 'contoso/Secret/orders-api' }, 'FORBIDDEN'],
+      [{ ...apiRepo, project: '..', fullName: 'contoso/../orders-api' }, 'NOT_FOUND'],
+      [{ ...apiRepo, repositoryId: '..' }, 'NOT_FOUND'],
+      [{ ...apiRepo, repositoryId: 'orders-api' }, 'NOT_FOUND'],
+      [{ ...apiRepo, repositoryId: '11111111-1111-4111-8111-11111111111/' }, 'NOT_FOUND'],
+      [{ ...apiRepo, organization: '.', fullName: './Platform/orders-api' }, 'NOT_FOUND'],
+    ]
+    for (const [repo, code] of cases) {
+      await expect(p.getPullRequestDetail(repo, 101)).rejects.toMatchObject({ code })
+      await expect(p.branchExists(repo, 'main')).rejects.toMatchObject({ code })
+      await expect(p.postComment({ repo, number: 101, bodyMarkdown: 'x' })).rejects.toMatchObject({
+        code,
+      })
+    }
+    expect(server.log).toHaveLength(0)
+    // The project match is case-insensitive.
+    await expect(
+      p.getPullRequestDetail({ ...apiRepo, project: MOCK_PROJECT.toLowerCase() }, 101),
+    ).resolves.toMatchObject({ number: 101 })
   })
 
   it('refuses a repo of an organization that is not configured, before any request', async () => {
@@ -298,6 +368,212 @@ describe('files', () => {
     expect(server.log.slice(before).map((entry) => entry.path.split('/').pop())).toEqual([
       'iterations',
     ])
+  })
+})
+
+describe('big PRs (file list capped)', () => {
+  const extra = [pngChange(1), pngChange(2), pngChange(3)]
+
+  it('reports the true total and filesTruncated; only the first maxFiles get a diff', async () => {
+    const p = provider({ fetch: withExtraChanges(102, extra), diffBudget: { maxFiles: 2 } })
+    const detail = await p.getPullRequestDetail(apiRepo, 102)
+    expect(detail).toMatchObject({ changedFiles: 4, filesTruncated: true })
+    const files = await p.getPullRequestFiles(apiRepo, 102)
+    expect(files.map((file) => file.path)).toEqual(['assets/extra-1.png', 'assets/extra-2.png'])
+    // Line totals would be a partial sum: left unknown.
+    expect(await p.getPullRequestDetail(apiRepo, 102)).toMatchObject({
+      changedFiles: 4,
+      additions: null,
+      deletions: null,
+    })
+  })
+
+  it('does not mislabel threads on files past the cap as outdated', async () => {
+    // Thread 2 is from iteration 1; with the server re-tracking it, it is current.
+    const tracked = (inner: typeof fetch): typeof fetch =>
+      (async (input: string | URL | Request, init?: RequestInit) => {
+        const response = await inner(input, init)
+        const url = new URL(String(input instanceof Request ? input.url : input))
+        if (!/\/pullRequests\/102\/threads$/i.test(url.pathname)) return response
+        const data = (await response.json()) as { value: AzThread[] }
+        for (const thread of data.value) {
+          if (thread.id === 2 && thread.pullRequestThreadContext) {
+            thread.pullRequestThreadContext.trackingCriteria = { firstComparingIteration: 1 }
+          }
+        }
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }) as typeof fetch
+    const full = await provider({ fetch: tracked(server.fetch) }).getCommentThreads(apiRepo, 102)
+    expect(full.find((thread) => thread.id === '2')?.isOutdated).toBeUndefined()
+    const capped = await provider({
+      fetch: tracked(withExtraChanges(102, extra)),
+      diffBudget: { maxFiles: 2 },
+    }).getCommentThreads(apiRepo, 102)
+    expect(capped.map((thread) => [thread.id, thread.isOutdated])).toEqual(
+      full.map((thread) => [thread.id, thread.isOutdated]),
+    )
+  })
+
+  it('gives an accurate error for a line comment on a file past the cap', async () => {
+    const p = provider({ fetch: withExtraChanges(102, extra), diffBudget: { maxFiles: 2 } })
+    await expect(
+      p.postComment({
+        repo: apiRepo,
+        number: 102,
+        path: 'src/Services/CheckoutService.cs',
+        line: 3,
+        bodyMarkdown: 'x',
+      }),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: expect.stringContaining('changes 4 files and only the first 2 are loaded'),
+    })
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('stops counting at MAX_CHANGES_COUNTED and says "more than"', async () => {
+    const many = Array.from({ length: MAX_CHANGES_COUNTED + 5 }, (_, i) => pngChange(i))
+    const p = provider({ fetch: withExtraChanges(102, many), diffBudget: { maxFiles: 2 } })
+    expect(await p.getPullRequestDetail(apiRepo, 102)).toMatchObject({
+      changedFiles: MAX_CHANGES_COUNTED,
+      filesTruncated: true,
+    })
+    await expect(
+      p.postComment({
+        repo: apiRepo,
+        number: 102,
+        path: 'src/Services/CheckoutService.cs',
+        line: 3,
+        bodyMarkdown: 'x',
+      }),
+    ).rejects.toThrow(/more than 20000 files/)
+  })
+})
+
+describe('caching and single-flight', () => {
+  it('runs concurrent requests for the same iteration once', async () => {
+    const p = provider()
+    const [a, b, detail] = await Promise.all([
+      p.getPullRequestFiles(webRepo, 108),
+      p.getPullRequestFiles(webRepo, 108),
+      p.getPullRequestDetail(webRepo, 108),
+    ])
+    expect(a).toBe(b)
+    expect(detail.changedFiles).toBe(1)
+    const count = (suffix: RegExp): number =>
+      server.log.filter((entry) => suffix.test(entry.path)).length
+    expect(count(/\/changes$/)).toBe(1)
+    expect(count(/\/blobs\//)).toBe(2)
+  })
+
+  it('bounds the iteration cache by bytes as well as by count', async () => {
+    const p = provider({ filesCacheMaxBytes: 1 })
+    await p.getPullRequestFiles(webRepo, 108)
+    await p.getPullRequestFiles(apiRepo, 102)
+    // Over budget: only the newest entry survives.
+    expect(p.iterationCacheStats().entries).toBe(1)
+    const before = server.log.length
+    await p.getPullRequestFiles(webRepo, 108)
+    expect(server.log.slice(before).some((entry) => entry.path.endsWith('/changes'))).toBe(true)
+
+    const roomy = provider()
+    await roomy.getPullRequestFiles(webRepo, 108)
+    await roomy.getPullRequestFiles(apiRepo, 102)
+    expect(roomy.iterationCacheStats()).toMatchObject({ entries: 2 })
+    expect(roomy.iterationCacheStats().bytes).toBeGreaterThan(0)
+  })
+
+  it('caches the project list per org for a while', async () => {
+    const p = provider()
+    await p.listProjects(MOCK_ORG)
+    await p.listProjects(MOCK_ORG.toUpperCase())
+    expect(server.log.filter((entry) => entry.path.endsWith('/_apis/projects'))).toHaveLength(1)
+    clock += 61_000
+    await p.listProjects(MOCK_ORG)
+    expect(server.log.filter((entry) => entry.path.endsWith('/_apis/projects'))).toHaveLength(2)
+  })
+
+  it('does not retry a 403 "last push" lookup every poll (negative cache per head)', async () => {
+    const forbidIterations = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (/\/iterations$/i.test(url.pathname)) {
+        return new Response(JSON.stringify({ message: 'no' }), {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      return server.fetch(input, init)
+    }) as typeof fetch
+    let seen = 0
+    const counting = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (/\/iterations$/i.test(url.pathname)) seen++
+      return forbidIterations(input, init)
+    }) as typeof fetch
+    const q = provider({ fetch: counting })
+    await q.listPullRequests({})
+    const first = seen
+    expect(first).toBeGreaterThan(0)
+    await q.listPullRequests({})
+    await q.listPullRequests({})
+    expect(seen).toBe(first)
+    // After invalidate() the tracker starts over.
+    q.invalidate({ credentials: false })
+    await q.listPullRequests({})
+    expect(seen).toBe(2 * first)
+  })
+
+  it('keeps list queries under the shared concurrency limit', async () => {
+    let active = 0
+    let peak = 0
+    const slow = (async (input: string | URL | Request, init?: RequestInit) => {
+      active++
+      peak = Math.max(peak, active)
+      await new Promise((resolve) => setTimeout(resolve, 2))
+      try {
+        return await server.fetch(input, init)
+      } finally {
+        active--
+      }
+    }) as typeof fetch
+    const config: AzureProviderConfig = {
+      enabled: true,
+      organizations: [
+        {
+          organization: MOCK_ORG,
+          projects: [MOCK_PROJECT, 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8'],
+        },
+      ],
+    }
+    await provider({ fetch: slow, config })
+      .listPullRequests({ state: 'all' })
+      .catch(() => [])
+    expect(peak).toBeGreaterThan(1)
+    expect(peak).toBeLessThanOrEqual(6)
+  })
+})
+
+describe('createLimiter', () => {
+  it('never runs more than the limit at once and runs everything', async () => {
+    const limit = createLimiter(2)
+    let active = 0
+    let peak = 0
+    const results = await Promise.all(
+      Array.from({ length: 7 }, (_, i) =>
+        limit(async () => {
+          active++
+          peak = Math.max(peak, active)
+          await new Promise((resolve) => setTimeout(resolve, 1))
+          active--
+          return i
+        }),
+      ),
+    )
+    expect(results).toEqual([0, 1, 2, 3, 4, 5, 6])
+    expect(peak).toBe(2)
   })
 })
 
