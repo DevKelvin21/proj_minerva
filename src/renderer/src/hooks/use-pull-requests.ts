@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { prKey } from '../../../shared/scm'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../shared/types'
+import { useAppStore } from '../stores/app-store'
 
 const SEARCH_DEBOUNCE_MS = 250
 
@@ -56,6 +57,8 @@ export function usePullRequests(
   const [error, setError] = useState<string | null>(null)
   const [debouncedSearch, setDebouncedSearch] = useState(search)
   const [refetchToken, setRefetchToken] = useState(0)
+  // Bumped after a retarget: the list must show the new base.
+  const scmDataVersion = useAppStore((s) => s.scmDataVersion)
 
   // Debounce: solo aplica al tecleo del buscador. Si `search` no cambió
   // (p. ej. re-render por otra razón) el timeout igual dispara, pero
@@ -96,7 +99,7 @@ export function usePullRequests(
     return () => {
       cancelled = true
     }
-  }, [debouncedSearch, state, authState, refetchToken])
+  }, [debouncedSearch, state, authState, refetchToken, scmDataVersion])
 
   const refetch = useCallback(() => {
     setRefetchToken((token) => token + 1)

@@ -22,11 +22,13 @@ import type {
   PullRequestSummary,
   ScmSettingsInfo,
 } from '../../../shared/types'
-import type { ScmAuthStatus, ScmProviderId } from '../../../shared/scm'
+import { prKey, type ScmAuthStatus, type ScmProviderId } from '../../../shared/scm'
 
 export type CenterTab = 'conversation' | 'files'
 export type DiffViewMode = 'split' | 'inline'
 export type FileTreeMode = 'tree' | 'list'
+/** What the left column shows: the PR list or the stacked-PR view. */
+export type SidebarView = 'list' | 'stacks'
 
 const DIDACTIC_PANEL_WIDTH_KEY = 'minerva.didacticPanelWidth'
 
@@ -121,7 +123,22 @@ interface AppState {
   settingsOpen: boolean
   aiModelInfo: AiSettingsInfo | null
 
+  /** Left column: PR list or stacks. Session only. */
+  sidebarView: SidebarView
+  /**
+   * Bumped after a write that changes PR data (a retarget): the PR list, the
+   * open PR's detail and the stacks refetch when it changes.
+   */
+  scmDataVersion: number
+
   selectPr: (pr: PullRequestSummary | null) => void
+  /**
+   * Swaps in a fresher summary of the SELECTED PR (same `prKey`) without the
+   * reset `selectPr` does (tab, file, threads). No-op for any other PR.
+   */
+  replaceSelectedPr: (pr: PullRequestSummary) => void
+  setSidebarView: (view: SidebarView) => void
+  bumpScmData: () => void
   setSearchQuery: (query: string) => void
   setPrStateFilter: (filter: PrStateFilter) => void
   setCenterTab: (tab: CenterTab) => void
@@ -170,6 +187,9 @@ export const useAppStore = create<AppState>((set) => ({
   settingsOpen: false,
   aiModelInfo: null,
 
+  sidebarView: 'list',
+  scmDataVersion: 0,
+
   selectPr: (pr) =>
     set({
       selectedPr: pr,
@@ -181,6 +201,15 @@ export const useAppStore = create<AppState>((set) => ({
       // lista tapa el centro, y el gesto natural tras elegir es ver el PR.
       sidebarOpen: false,
     }),
+  replaceSelectedPr: (pr) =>
+    set((state) =>
+      state.selectedPr &&
+      prKey(state.selectedPr.repo, state.selectedPr.number) === prKey(pr.repo, pr.number)
+        ? { selectedPr: { ...state.selectedPr, ...pr } }
+        : {},
+    ),
+  setSidebarView: (view) => set({ sidebarView: view }),
+  bumpScmData: () => set((state) => ({ scmDataVersion: state.scmDataVersion + 1 })),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setPrStateFilter: (filter) => set({ prStateFilter: filter }),
   setCenterTab: (tab) => set({ centerTab: tab }),
