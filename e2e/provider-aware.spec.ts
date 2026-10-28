@@ -77,6 +77,7 @@ async function openSettings(page: Page): Promise<void> {
     .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
     .first()
     .click()
+  await page.getByTestId('settings-nav-azure').click()
   await expect(page.getByTestId('azure-devops-settings')).toBeVisible()
 }
 
@@ -146,7 +147,8 @@ test('Azure only: Azure identity in the header, no GitHub text, Azure parity in 
 
     // Settings: GitHub's install guide and account picker are gone while it is off.
     await openSettings(page)
-    await expect(page.getByText('GitHub access').first()).toBeVisible()
+    await page.getByTestId('settings-nav-github').click()
+    await expect(page.getByRole('switch', { name: 'Enable GitHub' })).not.toBeChecked()
     await expect(page.getByText('cli.github.com')).toHaveCount(0)
     await expect(page.getByText('gh active account')).toHaveCount(0)
     await page.keyboard.press('Escape')

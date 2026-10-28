@@ -13,12 +13,23 @@ const STATUS_TONE: Record<AiProviderStatus['status'], 'neutral' | 'warning' | 's
 interface ActiveConfigSummaryProps {
   info: AiSettingsInfo
   statuses: Record<AiProviderId, AiProviderStatus> | null
-  /**
-   * Ventana baja (F16/T80): una sola fila (label + proveedor + badge + modelo)
-   * en vez de tres. Este strip es `sticky` dentro del scroller del modal, así
-   * que cada línea que ocupa es una línea menos de lista de modelos visible.
-   */
-  compact?: boolean
+}
+
+/** Sign-in state of one AI provider's CLI, as a badge (`…` while it is being checked). */
+export function ProviderStatusBadge({
+  status,
+}: {
+  status: AiProviderStatus | undefined
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  if (!status) return <Badge tone="neutral">…</Badge>
+  return (
+    <Badge tone={STATUS_TONE[status.status]}>
+      {t(`settings.providerStatus.${status.status}`)}
+      {status.status === 'authenticated' && status.account?.plan ? ' · ' + status.account.plan : ''}
+      {status.status === 'authenticated' && status.account?.email ? ' · ' + status.account.email : ''}
+    </Badge>
+  )
 }
 
 /**
@@ -29,14 +40,13 @@ interface ActiveConfigSummaryProps {
  * el proveedor se deducía de qué radio estaba marcada y el modelo activo se
  * confundía con el borrador todavía sin "Guardar".
  *
- * `SettingsModal` lo monta FIJO entre el header y el área con scroll (fuera
- * del `overflow-y-auto`): cambiar de tab para mirar otro proveedor nunca
- * debe hacer perder de vista qué está activo de verdad.
+ * It heads Settings › AI › Model, in its own "In use" group above the
+ * provider tabs: looking at another provider's models never hides what is
+ * really active.
  */
 export function ActiveConfigSummary({
   info,
   statuses,
-  compact = false,
 }: ActiveConfigSummaryProps): React.JSX.Element {
   const { t } = useTranslation()
   const status = statuses?.[info.provider]
@@ -48,15 +58,7 @@ export function ActiveConfigSummary({
     t,
   )
 
-  const statusBadge = status ? (
-    <Badge tone={STATUS_TONE[status.status]}>
-      {t(`settings.providerStatus.${status.status}`)}
-      {status.status === 'authenticated' && status.account?.plan ? ' · ' + status.account.plan : ''}
-      {status.status === 'authenticated' && status.account?.email ? ' · ' + status.account.email : ''}
-    </Badge>
-  ) : (
-    <Badge tone="neutral">…</Badge>
-  )
+  const statusBadge = <ProviderStatusBadge status={status} />
 
   // El aviso de procedencia del modelo se muestra en AMBAS densidades: es la
   // única pista de que `MINERVA_AI_MODEL` está pisando lo que se elija acá.
@@ -73,29 +75,8 @@ export function ActiveConfigSummary({
     </>
   )
 
-  if (compact) {
-    return (
-      <div className="border-b border-border px-4 py-2">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-            {t('settings.activeConfig.title')}
-          </h3>
-          <span className="text-sm font-medium text-text">{info.catalog[info.provider].label}</span>
-          {statusBadge}
-          <span className="min-w-0 truncate font-mono text-xs text-text">{info.model}</span>
-          {effortLabel && <span className="text-xs text-muted">· {effortLabel}</span>}
-        </div>
-        {sourceNote}
-      </div>
-    )
-  }
-
   return (
-    <div className="border-b border-border px-4 py-3">
-      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-        {t('settings.activeConfig.title')}
-      </h3>
-
+    <div className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-text">{info.catalog[info.provider].label}</span>
         {statusBadge}

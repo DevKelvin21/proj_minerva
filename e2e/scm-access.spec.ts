@@ -23,7 +23,8 @@ const openSettingsModal = async (page: Page) => {
     .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
     .first()
     .click()
-  await expect(page.getByText('GitHub access').first()).toBeVisible()
+  await page.getByTestId('settings-nav-github').click()
+  await expect(page.getByText('List pull requests from GitHub').first()).toBeVisible()
 }
 
 const card = (page: Page, label: string) => page.locator('button', { hasText: label }).first()
@@ -68,17 +69,24 @@ test('gh-only GitHub access, Azure mock signed in, and the account picker', asyn
   // 3. Settings "Source control": gh guide, probe feedback, picker, Azure line.
   await openSettingsModal(window)
   await expect(window.getByText('Demo mode (MINERVA_MOCK)').first()).toBeVisible()
-  await expect(window.getByText('cli.github.com').first()).toBeVisible()
-  await expect(window.getByText('gh auth login').first()).toBeVisible()
+  // The sign-in help (install link + `gh auth login`) shows only while gh is signed out.
+  if (auth.github.state === 'signed_in') {
+    await expect(window.getByText('cli.github.com')).toHaveCount(0)
+  } else {
+    await expect(window.getByText('cli.github.com').first()).toBeVisible()
+    await expect(window.getByText('gh auth login').first()).toBeVisible()
+  }
   await expect(
     window.getByText(/via gh|GitHub CLI not found|No gh session|has no valid session/).first(),
     'real probe feedback',
   ).toBeVisible()
+  await expect(card(window, 'gh active account'), 'default marked Active').toContainText('Active')
+  await attachScreenshot(window, testInfo, 'scm-access-settings')
+  await window.getByTestId('settings-nav-azure').click()
   await expect(window.getByTestId('azure-devops-settings')).toContainText(
     'Signed in as Ada Lovelace',
   )
-  await expect(card(window, 'gh active account'), 'default marked Active').toContainText('Active')
-  await attachScreenshot(window, testInfo, 'scm-access-settings')
+  await window.getByTestId('settings-nav-github').click()
 
   // 4. Pick a specific account over IPC (the machine's real accounts are not
   //    predictable): persisted, and the probe names it in `detail`.

@@ -24,6 +24,8 @@ import type { Page } from './fixtures'
 async function openSettings(page: Page): Promise<void> {
   await page.getByRole('button', { name: /^Settings/ }).click()
   await expect(page.locator('[role="dialog"]')).toBeVisible()
+  // Updates is its own page (listed only while the updater runs).
+  await page.getByTestId('settings-nav-updates').click()
 }
 
 const updateBadge = (page: Page) => page.locator('span[title="An update is available"]')

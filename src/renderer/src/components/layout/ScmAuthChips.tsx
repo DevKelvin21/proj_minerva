@@ -16,6 +16,7 @@ import {
   type ScmConnection,
 } from '../../lib/scm-connection'
 import { CREDENTIAL_SOURCE_KEY, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
+import { settingsPageForScm } from '../../lib/settings-pages'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -94,7 +95,7 @@ function ProviderAuthChip({
       <IconButton
         {...common}
         size="sm"
-        onClick={openSettings}
+        onClick={() => openSettings(settingsPageForScm(provider))}
         label={providerStateText(view, t)}
         className="relative"
         icon={
@@ -126,7 +127,7 @@ function ProviderAuthChip({
           label={
             provider === 'github' ? t('layout.auth.managedByGhCli') : t('layout.auth.managedByAz')
           }
-          onClick={openSettings}
+          onClick={() => openSettings(settingsPageForScm(provider))}
         />
       </div>
     )
@@ -151,7 +152,7 @@ function ProviderAuthChip({
       >
         {icon}
         <span className="truncate text-muted">{text}</span>
-        <Button size="xs" onClick={openSettings}>
+        <Button size="xs" onClick={() => openSettings(settingsPageForScm(provider))}>
           {t('layout.auth.openSettings')}
         </Button>
       </div>
@@ -339,7 +340,7 @@ export function AccountsMenu(): React.JSX.Element {
             size="xs"
             onClick={() => {
               setOpen(false)
-              openSettings()
+              openSettings(settingsPageForScm(views?.[0]?.provider ?? 'github'))
             }}
             className="self-start"
           >

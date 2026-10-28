@@ -1013,6 +1013,48 @@ export const en = {
     modal: {
       title: 'Settings',
       close: 'Close settings',
+      back: 'All settings',
+      navLabel: 'Settings sections',
+      breadcrumb: 'Breadcrumb',
+    },
+    nav: {
+      groups: {
+        sourceControl: 'Source control',
+        ai: 'AI',
+        app: 'App',
+      },
+      pages: {
+        general: 'General',
+        appearance: 'Appearance',
+        github: 'GitHub',
+        azure: 'Azure DevOps',
+        aiProviders: 'Providers',
+        aiModel: 'Model',
+        notifications: 'Notifications',
+        updates: 'Updates',
+      },
+      dot: {
+        warning: 'Needs your attention',
+        accent: 'Update available',
+      },
+    },
+    scmPage: {
+      access: 'Access',
+      connection: 'Connection',
+      recheck: 'Check again',
+      signIn: 'Sign in',
+    },
+    openAt: {
+      aiProviders: 'Open AI settings',
+    },
+    aiProviders: {
+      title: 'Command-line tools',
+      description:
+        'Minerva analyzes pull requests through your own CLI sessions; there are no Minerva API keys.',
+      recheckTitle: 'Status',
+      recheckHint: 'Sign-in happens in a terminal. Check again after you run the command.',
+      howToSignIn: 'How to sign in',
+      notSignedIn: '{{provider}} is not signed in yet.',
     },
     appearance: {
       title: 'Appearance',
@@ -1154,6 +1196,7 @@ export const en = {
         all: 'Also new comments on PRs I review.',
       },
       badge: 'Show the unread count on the app icon',
+      badgeTitle: 'App icon badge',
       loadError: 'Could not load the notification settings: {{error}}',
       saveError: 'Could not save the notification settings: {{error}}',
     },
@@ -1191,6 +1234,7 @@ export const en = {
       use: 'Use',
       activateError: 'Could not activate the model. Try again.',
       reasoningOnActive: 'Reasoning is set on the active model.',
+      title: 'Model',
     },
     modelOptions: {
       effort: 'Reasoning',
@@ -1236,6 +1280,9 @@ export const en = {
       intro:
         'Minerva uses your <mono>gh</mono> (GitHub CLI) session: there is no separate login to authorize. Enterprise orgs that block third-party OAuth apps usually allow GitHub CLI.',
       enable: 'Enable GitHub',
+      enableTitle: 'List pull requests from GitHub',
+      accountHint:
+        'The gh accounts you are signed in to. Following gh switches along with the CLI; picking one keeps Minerva on it.',
       demoMode:
         'Demo mode (MINERVA_MOCK): data is simulated; this setting applies once you go back to real data.',
       install:
@@ -1262,6 +1309,9 @@ export const en = {
       intro:
         'Minerva uses your Azure CLI credential (<mono>az devops login</mono> with a PAT that has Code Read & Write scope). The credential never leaves the main process.',
       enable: 'Enable Azure DevOps',
+      enableTitle: 'List pull requests from Azure DevOps',
+      enableHint: 'Minerva reads them with your Azure CLI credential. Applies when you save below.',
+      scopeTitle: 'Organization and projects',
       demoMode: 'Demo mode lists the mock organization "contoso" whatever is saved here.',
       organization: 'Organization',
       organizationPlaceholder: 'e.g. Contoso',
@@ -1311,6 +1361,7 @@ export const en = {
       notWritable: 'Minerva cannot write over its own file',
     },
     viewRelease: 'View the release',
+    versionTitle: 'Version',
   },
   errors: {
     boundary: {

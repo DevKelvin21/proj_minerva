@@ -55,6 +55,8 @@ async function openSettings(page: Page): Promise<void> {
     .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
     .first()
     .click()
+  // Settings opens on General (or the page list when tiled): go to Appearance.
+  await page.getByTestId('settings-nav-appearance').click()
   await expect(page.getByTestId('appearance-section')).toBeVisible()
 }
 
