@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { CircleAlert, GitPullRequest } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { usePullRequestDetail } from '../../hooks/use-pull-request-detail'
@@ -44,6 +45,7 @@ export function CenterPane(): React.JSX.Element {
     return (
       <section className="flex flex-1 flex-col bg-bg">
         <EmptyState
+          icon={GitPullRequest}
           title={t('layout.center.choosePrTitle')}
           hint={t('layout.center.choosePrHint')}
         />
@@ -71,7 +73,7 @@ function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): Reac
   if (error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <EmptyState title={t('layout.center.loadFailed')} hint={error} />
+        <EmptyState icon={CircleAlert} title={t('layout.center.loadFailed')} hint={error} />
       </div>
     )
   }
@@ -83,7 +85,7 @@ function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): Reac
   if (!detail || !detailIsCurrent) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <EmptyState title={t('layout.center.loading')} hint={`${repo.fullName}#${number}`} />
+        <EmptyState loading title={t('layout.center.loading')} hint={`${repo.fullName}#${number}`} />
       </div>
     )
   }

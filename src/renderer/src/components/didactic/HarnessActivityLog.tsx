@@ -1,5 +1,6 @@
-import { Check, CircleAlert, Loader2 } from 'lucide-react'
+import { Check, CircleAlert } from 'lucide-react'
 import type { AnalysisActivityItem } from '../../../../shared/events'
+import { Spinner } from '../ui/Spinner'
 
 /**
  * Mini-log SUTIL de actividad del harness (F13): las últimas ≤5 acciones
@@ -31,7 +32,7 @@ export function HarnessActivityLog({
           style={{ opacity: 0.45 + 0.55 * ((i + 1) / items.length) }}
         >
           {item.status === 'running' ? (
-            <Loader2 size={11} className="shrink-0 animate-spin text-accent" />
+            <Spinner size={11} />
           ) : item.status === 'error' ? (
             <CircleAlert size={11} className="shrink-0 text-danger" />
           ) : (

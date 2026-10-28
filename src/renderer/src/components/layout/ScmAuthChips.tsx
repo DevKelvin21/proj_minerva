@@ -20,6 +20,7 @@ import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { IconButton } from '../ui/IconButton'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
+import { Spinner } from '../ui/Spinner'
 
 /**
  * How much of each chip fits, by window width (F16): `full` = identity +
@@ -169,10 +170,7 @@ function ProviderAuthChip({
       title={view.status?.detail}
     >
       {icon}
-      <span
-        className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"
-        aria-hidden
-      />
+      <Spinner size={12} />
       <button
         type="button"
         title={t('layout.auth.copyCommandNamed', { command })}

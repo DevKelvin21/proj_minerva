@@ -23,6 +23,7 @@ import { CommentComposer, type AppendRequest } from './CommentComposer'
 import { ThreadCodeExcerpt } from './CodeExcerpt'
 import { ThreadStatusPicker } from './ThreadStatusPicker'
 import { errorText } from '../../lib/error-text'
+import { InlineError } from '../ui/InlineError'
 
 interface ThreadCardProps {
   thread: CommentThread
@@ -222,9 +223,7 @@ export function ThreadCard({
         </div>
       </div>
       {statusError && (
-        <p role="alert" className="border-t border-border px-3 py-1.5 text-xs text-danger">
-          {statusError}
-        </p>
+        <InlineError className="border-t border-border px-3 py-1.5" message={statusError} />
       )}
 
       {!collapsed && (

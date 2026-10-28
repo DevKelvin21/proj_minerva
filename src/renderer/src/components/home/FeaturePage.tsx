@@ -20,6 +20,7 @@ import { useEscapeBack } from '../../hooks/use-escape-back'
 import { HomeBreadcrumb } from './HomeBreadcrumb'
 import { ContinueReviewButton, ProviderErrorList } from './HomeShared'
 import { PrCard } from './PrCard'
+import { InlineError } from '../ui/InlineError'
 
 /**
  * The feature's name: shown as a heading with "Rename"; editing swaps in a
@@ -179,7 +180,7 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
           <>
             <ContinueReviewButton />
             <IconButton
-              icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
+              icon={<RefreshCw size={14} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
               label={t('home.overview.refresh')}
               onClick={refresh}
               disabled={loading}
@@ -242,15 +243,9 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
         </header>
 
         {error && (
-          <p role="alert" className="text-xs text-danger">
-            {t('home.overview.refreshFailed', { error })}
-          </p>
+          <InlineError message={t('home.overview.refreshFailed', { error })} onRetry={refresh} />
         )}
-        {openError && (
-          <p role="alert" className="text-xs text-danger">
-            {openError}
-          </p>
-        )}
+        {openError && <InlineError message={openError} />}
         <ProviderErrorList errors={providerErrors} />
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-4">

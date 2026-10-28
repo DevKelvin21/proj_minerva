@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
-import { Sparkles, X } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey as toPrKey, type RepoRef } from '../../../../shared/scm'
 import { useChatStore } from '../../stores/chat-store'
 import { ChatComposer } from './ChatComposer'
 import { ChatTranscript } from './ChatTranscript'
 import { ConversationSwitcher } from './ConversationSwitcher'
-import { IconButton } from '../ui/IconButton'
+import { EmptyState } from '../ui/EmptyState'
+import { InlineError } from '../ui/InlineError'
 
 interface AskTabProps {
   repo: RepoRef
@@ -48,31 +49,19 @@ export function AskTab({ repo, number }: AskTabProps): React.JSX.Element {
 function ChatEmptyState(): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-y-auto px-6 text-center">
-      <Sparkles size={22} className="text-muted" aria-hidden />
-      <p className="text-sm font-medium text-text">{t('chat.empty.title')}</p>
-      <p className="max-w-xs text-xs text-muted">{t('chat.empty.hint')}</p>
-    </div>
+    <EmptyState compact icon={Sparkles} title={t('chat.empty.title')} hint={t('chat.empty.hint')} />
   )
 }
 
 function ChatError({ prKey }: { prKey: string }): React.JSX.Element | null {
-  const { t } = useTranslation()
   const error = useChatStore((s) => s.errors[prKey] ?? null)
   const dismissError = useChatStore((s) => s.dismissError)
   if (!error) return null
   return (
-    <div
-      role="alert"
-      className="flex shrink-0 items-start gap-2 border-t border-border bg-danger/10 px-3 py-1.5 text-xs text-danger"
-    >
-      <p className="min-w-0 flex-1 break-words">{error}</p>
-      <IconButton
-        size="xs"
-        onClick={() => dismissError(prKey)}
-        label={t('common.dismiss')}
-        icon={<X size={12} />}
-      />
-    </div>
+    <InlineError
+      message={error}
+      onDismiss={() => dismissError(prKey)}
+      className="shrink-0 border-t border-border bg-danger/10 px-3 py-1.5"
+    />
   )
 }

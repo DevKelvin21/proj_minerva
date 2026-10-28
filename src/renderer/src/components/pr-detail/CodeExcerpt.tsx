@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import type { CommentThread } from '../../../../shared/types'
 import { useThreadFileLines } from '../../hooks/thread-actions'
 import { excerptWindow, threadLineRange, threadSide } from '../../lib/line-threads'
+import { InlineError } from '../ui/InlineError'
 
 interface CodeExcerptProps {
   lines: readonly string[]
@@ -71,9 +72,7 @@ export function ThreadCodeExcerpt({ thread }: ThreadCodeExcerptProps): React.JSX
   if (state.status === 'loading' || state.status === 'idle') {
     body = <p className="text-xs text-muted">{t('comments.excerpt.loading')}</p>
   } else if (state.status === 'error') {
-    body = <p className="text-xs text-danger">
-        {t('comments.excerpt.loadError', { error: state.error })}
-      </p>
+    body = <InlineError message={t('comments.excerpt.loadError', { error: state.error })} />
   } else if (state.status === 'unavailable') {
     body = <p className="text-xs text-muted">{t(`prDetail.fileContent.${state.reason}`)}</p>
   } else {

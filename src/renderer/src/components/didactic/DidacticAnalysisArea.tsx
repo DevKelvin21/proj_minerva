@@ -11,7 +11,6 @@ import {
   Globe,
   Languages,
   Layers,
-  Loader2,
   RefreshCw,
   Rocket,
   Workflow,
@@ -40,6 +39,9 @@ import {
   resolveInsightTab,
   type InsightTab,
 } from '../../lib/insight-tabs'
+import { InlineError } from '../ui/InlineError'
+import { Spinner } from '../ui/Spinner'
+import { Skeleton } from '../ui/Skeleton'
 
 const SECTION_ICON: Record<DidacticSection['kind'], React.JSX.Element> = {
   summary: <BookOpen size={16} />,
@@ -493,16 +495,11 @@ export function DidacticAnalysisArea({
   let body: React.JSX.Element
   if (error) {
     body = (
-      <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm">
-        <p className="mb-2 text-danger">{t('didactic.analysis.failed', { error })}</p>
-        <button
-          type="button"
-          onClick={analyze}
-          className="rounded-md border border-danger/40 px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/15"
-        >
-          {t('common.retry')}
-        </button>
-      </div>
+      <InlineError
+        className="rounded-md border border-danger/40 bg-danger/10 p-3"
+        message={t('didactic.analysis.failed', { error })}
+        onRetry={analyze}
+      />
     )
   } else if (analysis) {
     const tabs = availableInsightTabs(analysis.sections.map((section) => section.kind))
@@ -550,7 +547,7 @@ export function DidacticAnalysisArea({
     body = (
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm text-muted">
-          <Loader2 size={14} className="animate-spin text-accent" />
+          <Spinner size={14} />
           {checkingCache
             ? t('didactic.analysis.checkingCache')
             : isExploringEmpty
@@ -560,8 +557,8 @@ export function DidacticAnalysisArea({
         {/* Mini-log de actividad del harness (F13): qué está haciendo el
             agente sobre el snapshot mientras todavía no hay secciones. */}
         {activity && <HarnessActivityLog items={activity} />}
-        <div className="h-20 animate-pulse rounded-md border border-border bg-border/20" />
-        <div className="h-32 animate-pulse rounded-md border border-border bg-border/20" />
+        <Skeleton className="h-20" />
+        <Skeleton className="h-32" />
       </div>
     )
   } else if (showNoCliCard) {
@@ -582,7 +579,7 @@ export function DidacticAnalysisArea({
             title={t('didactic.analysis.reanalyzeHint')}
             className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted transition-colors hover:bg-border/60 hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : undefined} />
+            <RefreshCw size={12} className={loading ? 'animate-spin motion-reduce:animate-none' : undefined} />
             {t('didactic.analysis.reanalyze')}
           </button>
         </div>

@@ -1,8 +1,9 @@
-import { GitPullRequest, GitPullRequestDraft, LoaderCircle, TriangleAlert } from 'lucide-react'
+import { GitPullRequest, GitPullRequestDraft, TriangleAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { StackNode } from '../../../../shared/scm'
 import { orphanExplanation } from '../../lib/stacks'
 import { RetargetPanel } from './RetargetPanel'
+import { Spinner } from '../ui/Spinner'
 
 /** Indent per level, capped so a deep stack still fits a 240px column. */
 const INDENT_PX = 12
@@ -115,7 +116,7 @@ export function StackTree({
             </span>
           )}
           {pendingKey === node.prKey ? (
-            <LoaderCircle size={14} className="shrink-0 animate-spin text-muted" aria-hidden />
+            <Spinner size={14} />
           ) : (
             <StackStateIcon isDraft={node.isDraft} />
           )}

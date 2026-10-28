@@ -384,7 +384,6 @@ export const es: MessageShape<typeof en> = {
       missingHint: 'Se generó antes de que existieran las capas. Vuelve a analizar el PR para obtener uno.',
       reanalyze: 'Re-analizar',
       failed: 'El análisis falló: {{error}}',
-      retry: 'Reintentar',
       defaultCohort: 'Cambios',
       unassigned: 'Sin capa asignada',
       fileCount_one: '{{count}} archivo',

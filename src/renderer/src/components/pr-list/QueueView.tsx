@@ -14,6 +14,7 @@ import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { useAppStore } from '../../stores/app-store'
 import { PrListItem } from './PrListItem'
 import { CountBadge } from '../ui/CountBadge'
+import { InlineError } from '../ui/InlineError'
 
 const STATUS_TONE: Record<Exclude<QueueStatus, null>, string> = {
   optional: 'bg-border/60 text-muted',
@@ -56,7 +57,7 @@ function writeFolded(folded: Set<QueueSection>): void {
 export function QueueView(): React.JSX.Element {
   const { t } = useTranslation()
   const searchQuery = useAppStore((s) => s.searchQuery)
-  const { pullRequests, providerErrors, loading, error } = useDashboard()
+  const { pullRequests, providerErrors, loading, error, refresh } = useDashboard()
   const identity = useViewerIdentity()
   const { open } = useHomeOpenPr()
   const [folded, setFolded] = useState(readFolded)
@@ -78,7 +79,13 @@ export function QueueView(): React.JSX.Element {
   }
 
   if (error) {
-    return <p className="p-4 text-sm text-danger">{t('layout.queue.loadFailed', { error })}</p>
+    return (
+      <InlineError
+        className="p-4"
+        message={t('layout.queue.loadFailed', { error })}
+        onRetry={refresh}
+      />
+    )
   }
   if (pullRequests === null) {
     return (
@@ -93,13 +100,11 @@ export function QueueView(): React.JSX.Element {
       {providerErrors.length > 0 && (
         <div className="flex flex-col gap-1 border-b border-border p-3">
           {providerErrors.map((providerError) => (
-            <p
+            <InlineError
               key={providerError.provider}
               data-error-code={providerError.code}
-              className="text-xs text-danger"
-            >
-              {SCM_PROVIDER_LABEL[providerError.provider]}: {providerError.message}
-            </p>
+              message={`${SCM_PROVIDER_LABEL[providerError.provider]}: ${providerError.message}`}
+            />
           ))}
         </div>
       )}

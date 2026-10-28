@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { ScmListError } from '../../../../shared/types'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { useAppStore } from '../../stores/app-store'
+import { Skeleton } from '../ui/Skeleton'
 
 /**
  * "Continue reviewing #n": back to the review that stayed mounted (hidden)
@@ -76,7 +77,7 @@ export function CardSkeleton({ count }: { count: number }): React.JSX.Element {
   return (
     <div aria-hidden className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="h-24 animate-pulse rounded-lg border border-border bg-panel" />
+        <Skeleton key={index} className="h-24" />
       ))}
     </div>
   )
