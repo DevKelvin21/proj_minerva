@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import {
   CheckCheck,
   CircleCheck,
@@ -57,6 +57,7 @@ function EventRow({
   children: React.ReactNode
   onOpen: (item: ActivityItem) => void
 }): React.JSX.Element {
+  const { t } = useTranslation()
   const { locale } = useLocale()
   return (
     <button
@@ -70,7 +71,10 @@ function EventRow({
     >
       <UnreadDot unread={!item.read} />
       {icon}
-      <span className="min-w-0 flex-1 text-xs text-text">{children}</span>
+      <span className="min-w-0 flex-1 text-xs text-text">
+        {!item.read && <span className="sr-only">{t('layout.inbox.unreadItem')} </span>}
+        {children}
+      </span>
       <span className="shrink-0 text-[11px] text-muted" title={formatAbsoluteTime(item.at, locale)}>
         {formatRelativeTime(item.at, locale)}
       </span>
@@ -87,6 +91,7 @@ function ItemRow({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const { locale } = useLocale()
+  const excerptId = useId()
   const when = formatRelativeTime(item.at, locale)
   const tone = item.read ? 'opacity-60' : ''
 
@@ -148,7 +153,9 @@ function ItemRow({
       onClick={() => onOpen(item)}
       data-activity-item={item.id}
       data-read={item.read || undefined}
-      aria-label={label}
+      // The name says who and where (and whether it is unread); the excerpt is its description.
+      aria-label={item.read ? label : t('layout.inbox.unreadLabel', { label })}
+      aria-describedby={excerptId}
       className={`flex w-full items-start gap-1.5 px-3 py-1.5 text-left transition-colors duration-150 hover:bg-bg/60 ${tone}`}
     >
       <UnreadDot unread={!item.read} />
@@ -164,7 +171,9 @@ function ItemRow({
           </span>
         </span>
         {/* Plain text on purpose: main flattened it, and it is never Markdown here. */}
-        <span className="line-clamp-2 break-words text-xs text-text">{item.excerpt}</span>
+        <span id={excerptId} className="line-clamp-2 break-words text-xs text-text">
+          {item.excerpt}
+        </span>
       </span>
     </button>
   )
@@ -199,14 +208,16 @@ function GroupSection({
         {pending && (
           <LoaderCircle size={13} className="mt-0.5 shrink-0 animate-spin text-muted" aria-hidden />
         )}
-        {group.unreadCount > 0 && (
-          <IconButton
-            size="xs"
-            onClick={() => onMarkRead(group)}
-            label={t('layout.inbox.markPrRead', { number: group.number })}
-            icon={<CheckCheck size={13} aria-hidden />}
-          />
-        )}
+        {/* Stays mounted once the group is read (quiet, aria-disabled), so focus is not lost. */}
+        <IconButton
+          size="xs"
+          onClick={() => {
+            if (group.unreadCount > 0) onMarkRead(group)
+          }}
+          aria-disabled={group.unreadCount === 0 || undefined}
+          label={t('layout.inbox.markPrRead', { number: group.number })}
+          icon={<CheckCheck size={13} aria-hidden />}
+        />
       </div>
       <ul>
         {group.items.map((item) => (
@@ -219,6 +230,27 @@ function GroupSection({
   )
 }
 
+/** One failure, said with what failed, with Retry when it can be retried. */
+function InboxError({
+  message,
+  onRetry,
+}: {
+  message: string
+  onRetry?: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div role="alert" className="flex items-start gap-2 px-3 pt-2 text-xs text-danger">
+      <p className="min-w-0 flex-1 break-words">{message}</p>
+      {onRetry && (
+        <Button size="xs" onClick={onRetry}>
+          {t('common.retry')}
+        </Button>
+      )}
+    </div>
+  )
+}
+
 /**
  * The sidebar's Inbox: what happened on your PRs (new comments, orphaned
  * stacks), grouped by PR, newest first. Quiet on purpose: unread is a dot,
@@ -228,7 +260,7 @@ function GroupSection({
 export function InboxView(): React.JSX.Element {
   const { t } = useTranslation()
   const searchQuery = useAppStore((s) => s.searchQuery)
-  const { state, error, markRead } = useActivity()
+  const { state, loadError, markError, load, markRead, retryMarkRead } = useActivity()
   const { open, pendingKey, error: openError } = useOpenActivityItem()
 
   const groups = useMemo(
@@ -240,26 +272,42 @@ export function InboxView(): React.JSX.Element {
 
   return (
     <div data-testid="activity-inbox" className="flex min-h-0 flex-col pb-2">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-        <span className="min-w-0 flex-1 truncate text-xs text-muted">
-          {unread > 0 ? t('layout.inbox.unread', { count: unread }) : t('layout.inbox.allRead')}
-        </span>
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={() => void markRead({ all: true })}
-          disabled={unread === 0}
-        >
-          {t('layout.inbox.markAllRead')}
-        </Button>
-      </div>
-      {(error || openError) && (
-        <p className="px-3 pt-2 text-xs text-danger">
-          {openError ?? t('layout.inbox.loadFailed', { error })}
-        </p>
+      {/* No count (and no "All caught up") until main has answered. */}
+      {state !== null && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+          <span className="min-w-0 flex-1 truncate text-xs text-muted">
+            {unread > 0 ? t('layout.inbox.unread', { count: unread }) : t('layout.inbox.allRead')}
+          </span>
+          {/* aria-disabled, not disabled: a click that reads everything keeps focus here. */}
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => {
+              if (unread > 0) void markRead({ all: true })
+            }}
+            aria-disabled={unread === 0 || undefined}
+          >
+            {t('layout.inbox.markAllRead')}
+          </Button>
+        </div>
       )}
-      {state === null && !error && (
-        <p className="p-4 text-sm text-muted">{t('layout.inbox.loading')}</p>
+      {state === null && loadError && (
+        <InboxError
+          message={t('layout.inbox.loadFailed', { error: loadError })}
+          onRetry={() => void load()}
+        />
+      )}
+      {markError && (
+        <InboxError
+          message={t('layout.inbox.markFailed', { error: markError.message })}
+          onRetry={() => void retryMarkRead()}
+        />
+      )}
+      {openError && <InboxError message={openError} />}
+      {state === null && !loadError && (
+        <p role="status" className="p-4 text-sm text-muted">
+          {t('layout.inbox.loading')}
+        </p>
       )}
       {state !== null && groups.length === 0 && (
         <div className="flex flex-col gap-1 p-4">

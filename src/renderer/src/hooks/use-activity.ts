@@ -11,11 +11,14 @@ import { useDashboard } from './use-dashboard'
 /** The inbox state, subscribing the window to main's pushes on first use. */
 export function useActivity() {
   const state = useActivityInboxStore((s) => s.state)
-  const error = useActivityInboxStore((s) => s.error)
+  const loadError = useActivityInboxStore((s) => s.loadError)
+  const markError = useActivityInboxStore((s) => s.markError)
   const start = useActivityInboxStore((s) => s.start)
+  const load = useActivityInboxStore((s) => s.load)
   const markRead = useActivityInboxStore((s) => s.markRead)
+  const retryMarkRead = useActivityInboxStore((s) => s.retryMarkRead)
   useEffect(() => start(), [start])
-  return { state, error, markRead }
+  return { state, loadError, markError, load, markRead, retryMarkRead }
 }
 
 /** Unread items, for the tab and rail badges. */
