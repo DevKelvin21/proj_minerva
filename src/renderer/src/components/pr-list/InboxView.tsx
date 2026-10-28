@@ -5,7 +5,6 @@ import {
   CircleX,
   Eye,
   GitPullRequestArrow,
-  LoaderCircle,
   MessageSquareWarning,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +22,8 @@ import { useAppStore } from '../../stores/app-store'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
+import { InlineError } from '../ui/InlineError'
+import { Spinner } from '../ui/Spinner'
 
 /** The unread mark: a small dot, nothing louder. */
 function UnreadDot({ unread }: { unread: boolean }): React.JSX.Element {
@@ -206,7 +207,7 @@ function GroupSection({
           <span className="block truncate text-[11px] text-muted">{group.repo.fullName}</span>
         </span>
         {pending && (
-          <LoaderCircle size={13} className="mt-0.5 shrink-0 animate-spin text-muted" aria-hidden />
+          <Spinner size={13} className="mt-0.5" />
         )}
         {/* Stays mounted once the group is read (quiet, aria-disabled), so focus is not lost. */}
         <IconButton
@@ -227,27 +228,6 @@ function GroupSection({
         ))}
       </ul>
     </section>
-  )
-}
-
-/** One failure, said with what failed, with Retry when it can be retried. */
-function InboxError({
-  message,
-  onRetry,
-}: {
-  message: string
-  onRetry?: () => void
-}): React.JSX.Element {
-  const { t } = useTranslation()
-  return (
-    <div role="alert" className="flex items-start gap-2 px-3 pt-2 text-xs text-danger">
-      <p className="min-w-0 flex-1 break-words">{message}</p>
-      {onRetry && (
-        <Button size="xs" onClick={onRetry}>
-          {t('common.retry')}
-        </Button>
-      )}
-    </div>
   )
 }
 
@@ -292,18 +272,20 @@ export function InboxView(): React.JSX.Element {
         </div>
       )}
       {state === null && loadError && (
-        <InboxError
+        <InlineError
+          className="px-3 pt-2"
           message={t('layout.inbox.loadFailed', { error: loadError })}
           onRetry={() => void load()}
         />
       )}
       {markError && (
-        <InboxError
+        <InlineError
+          className="px-3 pt-2"
           message={t('layout.inbox.markFailed', { error: markError.message })}
           onRetry={() => void retryMarkRead()}
         />
       )}
-      {openError && <InboxError message={openError} />}
+      {openError && <InlineError className="px-3 pt-2" message={openError} />}
       {state === null && !loadError && (
         <p role="status" className="p-4 text-sm text-muted">
           {t('layout.inbox.loading')}

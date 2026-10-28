@@ -17,6 +17,7 @@ import { RetargetNote } from '../stacks/RetargetNote'
 import { FeatureCard } from './FeatureCard'
 import { CardSkeleton, ContinueReviewButton, ProviderErrorList, SectionHeading } from './HomeShared'
 import { RepoCard } from './RepoCard'
+import { InlineError } from '../ui/InlineError'
 
 function Total({
   value,
@@ -146,9 +147,7 @@ export function HomeOverview(): React.JSX.Element {
     )
   } else if (error && pullRequests === null) {
     body = (
-      <p role="alert" className="text-sm text-danger">
-        {t('home.overview.loadFailed', { error })}
-      </p>
+      <InlineError message={t('home.overview.loadFailed', { error })} onRetry={refreshAll} />
     )
   } else if (pullRequests === null) {
     body = (
@@ -164,9 +163,7 @@ export function HomeOverview(): React.JSX.Element {
     body = (
       <>
         {error && (
-          <p role="alert" className="text-xs text-danger">
-            {t('home.overview.refreshFailed', { error })}
-          </p>
+          <InlineError message={t('home.overview.refreshFailed', { error })} onRetry={refreshAll} />
         )}
         <ProviderErrorList errors={otherErrors} />
         <RetargetNote className="rounded-md border border-border bg-panel px-3 py-2" />
@@ -277,7 +274,7 @@ export function HomeOverview(): React.JSX.Element {
               </span>
             )}
             <IconButton
-              icon={<RefreshCw size={14} className={busy ? 'animate-spin' : ''} />}
+              icon={<RefreshCw size={14} className={busy ? 'animate-spin motion-reduce:animate-none' : ''} />}
               label={t('home.overview.refresh')}
               onClick={refreshAll}
               disabled={busy}

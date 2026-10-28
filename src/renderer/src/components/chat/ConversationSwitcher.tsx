@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, Loader2, MessagesSquare, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, MessagesSquare, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ChatConversationSummary } from '../../../../shared/chat'
 import type { RepoRef } from '../../../../shared/scm'
@@ -9,6 +9,8 @@ import { useChatStore } from '../../stores/chat-store'
 import { Button } from '../ui/Button'
 import { CountBadge } from '../ui/CountBadge'
 import { IconButton } from '../ui/IconButton'
+import { InlineError } from '../ui/InlineError'
+import { Spinner } from '../ui/Spinner'
 
 interface ConversationSwitcherProps {
   repo: RepoRef
@@ -64,11 +66,7 @@ export function ConversationSwitcher({
             {active ? active.title : t('chat.list.newTitle')}
           </span>
           {active?.running && (
-            <Loader2
-              size={12}
-              className="shrink-0 animate-spin text-accent motion-reduce:animate-none"
-              aria-label={t('chat.list.running')}
-            />
+            <Spinner size={12} label={t('chat.list.running')} />
           )}
           {count > 0 && <CountBadge count={count} tone="neutral" />}
           <ChevronDown
@@ -95,12 +93,11 @@ export function ConversationSwitcher({
           className="absolute inset-x-0 top-full z-20 max-h-[min(60vh,24rem)] overflow-y-auto border-b border-border bg-panel shadow-lg"
         >
           {error ? (
-            <div role="alert" className="flex flex-col gap-1.5 p-3 text-xs text-danger">
-              <p>{t('chat.list.loadError', { error })}</p>
-              <Button size="xs" className="w-fit" onClick={() => void loadList(repo, number, true)}>
-                {t('common.retry')}
-              </Button>
-            </div>
+            <InlineError
+              className="p-3"
+              message={t('chat.list.loadError', { error })}
+              onRetry={() => void loadList(repo, number, true)}
+            />
           ) : items === null || (loading && items.length === 0) ? (
             <p role="status" className="p-3 text-xs text-muted">
               {t('chat.list.loading')}
@@ -161,11 +158,7 @@ function ConversationRow({
             {conversation.title}
           </span>
           {conversation.running && (
-            <Loader2
-              size={11}
-              className="shrink-0 animate-spin text-accent motion-reduce:animate-none"
-              aria-label={t('chat.list.running')}
-            />
+            <Spinner size={11} label={t('chat.list.running')} />
           )}
           <time
             dateTime={conversation.updatedAt}

@@ -3,6 +3,7 @@ import type { Mermaid, MermaidConfig } from 'mermaid'
 import { useTranslation } from 'react-i18next'
 import { useResolvedAppearance } from '../../stores/appearance-store'
 import { mermaidInk, mermaidThemeConfig, type MermaidInk } from '../../theme/mermaid-theme'
+import { Skeleton } from '../ui/Skeleton'
 
 interface MermaidDiagramProps {
   code: string
@@ -264,7 +265,7 @@ export function MermaidDiagram({
   }
 
   if (!svg) {
-    return <div className="h-24 animate-pulse rounded-md border border-border bg-border/20" />
+    return <Skeleton className="h-24" />
   }
 
   // El SVG viene de `mermaid.render(...)` con `securityLevel: 'strict'`: en

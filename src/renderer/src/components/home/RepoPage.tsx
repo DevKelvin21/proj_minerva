@@ -29,6 +29,7 @@ import { HomeBreadcrumb } from './HomeBreadcrumb'
 import { ContinueReviewButton, ProviderErrorList, SectionHeading } from './HomeShared'
 import { PrCard } from './PrCard'
 import { StackBoard } from './StackBoard'
+import { InlineError } from '../ui/InlineError'
 
 const keyOf = (pr: PullRequestSummary): string => prKey(pr.repo, pr.number)
 
@@ -201,7 +202,7 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
           <>
             <ContinueReviewButton />
             <IconButton
-              icon={<RefreshCw size={14} className={busy ? 'animate-spin' : ''} />}
+              icon={<RefreshCw size={14} className={busy ? 'animate-spin motion-reduce:animate-none' : ''} />}
               label={t('home.overview.refresh')}
               onClick={refreshAll}
               disabled={busy}
@@ -244,15 +245,9 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
         </header>
 
         {error && (
-          <p role="alert" className="text-xs text-danger">
-            {t('home.overview.refreshFailed', { error })}
-          </p>
+          <InlineError message={t('home.overview.refreshFailed', { error })} onRetry={refreshAll} />
         )}
-        {openError && (
-          <p role="alert" className="text-xs text-danger">
-            {openError}
-          </p>
-        )}
+        {openError && <InlineError message={openError} />}
         <ProviderErrorList errors={[...providerErrors, ...stackErrors]} />
         <RetargetNote className="rounded-md border border-border bg-panel px-3 py-2" />
 
@@ -271,9 +266,10 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
             />
             {stacks === null ? (
               stacksError ? (
-                <p className="text-xs text-danger">
-                  {t('home.repoPage.stacksFailed', { error: stacksError })}
-                </p>
+                <InlineError
+                  message={t('home.repoPage.stacksFailed', { error: stacksError })}
+                  onRetry={refreshStacks}
+                />
               ) : (
                 <p className="text-xs text-muted">{t('home.repoPage.loadingStacks')}</p>
               )

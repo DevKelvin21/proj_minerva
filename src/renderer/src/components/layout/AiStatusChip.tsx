@@ -7,6 +7,7 @@ import { useAppStore } from '../../stores/app-store'
 import { useSettings } from '../../hooks/use-settings'
 import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
 import { resolveModelHintLabels } from '../../lib/model-labels'
+import { Spinner } from '../ui/Spinner'
 
 /** What the AI is doing for the PR on screen; `null` = no PR under review. */
 type AiChipStatus = 'idle' | 'checking' | 'exploring' | 'writing' | 'ready' | 'failed'
@@ -111,10 +112,7 @@ function ChipView({
       {!compact && <span className="max-w-[160px] truncate font-semibold">{modelLabel}</span>}
       {status &&
         (busy ? (
-          <span
-            className="h-2.5 w-2.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent motion-reduce:animate-none"
-            aria-hidden
-          />
+          <Spinner size={12} />
         ) : (
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[status]}`} aria-hidden />
         ))}

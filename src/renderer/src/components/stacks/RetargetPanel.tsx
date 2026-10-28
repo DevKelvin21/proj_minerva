@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { ArrowRight, LoaderCircle } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { RepoRef } from '../../../../shared/scm'
 import { useRetarget } from '../../hooks/use-retarget'
 import { validateBranchName } from '../../lib/retarget'
+import { Spinner } from '../ui/Spinner'
 
 /**
  * - `orphan`: one-click fix to the suggested base (the completed parent's own
@@ -133,7 +134,7 @@ export function RetargetPanel({
   if (state.phase === 'pending') {
     return (
       <p role="status" className="flex items-center gap-1.5 text-xs text-muted">
-        <LoaderCircle size={12} className="animate-spin" aria-hidden />
+        <Spinner size={12} />
         <span>
           <Trans
             i18nKey="stacks.retarget.waiting"

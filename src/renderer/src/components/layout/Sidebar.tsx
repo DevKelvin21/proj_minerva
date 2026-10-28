@@ -28,6 +28,7 @@ import { IconButton } from '../ui/IconButton'
 import { SignInHint } from './SignInHint'
 import { SidebarRail } from './SidebarRail'
 import { CountBadge } from '../ui/CountBadge'
+import { InlineError } from '../ui/InlineError'
 
 const STATE_FILTER_OPTIONS: readonly PrStateFilter[] = ['open', 'closed', 'all']
 
@@ -36,13 +37,11 @@ function ProviderErrors({ errors }: { errors: ScmListError[] }): React.JSX.Eleme
   return (
     <div className="flex flex-col gap-1 border-b border-border p-3">
       {errors.map((providerError) => (
-        <p
+        <InlineError
           key={providerError.provider}
           data-error-code={providerError.code}
-          className="text-xs text-danger"
-        >
-          {SCM_PROVIDER_LABEL[providerError.provider]}: {providerError.message}
-        </p>
+          message={`${SCM_PROVIDER_LABEL[providerError.provider]}: ${providerError.message}`}
+        />
       ))}
     </div>
   )
@@ -277,7 +276,7 @@ export function Sidebar(): React.JSX.Element | null {
             <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
               <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
               <IconButton
-                icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
+                icon={<RefreshCw size={14} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
                 label={t('layout.sidebar.refresh')}
                 onClick={refetch}
                 disabled={loading}
@@ -328,7 +327,11 @@ export function Sidebar(): React.JSX.Element | null {
               {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
             </div>
           ) : error ? (
-            <p className="p-4 text-sm text-danger">{t('layout.sidebar.loadFailed', { error })}</p>
+            <InlineError
+              className="p-4"
+              message={t('layout.sidebar.loadFailed', { error })}
+              onRetry={refetch}
+            />
           ) : otherErrors.length > 0 && pullRequests.length === 0 ? (
             <ProviderErrors errors={otherErrors} />
           ) : loading && pullRequests.length === 0 ? (

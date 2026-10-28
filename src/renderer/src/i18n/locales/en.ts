@@ -381,7 +381,6 @@ export const en = {
       missingHint: 'It was generated before layers existed. Re-analyze the PR to get one.',
       reanalyze: 'Re-analyze',
       failed: 'The analysis failed: {{error}}',
-      retry: 'Retry',
       defaultCohort: 'Changes',
       unassigned: 'Not covered by any layer',
       fileCount_one: '{{count}} file',

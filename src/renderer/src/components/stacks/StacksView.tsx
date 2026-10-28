@@ -18,6 +18,7 @@ import { IconButton } from '../ui/IconButton'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { RetargetNote } from './RetargetNote'
 import { StackTree } from './StackTree'
+import { InlineError } from '../ui/InlineError'
 
 interface StacksViewProps {
   /** The PR list's items: mark/filter "mine", and select without refetching. */
@@ -31,16 +32,14 @@ function ProviderErrors({ errors }: { errors: ScmListError[] }): React.JSX.Eleme
   return (
     <div className="flex flex-col gap-1 border-b border-border p-3">
       {errors.map((providerError) => (
-        <p
+        <InlineError
           key={providerError.provider}
           data-error-code={providerError.code}
-          className="text-xs text-danger"
-        >
-          {t('stacks.view.providerError', {
+          message={t('stacks.view.providerError', {
             provider: SCM_PROVIDER_LABEL[providerError.provider],
             message: providerError.message,
           })}
-        </p>
+        />
       ))}
     </div>
   )
@@ -153,7 +152,9 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
 
   let body: React.JSX.Element
   if (error && stacks === null) {
-    body = <p className="p-4 text-sm text-danger">{t('stacks.view.loadFailed', { error })}</p>
+    body = (
+      <InlineError className="p-4" message={t('stacks.view.loadFailed', { error })} onRetry={refresh} />
+    )
   } else if (stacks === null) {
     body = (
       <div className="flex flex-col gap-1 p-4 text-sm text-muted">
@@ -213,7 +214,7 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
           </span>
         )}
         <IconButton
-          icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
+          icon={<RefreshCw size={14} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
           label={t('stacks.view.refresh')}
           onClick={refresh}
           disabled={loading}
@@ -229,14 +230,14 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
         className="border-b border-border bg-bg/60 px-3 py-2"
       />
       {error && stacks !== null && (
-        <p className="border-b border-border px-3 py-2 text-xs text-danger">
-          {t('stacks.view.refreshFailed', { error })}
-        </p>
+        <InlineError
+          className="border-b border-border px-3 py-2"
+          message={t('stacks.view.refreshFailed', { error })}
+          onRetry={refresh}
+        />
       )}
       {openError && (
-        <p role="alert" className="border-b border-border px-3 py-2 text-xs text-danger">
-          {openError}
-        </p>
+        <InlineError className="border-b border-border px-3 py-2" message={openError} />
       )}
       {providerErrors.length > 0 && <ProviderErrors errors={providerErrors} />}
       {body}

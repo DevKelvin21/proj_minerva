@@ -1,4 +1,4 @@
-import { LoaderCircle, MessageSquare } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary, ReviewDecision } from '../../../../shared/types'
@@ -7,6 +7,7 @@ import { labelStyle } from '../../lib/label-colors'
 import { reviewDecisionLabelKey } from '../../lib/scm-labels'
 import { Avatar } from '../ui/Avatar'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
+import { Spinner } from '../ui/Spinner'
 import { OrphanBadge, StackStateIcon } from '../stacks/StackTree'
 
 const MAX_LABELS = 3
@@ -116,7 +117,7 @@ export function PrCard({
     >
       <span className="flex min-w-0 items-start gap-1.5">
         {pending ? (
-          <LoaderCircle size={14} className="mt-0.5 shrink-0 animate-spin text-muted" aria-hidden />
+          <Spinner size={14} className="mt-0.5" />
         ) : (
           <span className="mt-0.5">
             <StackStateIcon isDraft={pr.isDraft} />

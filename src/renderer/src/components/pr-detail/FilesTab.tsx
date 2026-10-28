@@ -22,6 +22,7 @@ import { DiffView } from './DiffView'
 import { LayerNavigator } from './LayerNavigator'
 import { LayerContextBar } from './LayerContextBar'
 import { WalkthroughFocusBar } from './WalkthroughFocusBar'
+import { InlineError } from '../ui/InlineError'
 
 interface FilesTabProps {
   repo: RepoRef
@@ -187,7 +188,7 @@ export function FilesTab({
   const treeIsDrawer = width !== null && width < FILE_TREE_COLUMN_MIN_WIDTH
 
   if (error) {
-    return <p className="p-4 text-sm text-danger">{t('prDetail.files.loadError', { error })}</p>
+    return <InlineError className="p-4" message={t('prDetail.files.loadError', { error })} />
   }
 
   if (loading) {

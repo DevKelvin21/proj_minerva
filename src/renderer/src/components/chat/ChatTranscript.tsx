@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useChatStore } from '../../stores/chat-store'
 import { ChatMessageRow } from './ChatMessageRow'
 import { Button } from '../ui/Button'
+import { InlineError } from '../ui/InlineError'
+import { Spinner } from '../ui/Spinner'
 
 const NO_IDS: string[] = []
 /** Within this many px of the bottom, new content keeps the view pinned there. */
@@ -94,17 +95,15 @@ export function ChatTranscript({ conversationId, prKey }: ChatTranscriptProps): 
         )}
         {loading && ids.length === 0 && (
           <p role="status" className="flex items-center gap-1.5 text-xs text-muted">
-            <Loader2 size={13} className="animate-spin motion-reduce:animate-none" />
+            <Spinner size={13} />
             {t('chat.transcript.loading')}
           </p>
         )}
         {error && (
-          <div role="alert" className="flex flex-col gap-1.5 text-xs text-danger">
-            <p>{t('chat.transcript.loadError', { error })}</p>
-            <Button size="xs" className="w-fit" onClick={() => void loadConversation(conversationId, true)}>
-              {t('common.retry')}
-            </Button>
-          </div>
+          <InlineError
+            message={t('chat.transcript.loadError', { error })}
+            onRetry={() => void loadConversation(conversationId, true)}
+          />
         )}
         {ids.map((id, i) => (
           <ChatMessageRow

@@ -13,6 +13,7 @@ import { useAppStore } from '../../stores/app-store'
 import { useDashboardStore } from '../../stores/dashboard-store'
 import { IconButton } from '../ui/IconButton'
 import { OrphanBadge, OrphanNotice, StackStateIcon } from './StackTree'
+import { InlineError } from '../ui/InlineError'
 
 function NodeChip({
   node,
@@ -226,11 +227,7 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
         </p>
       )}
       {orphanIsCurrent && <OrphanNotice node={node} />}
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          {error}
-        </p>
-      )}
+      {error && <InlineError message={error} />}
     </section>
   )
 }

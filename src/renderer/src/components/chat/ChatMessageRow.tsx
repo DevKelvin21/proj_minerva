@@ -1,4 +1,4 @@
-import { Loader2, RotateCcw } from 'lucide-react'
+import { RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ChatContextItem, ChatMessage } from '../../../../shared/chat'
 import { useChatStore } from '../../stores/chat-store'
@@ -7,6 +7,7 @@ import { Markdown } from '../ui/Markdown'
 import { AnswerActions } from './AnswerActions'
 import { ContextChip } from './ContextChip'
 import { Button } from '../ui/Button'
+import { Spinner } from '../ui/Spinner'
 
 const NO_CONTEXT: ChatContextItem[] = []
 
@@ -98,7 +99,7 @@ function AssistantMessage({
       ) : (
         streaming && (
           <span role="status" className="flex items-center gap-1.5 text-xs text-muted">
-            <Loader2 size={13} className="animate-spin text-accent motion-reduce:animate-none" />
+            <Spinner size={13} />
             {t('chat.message.thinking')}
           </span>
         )

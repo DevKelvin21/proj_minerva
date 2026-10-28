@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Loader2, MessageSquare, Sparkles, TriangleAlert, Workflow } from 'lucide-react'
+import { MessageSquare, Sparkles, Workflow } from 'lucide-react'
 import type { CommentThread, DiffFile, WalkthroughCohort } from '../../../../shared/types'
 import type { WalkthroughStatus } from '../../hooks/use-walkthrough'
 import type { LayerVerdict } from '../../stores/app-store'
@@ -13,6 +13,9 @@ import {
   layerVerdictKey,
 } from '../../lib/walkthrough'
 import { FileStatusIcon } from './FileStatusIcon'
+import { InlineError } from '../ui/InlineError'
+import { Spinner } from '../ui/Spinner'
+import { Skeleton } from '../ui/Skeleton'
 
 /** Number badge of a layer the reviewer already judged (status roles, never a hard-coded color). */
 const VERDICT_BADGE: Record<LayerVerdict, string> = {
@@ -60,15 +63,12 @@ export function LayerNavigator({
 
   if (status === 'error') {
     return (
-      <div className="flex flex-col gap-2 p-3 text-xs" data-testid="layers-error">
-        <p className="flex items-start gap-1.5 text-danger">
-          <TriangleAlert size={13} className="mt-0.5 shrink-0" />
-          {t('prDetail.layers.failed', { error: error ?? '' })}
-        </p>
-        <button type="button" onClick={onAnalyze} className={secondaryButton}>
-          {t('prDetail.layers.retry')}
-        </button>
-      </div>
+      <InlineError
+        className="p-3"
+        data-testid="layers-error"
+        message={t('prDetail.layers.failed', { error: error ?? '' })}
+        onRetry={onAnalyze}
+      />
     )
   }
 
@@ -76,11 +76,11 @@ export function LayerNavigator({
     return (
       <div className="flex flex-col gap-3 p-3" data-testid="layers-loading">
         <p className="flex items-center gap-2 text-xs text-muted">
-          <Loader2 size={13} className="animate-spin text-accent" />
+          <Spinner size={13} />
           {status === 'checking' ? t('prDetail.layers.checking') : t('prDetail.layers.analyzing')}
         </p>
-        <div className="h-10 animate-pulse rounded-md border border-border bg-border/20" />
-        <div className="h-10 animate-pulse rounded-md border border-border bg-border/20" />
+        <Skeleton className="h-10" />
+        <Skeleton className="h-10" />
       </div>
     )
   }
@@ -110,7 +110,7 @@ export function LayerNavigator({
     <nav aria-label={t('prDetail.layers.title')} className="flex flex-col py-1" data-testid="layer-navigator">
       {status === 'streaming' && (
         <p className="flex items-center gap-1.5 px-3 py-1 text-[11px] text-muted">
-          <Loader2 size={11} className="animate-spin text-accent" />
+          <Spinner size={11} />
           {t('prDetail.layers.streaming')}
         </p>
       )}
@@ -204,5 +204,3 @@ export function LayerNavigator({
 
 const primaryButton =
   'self-start rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg transition-opacity hover:opacity-90'
-const secondaryButton =
-  'self-start rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-border/60 hover:text-text'

@@ -60,7 +60,7 @@ export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardPro
         disabled={loading}
         className="flex items-center gap-1.5 rounded-md border border-warning/40 px-2.5 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+        <RefreshCw size={12} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />
         {t('didactic.noCli.recheck')}
       </button>
     </div>

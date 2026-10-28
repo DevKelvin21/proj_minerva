@@ -7,6 +7,7 @@ import { Avatar } from '../ui/Avatar'
 import { Markdown } from '../ui/Markdown'
 import { ThreadCard } from './ThreadCard'
 import { errorText } from '../../lib/error-text'
+import { InlineError } from '../ui/InlineError'
 
 interface ConversationTabProps {
   pr: PullRequestDetail
@@ -87,7 +88,10 @@ export function ConversationTab({
       </article>
 
       {error && (
-        <p className="text-sm text-danger">{t('comments.conversation.loadError', { error })}</p>
+        <InlineError
+          message={t('comments.conversation.loadError', { error })}
+          onRetry={() => void reload()}
+        />
       )}
       {!error && loading && threads.length === 0 && (
         <p className="text-sm text-muted">{t('comments.conversation.loading')}</p>
@@ -126,7 +130,7 @@ export function ConversationTab({
           className="resize-y rounded-md border border-border bg-panel px-3 py-2 text-sm text-text placeholder:text-muted focus:border-accent"
         />
         {postError && (
-          <p className="text-sm text-danger">{t('comments.conversation.postError', { error: postError })}</p>
+          <InlineError message={t('comments.conversation.postError', { error: postError })} />
         )}
         <button
           type="submit"
