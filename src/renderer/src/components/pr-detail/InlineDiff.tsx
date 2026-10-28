@@ -1,13 +1,12 @@
 import { Fragment, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Plus, Sparkles } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
 import { buildInlineRows, type DiffLineKind, type InlineRow } from '../../lib/diff-parser'
 import { linePositions } from '../../lib/diff-threads'
 import { lineThreadKey, resolveNewThreadPosition } from '../../lib/line-threads'
 import { DiffLineContent } from './DiffLineContent'
 import { DiffExpander } from './DiffExpander'
-import { LineThreadIndicator } from './LineThreadIndicator'
+import { DiffGutterActions } from './DiffGutterActions'
+import { DiffInsertRow } from './DiffInsertRow'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
 import { LineChatInput } from './LineChatInput'
@@ -44,8 +43,6 @@ export function InlineDiff({
   composer,
   chat,
 }: DiffBodyProps): React.JSX.Element {
-  const { t } = useTranslation()
-
   const rowsBySection = useMemo(
     () =>
       sections.map((s) =>
@@ -76,7 +73,9 @@ export function InlineDiff({
       0,
     )
     const composerHere = samePosition(composer.target, position) ? composer.target : null
-    const noteHere = chat && samePosition(chat.noteTarget, position) ? position : undefined
+    // The composer wins the row: the note input never stacks on it.
+    const noteHere =
+      chat && !composerHere && samePosition(chat.noteTarget, position) ? position : undefined
     const pending = position
       ? Boolean(chat?.pendingLines.has(lineThreadKey(position.line, position.side)))
       : false
@@ -88,47 +87,46 @@ export function InlineDiff({
             {row.oldNumber ?? ''}
           </span>
           <span className={`flex items-center gap-1 px-2 text-muted/70 ${bg}`}>
-            {indicatorKey ? (
-              <LineThreadIndicator
-                hidden={lineThreads.every(([key]) => model.hiddenKeys.has(key))}
-                count={commentCount}
-                onClick={() => {
-                  for (const [key] of lineThreads) model.toggleHidden(key)
-                }}
-              />
-            ) : position ? (
-              <button
-                type="button"
-                onClick={() => composer.open(position.side, position.line)}
-                aria-label={t('comments.line.addComment')}
-                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
-              >
-                <Plus size={12} />
-              </button>
-            ) : (
-              <span className="inline-block h-4 w-4 shrink-0" />
-            )}
-            {chat && position ? (
-              <button
-                type="button"
-                onClick={() =>
-                  noteHere ? chat.closeNote() : chat.openNote(position.side, position.line)
-                }
-                aria-label={t('chat.line.button', { line: position.line })}
-                title={pending ? t('chat.line.buttonTitlePending') : t('chat.line.buttonTitle')}
-                aria-expanded={Boolean(noteHere)}
-                data-pending={pending || undefined}
-                className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded hover:text-accent ${
-                  pending || noteHere
-                    ? 'text-accent'
-                    : 'text-muted opacity-0 focus:opacity-100 group-hover/row:opacity-100'
-                }`}
-              >
-                <Sparkles size={11} />
-              </button>
-            ) : (
-              chat && <span className="inline-block h-4 w-4 shrink-0" />
-            )}
+            <DiffGutterActions
+              line={position?.line}
+              indicator={
+                indicatorKey
+                  ? {
+                      hidden: lineThreads.every(([key]) => model.hiddenKeys.has(key)),
+                      count: commentCount,
+                      onClick: () => {
+                        for (const [key] of lineThreads) model.toggleHidden(key)
+                      },
+                    }
+                  : undefined
+              }
+              onComment={
+                position
+                  ? () => {
+                      if (chat && samePosition(chat.noteTarget, position)) chat.closeNote()
+                      composer.open(position.side, position.line)
+                    }
+                  : undefined
+              }
+              chat={
+                chat && position
+                  ? {
+                      pending,
+                      open: Boolean(noteHere),
+                      focusKey: lineThreadKey(position.line, position.side),
+                      onToggle: () => {
+                        if (noteHere) {
+                          chat.closeNote()
+                          return
+                        }
+                        if (composerHere) composer.close()
+                        chat.openNote(position.side, position.line)
+                      },
+                    }
+                  : undefined
+              }
+              chatSlot={chat !== undefined}
+            />
             <span className="select-none">{row.newNumber ?? ''}</span>
           </span>
           <span
@@ -157,21 +155,17 @@ export function InlineDiff({
           model.hiddenKeys.has(key)
             ? null
             : list.map((thread) => (
-                <div
-                  key={`thread-${thread.id}`}
-                  style={{ gridColumn: '1 / -1' }}
-                  className="min-w-0"
-                >
+                <DiffInsertRow key={`thread-${thread.id}`}>
                   <InlineThreadCard
                     thread={thread}
                     highlighted={thread.id === model.focusedThreadId}
                     onHide={() => model.toggleHidden(key)}
                   />
-                </div>
+                </DiffInsertRow>
               )),
         )}
         {noteHere && chat && (
-          <div style={{ gridColumn: '1 / -1' }} className="min-w-0">
+          <DiffInsertRow>
             <LineChatInput
               line={noteHere.line}
               side={noteHere.side}
@@ -179,10 +173,10 @@ export function InlineDiff({
               onAdd={(note) => chat.addLine(noteHere.side, noteHere.line, row.content, note)}
               onClose={chat.closeNote}
             />
-          </div>
+          </DiffInsertRow>
         )}
         {composerHere && (
-          <div style={{ gridColumn: '1 / -1' }} className="min-w-0">
+          <DiffInsertRow>
             <LineCommentComposer
               key={composerHere.token}
               line={composerHere.line}
@@ -195,7 +189,7 @@ export function InlineDiff({
                 composer.close()
               }}
             />
-          </div>
+          </DiffInsertRow>
         )}
       </Fragment>
     )

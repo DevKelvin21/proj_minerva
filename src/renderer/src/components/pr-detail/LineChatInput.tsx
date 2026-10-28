@@ -42,10 +42,8 @@ export function LineChatInput({
     side === 'LEFT' ? t('chat.line.inputLabelOld', { line }) : t('chat.line.inputLabel', { line })
 
   return (
-    <div
-      data-testid="line-chat-input"
-      className="border-y border-border bg-bg px-2 py-1.5 font-sans"
-    >
+    // Its frame is the diff's `DiffInsertRow` (same as threads and the composer).
+    <div data-testid="line-chat-input">
       <form
         className="flex min-w-0 items-center gap-2"
         onSubmit={(event) => {

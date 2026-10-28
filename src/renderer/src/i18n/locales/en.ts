@@ -422,6 +422,7 @@ export const en = {
       wordWrap: 'Word wrap',
     },
     diff: {
+      lineActions: 'Line {{line}} actions',
       tooLarge: 'Diff not shown: the file is too large to diff here.',
       overBudget:
         'Diff not shown: this pull request is too large to diff every file. Open it on the provider to see this one.',

@@ -92,7 +92,7 @@ export function LayerNavigator({
     return (
       <div className="flex flex-col gap-2 p-3" data-testid="layers-placeholder">
         <p className="flex items-center gap-1.5 text-sm font-medium text-text">
-          <Sparkles size={14} className="text-accent" />
+          <Sparkles size={14} className="text-muted" aria-hidden />
           {missing ? t('prDetail.layers.missingTitle') : t('prDetail.layers.placeholderTitle')}
         </p>
         <p className="text-xs text-muted">

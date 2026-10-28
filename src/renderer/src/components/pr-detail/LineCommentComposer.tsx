@@ -34,7 +34,8 @@ export function LineCommentComposer({
           reason: t('comments.line.suggestionOldSide'),
         }
   return (
-    <div className="border-y border-border bg-bg px-2 py-2 font-sans">
+    // Its frame is the diff's `DiffInsertRow` (same as threads and the chat input).
+    <div>
       <CommentComposer
         autoFocus
         label={t('comments.line.commentOnLine', { line })}
