@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleHelp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { LayerVerdict } from '../../stores/app-store'
+import { Button } from '../ui/Button'
 import { Kbd } from '../ui/Kbd'
 
 const VERDICTS: ReadonlyArray<{
@@ -62,21 +63,20 @@ export function WalkthroughFocusBar({
       data-testid="walkthrough-focus-bar"
       className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-panel px-4 py-2.5"
     >
-      <button
-        type="button"
+      <Button
+        size="md"
         onClick={onPrevious ?? undefined}
         disabled={!onPrevious}
-        className={navButton}
+        icon={<ChevronLeft size={15} aria-hidden />}
       >
-        <ChevronLeft size={15} aria-hidden />
         {t('prDetail.focus.previous')}
         <Kbd>K</Kbd>
-      </button>
-      <button type="button" onClick={onNext ?? undefined} disabled={!onNext} className={navButton}>
+      </Button>
+      <Button size="md" onClick={onNext ?? undefined} disabled={!onNext}>
         {t('prDetail.focus.next')}
         <Kbd>J</Kbd>
         <ChevronRight size={15} aria-hidden />
-      </button>
+      </Button>
 
       <div
         role="group"
@@ -93,7 +93,7 @@ export function WalkthroughFocusBar({
               aria-pressed={on}
               disabled={!onVerdict}
               onClick={() => onVerdict?.(on ? null : item.verdict)}
-              className={`flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`flex h-8 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
                 on ? item.on : 'border-border text-text hover:border-accent'
               }`}
             >
@@ -108,16 +108,9 @@ export function WalkthroughFocusBar({
       <span className="text-xs text-muted" data-testid="walkthrough-judged">
         {t('prDetail.focus.judged', { count: judged, total })}
       </span>
-      <button
-        type="button"
-        onClick={onFinish}
-        className="h-9 rounded-md bg-accent px-4 text-sm font-semibold text-accent-fg transition-opacity duration-150 hover:opacity-90"
-      >
+      <Button variant="primary" size="md" onClick={onFinish}>
         {t('prDetail.focus.finish')}
-      </button>
+      </Button>
     </footer>
   )
 }
-
-const navButton =
-  'flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium text-text transition-colors duration-150 hover:border-accent disabled:cursor-not-allowed disabled:opacity-40'

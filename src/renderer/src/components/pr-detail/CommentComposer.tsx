@@ -161,8 +161,7 @@ export function CommentComposer({
       {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {suggestion && (
-          <button
-            type="button"
+          <Button
             onClick={() => void handleInsertSuggestion()}
             disabled={posting || inserting || suggestion.kind === 'disabled'}
             title={
@@ -170,11 +169,11 @@ export function CommentComposer({
                 ? suggestion.reason
                 : t('comments.composer.insertSuggestionTitle')
             }
-            className="mr-auto inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
+            className="mr-auto"
+            icon={<Lightbulb size={12} aria-hidden />}
           >
-            <Lightbulb size={12} />
             {inserting ? t('comments.composer.loadingLines') : t('comments.composer.insertSuggestion')}
-          </button>
+          </Button>
         )}
         {onCancel && (
           <Button variant="ghost" onClick={onCancel} disabled={posting}>

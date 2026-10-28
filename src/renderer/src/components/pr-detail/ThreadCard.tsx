@@ -7,6 +7,7 @@ import type { ThreadStatus } from '../../../../shared/scm'
 import type { CommentThread } from '../../../../shared/types'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
 import { providerOfWebUrl, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { formatAbsoluteTime, formatRelativeTime } from '../../lib/relative-time'
 import { useLocale } from '../../i18n/use-locale'
@@ -254,22 +255,23 @@ export function ThreadCard({
                       {formatRelativeTime(comment.createdAt, locale)}
                     </time>
                     {comment.htmlUrl && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="xs"
                         onClick={() => void handleCopyUrl(comment.id, comment.htmlUrl!)}
                         title={copyLabel}
                         aria-label={copyLabel}
-                        className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted transition-colors hover:bg-border/60 hover:text-text"
+                        className="ml-auto"
+                        icon={
+                          copiedCommentId === comment.id ? (
+                            <Check size={12} className="text-success" aria-hidden />
+                          ) : (
+                            <Link size={12} aria-hidden />
+                          )
+                        }
                       >
-                        {copiedCommentId === comment.id ? (
-                          <>
-                            <Check size={12} className="text-success" />
-                            {t('common.copied')}
-                          </>
-                        ) : (
-                          <Link size={12} />
-                        )}
-                      </button>
+                        {copiedCommentId === comment.id && t('common.copied')}
+                      </Button>
                     )}
                   </div>
                   <CommentBody

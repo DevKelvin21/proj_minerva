@@ -323,13 +323,9 @@ export function ThemeEditorDialog({
               ),
             )}
             {draft.variants.light && draft.variants.dark && (
-              <button
-                type="button"
-                onClick={() => removeVariant(mode)}
-                className="ml-auto text-xs text-muted hover:text-danger"
-              >
+              <Button variant="ghost" size="xs" onClick={() => removeVariant(mode)} className="ml-auto">
                 {t('settings.appearance.editor.removeVariant', { mode: modeName(mode) })}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -396,16 +392,17 @@ export function ThemeEditorDialog({
               </section>
 
               <section>
-                <button
-                  type="button"
+                <Button
+                  variant="link"
+                  size="xs"
                   aria-expanded={showMore}
                   onClick={() => setShowMore((open) => !open)}
-                  className="mb-1 text-xs font-semibold text-accent hover:underline"
+                  className="mb-1"
                 >
                   {showMore
                     ? t('settings.appearance.editor.hideMore')
                     : t('settings.appearance.editor.showMore', { count: OTHER_ROLES.length })}
-                </button>
+                </Button>
                 {showMore && (
                   <>
                     <p className="mb-1 text-xs text-muted">

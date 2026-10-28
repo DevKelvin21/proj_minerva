@@ -272,7 +272,7 @@ export function AppearanceSection({ compact = false }: AppearanceSectionProps): 
                 <IconButton
                   icon={<Copy size={12} />}
                   label={t('settings.appearance.themes.duplicate', { name: theme.label })}
-                  className="!h-6 !w-6"
+                  size="xs"
                   onClick={() => setEditor({ kind: 'new', seedId: theme.id })}
                 />
                 {custom && (
@@ -280,19 +280,19 @@ export function AppearanceSection({ compact = false }: AppearanceSectionProps): 
                     <IconButton
                       icon={<Pencil size={12} />}
                       label={t('settings.appearance.themes.edit', { name: theme.label })}
-                      className="!h-6 !w-6"
+                      size="xs"
                       onClick={() => setEditor({ kind: 'edit', id: theme.id })}
                     />
                     <IconButton
                       icon={<Download size={12} />}
                       label={t('settings.appearance.themes.export', { name: theme.label })}
-                      className="!h-6 !w-6"
+                      size="xs"
                       onClick={() => downloadThemeFile(theme)}
                     />
                     <IconButton
                       icon={<Trash2 size={12} />}
                       label={t('settings.appearance.themes.delete', { name: theme.label })}
-                      className="!h-6 !w-6"
+                      size="xs"
                       onClick={() => setPendingDelete(theme)}
                     />
                   </>
@@ -343,15 +343,15 @@ export function AppearanceSection({ compact = false }: AppearanceSectionProps): 
               {t('settings.appearance.contrast.value', { value: contrast })}
             </span>
             {settings.contrast !== DEFAULT_APPEARANCE_CONTRAST && (
-              <button
-                type="button"
+              <Button
+                variant="link"
+                size="xs"
                 onClick={() =>
                   apply((current) => ({ ...current, contrast: DEFAULT_APPEARANCE_CONTRAST }))
                 }
-                className="text-xs text-accent hover:underline"
               >
                 {t('settings.appearance.contrast.reset')}
-              </button>
+              </Button>
             )}
           </div>
         </div>

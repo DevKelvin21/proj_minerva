@@ -11,6 +11,7 @@ import {
 } from '../../lib/dashboard'
 import { OrphanNotice, StackStateIcon } from '../stacks/StackTree'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { SelectableCard } from '../ui/SelectableCard'
 import { PrCard } from './PrCard'
@@ -188,16 +189,16 @@ function StackRow({
             {t('home.stackBoard.orphaned')}
           </Badge>
         )}
-        <button
-          type="button"
+        <Button
+          size="xs"
           onClick={() => onReviewStack(stack)}
           disabled={ctx.pendingKey === stack.root.prKey}
           title={t('home.stackBoard.reviewStackTitle')}
-          className="ml-auto inline-flex items-center gap-1 rounded-md border border-accent/50 bg-accent/10 px-2 py-1 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20 disabled:opacity-60"
+          className="ml-auto"
+          icon={<Play size={12} aria-hidden />}
         >
-          <Play size={12} aria-hidden />
           {t('home.stackBoard.reviewStack')}
-        </button>
+        </Button>
       </header>
       <div className={horizontal ? 'overflow-x-auto pb-1' : ''}>
         <div className={horizontal ? 'flex w-max items-start' : 'flex flex-col'}>

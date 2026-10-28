@@ -166,14 +166,15 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
         {status.phase === 'downloaded' && (
           <div>
             <p className="text-sm text-text">{t('updater.installOnQuit')}</p>
-            <button
-              type="button"
+            <Button
+              variant="link"
+              size="xs"
               disabled={restarting}
               onClick={() => void handleRestart()}
-              className="mt-1 text-[11px] text-muted underline decoration-dotted transition-colors duration-150 hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-1"
             >
               {t('updater.restartNow')}
-            </button>
+            </Button>
           </div>
         )}
 

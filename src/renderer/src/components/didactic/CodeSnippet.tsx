@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Check, Copy, Maximize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { DidacticSnippet } from '../../../../shared/types'
+import { Button } from '../ui/Button'
 import { HighlightedCode } from '../ui/HighlightedCode'
+import { IconButton } from '../ui/IconButton'
 
 interface CodeSnippetProps {
   snippet: DidacticSnippet
@@ -36,24 +38,27 @@ export function CodeSnippet({ snippet, onExpand }: CodeSnippetProps): React.JSX.
       <div className="flex items-center justify-between border-b border-border bg-border/30 px-2.5 py-1.5">
         <span className="text-xs font-medium text-muted">{snippet.label}</span>
         <div className="flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => void handleCopy()}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted transition-colors hover:bg-border/60 hover:text-text"
+            icon={
+              copied ? (
+                <Check size={12} className="text-success" aria-hidden />
+              ) : (
+                <Copy size={12} aria-hidden />
+              )
+            }
           >
-            {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
             {copied ? t('common.copied') : t('common.copy')}
-          </button>
+          </Button>
           {onExpand && (
-            <button
-              type="button"
+            <IconButton
+              size="xs"
               onClick={onExpand}
-              title={t('didactic.resources.expandSnippet')}
-              aria-label={t('didactic.resources.expandSnippet')}
-              className="rounded p-1 text-muted transition-colors hover:bg-border/60 hover:text-text"
-            >
-              <Maximize2 size={12} />
-            </button>
+              label={t('didactic.resources.expandSnippet')}
+              icon={<Maximize2 size={12} />}
+            />
           )}
         </div>
       </div>

@@ -26,6 +26,7 @@ import { QueueView } from '../pr-list/QueueView'
 import { InboxView } from '../pr-list/InboxView'
 import { useUnreadActivityCount } from '../../hooks/use-activity'
 import { useNeedsReviewCount } from '../../hooks/use-needs-review-count'
+import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 import { Input } from '../ui/Input'
 import { SignInHint } from './SignInHint'
@@ -280,13 +281,9 @@ export function Sidebar(): React.JSX.Element | null {
                 {t('layout.sidebar.noProvidersTitle')}
               </p>
               <p className="text-xs text-muted">{t('layout.sidebar.noProvidersHint')}</p>
-              <button
-                type="button"
-                onClick={openSettings}
-                className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-              >
+              <Button variant="primary" onClick={openSettings}>
                 {t('layout.sidebar.openSettings')}
-              </button>
+              </Button>
             </div>
           ) : needsLogin ? (
             <div
@@ -304,13 +301,9 @@ export function Sidebar(): React.JSX.Element | null {
                   azureOrganization={azureOrganization}
                 />
               ))}
-              <button
-                type="button"
-                onClick={openSettings}
-                className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-              >
+              <Button variant="primary" onClick={openSettings}>
                 {t('layout.sidebar.openSettings')}
-              </button>
+              </Button>
               {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
             </div>
           ) : error ? (

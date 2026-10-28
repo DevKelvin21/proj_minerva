@@ -31,15 +31,6 @@ interface RetargetPanelProps {
   onRetargeted?: () => void
 }
 
-const buttonBase =
-  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50'
-const primaryButton =
-  buttonBase + ' border border-warning/50 bg-warning/15 text-warning hover:bg-warning/25'
-const accentButton =
-  buttonBase + ' border border-accent/50 bg-accent/15 text-accent hover:bg-accent/25'
-const ghostButton =
-  buttonBase + ' border border-border text-muted hover:border-accent hover:text-text'
-
 /** `old → new`, monospace, wraps on narrow panels instead of overflowing. */
 function BaseChange({ from, to }: { from: string; to: string }): React.JSX.Element {
   return (
@@ -172,13 +163,9 @@ export function RetargetPanel({
 
   if (mode.kind === 'orphan' && !previewing) {
     return (
-      <button
-        type="button"
-        onClick={() => setPreviewing(true)}
-        className={primaryButton + ' self-start'}
-      >
+      <Button size="xs" onClick={() => setPreviewing(true)} className="self-start">
         {t('stacks.retarget.retargetTo', { branch: mode.suggestedBase })}
-      </button>
+      </Button>
     )
   }
 
@@ -188,12 +175,12 @@ export function RetargetPanel({
       <div className="flex min-w-0 flex-col gap-2">
         <Consequence from={currentBase} to={mode.suggestedBase} parentNumber={mode.parentNumber} />
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => void submit()} className={primaryButton}>
+          <Button variant="primary" size="xs" onClick={() => void submit()}>
             {t('stacks.retarget.retargetNumber', { number })}
-          </button>
-          <button type="button" onClick={close} className={ghostButton}>
+          </Button>
+          <Button size="xs" onClick={close}>
             {t('stacks.retarget.cancel')}
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -239,12 +226,12 @@ export function RetargetPanel({
         <p className="text-xs text-muted">{t('stacks.retarget.typeBranch')}</p>
       )}
       <div className="flex flex-wrap gap-1.5">
-        <button type="submit" disabled={!canSubmit} className={accentButton}>
+        <Button type="submit" variant="primary" size="xs" disabled={!canSubmit}>
           {t('stacks.retarget.retarget')}
-        </button>
-        <button type="button" onClick={close} className={ghostButton}>
+        </Button>
+        <Button size="xs" onClick={close}>
           {t('stacks.retarget.cancel')}
-        </button>
+        </Button>
       </div>
     </form>
   )
