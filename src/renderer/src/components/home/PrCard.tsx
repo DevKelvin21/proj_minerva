@@ -6,6 +6,7 @@ import { isUnread, needsMyReview, type ViewerIdentity } from '../../lib/dashboar
 import { labelStyle } from '../../lib/label-colors'
 import { reviewDecisionLabelKey } from '../../lib/scm-labels'
 import { Avatar } from '../ui/Avatar'
+import { Badge, type BadgeTone } from '../ui/Badge'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
 import { Spinner } from '../ui/Spinner'
 import { OrphanBadge, StackStateIcon } from '../stacks/StackTree'
@@ -37,31 +38,22 @@ export function RoleBadges({
   const { t } = useTranslation()
   const viewer = pr.viewer
   if (!viewer) return null
-  const chips: { key: 'required' | 'optional' | 'mine'; className: string }[] = []
+  const chips: { key: 'required' | 'optional' | 'mine'; tone: BadgeTone }[] = []
   if (viewer.reviewer === 'required') {
-    chips.push({
-      key: 'required',
-      className: needsMyReview(pr, identity)
-        ? 'border-warning/50 bg-warning/10 text-warning'
-        : 'border-border text-muted',
-    })
+    chips.push({ key: 'required', tone: needsMyReview(pr, identity) ? 'warning' : 'neutral' })
   } else if (viewer.reviewer === 'optional') {
-    chips.push({ key: 'optional', className: 'border-border text-muted' })
+    chips.push({ key: 'optional', tone: 'neutral' })
   }
   if (viewer.isAuthor) {
-    chips.push({ key: 'mine', className: 'border-accent/40 bg-accent/10 text-accent' })
+    chips.push({ key: 'mine', tone: 'accent' })
   }
   if (chips.length === 0) return null
   return (
     <>
       {chips.map((chip) => (
-        <span
-          key={chip.key}
-          data-role={chip.key}
-          className={`inline-flex shrink-0 items-center rounded border px-1 text-[10px] font-medium ${chip.className}`}
-        >
+        <Badge key={chip.key} data-role={chip.key} tone={chip.tone} size="sm">
           {t(`home.prCard.role.${chip.key}`)}
-        </span>
+        </Badge>
       ))}
     </>
   )
@@ -173,9 +165,7 @@ export function PrCard({
         <span className="flex min-w-0 flex-wrap items-center gap-1">
           <RoleBadges pr={pr} identity={identity} />
           {pr.isDraft && (
-            <span className="inline-flex shrink-0 items-center rounded border border-border px-1 text-[10px] text-muted">
-              {t('home.prCard.draft')}
-            </span>
+            <Badge size="sm">{t('home.prCard.draft')}</Badge>
           )}
           {orphan && <OrphanBadge />}
           {shownLabels.map((label) => {

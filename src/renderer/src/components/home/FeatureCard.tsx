@@ -1,6 +1,7 @@
 import { Tag } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FeatureGroup } from '../../lib/dashboard'
+import { Badge } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 
 /** "x of n approved" as a thin bar (theme tokens only). */
@@ -54,22 +55,23 @@ export function FeatureCard({
           <span className="truncate text-sm font-semibold text-text" title={group.name}>
             {group.name}
           </span>
-          <span
-            className="inline-flex max-w-full items-center gap-1 self-start rounded-full bg-border/60 px-1.5 py-0.5 text-[10px] font-medium text-muted"
+          <Badge
+            size="sm"
+            className="max-w-full self-start"
+            icon={<Tag size={10} aria-hidden />}
             title={
               group.renamed
                 ? t('home.featureCard.renamedTitle', { tag: group.tag })
                 : t('home.featureCard.tag')
             }
           >
-            <Tag size={10} aria-hidden />
             <span className="truncate">{group.tag}</span>
-          </span>
+          </Badge>
         </span>
         {group.needsMyReview > 0 && (
-          <span className="shrink-0 rounded-full bg-warning/15 px-1.5 py-0.5 text-[11px] font-medium text-warning">
+          <Badge tone="warning" size="sm">
             {t('home.featureCard.needsReview', { count: group.needsMyReview })}
-          </span>
+          </Badge>
         )}
       </span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">

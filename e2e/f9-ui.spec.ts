@@ -91,9 +91,9 @@ test('análisis con headSha viejo muestra la barra de staleness y "Actualizar" l
     await win2.getByText('Add POST /carts/:id/apply-coupon').first().click()
     await openAnalysisTab(win2)
     await expect(win2.getByText(/new commits/).first()).toBeVisible()
-    // Escopado a la barra: el refresh de la lista (aside) también se llama
-    // "Actualizar". El div más interno con el texto de aviso ES la barra.
-    const staleBar = win2.locator('div').filter({ hasText: /new commits/ }).last()
+    // Scoped to the bar: the list refresh in the aside is also called "Update".
+    const staleBar = win2.getByTestId('analysis-stale-banner')
+    await expect(staleBar).toContainText(/new commits/)
     const update = staleBar.getByRole('button', { name: 'Update' })
     await expect(update).toBeVisible()
     await attachScreenshot(win2, testInfo, 'f9-staleness-visible')

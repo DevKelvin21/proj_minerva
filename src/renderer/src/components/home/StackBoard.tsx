@@ -10,6 +10,7 @@ import {
   type ViewerIdentity,
 } from '../../lib/dashboard'
 import { OrphanNotice, StackStateIcon } from '../stacks/StackTree'
+import { Badge } from '../ui/Badge'
 import { PrCard } from './PrCard'
 
 /**
@@ -182,9 +183,9 @@ function StackRow({
           {t('home.stackBoard.prCount', { count: stack.size })}
         </span>
         {orphan && (
-          <span className="rounded border border-warning/50 bg-warning/10 px-1 text-[10px] font-medium text-warning">
+          <Badge tone="warning" size="sm">
             {t('home.stackBoard.orphaned')}
-          </span>
+          </Badge>
         )}
         <button
           type="button"

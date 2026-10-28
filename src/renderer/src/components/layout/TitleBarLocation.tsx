@@ -6,13 +6,14 @@ import { useAppStore } from '../../stores/app-store'
 import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
 import { useDashboardStore } from '../../stores/dashboard-store'
 import { buildFeatureGroups } from '../../lib/dashboard'
+import { Badge, type BadgeTone } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 
-const STATE_TONE: Record<'open' | 'draft' | 'merged' | 'closed', string> = {
-  open: 'bg-success/15 text-success',
-  draft: 'bg-border/60 text-muted',
-  merged: 'bg-merged/15 text-merged',
-  closed: 'bg-danger/15 text-danger',
+const STATE_TONE: Record<'open' | 'draft' | 'merged' | 'closed', BadgeTone> = {
+  open: 'success',
+  draft: 'neutral',
+  merged: 'merged',
+  closed: 'danger',
 }
 
 /** Last segment of a repo's full name: "orders-api" for "contoso/Platform/orders-api". */
@@ -114,11 +115,9 @@ function ReviewLocation({
         <span className="shrink-0 font-mono text-muted">#{pr.number}</span>
         <span className="min-w-0 truncate font-semibold">{pr.title}</span>
         {!compact && (
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none ${STATE_TONE[state]}`}
-          >
+          <Badge tone={STATE_TONE[state]} size="sm">
             {t(`prList.state.${state}`)}
-          </span>
+          </Badge>
         )}
         <ChevronDown size={14} className="shrink-0 text-muted" aria-hidden />
       </button>

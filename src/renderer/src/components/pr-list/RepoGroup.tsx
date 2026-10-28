@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { PullRequestSummary } from '../../../../shared/types'
 import type { RepoGroupData } from '../../lib/pr-filters'
 import { prKey } from '../../../../shared/scm'
+import { Badge } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { PrListItem } from './PrListItem'
 
@@ -27,9 +28,9 @@ export function RepoGroup({ group, onSelectPr }: RepoGroupProps): React.JSX.Elem
         {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         <ScmProviderIcon provider={group.repo.provider} />
         <span className="truncate">{group.repo.fullName}</span>
-        <span className="ml-auto rounded-full bg-border/60 px-1.5 py-0.5 text-[10px] font-medium normal-case text-muted">
+        <Badge size="sm" className="ml-auto normal-case">
           {group.pullRequests.length}
-        </span>
+        </Badge>
       </button>
       {!collapsed && (
         <ul>

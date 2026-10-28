@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 
-type BadgeTone = 'neutral' | 'accent' | 'success' | 'danger' | 'warning'
+export type BadgeTone = 'neutral' | 'accent' | 'success' | 'danger' | 'warning' | 'info' | 'merged'
 
 const toneClasses: Record<BadgeTone, string> = {
   neutral: 'bg-border/60 text-muted',
@@ -8,6 +8,8 @@ const toneClasses: Record<BadgeTone, string> = {
   success: 'bg-success/15 text-success',
   danger: 'bg-danger/15 text-danger',
   warning: 'bg-warning/15 text-warning',
+  info: 'bg-info/15 text-info',
+  merged: 'bg-merged/15 text-merged',
 }
 
 const sizeClasses = {
@@ -15,7 +17,7 @@ const sizeClasses = {
   md: 'px-2 py-0.5 text-xs',
 }
 
-interface BadgeProps {
+interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   children: ReactNode
   tone?: BadgeTone
   icon?: ReactNode
@@ -23,10 +25,19 @@ interface BadgeProps {
   size?: keyof typeof sizeClasses
 }
 
-export function Badge({ children, tone = 'neutral', icon, size = 'md' }: BadgeProps): React.JSX.Element {
+/** A status pill (draft, merged, orphaned…): static text, never a control. */
+export function Badge({
+  children,
+  tone = 'neutral',
+  icon,
+  size = 'md',
+  className = '',
+  ...rest
+}: BadgeProps): React.JSX.Element {
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full font-medium ${sizeClasses[size]} ${toneClasses[tone]}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full font-medium ${sizeClasses[size]} ${toneClasses[tone]} ${className}`}
+      {...rest}
     >
       {icon}
       {children}

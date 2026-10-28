@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, TriangleAlert, Workflow } from 'lucide-react
 import type { DiffFile, WalkthroughFileRef } from '../../../../shared/types'
 import { rangeLabel, rangeLineCount, type FlatLayer } from '../../lib/walkthrough'
 import { Markdown } from '../ui/Markdown'
+import { Chip } from '../ui/Chip'
 import { IconButton } from '../ui/IconButton'
 import { ExpandableResource } from '../didactic/ExpandableResource'
 import { MermaidDiagram } from '../didactic/MermaidDiagram'
@@ -94,39 +95,32 @@ export function LayerContextBar({
           const basename = file.path.slice(file.path.lastIndexOf('/') + 1)
           const lines = rangeLineCount(ref.ranges)
           return (
-            <button
+            <Chip
               key={file.path}
-              type="button"
               onClick={() => onSelectFile(file.path)}
-              aria-pressed={active}
+              selected={active}
               title={file.path}
               data-testid="layer-file-chip"
-              className={`flex max-w-full items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs transition-colors duration-150 ${
-                active
-                  ? 'border-accent/50 bg-accent/10 text-text'
-                  : 'border-border text-muted hover:border-accent/40 hover:text-text'
-              }`}
+              icon={<FileStatusIcon status={file.status} />}
             >
-              <FileStatusIcon status={file.status} />
               <span className="truncate font-mono">{basename}</span>
               <span className="shrink-0 font-mono text-[11px] text-muted tabular-nums">
                 {ref.ranges.length > 0
                   ? `${rangeLabel(ref.ranges)} · ${t('prDetail.layers.lineCount', { count: lines })}`
                   : t('prDetail.layers.wholeFile')}
               </span>
-            </button>
+            </Chip>
           )
         })}
         {layer.mermaid && (
-          <button
-            type="button"
+          <Chip
             onClick={() => setDiagramOpen((open) => !open)}
             aria-expanded={diagramOpen}
-            className="ml-auto flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-text"
+            icon={<Workflow size={12} aria-hidden />}
+            className="ml-auto"
           >
-            <Workflow size={12} />
             {diagramOpen ? t('prDetail.layers.hideDiagram') : t('prDetail.layers.showDiagram')}
-          </button>
+          </Chip>
         )}
       </div>
 

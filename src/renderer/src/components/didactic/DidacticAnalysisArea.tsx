@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { useRovingTabs } from '../../hooks/use-roving-tabs'
 import type { TFunction } from 'i18next'
 import {
-  AlertTriangle,
   BookOpen,
   Building2,
   Cloud,
@@ -22,6 +21,8 @@ import { isAnalysisLanguageMismatch, isAnalysisStale } from '../../lib/staleness
 import { useLocale } from '../../i18n/use-locale'
 import { DidacticSectionCard } from './DidacticSectionCard'
 import { Markdown } from '../ui/Markdown'
+import { Button } from '../ui/Button'
+import { Callout } from '../ui/Callout'
 import { MermaidDiagram } from './MermaidDiagram'
 import { CodeSnippet } from './CodeSnippet'
 import { DidacticPlaceholder } from './DidacticPlaceholder'
@@ -39,7 +40,6 @@ import {
   resolveInsightTab,
   type InsightTab,
 } from '../../lib/insight-tabs'
-import { InlineError } from '../ui/InlineError'
 import { Spinner } from '../ui/Spinner'
 import { Skeleton } from '../ui/Skeleton'
 
@@ -495,11 +495,17 @@ export function DidacticAnalysisArea({
   let body: React.JSX.Element
   if (error) {
     body = (
-      <InlineError
-        className="rounded-md border border-danger/40 bg-danger/10 p-3"
-        message={t('didactic.analysis.failed', { error })}
-        onRetry={analyze}
-      />
+      <Callout
+        tone="danger"
+        role="alert"
+        action={
+          <Button size="xs" onClick={analyze}>
+            {t('common.retry')}
+          </Button>
+        }
+      >
+        {t('didactic.analysis.failed', { error })}
+      </Callout>
     )
   } else if (analysis) {
     const tabs = availableInsightTabs(analysis.sections.map((section) => section.kind))
@@ -585,46 +591,42 @@ export function DidacticAnalysisArea({
         </div>
       )}
       {isStale && analysis && currentHeadSha && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs">
-          <span className="flex items-center gap-2 text-warning">
-            <AlertTriangle size={14} className="shrink-0" />
-            {t('didactic.analysis.staleNotice', {
-              from: analysis.headSha.slice(0, 7),
-              to: currentHeadSha.slice(0, 7),
-            })}
-          </span>
-          <button
-            type="button"
-            onClick={reanalyze}
-            disabled={loading}
-            className="shrink-0 rounded-md border border-warning/40 px-2 py-1 font-medium text-warning transition-colors hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t('didactic.analysis.update')}
-          </button>
-        </div>
+        <Callout
+          tone="warning"
+          data-testid="analysis-stale-banner"
+          action={
+            <Button size="xs" onClick={reanalyze} disabled={loading}>
+              {t('didactic.analysis.update')}
+            </Button>
+          }
+        >
+          {t('didactic.analysis.staleNotice', {
+            from: analysis.headSha.slice(0, 7),
+            to: currentHeadSha.slice(0, 7),
+          })}
+        </Callout>
       )}
       {isLanguageMismatch && analysis && (
-        <div
+        <Callout
+          tone="warning"
+          icon={Languages}
           data-testid="analysis-language-banner"
-          className="flex items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs"
+          action={
+            <Button
+              size="xs"
+              data-testid="analysis-language-regenerate"
+              onClick={reanalyze}
+              disabled={loading}
+            >
+              {t('didactic.analysis.regenerate')}
+            </Button>
+          }
         >
-          <span className="flex items-center gap-2 text-warning">
-            <Languages size={14} className="shrink-0" />
-            {t('didactic.analysis.languageMismatch', {
-              analysisLanguage: t(`didactic.languageNames.${analysis.language}`),
-              uiLanguage: t(`didactic.languageNames.${locale}`),
-            })}
-          </span>
-          <button
-            type="button"
-            data-testid="analysis-language-regenerate"
-            onClick={reanalyze}
-            disabled={loading}
-            className="shrink-0 rounded-md border border-warning/40 px-2 py-1 font-medium text-warning transition-colors hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t('didactic.analysis.regenerate')}
-          </button>
-        </div>
+          {t('didactic.analysis.languageMismatch', {
+            analysisLanguage: t(`didactic.languageNames.${analysis.language}`),
+            uiLanguage: t(`didactic.languageNames.${locale}`),
+          })}
+        </Callout>
       )}
       {body}
       {viewerResource && (

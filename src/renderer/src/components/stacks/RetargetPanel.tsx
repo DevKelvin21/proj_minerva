@@ -5,6 +5,8 @@ import type { RepoRef } from '../../../../shared/scm'
 import { useRetarget } from '../../hooks/use-retarget'
 import { validateBranchName } from '../../lib/retarget'
 import { Spinner } from '../ui/Spinner'
+import { Button } from '../ui/Button'
+import { Callout } from '../ui/Callout'
 
 /**
  * - `orphan`: one-click fix to the suggested base (the completed parent's own
@@ -149,24 +151,22 @@ export function RetargetPanel({
   if (state.phase === 'failed') {
     const { failure } = state
     return (
-      <div
-        role="alert"
-        data-error-code={failure.code ?? 'UNKNOWN'}
-        className="flex min-w-0 flex-col gap-1.5 rounded-md border border-danger/40 bg-danger/10 p-2 text-xs"
-      >
-        <p className="font-medium text-danger">
-          {t('stacks.retarget.couldNotRetarget', { number })}
-        </p>
-        <p className="text-text/80">
-          {t(`stacks.retarget.failures.${failure.reason}`, { branch: failure.newBase })}
-        </p>
-        {failure.detail && <p className="break-words text-muted">{failure.detail}</p>}
-        <div className="flex gap-1.5">
-          <button type="button" onClick={close} className={ghostButton}>
-            {t('stacks.retarget.dismiss')}
-          </button>
+      <Callout tone="danger" role="alert" data-error-code={failure.code ?? 'UNKNOWN'}>
+        <div className="flex flex-col gap-1.5">
+          <p className="font-medium text-danger">
+            {t('stacks.retarget.couldNotRetarget', { number })}
+          </p>
+          <p className="text-text/80">
+            {t(`stacks.retarget.failures.${failure.reason}`, { branch: failure.newBase })}
+          </p>
+          {failure.detail && <p className="break-words text-muted">{failure.detail}</p>}
+          <div className="flex gap-1.5">
+            <Button size="xs" onClick={close}>
+              {t('stacks.retarget.dismiss')}
+            </Button>
+          </div>
         </div>
-      </div>
+      </Callout>
     )
   }
 
@@ -182,9 +182,10 @@ export function RetargetPanel({
     )
   }
 
+  // No box of its own: it sits inside the orphan's warning callout (`OrphanNotice`).
   if (mode.kind === 'orphan') {
     return (
-      <div className="flex min-w-0 flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 p-2">
+      <div className="flex min-w-0 flex-col gap-2">
         <Consequence from={currentBase} to={mode.suggestedBase} parentNumber={mode.parentNumber} />
         <div className="flex flex-wrap gap-1.5">
           <button type="button" onClick={() => void submit()} className={primaryButton}>

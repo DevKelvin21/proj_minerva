@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useResolvedAppearance } from '../../stores/appearance-store'
 import { mermaidInk, mermaidThemeConfig, type MermaidInk } from '../../theme/mermaid-theme'
 import { Skeleton } from '../ui/Skeleton'
+import { Callout } from '../ui/Callout'
 
 interface MermaidDiagramProps {
   code: string
@@ -255,12 +256,10 @@ export function MermaidDiagram({
 
   if (failed) {
     return (
-      <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
-        <p className="mb-2 text-xs font-medium text-warning">
-          {t('didactic.mermaid.unrenderable')}
-        </p>
+      <Callout tone="warning">
+        <p className="mb-2 font-medium">{t('didactic.mermaid.unrenderable')}</p>
         <pre className="overflow-x-auto text-[11px] whitespace-pre-wrap text-muted">{code}</pre>
-      </div>
+      </Callout>
     )
   }
 

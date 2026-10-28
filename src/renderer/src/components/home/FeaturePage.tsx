@@ -13,6 +13,7 @@ import {
 } from '../../lib/dashboard'
 import { useAppStore } from '../../stores/app-store'
 import { useDashboardStore } from '../../stores/dashboard-store'
+import { Badge } from '../ui/Badge'
 import { IconButton } from '../ui/IconButton'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { ApprovalBar } from './FeatureCard'
@@ -207,13 +208,9 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
             <p className="text-[11px] text-muted">{t('home.featurePage.hiddenHint')}</p>
           )}
           <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted">
-            <span
-              data-testid="feature-tag"
-              className="inline-flex max-w-full items-center gap-1 rounded-full bg-border/60 px-2 py-0.5 text-[11px] font-medium text-muted"
-            >
-              <Tag size={11} aria-hidden />
+            <Badge data-testid="feature-tag" className="max-w-full" icon={<Tag size={11} aria-hidden />}>
               <span className="truncate">{group.tag}</span>
-            </span>
+            </Badge>
             <span>
               {group.renamed
                 ? t('home.featurePage.renamedHint', { tag: group.tag })
@@ -269,9 +266,9 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
                 <span className="truncate text-[11px] text-muted">
                   {repoOwnerLabel(featureRepo.repo)}
                 </span>
-                <span className="shrink-0 rounded-full bg-border/60 px-1.5 text-[10px] text-muted">
+                <Badge size="sm">
                   {t('home.featurePage.prsInRepo', { count: featureRepo.pullRequests.length })}
-                </span>
+                </Badge>
               </button>
               <div className="flex flex-col gap-2">
                 {featureRepo.pullRequests.map((pr) => (
