@@ -65,6 +65,11 @@ function loadDidacticRoute(win: BrowserWindow, repo: RepoRef, number: number, ti
   }
 }
 
+/** `true` for the detached didactic window (so callers can find the MAIN one). */
+export function isDidacticWindow(win: BrowserWindow): boolean {
+  return win === didacticWindow
+}
+
 export function openDidacticWindow(repo: RepoRef, number: number, title: string): void {
   didacticTarget = { repo, number }
   if (didacticWindow && !didacticWindow.isDestroyed()) {

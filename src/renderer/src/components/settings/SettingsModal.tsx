@@ -14,6 +14,7 @@ import { ProviderTabs } from './ProviderTabs'
 import { ProviderModelPanel } from './ProviderModelPanel'
 import { UpdateSection } from './UpdateSection'
 import { LanguageSection } from './LanguageSection'
+import { NotificationsSection } from './NotificationsSection'
 import { AppearanceSection } from './appearance/AppearanceSection'
 
 /**
@@ -174,6 +175,9 @@ function SettingsModalBody({
   // Appearance (mode, themes, contrast): right below the language.
   const appearance = <AppearanceSection compact={compact} />
 
+  // Notifications (system notification level, dock badge): below appearance.
+  const notifications = <NotificationsSection compact={compact} />
+
   // Sección "Actualizaciones" (T93, F17): en una columna va al final de todo
   // el scroll; en dos columnas (≥980px) va debajo de GitHub, la columna más
   // corta (mismo criterio que el PLAN.md § F17). Se automonta en `disabled`
@@ -214,6 +218,7 @@ function SettingsModalBody({
         <div className="w-[40%] min-w-0 shrink-0 overflow-y-auto border-r border-border">
           <div className="border-b border-border">{language}</div>
           <div className="border-b border-border">{appearance}</div>
+          <div className="border-b border-border">{notifications}</div>
           {github}
           {updates}
         </div>
@@ -226,6 +231,7 @@ function SettingsModalBody({
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="border-b border-border">{language}</div>
       <div className="border-b border-border">{appearance}</div>
+      <div className="border-b border-border">{notifications}</div>
       <div className="border-b border-border">{github}</div>
       {ai}
       {updates}

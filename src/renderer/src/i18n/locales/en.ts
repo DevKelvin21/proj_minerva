@@ -1057,6 +1057,25 @@ export const en = {
         },
       },
     },
+    notifications: {
+      title: 'Notifications',
+      description:
+        'Minerva checks your pull requests in the background. New comments and orphaned PRs always land in the sidebar Inbox; here you choose what also raises a system notification while Minerva is in the background.',
+      levelLabel: 'System notifications',
+      level: {
+        off: 'Off',
+        direct: 'Only what is aimed at me',
+        all: 'Everything in the Inbox',
+      },
+      levelHint: {
+        off: 'The Inbox and its badge only.',
+        direct: 'Comments on my PRs, replies in threads I wrote in, my orphaned PRs.',
+        all: 'Also new comments on PRs I review.',
+      },
+      badge: 'Show the unread count on the app icon',
+      loadError: 'Could not load the notification settings: {{error}}',
+      saveError: 'Could not save the notification settings: {{error}}',
+    },
     language: {
       title: 'Language',
       description: 'Language of the interface, native dialogs and new AI analyses.',

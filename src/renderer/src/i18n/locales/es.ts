@@ -1070,6 +1070,25 @@ export const es: MessageShape<typeof en> = {
         },
       },
     },
+    notifications: {
+      title: 'Notificaciones',
+      description:
+        'Minerva revisa tus pull requests en segundo plano. Los comentarios nuevos y los PRs huérfanos siempre llegan a la Bandeja de la barra lateral; aquí eliges qué genera además una notificación del sistema mientras Minerva está en segundo plano.',
+      levelLabel: 'Notificaciones del sistema',
+      level: {
+        off: 'Desactivadas',
+        direct: 'Solo lo dirigido a mí',
+        all: 'Todo lo de la Bandeja',
+      },
+      levelHint: {
+        off: 'Solo la Bandeja y su contador.',
+        direct: 'Comentarios en mis PRs, respuestas en hilos donde escribí, mis PRs huérfanos.',
+        all: 'También comentarios nuevos en PRs que reviso.',
+      },
+      badge: 'Mostrar el número sin leer en el ícono de la app',
+      loadError: 'No se pudo cargar la configuración de notificaciones: {{error}}',
+      saveError: 'No se pudo guardar la configuración de notificaciones: {{error}}',
+    },
     language: {
       title: 'Idioma',
       description: 'Idioma de la interfaz, de los diálogos nativos y de los nuevos análisis de IA.',

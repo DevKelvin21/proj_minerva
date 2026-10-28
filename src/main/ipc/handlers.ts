@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Notification } from 'electron'
 import { handle } from './register'
 import { createAiService } from '../ai'
 import { getAiSettingsInfo, getEffectiveAiSelection, providerNeedingCatalogWarmup } from '../ai/env'
@@ -14,12 +14,20 @@ import { createPrContextSource } from '../scm/pr-context-source'
 import { createPrWatcher, type PrWatcher } from '../scm/pr-watcher'
 import { createActivityService } from '../scm/activity-service'
 import { createActivityStore } from '../scm/activity-store'
+import {
+  createActivityNotifier,
+  type NotificationContent,
+} from '../notifications/activity-notifier'
 import { createAzureOrgAccess } from '../scm/azure-org-access'
 import { nativeConfirm } from '../scm/confirm'
 import { getAuthStatusMap, listAcrossProviders } from '../scm/registry'
 import { retargetPullRequest } from '../scm/retarget'
 import { seenStore } from '../scm/seen-store'
-import { openDidacticWindow, refreshDidacticWindowTitle } from '../windows/didactic-window'
+import {
+  isDidacticWindow,
+  openDidacticWindow,
+  refreshDidacticWindowTitle,
+} from '../windows/didactic-window'
 import { getMainLocale, mt, setMainLocale } from '../i18n'
 import { applyNativeAppearance } from '../theme/appearance-service'
 import { createOpenVsxClient } from '../theme/open-vsx'
@@ -55,6 +63,41 @@ function broadcastPrListChanged(payload: PrListChangedEvent): void {
       win.webContents.send(MINERVA_EVENTS.prListChanged, payload)
     }
   }
+}
+
+/** The main window (not the detached didactic one), if it is open. */
+function findMainWindow(): BrowserWindow | null {
+  return (
+    BrowserWindow.getAllWindows().find((win) => !win.isDestroyed() && !isDidacticWindow(win)) ??
+    null
+  )
+}
+
+/**
+ * Live system notifications. Electron drops a `Notification`'s handlers when
+ * the object is garbage collected, so each one is held until it closes.
+ */
+const liveNotifications = new Set<Notification>()
+
+/** Shows one activity notification; a click brings the main window up and opens the item. */
+function showActivityNotification(content: NotificationContent): void {
+  if (!Notification.isSupported()) return
+  const notification = new Notification({ title: content.title, body: content.body })
+  liveNotifications.add(notification)
+  const release = (): void => {
+    liveNotifications.delete(notification)
+  }
+  notification.on('click', () => {
+    release()
+    const win = findMainWindow()
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+    win.webContents.send(MINERVA_EVENTS.openActivity, { itemId: content.itemId })
+  })
+  notification.on('close', release)
+  notification.show()
 }
 
 /** Pushes the activity inbox's full state to every open window. */
@@ -219,6 +262,16 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     }
   })
 
+  // Dock badge + one system notification per batch (`notifications/activity-notifier.ts`).
+  const notifier = createActivityNotifier({
+    getSettings: () => settingsStore.getNotifications(),
+    setBadge: (count) => {
+      app.setBadgeCount(count)
+    },
+    isAppFocused: () => BrowserWindow.getFocusedWindow() !== null,
+    show: showActivityNotification,
+    text: (key, vars) => mt(key, vars),
+  })
   // Activity inbox (`docs/plan-notifications.md`): fed by every watcher
   // listing, it fetches threads only for PRs with a reason to and keeps
   // `activity.json`. Pushes the full state to every window on each change.
@@ -226,10 +279,21 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     store: createActivityStore(() => join(app.getPath('userData'), 'activity.json')),
     getThreads: (repo, number) => scm.forRepo(repo).getCommentThreads(repo, number),
     getStacks: () => scmRoot.stacks.get(),
-    onChange: (state) => broadcastActivityChanged({ state }),
+    onChange: (state, added) => {
+      broadcastActivityChanged({ state })
+      notifier.onActivity(state, added)
+    },
   })
+  // The unread count saved last session shows on the icon from startup.
+  notifier.refreshBadge(activity.get())
   handle('activity:get', () => activity.get())
   handle('activity:markRead', (req) => activity.markRead(req))
+  handle('settings:getNotifications', () => settingsStore.getNotifications())
+  handle('settings:setNotifications', (req) => {
+    settingsStore.setNotifications(req)
+    notifier.refreshBadge(activity.get())
+    return settingsStore.getNotifications()
+  })
 
   // Background PR watcher: lists `{ state: 'all' }` across providers on an
   // interval and pushes `prListChanged` when something changed. Not decorated

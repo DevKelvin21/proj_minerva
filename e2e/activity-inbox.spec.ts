@@ -135,3 +135,37 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
   await expect(incoming(window)).toContainText('carts.ts:26')
   await attachScreenshot(window, testInfo, 'inbox-tiled-960')
 })
+
+test('Settings → Notifications: defaults to "aimed at me", saves the level and the badge', async ({
+  window,
+}, testInfo) => {
+  await setViewport(window, 1600, 1000)
+  const openSettings = async (): Promise<void> => {
+    await window
+      .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
+      .first()
+      .click()
+  }
+  await openSettings()
+  const section = window.getByTestId('notifications-section')
+  await expect(section).toContainText('Notifications')
+  await expect(section.getByRole('radio', { name: /Only what is aimed at me/ })).toBeChecked()
+  await expect(section.getByRole('checkbox', { name: /unread count/ })).toBeChecked()
+  await section.scrollIntoViewIfNeeded()
+  await attachScreenshot(window, testInfo, 'settings-notifications')
+
+  await section.getByRole('radio', { name: /^Off/ }).check()
+  await section.getByRole('checkbox', { name: /unread count/ }).uncheck()
+  await expect(section.getByRole('radio', { name: /^Off/ })).toBeChecked()
+  await expect(section.getByRole('checkbox', { name: /unread count/ })).not.toBeChecked()
+
+  // Saved in main: a fresh Settings shows the same choice.
+  await window.getByRole('button', { name: 'Close settings' }).click()
+  await openSettings()
+  await expect(
+    window.getByTestId('notifications-section').getByRole('radio', { name: /^Off/ }),
+  ).toBeChecked()
+  await expect(
+    window.getByTestId('notifications-section').getByRole('checkbox', { name: /unread count/ }),
+  ).not.toBeChecked()
+})

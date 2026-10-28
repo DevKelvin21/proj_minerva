@@ -210,6 +210,15 @@ export interface ActivityChangedEvent {
   state: ActivityState
 }
 
+/**
+ * Payload of `minerva:event:openActivity`: the user clicked a system
+ * notification. `itemId` = open that inbox item; `null` = several items,
+ * show the Inbox. Sent to the main window only.
+ */
+export interface OpenActivityEvent {
+  itemId: string | null
+}
+
 export interface EventContract {
   'minerva:event:analysisProgress': AnalysisProgressEvent
   'minerva:event:prListChanged': PrListChangedEvent
@@ -217,6 +226,7 @@ export interface EventContract {
   'minerva:event:languageChanged': LanguageChangedEvent
   'minerva:event:appearanceChanged': AppearanceChangedEvent
   'minerva:event:activityChanged': ActivityChangedEvent
+  'minerva:event:openActivity': OpenActivityEvent
 }
 
 export type EventChannel = keyof EventContract
@@ -234,4 +244,5 @@ export const MINERVA_EVENTS = {
   languageChanged: 'minerva:event:languageChanged',
   appearanceChanged: 'minerva:event:appearanceChanged',
   activityChanged: 'minerva:event:activityChanged',
+  openActivity: 'minerva:event:openActivity',
 } satisfies Record<string, EventChannel>

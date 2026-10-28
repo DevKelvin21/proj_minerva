@@ -14,6 +14,7 @@
  * indexada por canal, así el tipado (`Record<IpcChannel, ...>`) obliga a
  * cubrir cualquier canal nuevo del contrato.
  */
+import { isNotificationSettings } from '../../shared/activity'
 import { isAiProviderId } from '../../shared/ai-providers'
 import type { IpcChannel } from '../../shared/ipc'
 import { isAppLocale } from '../../shared/locale'
@@ -464,6 +465,8 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'settings:setModelOption': isSetModelOptionPayload,
   'settings:getLanguage': isVoidPayload,
   'settings:setLanguage': isSetLanguagePayload,
+  'settings:getNotifications': isVoidPayload,
+  'settings:setNotifications': isNotificationSettings,
   'settings:getAppearance': isVoidPayload,
   'settings:setAppearance': isSetAppearancePayload,
   'themes:searchOpenVsx': isSearchOpenVsxPayload,

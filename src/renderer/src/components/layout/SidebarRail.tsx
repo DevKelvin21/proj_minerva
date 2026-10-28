@@ -68,9 +68,7 @@ export function SidebarRail(): React.JSX.Element {
             aria-label={label}
             title={label}
             className={`relative flex h-10 w-10 items-center justify-center rounded-md transition-colors duration-150 ${
-              sidebarView === view
-                ? 'bg-accent/15 text-accent'
-                : 'text-muted hover:bg-border/60 hover:text-text'
+              sidebarView === view ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-border/60 hover:text-text'
             }`}
           >
             {VIEW_ICON[view]}

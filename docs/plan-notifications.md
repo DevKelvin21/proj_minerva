@@ -1,6 +1,7 @@
 # Plan: activity inbox + notifications
 
-Status (2026-10-28): steps 1 (engine) and 2 (Inbox UI) done on `feat/activity-inbox`. Verified: `npm run verify`, `npm run test:e2e`, and a live mock run where the scripted
+Status (2026-10-28): steps 1 (engine), 2 (Inbox UI) and 3 (notifications) done on
+`feat/activity-inbox`. Verified: `npm run verify`, `npm run test:e2e`, and a live mock run where the scripted
 comment reached `activity:get`. GitHub's PR `updatedAt` was checked against real data and does move
 on line comments (microsoft/vscode#344792, #344785: `updatedAt` equals the last review comment).
 
@@ -99,10 +100,16 @@ Inbox                         Mark all read
 
 ### 3. Notifications
 
-- Dock / taskbar badge with the unread count (`app.setBadgeCount`). On by default.
+- Dock / taskbar badge with the unread count (`app.setBadgeCount`). On by default; set at
+  startup from the saved inbox.
 - System notifications only for `direct` items, one per tick ("3 new comments on 2 PRs"),
   only while the window is not focused. Clicking one focuses the app and opens the item.
-- Settings → Notifications: Off / Direct only (default) / Everything, plus the badge toggle.
+- Settings → Notifications: Off / Direct only (default) / Everything, plus the badge toggle
+  (`settings.json` `notifications`, `settings:get|setNotifications`).
+- Rules live in `main/notifications/activity-notifier.ts` (pure, unit-tested); a click
+  pushes `openActivity` to the main window only (one item opens at its thread, a batch
+  opens the Inbox). The native notification and the dock badge themselves are not covered
+  by e2e (no way to observe them over CDP).
 - macOS build is unsigned: the first notification may prompt for permission, and dev builds
   show as "Electron". The badge works regardless.
 

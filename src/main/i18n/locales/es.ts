@@ -122,6 +122,18 @@ export const es: MessageShape<typeof en> = {
   common: {
     cancel: 'Cancelar',
   },
+  activity: {
+    notification: {
+      commentTitle: '#{{number}} {{title}}',
+      commentBody: '{{author}} comentó: {{excerpt}}',
+      replyBody: '{{author}} respondió: {{excerpt}}',
+      orphanTitle: '#{{number}} {{title}}',
+      orphanBody: 'Su PR base #{{parent}} se fusionó. Cambia su destino a {{base}}.',
+      manyTitle: '{{count}} novedades en tus pull requests',
+      manyBody: 'En {{prs}} pull requests. Abre la Bandeja para verlas.',
+      manyBodyOnePr: 'En un pull request. Abre la Bandeja para verlas.',
+    },
+  },
   windows: {
     didacticTitle: 'Minerva — Análisis {{repo}}#{{number}}',
   },

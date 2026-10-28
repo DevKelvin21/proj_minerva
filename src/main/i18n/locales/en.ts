@@ -126,6 +126,18 @@ export const en = {
   common: {
     cancel: 'Cancel',
   },
+  activity: {
+    notification: {
+      commentTitle: '#{{number}} {{title}}',
+      commentBody: '{{author}} commented: {{excerpt}}',
+      replyBody: '{{author}} replied: {{excerpt}}',
+      orphanTitle: '#{{number}} {{title}}',
+      orphanBody: 'Its base PR #{{parent}} was merged. Retarget it to {{base}}.',
+      manyTitle: '{{count}} new updates on your pull requests',
+      manyBody: 'On {{prs}} pull requests. Open the Inbox to see them.',
+      manyBodyOnePr: 'On one pull request. Open the Inbox to see them.',
+    },
+  },
   windows: {
     didacticTitle: 'Minerva — Analysis {{repo}}#{{number}}',
   },

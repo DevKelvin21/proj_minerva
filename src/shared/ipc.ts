@@ -33,7 +33,7 @@ import type {
   LineQuestion,
 } from './types'
 import type { FileContent, ScmAuthStatus, ScmProviderId } from './scm'
-import type { ActivityState, MarkActivityReadRequest } from './activity'
+import type { ActivityState, MarkActivityReadRequest, NotificationSettings } from './activity'
 import type { AiModelOption, AiProviderId } from './ai-providers'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
@@ -43,6 +43,7 @@ import type {
   AnalysisProgressEvent,
   AppearanceChangedEvent,
   LanguageChangedEvent,
+  OpenActivityEvent,
   PrListChangedEvent,
   UpdaterStatusChangedEvent,
 } from './events'
@@ -263,6 +264,10 @@ export interface IpcContract {
    * didactic window switch at once. Answers the saved language.
    */
   'settings:setLanguage': { req: { language: AppLocale }; res: AppLocale }
+  /** Settings → Notifications (`shared/activity.ts`); the defaults when nothing is saved. */
+  'settings:getNotifications': { req: void; res: NotificationSettings }
+  /** Saves them and re-applies the dock badge; answers what was saved. */
+  'settings:setNotifications': { req: NotificationSettings; res: NotificationSettings }
 
   /** Appearance (mode, theme per half, contrast, custom themes) from settings.json, or the defaults. */
   'settings:getAppearance': { req: void; res: AppearanceSettings }
@@ -379,6 +384,8 @@ export const IPC_CHANNELS = [
   'settings:setModelOption',
   'settings:getLanguage',
   'settings:setLanguage',
+  'settings:getNotifications',
+  'settings:setNotifications',
   'settings:getAppearance',
   'settings:setAppearance',
   'themes:searchOpenVsx',
@@ -452,6 +459,8 @@ interface EventsApi {
   onAppearanceChanged(callback: (payload: AppearanceChangedEvent) => void): () => void
   /** The activity inbox changed (full state); same concrete-method pattern. */
   onActivityChanged(callback: (payload: ActivityChangedEvent) => void): () => void
+  /** A system notification was clicked (main window only); same concrete-method pattern. */
+  onOpenActivity(callback: (payload: OpenActivityEvent) => void): () => void
 }
 
 export type MinervaApi = InvokeApi & { events: EventsApi }

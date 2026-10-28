@@ -25,6 +25,29 @@ export function useUnreadActivityCount(): number {
   return useActivityInboxStore((s) => s.state?.unreadCount ?? 0)
 }
 
+/**
+ * A click on a system notification (main window only): one item opens at its
+ * thread; a batch (`itemId: null`) brings up the Inbox. An item that is no
+ * longer in the inbox (pruned meanwhile) falls back to the Inbox too.
+ */
+export function useOpenActivityFromNotifications(): void {
+  const { open } = useOpenActivityItem()
+  const showInbox = useAppStore((s) => s.showInbox)
+  const start = useActivityInboxStore((s) => s.start)
+  useEffect(() => start(), [start])
+  useEffect(
+    () =>
+      window.minerva.events.onOpenActivity(({ itemId }) => {
+        const item = itemId
+          ? useActivityInboxStore.getState().state?.items.find((entry) => entry.id === itemId)
+          : undefined
+        if (item) open(item)
+        else showInbox()
+      }),
+    [open, showInbox],
+  )
+}
+
 interface UseOpenActivityItemResult {
   /** Opens the item's PR at its thread and marks the item read. */
   open: (item: ActivityItem) => void

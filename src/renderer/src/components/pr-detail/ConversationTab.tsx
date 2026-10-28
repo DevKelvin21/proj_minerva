@@ -126,9 +126,7 @@ export function ConversationTab({
           className="resize-y rounded-md border border-border bg-panel px-3 py-2 text-sm text-text placeholder:text-muted focus:border-accent"
         />
         {postError && (
-          <p className="text-sm text-danger">
-            {t('comments.conversation.postError', { error: postError })}
-          </p>
+          <p className="text-sm text-danger">{t('comments.conversation.postError', { error: postError })}</p>
         )}
         <button
           type="submit"

@@ -69,6 +69,34 @@ export interface ActivityState {
 /** Request of `activity:markRead`: some items, or every one. */
 export type MarkActivityReadRequest = { ids: string[] } | { all: true }
 
+/**
+ * Which new items raise a system notification: none, only the ones aimed at
+ * the user (`ActivityItem.direct`), or every one.
+ */
+export type NotificationLevel = 'off' | 'direct' | 'all'
+
+export const NOTIFICATION_LEVELS: readonly NotificationLevel[] = ['off', 'direct', 'all']
+
+/** Settings → Notifications, saved in settings.json (`notifications`). */
+export interface NotificationSettings {
+  level: NotificationLevel
+  /** Unread count on the dock / taskbar icon. */
+  badge: boolean
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = { level: 'direct', badge: true }
+
+/** Exactly `{ level, badge }` with valid values (settings.json on load, IPC payloads). */
+export function isNotificationSettings(value: unknown): value is NotificationSettings {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const v = value as Record<string, unknown>
+  return (
+    Object.keys(v).every((key) => key === 'level' || key === 'badge') &&
+    NOTIFICATION_LEVELS.includes(v.level as NotificationLevel) &&
+    typeof v.badge === 'boolean'
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Shape guards: `activity.json` on load (main) and the `activityChanged`
 // payload (preload). Shape only; the text was sanitized when the item was made.

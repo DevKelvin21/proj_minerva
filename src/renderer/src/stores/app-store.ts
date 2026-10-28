@@ -281,6 +281,11 @@ interface AppState {
    */
   setStackNav: (nav: StackNavContext | null) => void
   toggleSidebarCollapsed: () => void
+  /**
+   * Brings the sidebar up on the Inbox, whatever the tier (docked column
+   * unfolded, drawer opened), leaving the full-screen walkthrough.
+   */
+  showInbox: () => void
   /** Sets (clamped, persisted) or resets (`null`) the docked sidebar width. */
   setSidebarWidth: (width: number | null) => void
   /**
@@ -434,6 +439,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return { sidebarCollapsed: collapsed }
     }),
+  showInbox: () => {
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, 'false')
+    } catch {
+      // Session-only when storage is unavailable.
+    }
+    set({
+      sidebarView: 'inbox',
+      sidebarCollapsed: false,
+      sidebarOpen: true,
+      walkthroughFocus: false,
+    })
+  },
   setSidebarWidth: (width) => {
     const next = width === null ? null : clampSidebarWidth(width, window.innerWidth)
     try {
