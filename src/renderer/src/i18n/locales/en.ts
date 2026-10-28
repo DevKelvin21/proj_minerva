@@ -565,6 +565,7 @@ export const en = {
       hint: 'Add lines or comment threads from the diff, or just ask about the PR.',
     },
     list: {
+      label: 'Conversations about this pull request',
       toggle: 'Show the conversations about this pull request',
       newTitle: 'New conversation',
       new: 'New conversation',
@@ -603,7 +604,8 @@ export const en = {
       followUpPlaceholder: 'Ask a follow-up…',
       send: 'Send',
       stop: 'Stop the answer',
-      hint: 'Enter to send · Shift+Enter for a new line',
+      hint: 'Enter or {{mod}}+Enter to send · Shift+Enter for a new line',
+      hintKeys: '<k>↵</k> or <k>{{mod}}↵</k> to send · <k>⇧↵</k> for a new line',
       busyHint: 'Answering… Stop it to ask something else here.',
       contextCount_one: '{{count}} of {{max}} context items',
       contextCount_other: '{{count}} of {{max}} context items',

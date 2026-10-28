@@ -23,7 +23,7 @@ const composer = (page: Page) => page.getByTestId('chat-composer')
 const question = (page: Page) =>
   page.getByRole('textbox', { name: 'Your question about this pull request' })
 const transcript = (page: Page) => page.getByTestId('chat-transcript')
-const listToggle = (page: Page) => page.locator('[aria-controls="chat-conversation-list"]')
+const listToggle = (page: Page) => page.getByTestId('chat-conversation-toggle')
 const conversations = (page: Page) =>
   page.getByTestId('chat-conversation-list').getByTestId('chat-conversation')
 
@@ -161,19 +161,77 @@ test('several conversations: new, switch back, delete', async ({ window }, testI
   await listToggle(window).click()
   await expect(conversations(window)).toHaveCount(2)
   await expect(conversations(window).nth(0)).toContainText('Second question')
-  await conversations(window).nth(1).getByRole('button').first().click()
+  await conversations(window).nth(1).getByRole('menuitemradio').click()
   await expect(transcript(window)).toContainText('First question about the PR')
   await expect(transcript(window)).not.toContainText('Second question about the PR')
+  await expect(listToggle(window)).toBeFocused()
   await attachScreenshot(window, testInfo, 'chat-switch')
 
-  // Delete (with a confirm) the open one: the panel goes back to a new conversation.
+  // A menu: it opens on the open conversation, arrows move, Esc closes back to the toggle,
+  // and `aria-controls` points at it only while it is open.
+  await expect(listToggle(window)).not.toHaveAttribute('aria-controls')
   await listToggle(window).click()
+  const list = window.getByRole('menu', { name: 'Conversations about this pull request' })
+  await expect(listToggle(window)).toHaveAttribute('aria-controls', 'chat-conversation-list')
+  const firstItem = conversations(window)
+    .filter({ hasText: 'First question' })
+    .getByRole('menuitemradio')
+  const secondItem = conversations(window)
+    .filter({ hasText: 'Second question' })
+    .getByRole('menuitemradio')
+  await expect(firstItem).toHaveAttribute('aria-checked', 'true')
+  await expect(firstItem).toBeFocused()
+  await window.keyboard.press('ArrowDown')
+  await expect(secondItem).toBeFocused()
+  await window.keyboard.press('Home')
+  await expect(secondItem).toBeFocused()
+  await window.keyboard.press('End')
+  await expect(firstItem).toBeFocused()
+  await attachScreenshot(window, testInfo, 'chat-list-open')
+  await window.keyboard.press('Escape')
+  await expect(list).toHaveCount(0)
+  await expect(listToggle(window)).toBeFocused()
+  // The AI panel stays open: that Esc belonged to the list.
+  await expect(window.getByTestId('ask-tab')).toBeVisible()
+
+  // A click outside closes it too.
+  await listToggle(window).click()
+  await expect(list).toBeVisible()
+  await composer(window).click({ position: { x: 4, y: 4 } })
+  await expect(list).toHaveCount(0)
+
+  // Delete (with a confirm) the open one: the confirm takes focus, Esc cancels only the confirm.
+  await listToggle(window).focus()
+  await window.keyboard.press('ArrowDown')
+  await expect(firstItem).toBeFocused()
+  await window.keyboard.press('ArrowRight')
   const first = conversations(window).filter({ hasText: 'First question' })
-  await first.getByRole('button', { name: /^Delete conversation/ }).click()
-  await first.getByRole('button', { name: 'Delete', exact: true }).click()
+  const trash = first.getByRole('menuitem', { name: /^Delete conversation/ })
+  await expect(trash).toBeFocused()
+  await window.keyboard.press('Enter')
+  const confirm = first.getByRole('menuitem', { name: 'Delete', exact: true })
+  await expect(confirm).toBeFocused()
+  await window.keyboard.press('Escape')
+  await expect(confirm).toHaveCount(0)
+  await expect(list).toBeVisible()
+  await expect(trash).toBeFocused()
+  await trash.click()
+  await expect(confirm).toBeFocused()
+  await attachScreenshot(window, testInfo, 'chat-delete-confirm')
+  await confirm.click()
+  // The panel goes back to a new conversation; focus lands on the row that took its place.
   await expect(conversations(window)).toHaveCount(1)
   await expect(conversations(window).first()).toContainText('Second question')
+  await expect(secondItem).toBeFocused()
   await expect(window.getByTestId('ask-tab')).toContainText('Ask about this pull request')
+
+  // Deleting the last one closes the list and focus goes back to the toggle.
+  await window.keyboard.press('ArrowRight')
+  await window.keyboard.press('Enter')
+  await window.keyboard.press('Enter')
+  await expect(list).toHaveCount(0)
+  await expect(window.getByTestId('chat-conversation-list')).toHaveCount(0)
+  await expect(listToggle(window)).toBeFocused()
 })
 
 // eslint-disable-next-line no-empty-pattern
@@ -200,7 +258,7 @@ test('conversations survive a restart', async ({}, testInfo) => {
     await listToggle(win2).click()
     await expect(conversations(win2)).toHaveCount(1)
     await expect(conversations(win2).first()).toContainText('Will this survive a restart?')
-    await conversations(win2).first().getByRole('button').first().click()
+    await conversations(win2).first().getByRole('menuitemradio').click()
     await expect(transcript(win2)).toContainText('Will this survive a restart?')
     await expect(transcript(win2).locator('[data-role="assistant"]')).toHaveAttribute(
       'data-status',
@@ -241,4 +299,17 @@ test('narrow window: the chat is an overlay and adding a line leaves the diff in
   await expect(composer(window).getByTestId('chat-chip')).toHaveCount(1)
   await expect(composer(window).getByTestId('chat-chip')).toContainText('Rounding?')
   await attachScreenshot(window, testInfo, 'chat-narrow')
+
+  // The conversation list opens over the overlay without being clipped; Esc closes the list only.
+  await ask(window, 'Rounding in the overlay?')
+  await listToggle(window).click()
+  await expect(conversations(window).first().getByRole('menuitemradio')).toBeFocused()
+  const listBox = await window.getByTestId('chat-conversation-list').boundingBox()
+  expect(listBox?.width ?? 0).toBeGreaterThan(200)
+  await attachScreenshot(window, testInfo, 'chat-narrow-list')
+  await window.keyboard.press('Escape')
+  await expect(window.getByTestId('chat-conversation-list')).toHaveCount(0)
+  await expect(askTab).toBeVisible()
+  await window.keyboard.press('Escape')
+  await expect(askTab).toHaveCount(0)
 })

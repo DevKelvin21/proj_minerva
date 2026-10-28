@@ -572,6 +572,7 @@ export const es: MessageShape<typeof en> = {
       hint: 'Agrega líneas o hilos de comentarios desde el diff, o simplemente pregunta sobre el PR.',
     },
     list: {
+      label: 'Conversaciones sobre este pull request',
       toggle: 'Mostrar las conversaciones sobre este pull request',
       newTitle: 'Conversación nueva',
       new: 'Conversación nueva',
@@ -610,7 +611,8 @@ export const es: MessageShape<typeof en> = {
       followUpPlaceholder: 'Haz una pregunta de seguimiento…',
       send: 'Enviar',
       stop: 'Detener la respuesta',
-      hint: 'Enter para enviar · Shift+Enter para una línea nueva',
+      hint: 'Enter o {{mod}}+Enter para enviar · Shift+Enter para una línea nueva',
+      hintKeys: '<k>↵</k> o <k>{{mod}}↵</k> para enviar · <k>⇧↵</k> para una línea nueva',
       busyHint: 'Respondiendo… Detenla para preguntar otra cosa aquí.',
       contextCount_one: '{{count}} de {{max}} elementos de contexto',
       contextCount_other: '{{count}} de {{max}} elementos de contexto',

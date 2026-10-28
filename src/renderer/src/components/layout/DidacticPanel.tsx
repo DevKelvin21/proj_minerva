@@ -132,7 +132,7 @@ export function DidacticPanel(): React.JSX.Element {
         )}
         <header className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-1.5">
           <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-text">
-            <Sparkles size={15} className="text-accent" aria-hidden />
+            <Sparkles size={14} className="text-muted" aria-hidden />
             {t('chat.panel.title')}
           </span>
           <div
@@ -142,19 +142,20 @@ export function DidacticPanel(): React.JSX.Element {
           >
             <PanelTab
               tabProps={tabs.tabProps('ask')}
-              icon={<MessageCircle size={13} aria-hidden />}
+              icon={<MessageCircle size={12} aria-hidden />}
               label={t('chat.panel.tabs.ask')}
             />
             <PanelTab
               tabProps={tabs.tabProps('analysis')}
-              icon={<GraduationCap size={13} aria-hidden />}
+              icon={<GraduationCap size={12} aria-hidden />}
               label={t('chat.panel.tabs.analysis')}
             />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
             {selectedPr && tab === 'analysis' && (
               <IconButton
-                icon={<ExternalLink size={16} />}
+                size="sm"
+                icon={<ExternalLink size={14} />}
                 label={t('didactic.panel.openInWindow')}
                 onClick={() => {
                   void window.minerva.window.openDidactic({
@@ -167,7 +168,8 @@ export function DidacticPanel(): React.JSX.Element {
               />
             )}
             <IconButton
-              icon={<X size={16} />}
+              size="sm"
+              icon={<X size={14} />}
               label={t('didactic.panel.close')}
               onClick={toggleDidacticPanel}
             />
