@@ -145,7 +145,8 @@ export function createActivityStore(filePath: () => string): ActivityStore {
       }
       const finalPath = filePath()
       const tmpPath = finalPath + '.tmp'
-      writeFileSync(tmpPath, JSON.stringify(persisted) + '\n', 'utf-8')
+      // Titles and excerpts of private PRs: readable by the user only.
+      writeFileSync(tmpPath, JSON.stringify(persisted) + '\n', { encoding: 'utf-8', mode: 0o600 })
       renameSync(tmpPath, finalPath)
     },
   }

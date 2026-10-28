@@ -132,7 +132,12 @@ const NOW = Date.parse('2026-10-28T12:00:00.000Z')
 
 describe('toPlainLine', () => {
   it('flattens whitespace and drops control and bidi characters', () => {
-    expect(toPlainLine('  a\n\nb\tc\u0007d‮e  ', 50)).toBe('a b c d e')
+    expect(toPlainLine('  a\n\nb\tc\u0007d\u202Ee  ', 50)).toBe('a b c d e')
+  })
+
+  it('drops invisible characters that can hide or disguise text', () => {
+    expect(toPlainLine('ad\u200Bmin\uFEFF\u2060\u00AD\u061C', 50)).toBe('ad min')
+    expect(toPlainLine('x\u{E0041}\u{E007F}y', 50)).toBe('x y')
   })
 
   it('caps with an ellipsis, by characters (not UTF-16 units)', () => {
@@ -188,6 +193,20 @@ describe('newCommentItems', () => {
     })
   })
 
+  it('flattens the path and skips ids no provider would send', () => {
+    const items = newCommentItems(
+      pr(10),
+      [
+        { ...lineThread('t', [comment('ok')]), path: 'src/a\u202E.ts\nevil' },
+        lineThread('x'.repeat(400), [comment('long-thread')]),
+        lineThread('t2', [comment('y'.repeat(400))]),
+      ],
+      new Set(),
+    )
+    expect(items.map((item) => item.commentId)).toEqual(['ok'])
+    expect(items[0].path).toBe('src/a .ts evil')
+  })
+
   it('is direct on my own PR or in a thread I wrote in, and not otherwise', () => {
     const reviewing = pr(8, { viewer: { isAuthor: false, reviewer: 'required' } })
     const threads = [
@@ -209,7 +228,7 @@ describe('newCommentItems', () => {
         generalThread('t', [
           comment('x', {
             bodyMarkdown: 'line one\n\nline two ' + 'z'.repeat(300),
-            author: { login: 'eve‮', avatarUrl: 'javascript:alert(1)' },
+            author: { login: 'eve\u202E', avatarUrl: 'javascript:alert(1)' },
           }),
         ]),
       ],
@@ -218,6 +237,7 @@ describe('newCommentItems', () => {
     expect(item.prTitle).toBe('Title with break')
     expect(item.excerpt.startsWith('line one line two zzz')).toBe(true)
     expect(Array.from(item.excerpt)).toHaveLength(160)
+    // No avatar URL is kept (the inbox draws initials).
     expect(item.author).toEqual({ login: 'eve' })
   })
 })

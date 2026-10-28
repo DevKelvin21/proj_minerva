@@ -69,6 +69,10 @@ const READ_ITEM_MAX_AGE_MS = 14 * 24 * 60 * 60_000
 const TRACK_MAX_AGE_MS = 30 * 24 * 60 * 60_000
 const MAX_TITLE_LEN = 200
 const MAX_LOGIN_LEN = 100
+const MAX_PATH_LEN = 500
+const MAX_BRANCH_LEN = 250
+/** Provider ids longer than this are not real: the item is skipped. */
+const MAX_ID_LEN = 300
 
 export interface ActivityServiceDeps {
   store: ActivityStore
@@ -92,10 +96,13 @@ export interface ActivityService {
   markRead(req: MarkActivityReadRequest): ActivityState
 }
 
-// Control characters (C0, DEL, C1) and bidi overrides / isolates, which can
-// make a line render in a misleading order.
-// eslint-disable-next-line no-control-regex
-const UNSAFE_CHARS = /[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g
+// Control characters (C0, DEL, C1), soft hyphen, invisible format characters
+// (zero-width, word joiner, BOM, Arabic/Mongolian marks), bidi overrides and
+// isolates, and Unicode tags: all of them can hide text or make a line render
+// in a misleading order. Written as escapes on purpose (no invisible literals).
+const UNSAFE_CHARS =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\u{e0000}-\u{e007f}]/gu
 
 /** One line of plain text: unsafe characters out, whitespace collapsed, capped with `…`. */
 export function toPlainLine(text: string, max: number): string {
@@ -171,8 +178,9 @@ export function newCommentItems(
   const items: ActivityCommentItem[] = []
   for (const thread of threads) {
     const participated = thread.comments.some((comment) => comment.isViewer === true)
+    if (thread.id.length > MAX_ID_LEN) continue
     thread.comments.forEach((comment, index) => {
-      if (known.has(comment.id) || comment.isViewer) return
+      if (known.has(comment.id) || comment.isViewer || comment.id.length > MAX_ID_LEN) return
       const item: ActivityCommentItem = {
         kind: 'comment',
         id: 'comment:' + key + ':' + comment.id,
@@ -193,10 +201,8 @@ export function newCommentItems(
       if (comment.author.displayName) {
         item.author.displayName = toPlainLine(comment.author.displayName, MAX_LOGIN_LEN)
       }
-      if (comment.author.avatarUrl?.startsWith('https://')) {
-        item.author.avatarUrl = comment.author.avatarUrl
-      }
-      if (thread.path) item.path = thread.path
+      // No `avatarUrl`: the inbox draws initials, and an unused URL is only risk.
+      if (thread.path) item.path = toPlainLine(thread.path, MAX_PATH_LEN)
       if (thread.line !== undefined && thread.line > 0) item.line = thread.line
       if (thread.side) item.side = thread.side
       items.push(item)
@@ -234,9 +240,9 @@ export function orphanItems(
         parent: {
           number: node.orphan.parent.number,
           title: toPlainLine(node.orphan.parent.title, MAX_TITLE_LEN),
-          mergedInto: node.orphan.parent.mergedInto,
+          mergedInto: toPlainLine(node.orphan.parent.mergedInto, MAX_BRANCH_LEN),
         },
-        suggestedBase: node.orphan.suggestedBase,
+        suggestedBase: toPlainLine(node.orphan.suggestedBase, MAX_BRANCH_LEN),
       })
     }
   }
@@ -388,12 +394,23 @@ export function createActivityService(deps: ActivityServiceDeps): ActivityServic
       const key = prKey(pr.repo, pr.number)
       const track = state.prs.get(key)
       if (track) {
-        const fresh = newCommentItems(pr, threads, new Set(track.knownCommentIds))
-        const existing = new Set(state.items.map((item) => item.id))
-        for (const item of fresh) {
-          if (existing.has(item.id)) continue
-          state.items.push(item)
-          added.push(item)
+        try {
+          const fresh = newCommentItems(pr, threads, new Set(track.knownCommentIds))
+          const existing = new Set(state.items.map((item) => item.id))
+          for (const item of fresh) {
+            if (existing.has(item.id)) continue
+            state.items.push(item)
+            added.push(item)
+          }
+        } catch (error) {
+          // Malformed provider data: this PR's new comments are skipped (and
+          // become known below), the rest of the listing goes on.
+          console.warn(
+            '[activity] could not read the comments of',
+            pr.repo.fullName,
+            pr.number,
+            error,
+          )
         }
       }
       state.prs.set(key, {

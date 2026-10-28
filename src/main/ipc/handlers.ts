@@ -79,11 +79,30 @@ function findMainWindow(): BrowserWindow | null {
  */
 const liveNotifications = new Set<Notification>()
 
+/** Live notifications kept at most; the oldest is let go past this (a toast that expired). */
+const MAX_LIVE_NOTIFICATIONS = 20
+
+/**
+ * Some Linux notification servers read `<b>`, `<a href>`… in the body: the
+ * text comes from PRs, so it is escaped there. Elsewhere it is plain text.
+ */
+function notificationText(text: string): string {
+  if (process.platform !== 'linux') return text
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 /** Shows one activity notification; a click brings the main window up and opens the item. */
 function showActivityNotification(content: NotificationContent): void {
   if (!Notification.isSupported()) return
-  const notification = new Notification({ title: content.title, body: content.body })
+  const notification = new Notification({
+    title: notificationText(content.title),
+    body: notificationText(content.body),
+  })
   liveNotifications.add(notification)
+  if (liveNotifications.size > MAX_LIVE_NOTIFICATIONS) {
+    const oldest = liveNotifications.values().next().value
+    if (oldest) liveNotifications.delete(oldest)
+  }
   const release = (): void => {
     liveNotifications.delete(notification)
   }
