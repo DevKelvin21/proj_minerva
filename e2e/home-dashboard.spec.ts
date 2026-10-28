@@ -348,15 +348,15 @@ test('stack navigator: prev/next, next disabled on the last PR, cleared by a PR 
   // "Continue reviewing #102" restores the review with the tab that was open.
   await window.getByTestId('continue-review').click()
   await expect(prHeader(window)).toContainText('#102')
-  await window.getByRole('button', { name: /^Files/ }).click()
-  await expect(window.getByRole('button', { name: /^Files/ })).toHaveAttribute('aria-pressed', 'true')
+  await window.getByRole('tab', { name: /^Files/ }).click()
+  await expect(window.getByRole('tab', { name: /^Files/ })).toHaveAttribute('aria-selected', 'true')
   await window.getByTestId('home-button').click()
   await expect(overview(window)).toBeVisible()
   await expect(overview(window).getByTestId('continue-review')).toContainText('#102')
   await attachScreenshot(window, testInfo, 'home-overview-continue')
   await overview(window).getByTestId('continue-review').click()
   await expect(prHeader(window)).toContainText('#102')
-  await expect(window.getByRole('button', { name: /^Files/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(window.getByRole('tab', { name: /^Files/ })).toHaveAttribute('aria-selected', 'true')
   await expect(window.getByTestId('stack-nav')).toBeVisible()
 
   // A PR of ANOTHER stack opened from the sidebar: its stack map shows, the navigator is gone.

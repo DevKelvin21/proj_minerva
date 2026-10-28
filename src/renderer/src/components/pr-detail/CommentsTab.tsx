@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileCode, MessagesSquare } from 'lucide-react'
 import type { CommentThread, DiffFile } from '../../../../shared/types'
-import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { threadStatusLabel } from '../../lib/scm-labels'
 import {
@@ -13,7 +11,9 @@ import {
   type ThreadFilter,
 } from '../../lib/thread-groups'
 import { Chip } from '../ui/Chip'
-import { ThreadCard } from './ThreadCard'
+import { InlineError } from '../ui/InlineError'
+import { Spinner } from '../ui/Spinner'
+import { ThreadGroupList } from './ThreadGroupList'
 
 interface CommentsTabProps {
   threads: CommentThread[]
@@ -21,6 +21,8 @@ interface CommentsTabProps {
   error: string | null
   /** Files of the PR (`null` while loading): a thread can only jump to a file the diff lists. */
   files: DiffFile[] | null
+  /** Asks main for the threads again (Retry after a load error). */
+  reload: () => Promise<CommentThread[]>
 }
 
 /**
@@ -35,10 +37,10 @@ export function CommentsTab({
   loading,
   error,
   files,
+  reload,
 }: CommentsTabProps): React.JSX.Element {
   const { t } = useTranslation()
   const [filter, setFilter] = useState<ThreadFilter>('open')
-  const openLineThread = useAppStore((s) => s.openLineThread)
   const tier = useLayoutTier()
 
   const counts = useMemo(() => countThreadsByFilter(threads), [threads])
@@ -46,7 +48,6 @@ export function CommentsTab({
     () => groupThreadsByFile(filterThreads(threads, filter)),
     [threads, filter],
   )
-  const filePaths = useMemo(() => new Set(files?.map((f) => f.path) ?? []), [files])
 
   const filters: Array<{ value: ThreadFilter; label: string }> = [
     { value: 'open', label: t('comments.tab.filterOpen') },
@@ -63,7 +64,11 @@ export function CommentsTab({
         tier.w === 'sm' ? 'p-2' : 'p-4'
       }`}
     >
-      <div role="group" aria-label={t('comments.tab.filterGroup')} className="flex flex-wrap items-center gap-1.5">
+      <div
+        role="group"
+        aria-label={t('comments.tab.filterGroup')}
+        className="flex flex-wrap items-center gap-1.5"
+      >
         {filters.map((option) => (
           <Chip
             key={option.value}
@@ -78,61 +83,25 @@ export function CommentsTab({
         ))}
       </div>
 
-      {error && <p className="text-sm text-danger">{t('comments.tab.loadError', { error })}</p>}
+      {error && (
+        <InlineError
+          message={t('comments.tab.loadError', { error })}
+          onRetry={() => void reload()}
+        />
+      )}
       {!error && loading && threads.length === 0 && (
-        <p className="text-sm text-muted">{t('comments.tab.loading')}</p>
+        <p className="flex items-center gap-2 text-sm text-muted">
+          <Spinner />
+          {t('comments.tab.loading')}
+        </p>
       )}
       {!error && !loading && groups.length === 0 && (
         <p className="text-sm text-muted">
-          {threads.length === 0
-            ? t('comments.tab.empty')
-            : t('comments.tab.noMatch')}
+          {threads.length === 0 ? t('comments.tab.empty') : t('comments.tab.noMatch')}
         </p>
       )}
 
-      {groups.map((group) => {
-        const inDiff = group.path !== null && filePaths.has(group.path)
-        return (
-          <section
-            key={group.path ?? '(general)'}
-            aria-label={group.path ?? t('comments.tab.general')}
-            data-thread-group={group.path ?? 'general'}
-            className="flex min-w-0 flex-col gap-2"
-          >
-            <h3 className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted">
-              {group.path === null ? (
-                <MessagesSquare size={13} className="shrink-0" />
-              ) : (
-                <FileCode size={13} className="shrink-0" />
-              )}
-              <span className="truncate font-mono text-text" title={group.path ?? undefined}>
-                {group.path ?? t('comments.tab.general')}
-              </span>
-              <span className="shrink-0 tabular-nums">({group.threads.length})</span>
-              {group.path !== null && files !== null && !inDiff && (
-                <span
-                  className="shrink-0 text-warning"
-                  title={t('comments.tab.notInDiffTitle')}
-                >
-                  · {t('comments.tab.notInDiff')}
-                </span>
-              )}
-            </h3>
-            {group.threads.map((thread) => (
-              <ThreadCard
-                key={thread.id}
-                thread={thread}
-                showExcerpt
-                onNavigateToLine={
-                  thread.path && inDiff
-                    ? () => openLineThread(thread.path!, thread.line ?? 0, thread.id)
-                    : undefined
-                }
-              />
-            ))}
-          </section>
-        )
-      })}
+      <ThreadGroupList groups={groups} files={files} />
     </div>
   )
 }

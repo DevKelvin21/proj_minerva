@@ -11,7 +11,8 @@ import type { Page } from './fixtures'
  */
 
 const aside = (page: Page) => page.locator('aside')
-const tab = (page: Page, name: RegExp) => page.getByRole('button', { name }).first()
+const tab = (page: Page, name: RegExp) =>
+  page.getByRole('tablist', { name: 'Pull request views' }).getByRole('tab', { name })
 const filters = (page: Page) => page.getByRole('group', { name: 'Filter threads' })
 const filterButton = (page: Page, label: string) =>
   filters(page).getByRole('button', { name: new RegExp('^' + label + ' \\d+$') })
@@ -38,7 +39,7 @@ test('#108: every status label, counts per filter, and a status change persists'
   await openPr(window, 'Fix cart rounding')
 
   // Tab label carries the open-thread count (active + pending).
-  await expect(tab(window, /^Comments \(2\)$/)).toBeVisible()
+  await expect(tab(window, /^Comments · 2 open$/)).toBeVisible()
   await tab(window, /^Comments/).click()
 
   // Filter counts: Open 2, All 6, one per status.
@@ -83,7 +84,7 @@ test('#108: every status label, counts per filter, and a status change persists'
   await card(window, '1').getByLabel('Thread status').selectOption('wont_fix')
   await expect(card(window, '1').getByLabel('Thread status')).toHaveValue('wont_fix')
   await expect(filterButton(window, 'Open')).toHaveText(/Open\s*1/)
-  await expect(tab(window, /^Comments \(1\)$/)).toBeVisible()
+  await expect(tab(window, /^Comments · 1 open$/)).toBeVisible()
 
   // Persisted: a fresh read of the threads (main + provider) has it...
   const threads = await window.evaluate(
@@ -163,6 +164,9 @@ test('suggestions: insert from the head file, post, and render as a mini-diff', 
 
   // Reply composer: prefilled with line 12 of the head file.
   const reply = thread.getByLabel('Reply to this thread')
+  // The reply box starts as one line; focusing it grows the full composer.
+  await expect(thread.getByRole('button', { name: 'Insert suggestion' })).toHaveCount(0)
+  await reply.click()
   await thread.getByRole('button', { name: 'Insert suggestion' }).click()
   await expect(reply).toHaveValue('```suggestion\n        // Line 12: kept as context.\n```\n')
   await reply.fill('Reword it:\n```suggestion\n        // Line 12: validated above.\n```')
@@ -210,7 +214,7 @@ test('Comments view: filters, General group, and jumping to a hidden line', asyn
   window,
 }, testInfo) => {
   await openPr(window, 'Checkout v2: submit validation')
-  await tab(window, /^Comments \(2\)$/).click()
+  await tab(window, /^Comments · 2 open$/).click()
   await expect(filterButton(window, 'Open')).toHaveText(/Open\s*2/)
   await expect(filterButton(window, 'All')).toHaveText(/All\s*2/)
   await expect(card(window, '2').getByTestId('outdated-badge')).toBeVisible()
@@ -221,7 +225,7 @@ test('Comments view: filters, General group, and jumping to a hidden line', asyn
 
   // Jump: Files tab, the file, line 12 revealed, highlighted and in view.
   await window.getByRole('link', { name: 'src/Services/CheckoutService.cs:12' }).click()
-  await expect(tab(window, /^Files/)).toHaveAttribute('aria-pressed', 'true')
+  await expect(tab(window, /^Files/)).toHaveAttribute('aria-selected', 'true')
   const focused = window.locator('[data-new-line="12"][data-focused="true"]').first()
   await expect(focused).toContainText('// Line 12: kept as context.')
   await expect(focused).toBeInViewport()

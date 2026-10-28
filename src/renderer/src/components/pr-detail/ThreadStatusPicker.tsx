@@ -3,6 +3,13 @@ import type { ThreadStatus } from '../../../../shared/scm'
 import { Badge } from '../ui/Badge'
 import { threadStatusLabel, THREAD_STATUS_TONE, type ScmTone } from '../../lib/scm-labels'
 
+/**
+ * An open (`active`) thread is the normal state: a quiet control with no
+ * fill, so only the states worth noticing (pending, resolved, won't fix…)
+ * carry a tinted pill.
+ */
+const QUIET_CLASS = 'bg-transparent text-muted hover:bg-border/60 hover:text-text'
+
 const TONE_CLASS: Record<ScmTone, string> = {
   neutral: 'bg-border/60 text-muted',
   accent: 'bg-accent/15 text-accent',
@@ -21,8 +28,8 @@ interface ThreadStatusPickerProps {
 
 /**
  * The thread's status as a pill. When the provider allows changes it is a
- * native `<select>` (keyboard and screen-reader friendly) styled as the badge;
- * otherwise a plain badge (none for `active`, the default).
+ * native `<select>` (keyboard and screen-reader friendly) styled as the badge,
+ * untinted for `active`; otherwise a plain badge (none for `active`, the default).
  */
 export function ThreadStatusPicker({
   status,
@@ -48,7 +55,9 @@ export function ThreadStatusPicker({
       disabled={busy}
       onChange={(event) => onChange(event.target.value as ThreadStatus)}
       onClick={(event) => event.stopPropagation()}
-      className={`cursor-pointer rounded-full border-0 py-0.5 pr-1 pl-2 text-xs font-medium outline-offset-1 disabled:cursor-wait disabled:opacity-70 ${TONE_CLASS[THREAD_STATUS_TONE[status]]}`}
+      className={`cursor-pointer rounded-full border-0 py-0.5 pr-1 pl-2 text-xs font-medium outline-offset-1 disabled:cursor-wait disabled:opacity-70 ${
+        status === 'active' ? QUIET_CLASS : TONE_CLASS[THREAD_STATUS_TONE[status]]
+      }`}
     >
       {options.map((option) => (
         <option

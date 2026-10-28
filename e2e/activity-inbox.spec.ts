@@ -75,9 +75,9 @@ test('a new line comment lands in the Inbox and opens the review at its line', a
   await expect(window.locator('header:has(h1)')).toContainText('#482')
   await expect(
     window
-      .getByRole('navigation', { name: 'Pull request views' })
-      .getByRole('button', { name: /^Files/ }),
-  ).toHaveAttribute('aria-pressed', 'true')
+      .getByRole('tablist', { name: 'Pull request views' })
+      .getByRole('tab', { name: /^Files/ }),
+  ).toHaveAttribute('aria-selected', 'true')
   const thread = window.locator('#thread-thread-482-incoming')
   await expect(thread).toBeInViewport()
   await expect(thread).toContainText('Should this retry on 409')
