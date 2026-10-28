@@ -29,3 +29,29 @@ export function mockAuthOverride(
   const value = process.env[variable]
   return MOCK_AUTH_OVERRIDES.find((option) => option === value) ?? null
 }
+
+/**
+ * `MINERVA_MOCK_INCOMING_COMMENT_MS`: in mock mode, a reviewer leaves a new
+ * line comment on one of "my" PRs this many ms after startup (see
+ * `MockGithubService.simulateIncomingComment`), so the activity inbox can be
+ * exercised end to end without a real org. `null` = off (the default).
+ */
+export function mockIncomingCommentDelayMs(): number | null {
+  return mockDelay('MINERVA_MOCK_INCOMING_COMMENT_MS')
+}
+
+/**
+ * `MINERVA_MOCK_INCOMING_REVIEW_MS`: same idea for a vote: the required
+ * reviewer of "my" api#482 requests changes (`simulateIncomingReview`).
+ */
+export function mockIncomingReviewDelayMs(): number | null {
+  return mockDelay('MINERVA_MOCK_INCOMING_REVIEW_MS')
+}
+
+function mockDelay(variable: string): number | null {
+  if (!isMockScmMode()) return null
+  const raw = process.env[variable]
+  if (!raw) return null
+  const parsed = Number.parseInt(raw, 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+}

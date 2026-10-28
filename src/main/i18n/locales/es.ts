@@ -127,6 +127,28 @@ export const es: MessageShape<typeof en> = {
   common: {
     cancel: 'Cancelar',
   },
+  activity: {
+    notification: {
+      commentTitle: '#{{number}} {{title}}',
+      commentBody: '{{author}} comentó: {{excerpt}}',
+      replyBody: '{{author}} respondió: {{excerpt}}',
+      orphanTitle: '#{{number}} {{title}}',
+      orphanBody: 'Su PR base #{{parent}} se fusionó. Cambia su destino a {{base}}.',
+      manyTitle: '{{count}} novedades en tus pull requests',
+      manyBody: 'En {{prs}} pull requests. Abre la Bandeja para verlas.',
+      manyBodyOnePr: 'En un pull request. Abre la Bandeja para verlas.',
+      reviewTitle: '#{{number}} {{title}}',
+      requestTitle: 'Revisión solicitada: #{{number}}',
+      requestBody: 'Te pidieron revisar "{{title}}".',
+      requestBodyOptional: 'Te agregaron como revisor opcional de "{{title}}".',
+      vote: {
+        approved: '{{reviewer}} aprobó tu pull request.',
+        approved_with_suggestions: '{{reviewer}} aprobó con sugerencias.',
+        changes_requested: '{{reviewer}} pidió cambios.',
+        rejected: '{{reviewer}} rechazó tu pull request.',
+      },
+    },
+  },
   windows: {
     didacticTitle: 'Minerva — Análisis {{repo}}#{{number}}',
   },

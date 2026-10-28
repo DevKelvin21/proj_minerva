@@ -8,6 +8,7 @@ import { CommandPalette } from './components/layout/CommandPalette'
 import { useCommandPaletteShortcut } from './hooks/use-command-palette-shortcut'
 import { useSidebarShortcut } from './hooks/use-sidebar-shortcut'
 import { useChatEvents } from './hooks/use-chat-events'
+import { useOpenActivityFromNotifications } from './hooks/use-activity'
 import { useAppStore } from './stores/app-store'
 
 /**
@@ -34,6 +35,7 @@ function App(): React.JSX.Element {
   useSidebarShortcut()
   useCommandPaletteShortcut()
   useChatEvents()
+  useOpenActivityFromNotifications()
 
   const onHome = mainView === 'home'
 

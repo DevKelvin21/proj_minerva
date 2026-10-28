@@ -64,16 +64,33 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci�
   await expect(detached.getByText(/^\d+%$/).first()).toBeVisible()
   const overlaySvg = overlay.locator('svg[id*="mermaid"], svg[aria-roledescription]').first()
   await expect(overlaySvg).toBeVisible({ timeout: 10_000 })
-  // The viewer lays the diagram out a frame after it shows: wait for a real box.
+  // Find the diagram AND measure it in one page-side step, polled. Measuring
+  // through a locator (`boundingBox()`, `evaluate`) resolves the element in
+  // one round trip and measures it in another: the viewer swaps the SVG node
+  // shortly after it first shows, and a node swapped in between measures as
+  // detached (`boundingBox()` null, no `closest()` ancestor, height 0) while
+  // the page shows the diagram at full size.
   await expect
-    .poll(async () => (await overlaySvg.boundingBox())?.width ?? 0, {
-      message: 'diagrama con tamaño real dentro del visor',
-    })
-    .toBeGreaterThan(100)
-  const zoomAreaH = await overlaySvg.evaluate(
-    (svg) => svg.closest('[class*="overflow-hidden"]')?.getBoundingClientRect().height ?? 0,
-  )
-  expect(zoomAreaH, 'área de zoom con altura real (no colapsada)').toBeGreaterThan(300)
+    .poll(
+      () =>
+        detached.evaluate(() => {
+          const svg = document.querySelector(
+            '.fixed.inset-0 svg[id*="mermaid"], .fixed.inset-0 svg[aria-roledescription]',
+          )
+          const zoomArea = svg?.closest('[class*="overflow-hidden"]')
+          const svgWidth = svg?.getBoundingClientRect().width ?? 0
+          const zoomAreaHeight = zoomArea?.getBoundingClientRect().height ?? 0
+          // The numbers ride along so a failure says what was measured.
+          return {
+            svgSized: svgWidth > 100,
+            zoomAreaTall: zoomAreaHeight > 300,
+            svgWidth: Math.round(svgWidth),
+            zoomAreaHeight: Math.round(zoomAreaHeight),
+          }
+        }),
+      { message: 'diagrama con tamaño real, en un área de zoom no colapsada' },
+    )
+    .toMatchObject({ svgSized: true, zoomAreaTall: true })
 
   await attachScreenshot(detached, testInfo, 'detached-viewer-482')
 

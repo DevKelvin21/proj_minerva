@@ -1,8 +1,11 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { ChatConversationSummary, ChatEvent, ChatMessage } from '../shared/chat'
 import type { IpcChannel, IpcRequest, IpcResponse, MinervaApi } from '../shared/ipc'
+import { isActivityState } from '../shared/activity'
 import {
   MINERVA_EVENTS,
+  type ActivityChangedEvent,
+  type OpenActivityEvent,
   type AnalysisActivityItem,
   type AnalysisProgressEvent,
   type AppearanceChangedEvent,
@@ -296,6 +299,32 @@ function onChatEvent(callback: (payload: ChatEvent) => void): () => void {
   return () => ipcRenderer.removeListener(MINERVA_EVENTS.chat, listener)
 }
 
+/** The activity inbox changed; the payload is checked item by item (its text reaches the UI). */
+function onActivityChanged(callback: (payload: ActivityChangedEvent) => void): () => void {
+  const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+    if (
+      typeof payload === 'object' &&
+      payload !== null &&
+      isActivityState((payload as Record<string, unknown>).state)
+    ) {
+      callback(payload as ActivityChangedEvent)
+    }
+  }
+  ipcRenderer.on(MINERVA_EVENTS.activityChanged, listener)
+  return () => ipcRenderer.removeListener(MINERVA_EVENTS.activityChanged, listener)
+}
+
+/** A system notification was clicked: `itemId` (string) or `null` (open the Inbox). */
+function onOpenActivity(callback: (payload: OpenActivityEvent) => void): () => void {
+  const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+    if (typeof payload !== 'object' || payload === null) return
+    const itemId = (payload as Record<string, unknown>).itemId
+    if (itemId === null || typeof itemId === 'string') callback({ itemId })
+  }
+  ipcRenderer.on(MINERVA_EVENTS.openActivity, listener)
+  return () => ipcRenderer.removeListener(MINERVA_EVENTS.openActivity, listener)
+}
+
 const minervaApi = {
   system: {
     ping: invoke('minerva:ping'),
@@ -320,6 +349,10 @@ const minervaApi = {
     getStacks: invoke('scm:getStacks'),
     getDashboard: invoke('scm:getDashboard'),
   },
+  activity: {
+    get: invoke('activity:get'),
+    markRead: invoke('activity:markRead'),
+  },
   ai: {
     analyzePullRequest: invoke('ai:analyzePullRequest'),
     getCachedAnalysis: invoke('ai:getCachedAnalysis'),
@@ -343,6 +376,8 @@ const minervaApi = {
     setModelOption: invoke('settings:setModelOption'),
     getLanguage: invoke('settings:getLanguage'),
     setLanguage: invoke('settings:setLanguage'),
+    getNotifications: invoke('settings:getNotifications'),
+    setNotifications: invoke('settings:setNotifications'),
     getAppearance: invoke('settings:getAppearance'),
     setAppearance: invoke('settings:setAppearance'),
   },
@@ -367,6 +402,8 @@ const minervaApi = {
     onLanguageChanged,
     onAppearanceChanged,
     onChatEvent,
+    onActivityChanged,
+    onOpenActivity,
   },
 } satisfies MinervaApi
 

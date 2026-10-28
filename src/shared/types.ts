@@ -211,6 +211,11 @@ export interface PrComment {
    * doesn't offer the copy button.
    */
   htmlUrl?: string
+  /**
+   * Written by the signed-in user, matched by identity in main (GitHub
+   * `viewerDidAuthor`, Azure identity id). Absent = someone else, or unknown.
+   */
+  isViewer?: boolean
 }
 
 export interface CommentThread {

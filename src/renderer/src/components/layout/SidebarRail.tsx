@@ -1,8 +1,9 @@
-import { FolderGit2, Layers, ListTodo, PanelLeft } from 'lucide-react'
+import { Bell, FolderGit2, Layers, ListTodo, PanelLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import { useHomeOpenPr } from '../../hooks/use-home-open-pr'
 import { useNeedsReviewCount } from '../../hooks/use-needs-review-count'
+import { useUnreadActivityCount } from '../../hooks/use-activity'
 import { countOrphans } from '../../lib/stacks'
 import { MOD_KEY_LABEL } from '../../lib/platform'
 import { useAppStore, type SidebarView } from '../../stores/app-store'
@@ -12,9 +13,10 @@ const VIEW_ICON: Record<SidebarView, React.JSX.Element> = {
   queue: <ListTodo size={18} aria-hidden />,
   list: <FolderGit2 size={18} aria-hidden />,
   stacks: <Layers size={18} aria-hidden />,
+  inbox: <Bell size={18} aria-hidden />,
 }
 
-const VIEWS: readonly SidebarView[] = ['queue', 'list', 'stacks']
+const VIEWS: readonly SidebarView[] = ['queue', 'list', 'stacks', 'inbox']
 
 /**
  * The docked sidebar folded (Cmd/Ctrl+B, title bar toggle): 56px that keep
@@ -33,10 +35,16 @@ export function SidebarRail(): React.JSX.Element {
     s.selectedPr && s.mainView === 'review' ? prKey(s.selectedPr.repo, s.selectedPr.number) : null,
   )
   const toReview = useNeedsReviewCount()
+  const unreadActivity = useUnreadActivityCount()
   const orphans = useStacksStore((s) => (s.result ? countOrphans(s.result.stacks) : 0))
   const { open } = useHomeOpenPr()
 
-  const badge: Record<SidebarView, number> = { queue: toReview, list: 0, stacks: orphans }
+  const badge: Record<SidebarView, number> = {
+    queue: toReview,
+    list: 0,
+    stacks: orphans,
+    inbox: unreadActivity,
+  }
 
   return (
     <nav

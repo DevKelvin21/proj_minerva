@@ -14,6 +14,7 @@
  * indexada por canal, así el tipado (`Record<IpcChannel, ...>`) obliga a
  * cubrir cualquier canal nuevo del contrato.
  */
+import { isNotificationSettings } from '../../shared/activity'
 import { isAiProviderId } from '../../shared/ai-providers'
 import type { IpcChannel } from '../../shared/ipc'
 import { isAppLocale } from '../../shared/locale'
@@ -207,6 +208,27 @@ function isGetStacksPayload(value: unknown): boolean {
   return value.refresh === undefined || typeof value.refresh === 'boolean'
 }
 
+const MAX_ACTIVITY_IDS = 500
+const MAX_ACTIVITY_ID_LEN = 600
+
+/**
+ * `activity:markRead`: exactly `{ all: true }`, or `{ ids }` with 1..500
+ * non-empty ids (no other key).
+ */
+function isMarkActivityReadPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (Object.hasOwn(value, 'all')) {
+    return hasOnlyKeys(value, ['all']) && value.all === true
+  }
+  if (!hasOnlyKeys(value, ['ids']) || !Array.isArray(value.ids)) return false
+  const ids: unknown[] = value.ids
+  return (
+    ids.length > 0 &&
+    ids.length <= MAX_ACTIVITY_IDS &&
+    ids.every((id) => isNonEmptyString(id, MAX_ACTIVITY_ID_LEN))
+  )
+}
+
 /**
  * `scm:getDashboard`: nothing, or a plain `{ refresh?: boolean }` (no other
  * key, no inherited `refresh`).
@@ -380,6 +402,8 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:retarget': isRetargetPayload,
   'scm:getStacks': isGetStacksPayload,
   'scm:getDashboard': isGetDashboardPayload,
+  'activity:get': isVoidPayload,
+  'activity:markRead': isMarkActivityReadPayload,
   'ai:analyzePullRequest': isRepoAndNumberPayload,
   'ai:getCachedAnalysis': isRepoAndNumberPayload,
   'ai:invalidateAnalysis': isRepoAndNumberPayload,
@@ -398,6 +422,8 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'settings:setModelOption': isSetModelOptionPayload,
   'settings:getLanguage': isVoidPayload,
   'settings:setLanguage': isSetLanguagePayload,
+  'settings:getNotifications': isVoidPayload,
+  'settings:setNotifications': isNotificationSettings,
   'settings:getAppearance': isVoidPayload,
   'settings:setAppearance': isSetAppearancePayload,
   'themes:searchOpenVsx': isSearchOpenVsxPayload,

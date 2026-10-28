@@ -38,14 +38,17 @@ import type {
   ChatSendRequest,
   ChatSendResult,
 } from './chat'
+import type { ActivityState, MarkActivityReadRequest, NotificationSettings } from './activity'
 import type { AiModelOption, AiProviderId } from './ai-providers'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
 import type { OpenVsxExtension, OpenVsxSort, OpenVsxThemePackage } from './theme/open-vsx'
 import type {
+  ActivityChangedEvent,
   AnalysisProgressEvent,
   AppearanceChangedEvent,
   LanguageChangedEvent,
+  OpenActivityEvent,
   PrListChangedEvent,
   UpdaterStatusChangedEvent,
 } from './events'
@@ -161,6 +164,11 @@ export interface IpcContract {
    */
   'scm:getDashboard': { req: { refresh?: boolean } | void; res: DashboardResult }
 
+  /** The activity inbox (`shared/activity.ts`): every item, newest first, plus the unread count. */
+  'activity:get': { req: void; res: ActivityState }
+  /** Marks some items (`ids`) or every one (`all`) as read; answers the new state. */
+  'activity:markRead': { req: MarkActivityReadRequest; res: ActivityState }
+
   'ai:analyzePullRequest': { req: { repo: RepoRef; number: number }; res: DidacticAnalysis }
   /**
    * Lectura pura del cache de análisis en main (T14, `../main/ai/analysis-cache.ts`):
@@ -270,6 +278,10 @@ export interface IpcContract {
    * didactic window switch at once. Answers the saved language.
    */
   'settings:setLanguage': { req: { language: AppLocale }; res: AppLocale }
+  /** Settings → Notifications (`shared/activity.ts`); the defaults when nothing is saved. */
+  'settings:getNotifications': { req: void; res: NotificationSettings }
+  /** Saves them and re-applies the dock badge; answers what was saved. */
+  'settings:setNotifications': { req: NotificationSettings; res: NotificationSettings }
 
   /** Appearance (mode, theme per half, contrast, custom themes) from settings.json, or the defaults. */
   'settings:getAppearance': { req: void; res: AppearanceSettings }
@@ -371,6 +383,8 @@ export const IPC_CHANNELS = [
   'scm:retarget',
   'scm:getStacks',
   'scm:getDashboard',
+  'activity:get',
+  'activity:markRead',
   'ai:analyzePullRequest',
   'ai:getCachedAnalysis',
   'ai:invalidateAnalysis',
@@ -389,6 +403,8 @@ export const IPC_CHANNELS = [
   'settings:setModelOption',
   'settings:getLanguage',
   'settings:setLanguage',
+  'settings:getNotifications',
+  'settings:setNotifications',
   'settings:getAppearance',
   'settings:setAppearance',
   'themes:searchOpenVsx',
@@ -462,6 +478,10 @@ interface EventsApi {
   onAppearanceChanged(callback: (payload: AppearanceChangedEvent) => void): () => void
   /** Side-panel chat messages, summaries and deletions (`./chat.ts`); same concrete-method pattern. */
   onChatEvent(callback: (payload: ChatEvent) => void): () => void
+  /** The activity inbox changed (full state); same concrete-method pattern. */
+  onActivityChanged(callback: (payload: ActivityChangedEvent) => void): () => void
+  /** A system notification was clicked (main window only); same concrete-method pattern. */
+  onOpenActivity(callback: (payload: OpenActivityEvent) => void): () => void
 }
 
 export type MinervaApi = InvokeApi & { events: EventsApi }

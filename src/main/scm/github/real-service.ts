@@ -86,6 +86,8 @@ interface GraphqlCommentNode {
   createdAt: string
   isMinimized: boolean
   url: string
+  /** Absent in older fixtures; `true` = the token's user wrote it. */
+  viewerDidAuthor?: boolean
   author: GraphqlAuthor | null
 }
 
@@ -293,12 +295,12 @@ const PULL_REQUEST_THREADS_QUERY = `
             originalLine
             diffSide
             comments(first: 100) {
-              nodes { id body createdAt isMinimized url author { login avatarUrl } }
+              nodes { id body createdAt isMinimized url viewerDidAuthor author { login avatarUrl } }
             }
           }
         }
         comments(first: 100) {
-          nodes { id body createdAt isMinimized url author { login avatarUrl } }
+          nodes { id body createdAt isMinimized url viewerDidAuthor author { login avatarUrl } }
         }
       }
     }
@@ -314,6 +316,7 @@ const ADD_REVIEW_THREAD_REPLY_MUTATION = `
         createdAt
         isMinimized
         url
+        viewerDidAuthor
         author { login avatarUrl }
       }
     }
@@ -323,7 +326,7 @@ const ADD_REVIEW_THREAD_REPLY_MUTATION = `
 const REVIEW_THREAD_FIELDS =
   ' id isResolved isOutdated path line originalLine diffSide' +
   ' comments(first: 100) {' +
-  '   nodes { id body createdAt isMinimized url author { login avatarUrl } }' +
+  '   nodes { id body createdAt isMinimized url viewerDidAuthor author { login avatarUrl } }' +
   ' }'
 
 const RESOLVE_REVIEW_THREAD_MUTATION =
@@ -586,7 +589,7 @@ function mapDetailNode(pr: PullRequestDetailNode, repo: GithubRepoRef): PullRequ
 }
 
 function mapGraphqlCommentToPrComment(comment: GraphqlCommentNode): PrComment {
-  return {
+  const mapped: PrComment = {
     id: comment.id,
     author: mapAuthor(comment.author),
     bodyMarkdown: comment.body,
@@ -594,6 +597,8 @@ function mapGraphqlCommentToPrComment(comment: GraphqlCommentNode): PrComment {
     isMinimized: comment.isMinimized,
     htmlUrl: comment.url,
   }
+  if (comment.viewerDidAuthor) mapped.isViewer = true
+  return mapped
 }
 
 function mapReviewThreadNode(node: ReviewThreadNode): CommentThread {
@@ -636,6 +641,7 @@ function mapFileStatus(status: string): DiffFileStatus {
   }
 }
 
+/** Only maps what `postComment` just wrote, so it is always the user's own comment. */
 function mapRestCommentToPrComment(data: {
   id: number
   body?: string | null
@@ -652,6 +658,7 @@ function mapRestCommentToPrComment(data: {
     createdAt: data.created_at,
     isMinimized: false,
     htmlUrl: data.html_url,
+    isViewer: true,
   }
 }
 

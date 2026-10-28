@@ -627,6 +627,40 @@ describe('SettingsStore', () => {
       expect(JSON.parse(readFileSync(settingsFilePath(), 'utf-8'))).not.toHaveProperty('language')
     })
   })
+  describe('notifications', () => {
+    it('defaults to direct-only with the badge on', () => {
+      expect(new SettingsStore().getNotifications()).toEqual({ level: 'direct', badge: true })
+    })
+
+    it('persists them without touching other fields, and other setters keep them', () => {
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({ aiProvider: 'codex', models: { codex: 'gpt-5' }, language: 'es' }),
+        'utf-8',
+      )
+      new SettingsStore().setNotifications({ level: 'off', badge: false })
+      const reloaded = new SettingsStore()
+      expect(reloaded.getNotifications()).toEqual({ level: 'off', badge: false })
+      expect(reloaded.getLanguage()).toBe('es')
+      reloaded.setLanguage('en')
+      expect(new SettingsStore().getNotifications()).toEqual({ level: 'off', badge: false })
+    })
+
+    it('drops an invalid block (defaults) without discarding the rest', () => {
+      writeFileSync(
+        settingsFilePath(),
+        JSON.stringify({
+          aiProvider: 'codex',
+          models: { codex: 'gpt-5' },
+          notifications: { level: 'loud', badge: true },
+        }),
+        'utf-8',
+      )
+      const store = new SettingsStore()
+      expect(store.getNotifications()).toEqual({ level: 'direct', badge: true })
+      expect(store.getPersistedModel('codex')).toBe('gpt-5')
+    })
+  })
   describe('appearance', () => {
     const custom = {
       id: 'my-theme',

@@ -308,6 +308,14 @@ describe('mapThread', () => {
     ],
   }
 
+  it("marks the viewer's comments by identity id, case-insensitively", () => {
+    const flags = (viewerId?: string) =>
+      mapThread(base, azRepo, 42, viewerId)?.comments.map((c) => c.isViewer === true)
+    expect(flags('U')).toEqual([true, false])
+    expect(flags('v')).toEqual([false, true])
+    expect(flags()).toEqual([false, false])
+  })
+
   it('maps a line thread to the neutral shape, with its anchor', () => {
     expect(mapThread(base, azRepo, 42)).toEqual({
       id: '9',
