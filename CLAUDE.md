@@ -39,8 +39,10 @@ unified patches built in main.
   `stacks-service` (orphans via exact merged-by-source lookups), `dashboard-service`
   (`scm:getDashboard`: scope open PRs + the user's own, with `labels`/`reviewers`/`viewer`),
   `scope-cache` (ONE single-flight 60 s scope fetch shared by stacks and dashboard; the
-  watcher's changes, retargets and settings drop it via `invalidateListCaches`). Composition
-  root: `default-scm.ts`. `viewer` (author / required / optional reviewer + own vote) is
+  watcher's changes, retargets and settings drop it via `invalidateListCaches`), `activity-service`
+  (inbox fed by every watcher listing: threads fetched only when GitHub's `updatedAt` moved,
+  Azure round-robin; ids diffed in `activity.json`; own comments skipped via `PrComment.isViewer`;
+  `docs/plan-notifications.md`). Composition root: `default-scm.ts`. `viewer` (author / required / optional reviewer + own vote) is
   matched by identity in main, never by display login in the renderer.
 - **Title bar** (`components/layout/TitleBar.tsx`): where you are (`TitleBarLocation`: repo or
   feature › #n Title), the Cmd/Ctrl+K `CommandPalette` (PRs from the dashboard cache, files of
@@ -197,6 +199,9 @@ author's Spanish logs, not maintained)
 - `MINERVA_MOCK_GH_AUTH` / `MINERVA_MOCK_AZURE_AUTH` = `signed_in|unauthenticated|cli_unavailable`
   (mock only): force a provider's auth state. The `gh` probe is real even in mock mode, so e2e
   that assert GitHub's header/sign-in state must set `MINERVA_MOCK_GH_AUTH` (`provider-aware.spec.ts`).
+- `MINERVA_MOCK_INCOMING_COMMENT_MS=<ms>` / `MINERVA_MOCK_INCOMING_REVIEW_MS=<ms>` (mock only): a
+  reviewer opens a line thread on / requests changes on api#482 that long after startup, to exercise
+  the activity inbox. Pair with a short `MINERVA_WATCH_INTERVAL_MS`.
 - `MINERVA_MOCK_UPDATER=1|notify|error` scripted updater UI · `MINERVA_UPDATER=off` kill switch (e2e default).
 - Packaging: `npm run dist:mac:dir` / `dist:mac`, `dist:dir` / `dist` (Linux).
 

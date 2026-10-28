@@ -60,3 +60,59 @@ describe('MockGithubService summaries', () => {
     expect(again).toEqual(first)
   })
 })
+
+describe('MockGithubService comments', () => {
+  const api = {
+    provider: 'github' as const,
+    owner: 'shopwave',
+    name: 'api',
+    fullName: 'shopwave/api',
+  }
+
+  it("marks the mock user's comments as the viewer's", async () => {
+    const threads = await new MockGithubService().getCommentThreads(api, 482)
+    const flags = threads.flatMap((t) =>
+      t.comments.map((c) => [c.author.login, c.isViewer === true]),
+    )
+    expect(flags).toEqual([
+      ['dkumar', false],
+      ['mgarcia', true],
+      ['dkumar', false],
+    ])
+  })
+
+  it('simulates one incoming line comment on api#482 and moves its updatedAt', async () => {
+    const mock = new MockGithubService()
+    const before = (await mock.listPullRequests({})).find((pr) => pr.number === 482)
+    const at = new Date('2026-10-28T12:00:00.000Z')
+    expect(mock.simulateIncomingComment(at)).toBe(true)
+    expect(mock.simulateIncomingComment(at)).toBe(false)
+
+    const after = (await mock.listPullRequests({})).find((pr) => pr.number === 482)
+    expect(after?.updatedAt).toBe(at.toISOString())
+    expect(after?.updatedAt).not.toBe(before?.updatedAt)
+    // Review comments do not count in GitHub's comment total.
+    expect(after?.commentCount).toBe(before?.commentCount)
+
+    const threads = await mock.getCommentThreads(api, 482)
+    expect(threads.at(-1)).toMatchObject({
+      isLineThread: true,
+      path: 'src/routes/carts.ts',
+      line: 26,
+      comments: [{ author: { login: 'jrivas' }, createdAt: at.toISOString() }],
+    })
+    expect(threads.at(-1)?.comments[0].isViewer).toBeUndefined()
+  })
+})
+
+describe('MockGithubService incoming review', () => {
+  it('dkumar requests changes on api#482, once', async () => {
+    const mock = new MockGithubService()
+    expect(mock.simulateIncomingReview(new Date('2026-10-28T12:00:00.000Z'))).toBe(true)
+    expect(mock.simulateIncomingReview()).toBe(false)
+    const pr = (await mock.listPullRequests({})).find((p) => p.number === 482)
+    expect(pr?.reviewers).toEqual([expect.objectContaining({ vote: 'changes_requested' })])
+    expect(pr?.reviewDecision).toBe('changes_requested')
+    expect(pr?.updatedAt).toBe('2026-10-28T12:00:00.000Z')
+  })
+})

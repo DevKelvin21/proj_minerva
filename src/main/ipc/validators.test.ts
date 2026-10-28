@@ -741,6 +741,52 @@ describe('payloadValidators', () => {
     })
   })
 
+  describe('settings:setNotifications', () => {
+    const validate = payloadValidators['settings:setNotifications']
+    it('accepts a level and the badge flag', () => {
+      expect(validate({ level: 'off', badge: false })).toBe(true)
+      expect(validate({ level: 'direct', badge: true })).toBe(true)
+      expect(validate({ level: 'all', badge: true })).toBe(true)
+    })
+
+    it('rejects unknown levels, missing or extra keys, wrong types', () => {
+      expect(validate(undefined)).toBe(false)
+      expect(validate({ level: 'loud', badge: true })).toBe(false)
+      expect(validate({ level: 'all' })).toBe(false)
+      expect(validate({ level: 'all', badge: 'yes' })).toBe(false)
+      expect(validate({ level: 'all', badge: true, sound: true })).toBe(false)
+      expect(validate([])).toBe(false)
+    })
+  })
+
+  describe('activity:markRead', () => {
+    const validate = payloadValidators['activity:markRead']
+    it('accepts { all: true } or a list of ids', () => {
+      expect(validate({ all: true })).toBe(true)
+      expect(validate({ ids: ['comment:github:shopwave/api#1:c1'] })).toBe(true)
+    })
+
+    it('rejects anything else', () => {
+      expect(validate(undefined)).toBe(false)
+      expect(validate({})).toBe(false)
+      expect(validate({ all: false })).toBe(false)
+      expect(validate({ all: true, ids: ['a'] })).toBe(false)
+      expect(validate({ ids: [] })).toBe(false)
+      expect(validate({ ids: [''] })).toBe(false)
+      expect(validate({ ids: [1] })).toBe(false)
+      expect(validate({ ids: 'a' })).toBe(false)
+      expect(validate({ ids: ['x'.repeat(601)] })).toBe(false)
+      expect(validate({ ids: Array.from({ length: 501 }, (_, i) => 'id' + i) })).toBe(false)
+    })
+  })
+
+  describe('activity:get', () => {
+    it('takes no payload', () => {
+      expect(payloadValidators['activity:get'](undefined)).toBe(true)
+      expect(payloadValidators['activity:get']({})).toBe(false)
+    })
+  })
+
   describe('scm:getDashboard', () => {
     const validate = payloadValidators['scm:getDashboard']
     it('accepts nothing or { refresh: boolean }', () => {

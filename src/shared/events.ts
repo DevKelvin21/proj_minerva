@@ -12,6 +12,7 @@
  * renderer se suscriba a un canal arbitrario si en algún momento tuviera
  * acceso a `ipcRenderer` por una vía no prevista.
  */
+import type { ActivityState } from './activity'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
 import type { DidacticSnippet, RepoRef, UpdaterStatus, WalkthroughCohort } from './types'
@@ -200,12 +201,32 @@ export interface AppearanceChangedEvent {
   appearance: AppearanceSettings
 }
 
+/**
+ * Payload of `minerva:event:activityChanged`: the activity inbox changed
+ * (new items, read flags, an orphan resolved). Always the FULL state, like
+ * `UpdaterStatusChangedEvent`, so a window that joins late rebuilds nothing.
+ */
+export interface ActivityChangedEvent {
+  state: ActivityState
+}
+
+/**
+ * Payload of `minerva:event:openActivity`: the user clicked a system
+ * notification. `itemId` = open that inbox item; `null` = several items,
+ * show the Inbox. Sent to the main window only.
+ */
+export interface OpenActivityEvent {
+  itemId: string | null
+}
+
 export interface EventContract {
   'minerva:event:analysisProgress': AnalysisProgressEvent
   'minerva:event:prListChanged': PrListChangedEvent
   'minerva:event:updaterStatusChanged': UpdaterStatusChangedEvent
   'minerva:event:languageChanged': LanguageChangedEvent
   'minerva:event:appearanceChanged': AppearanceChangedEvent
+  'minerva:event:activityChanged': ActivityChangedEvent
+  'minerva:event:openActivity': OpenActivityEvent
 }
 
 export type EventChannel = keyof EventContract
@@ -222,4 +243,6 @@ export const MINERVA_EVENTS = {
   updaterStatusChanged: 'minerva:event:updaterStatusChanged',
   languageChanged: 'minerva:event:languageChanged',
   appearanceChanged: 'minerva:event:appearanceChanged',
+  activityChanged: 'minerva:event:activityChanged',
+  openActivity: 'minerva:event:openActivity',
 } satisfies Record<string, EventChannel>

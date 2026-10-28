@@ -974,8 +974,9 @@ export class AzureScmProvider implements ScmProvider {
     number: number,
     latest: number | null,
     paths: ReadonlySet<string> | null,
+    viewerId: string | null = null,
   ): CommentThread | null {
-    const mapped = mapThread(thread, repo, number)
+    const mapped = mapThread(thread, repo, number, viewerId)
     if (!mapped) return null
     if (isThreadOutdated(mapped, threadAnchor(thread), latest, paths)) mapped.isOutdated = true
     return mapped
@@ -984,13 +985,15 @@ export class AzureScmProvider implements ScmProvider {
   async getCommentThreads(repoRef: RepoRef, number: number): Promise<CommentThread[]> {
     const repo = this.scoped(repoRef)
     const latest = await this.requireLatestIteration(repo, number)
-    const [threads, iteration] = await Promise.all([
+    const [threads, iteration, me] = await Promise.all([
       this.threadsAt(repo, number, latest.id),
       this.iterationChanges(repo, number, latest.id).catch(() => null),
+      // Only marks the user's own comments (`isViewer`): never fails the read.
+      this.identity(repo.organization).catch(() => null),
     ])
     const paths = AzureScmProvider.knownPaths(iteration)
     return threads
-      .map((thread) => this.finishThread(thread, repo, number, latest.id, paths))
+      .map((thread) => this.finishThread(thread, repo, number, latest.id, paths, me?.id))
       .filter((thread): thread is CommentThread => thread !== null)
   }
 
@@ -1017,7 +1020,7 @@ export class AzureScmProvider implements ScmProvider {
         this.repoUrl(repo, 'pullRequests', req.number, 'threads', threadId, 'comments'),
         { method: 'POST', body: { ...comment, parentCommentId: root?.id ?? 0 } },
       )
-      return mapComment(created, threadId, repo, req.number)
+      return { ...mapComment(created, threadId, repo, req.number), isViewer: true }
     }
 
     const body: Record<string, unknown> = {
@@ -1059,7 +1062,7 @@ export class AzureScmProvider implements ScmProvider {
     )
     const first = created.comments[0]
     if (!first) throw new ScmError('UNKNOWN', mt('azure.threadWithoutComments'))
-    return mapComment(first, created.id, repo, req.number)
+    return { ...mapComment(first, created.id, repo, req.number), isViewer: true }
   }
 
   async setThreadStatus(req: SetThreadStatusRequest): Promise<CommentThread> {

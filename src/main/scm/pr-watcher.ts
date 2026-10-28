@@ -50,6 +50,12 @@ export interface PrWatcherDeps {
    * A throw here never blocks the broadcast.
    */
   onChanges?: (event: PrListChangedEvent) => void
+  /**
+   * Every listing that reached at least one provider, the silent first one
+   * included (the activity inbox, `./activity-service.ts`, does its own
+   * baseline). Not awaited; a throw never stops the watcher.
+   */
+  onListing?: (result: WatcherListResult) => void
   /** Nominal interval between successful ticks (ms). Default 60s. */
   intervalMs?: number
 }
@@ -188,6 +194,13 @@ export function createPrWatcher(deps: PrWatcherDeps): PrWatcher {
       // First tick establishes the baseline silently (no broadcast).
       if (snapshot || result.okProviders.length > 0) snapshot = nextSnapshot
       for (const provider of result.okProviders) baselined.add(provider)
+      if (result.okProviders.length > 0) {
+        try {
+          deps.onListing?.(result)
+        } catch (error) {
+          console.warn('[pr-watcher] onListing failed:', error)
+        }
+      }
     } catch (error) {
       handleErrors([{ code: scmCodeOf(error), detail: error }])
     } finally {

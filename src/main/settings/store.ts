@@ -67,6 +67,11 @@
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  isNotificationSettings,
+  type NotificationSettings,
+} from '../../shared/activity'
 import { DEFAULT_AI_PROVIDER, isAiProviderId, type AiProviderId } from '../../shared/ai-providers'
 import { DEFAULT_LOCALE, isAppLocale, type AppLocale } from '../../shared/locale'
 import {
@@ -142,6 +147,12 @@ export interface PersistedSettings {
    * rest of the file.
    */
   appearance?: AppearanceSettings
+  /**
+   * Activity notifications (`../../shared/activity.ts`): system notification
+   * level and the dock badge. Absent = defaults (direct only, badge on); an
+   * invalid block is dropped on load without touching the rest.
+   */
+  notifications?: NotificationSettings
 }
 
 export interface PersistedScmSettings {
@@ -247,6 +258,15 @@ function dropInvalidLanguage(value: Record<string, unknown>): Record<string, unk
   return next
 }
 
+/** Same idea for `notifications`: a bad hand edit falls back to the defaults. */
+function dropInvalidNotifications(value: Record<string, unknown>): Record<string, unknown> {
+  if (value.notifications === undefined || isNotificationSettings(value.notifications)) return value
+  console.warn('[settings] settings.json has an invalid "notifications" block; using the defaults.')
+  const next = { ...value }
+  delete next.notifications
+  return next
+}
+
 /**
  * Repairs `appearance` piece by piece (`sanitizeAppearanceSettings`: invalid
  * custom themes dropped, dangling theme ids reset) or drops it when it is not
@@ -274,6 +294,9 @@ function isNewPersistedSettings(value: unknown): value is PersistedSettings {
   if (value.scm !== undefined && !isPersistedScmSettings(value.scm)) return false
   if (value.language !== undefined && !isAppLocale(value.language)) return false
   if (value.appearance !== undefined && !isAppearanceSettings(value.appearance)) return false
+  if (value.notifications !== undefined && !isNotificationSettings(value.notifications)) {
+    return false
+  }
   return value.githubAccount === undefined || isGithubAccountLogin(value.githubAccount)
 }
 
@@ -372,8 +395,8 @@ function migrateRaw(parsed: unknown): MigrationResult | null {
 
   if (!isPlainObject(parsed)) return null
 
-  const migrated = repairAppearance(
-    dropInvalidLanguage(dropInvalidScm(migrateRawOpenRouterToOpenCode(parsed))),
+  const migrated = dropInvalidNotifications(
+    repairAppearance(dropInvalidLanguage(dropInvalidScm(migrateRawOpenRouterToOpenCode(parsed)))),
   )
   if (!isNewPersistedSettings(migrated)) return null
   return { settings: migrated, changedFromDisk: migrated !== parsed }
@@ -497,6 +520,16 @@ export class SettingsStore {
     this.persist({ ...this.baseSettings(), appearance })
   }
 
+  /** Notification settings; the defaults when nothing (valid) is saved. */
+  getNotifications(): NotificationSettings {
+    return this.load()?.notifications ?? DEFAULT_NOTIFICATION_SETTINGS
+  }
+
+  /** Replaces the saved notification settings (caller validated them). */
+  setNotifications(notifications: NotificationSettings): void {
+    this.persist({ ...this.baseSettings(), notifications })
+  }
+
   /** Replaces the saved per-provider SCM settings (caller validated `next`). */
   setScmSettings(next: PersistedScmSettings): void {
     this.persist({ ...this.baseSettings(), scm: next })
@@ -520,6 +553,7 @@ export class SettingsStore {
       scm: current.scm,
       language: current.language,
       appearance: current.appearance,
+      notifications: current.notifications,
     }
   }
 

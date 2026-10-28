@@ -242,9 +242,12 @@ export function DiffView({
     if (!pendingThreadFocus || pendingThreadFocus.path !== file.path) return
     const el = document.getElementById(`thread-${pendingThreadFocus.threadId}`)
     if (!el && head.status === 'loading') return
+    // Not among this file's threads yet: they are being refetched (the
+    // activity inbox reopened the PR for a newer comment). Wait for them.
+    if (!el && !lineThreads.some((thread) => thread.id === pendingThreadFocus.threadId)) return
     el?.scrollIntoView({ block: 'center' })
     clearPendingThreadFocus()
-  }, [pendingThreadFocus, file.path, head.status, sections, clearPendingThreadFocus])
+  }, [pendingThreadFocus, file.path, head.status, sections, lineThreads, clearPendingThreadFocus])
 
   // Scroll to the first line of the active layer's range in this file (its
   // row carries `data-new-line`/`data-old-line`). A line hidden in a collapsed

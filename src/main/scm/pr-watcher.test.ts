@@ -77,6 +77,28 @@ describe('createPrWatcher', () => {
     watcher.stop()
   })
 
+  it('hands every listing that reached a provider to onListing, the first one included', async () => {
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce(ok([makeSummary()]))
+      .mockResolvedValueOnce(fail('NETWORK'))
+      .mockResolvedValueOnce(ok([makeSummary()]))
+    const onListing = vi.fn(() => {
+      throw new Error('a failing consumer never stops the watcher')
+    })
+    const watcher = createPrWatcher({ list, broadcast: vi.fn(), onListing, intervalMs: 1000 })
+
+    watcher.start()
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(1000)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(list).toHaveBeenCalledTimes(3)
+    expect(onListing).toHaveBeenCalledTimes(2)
+    expect(onListing).toHaveBeenLastCalledWith(ok([makeSummary()]))
+    watcher.stop()
+  })
+
   it('detecta un PR nuevo (new_pr)', async () => {
     const prA = makeSummary({ id: 'shopwave/api#1', number: 1 })
     const prB = makeSummary({ id: 'shopwave/api#2', number: 2, title: 'PR nuevo' })

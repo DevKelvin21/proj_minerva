@@ -44,12 +44,17 @@ import type { StackInputPr } from '../stacks'
 import { MOCK_GITHUB_LOGIN, prFixtures } from './fixtures'
 import { genericSnapshotFixture, snapshotFixturesByRepo } from './fixtures-snapshot'
 import { asGithubRepo } from './repo'
+import { githubRepo } from '../../../shared/scm-guards'
 
 interface PrRecord {
   detail: PullRequestDetail
   files: DiffFile[]
   threads: CommentThread[]
 }
+
+/** Ids of the scripted incoming comment (`simulateIncomingComment`). */
+const INCOMING_THREAD_ID = 'thread-482-incoming'
+const INCOMING_COMMENT_ID = 'c-482-incoming'
 
 /** Latencia simulada por método (ms), determinística — dentro del rango 150-400ms. */
 const LATENCY_MS = {
@@ -145,6 +150,8 @@ export class MockGithubService implements ScmDataSource {
               comment.id,
               thread.isLineThread,
             ),
+            // Same meaning as the real `viewerDidAuthor`.
+            ...(comment.author.login === MOCK_GITHUB_LOGIN ? { isViewer: true } : {}),
           })),
         })),
       })
@@ -207,6 +214,7 @@ export class MockGithubService implements ScmDataSource {
       bodyMarkdown: req.bodyMarkdown,
       createdAt: new Date().toISOString(),
       isMinimized: false,
+      isViewer: true,
     }
 
     if (req.threadId) {
@@ -231,6 +239,64 @@ export class MockGithubService implements ScmDataSource {
     record.detail.commentCount = (record.detail.commentCount ?? 0) + 1
 
     return comment
+  }
+
+  /**
+   * A reviewer (`jrivas`) opens a new line thread on "my" api#482 and the PR's
+   * `updatedAt` moves, like on github.com. Driven by
+   * `MINERVA_MOCK_INCOMING_COMMENT_MS` (`../mock-mode.ts`); runs once.
+   * Returns `false` when it already ran (or the fixture is gone).
+   */
+  simulateIncomingComment(now: Date = new Date()): boolean {
+    const record = this.records.get(prKey(githubRepo('shopwave', 'api'), 482))
+    if (!record || record.threads.some((thread) => thread.id === INCOMING_THREAD_ID)) return false
+    const repo = asGithubRepo(record.detail.repo)
+    const createdAt = now.toISOString()
+    record.threads.push({
+      id: INCOMING_THREAD_ID,
+      status: 'active',
+      isResolved: false,
+      isLineThread: true,
+      path: 'src/routes/carts.ts',
+      line: 26,
+      side: 'RIGHT',
+      comments: [
+        {
+          id: INCOMING_COMMENT_ID,
+          author: {
+            login: 'jrivas',
+            avatarUrl: 'https://avatars.githubusercontent.com/u/1002?v=4',
+          },
+          bodyMarkdown: 'Should this retry on 409, or is a 409 final for the client?',
+          createdAt,
+          isMinimized: false,
+          htmlUrl: mockCommentUrl(repo, 482, INCOMING_COMMENT_ID, true),
+        },
+      ],
+    })
+    // Review comments do not count in GitHub's `comments.totalCount`: only `updatedAt` moves.
+    record.detail = { ...record.detail, updatedAt: createdAt }
+    return true
+  }
+
+  /**
+   * `dkumar`, the required reviewer of "my" api#482, requests changes, like a
+   * review submitted on github.com (`MINERVA_MOCK_INCOMING_REVIEW_MS`).
+   * Returns `false` when it already ran.
+   */
+  simulateIncomingReview(now: Date = new Date()): boolean {
+    const record = this.records.get(prKey(githubRepo('shopwave', 'api'), 482))
+    const entry = record?.detail.reviewers.find((reviewer) => reviewer.user.login === 'dkumar')
+    if (!record || !entry || entry.vote === 'changes_requested') return false
+    record.detail = {
+      ...record.detail,
+      updatedAt: now.toISOString(),
+      reviewDecision: 'changes_requested',
+      reviewers: record.detail.reviewers.map((reviewer) =>
+        reviewer === entry ? { ...reviewer, vote: 'changes_requested' } : reviewer,
+      ),
+    }
+    return true
   }
 
   async setThreadStatus(req: SetThreadStatusRequest): Promise<CommentThread> {

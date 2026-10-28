@@ -21,6 +21,8 @@ import { countOrphans } from '../../lib/stacks'
 import { RepoGroup } from '../pr-list/RepoGroup'
 import { StacksView } from '../stacks/StacksView'
 import { QueueView } from '../pr-list/QueueView'
+import { InboxView } from '../pr-list/InboxView'
+import { useUnreadActivityCount } from '../../hooks/use-activity'
 import { useNeedsReviewCount } from '../../hooks/use-needs-review-count'
 import { IconButton } from '../ui/IconButton'
 import { SignInHint } from './SignInHint'
@@ -89,10 +91,12 @@ function SidebarViewSwitch({
   const { t } = useTranslation()
   const orphans = useStacksStore((s) => (s.result ? countOrphans(s.result.stacks) : 0))
   const toReview = useNeedsReviewCount()
+  const unreadActivity = useUnreadActivityCount()
   const options: { value: SidebarView; label: string }[] = [
     { value: 'queue', label: t('layout.sidebar.views.queue') },
     { value: 'list', label: t('layout.sidebar.views.list') },
     { value: 'stacks', label: t('layout.sidebar.views.stacks') },
+    { value: 'inbox', label: t('layout.sidebar.views.inbox') },
   ]
   return (
     <div
@@ -106,22 +110,31 @@ function SidebarViewSwitch({
           type="button"
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
-          className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-2 py-1 font-medium transition-colors duration-150 ${
+          className={`flex min-w-0 flex-auto items-center justify-center gap-0.5 rounded px-1 py-1 font-medium transition-colors duration-150 ${
             value === option.value ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
           }`}
         >
           <span className="truncate">{option.label}</span>
           {option.value === 'queue' && toReview > 0 && (
             <span
-              className="shrink-0 rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-fg"
+              className="shrink-0 rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-fg"
               title={t('layout.queue.toReview', { count: toReview })}
             >
               {toReview}
             </span>
           )}
+          {option.value === 'inbox' && unreadActivity > 0 && (
+            <span
+              data-testid="inbox-unread-badge"
+              className="shrink-0 rounded-full bg-accent/15 px-1 text-[10px] font-semibold text-accent"
+              title={t('layout.inbox.unread', { count: unreadActivity })}
+            >
+              {unreadActivity}
+            </span>
+          )}
           {option.value === 'stacks' && orphans > 0 && (
             <span
-              className="shrink-0 rounded-full bg-warning/20 px-1.5 text-[10px] text-warning"
+              className="shrink-0 rounded-full bg-warning/20 px-1 text-[10px] text-warning"
               title={t('layout.sidebar.orphans', { count: orphans })}
             >
               {orphans}
@@ -256,7 +269,9 @@ export function Sidebar(): React.JSX.Element | null {
           className="w-full rounded-md border border-border bg-bg py-1.5 pl-8 pr-2 text-sm text-text transition-colors duration-150 placeholder:text-muted focus:border-accent"
         />
       </div>
-      {sidebarView === 'stacks' ? (
+      {sidebarView === 'inbox' ? (
+        <InboxView />
+      ) : sidebarView === 'stacks' ? (
         <StacksView pullRequests={pullRequests} onSelectPr={handleSelectPr} />
       ) : sidebarView === 'queue' && !noProviders && !needsLogin ? (
         <QueueView />
