@@ -21,6 +21,7 @@ import {
   type ViewerFilter,
 } from '../../lib/dashboard'
 import { useAppStore } from '../../stores/app-store'
+import { Chip } from '../ui/Chip'
 import { IconButton } from '../ui/IconButton'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { RetargetNote } from '../stacks/RetargetNote'
@@ -56,25 +57,16 @@ function FilterChips({
       {VIEWER_FILTERS.map((filter) => {
         const active = value === filter
         return (
-          <button
+          <Chip
             key={filter}
-            type="button"
             data-testid={'repo-filter-' + filter}
-            aria-pressed={active}
+            selected={active}
             onClick={() => onChange(filter)}
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors duration-150 ${
-              active
-                ? 'border-accent/40 bg-accent/15 text-accent'
-                : 'border-border text-muted hover:text-text'
-            }`}
+            count={counts[filter]}
+            className="font-medium"
           >
             {t(`home.filters.${filter}`)}
-            <span
-              className={`rounded-full px-1 text-[10px] ${active ? 'bg-accent/20' : 'bg-border/60'}`}
-            >
-              {counts[filter]}
-            </span>
-          </button>
+          </Chip>
         )
       })}
     </div>

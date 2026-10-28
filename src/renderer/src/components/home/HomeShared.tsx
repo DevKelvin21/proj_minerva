@@ -5,6 +5,7 @@ import type { ScmListError } from '../../../../shared/types'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { useAppStore } from '../../stores/app-store'
 import { Skeleton } from '../ui/Skeleton'
+import { Callout } from '../ui/Callout'
 
 /**
  * "Continue reviewing #n": back to the review that stayed mounted (hidden)
@@ -40,16 +41,18 @@ export function ProviderErrorList({ errors }: { errors: readonly ScmListError[] 
   const { t } = useTranslation()
   if (errors.length === 0) return null
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-danger/40 bg-danger/5 px-3 py-2">
-      {errors.map((providerError) => (
-        <p key={providerError.provider} data-error-code={providerError.code} className="text-xs text-danger">
-          {t('home.overview.providerError', {
-            provider: SCM_PROVIDER_LABEL[providerError.provider],
-            message: providerError.message,
-          })}
-        </p>
-      ))}
-    </div>
+    <Callout tone="danger">
+      <div className="flex flex-col gap-1">
+        {errors.map((providerError) => (
+          <p key={providerError.provider} data-error-code={providerError.code}>
+            {t('home.overview.providerError', {
+              provider: SCM_PROVIDER_LABEL[providerError.provider],
+              message: providerError.message,
+            })}
+          </p>
+        ))}
+      </div>
+    </Callout>
   )
 }
 

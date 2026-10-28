@@ -12,6 +12,7 @@ import {
   THREAD_STATUS_ORDER,
   type ThreadFilter,
 } from '../../lib/thread-groups'
+import { Chip } from '../ui/Chip'
 import { ThreadCard } from './ThreadCard'
 
 interface CommentsTabProps {
@@ -64,23 +65,16 @@ export function CommentsTab({
     >
       <div role="group" aria-label={t('comments.tab.filterGroup')} className="flex flex-wrap items-center gap-1.5">
         {filters.map((option) => (
-          <button
+          <Chip
             key={option.value}
-            type="button"
-            aria-pressed={filter === option.value}
+            selected={filter === option.value}
             data-filter={option.value}
             onClick={() => setFilter(option.value)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
-              filter === option.value
-                ? 'border-accent bg-accent/15 text-text'
-                : 'border-border text-muted hover:text-text'
-            }`}
+            count={counts[option.value]}
+            countTestId="filter-count"
           >
             {option.label}
-            <span data-testid="filter-count" className="tabular-nums text-muted">
-              {counts[option.value]}
-            </span>
-          </button>
+          </Chip>
         ))}
       </div>
 

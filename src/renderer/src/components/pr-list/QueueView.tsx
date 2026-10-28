@@ -13,18 +13,19 @@ import {
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { useAppStore } from '../../stores/app-store'
 import { PrListItem } from './PrListItem'
+import { Badge, type BadgeTone } from '../ui/Badge'
 import { CountBadge } from '../ui/CountBadge'
 import { InlineError } from '../ui/InlineError'
 
-const STATUS_TONE: Record<Exclude<QueueStatus, null>, string> = {
-  optional: 'bg-border/60 text-muted',
-  newComments: 'bg-accent/15 text-accent',
-  newCommits: 'bg-accent/15 text-accent',
-  draft: 'bg-border/60 text-muted',
-  ciFailing: 'bg-danger/15 text-danger',
-  changesRequested: 'bg-warning/15 text-warning',
-  approved: 'bg-success/15 text-success',
-  waiting: 'bg-border/60 text-muted',
+const STATUS_TONE: Record<Exclude<QueueStatus, null>, BadgeTone> = {
+  optional: 'neutral',
+  newComments: 'accent',
+  newCommits: 'accent',
+  draft: 'neutral',
+  ciFailing: 'danger',
+  changesRequested: 'warning',
+  approved: 'success',
+  waiting: 'neutral',
 }
 
 const FOLDED_KEY = 'minerva.queueFolded'
@@ -149,12 +150,9 @@ export function QueueView(): React.JSX.Element {
                       showRepo
                       badge={
                         status ? (
-                          <span
-                            data-queue-status={status}
-                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${STATUS_TONE[status]}`}
-                          >
+                          <Badge data-queue-status={status} tone={STATUS_TONE[status]} size="sm">
                             {t(`layout.queue.status.${status}`)}
-                          </span>
+                          </Badge>
                         ) : undefined
                       }
                     />

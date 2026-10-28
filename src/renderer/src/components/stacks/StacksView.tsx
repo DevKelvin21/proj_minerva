@@ -14,6 +14,7 @@ import {
   type StackGroup,
 } from '../../lib/stacks'
 import { useAppStore } from '../../stores/app-store'
+import { Chip } from '../ui/Chip'
 import { IconButton } from '../ui/IconButton'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { RetargetNote } from './RetargetNote'
@@ -196,19 +197,14 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
   return (
     <div className="flex min-w-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
-        <button
-          type="button"
-          aria-pressed={mineOnly}
+        <Chip
+          selected={mineOnly}
           onClick={() => setMineOnly((value) => !value)}
           title={t('stacks.view.mineOnlyTitle')}
-          className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors duration-150 ${
-            mineOnly
-              ? 'border-accent/40 bg-accent/15 text-accent'
-              : 'border-border text-muted hover:text-text'
-          }`}
+          className="shrink-0 font-medium"
         >
           {t('stacks.view.mineOnly')}
-        </button>
+        </Chip>
         {orphanCount > 0 && (
           <span className="min-w-0 truncate text-xs text-warning">{t('stacks.view.orphaned', { count: orphanCount })}
           </span>

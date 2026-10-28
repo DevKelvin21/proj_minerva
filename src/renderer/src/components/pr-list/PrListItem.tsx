@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import type { PullRequestState, PullRequestSummary, ReviewDecision } from '../../../../shared/types'
 import { useAppStore } from '../../stores/app-store'
 import { Avatar } from '../ui/Avatar'
+import { Badge } from '../ui/Badge'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { prKey } from '../../../../shared/scm'
@@ -89,16 +90,16 @@ function StateBadge({ state }: { state: PullRequestState }): React.JSX.Element |
   const { t } = useTranslation()
   if (state === 'merged') {
     return (
-      <span className="rounded border border-merged/40 px-1 text-[10px] text-merged">
+      <Badge tone="merged" size="sm">
         {t('prList.state.mergedBadge')}
-      </span>
+      </Badge>
     )
   }
   if (state === 'closed') {
     return (
-      <span className="rounded border border-danger/40 px-1 text-[10px] text-danger/80">
+      <Badge tone="danger" size="sm">
         {t('prList.state.closedBadge')}
-      </span>
+      </Badge>
     )
   }
   return null

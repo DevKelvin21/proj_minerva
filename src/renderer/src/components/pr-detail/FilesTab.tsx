@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TriangleAlert } from 'lucide-react'
 import { useElementWidth } from '../../hooks/use-element-width'
 import { useWalkthrough } from '../../hooks/use-walkthrough'
 import { FILE_TREE_COLUMN_MIN_WIDTH } from '../../lib/layout'
@@ -17,6 +16,7 @@ import {
 import { useAppStore, type LayerVerdict } from '../../stores/app-store'
 import { prKey } from '../../../../shared/scm'
 import type { CommentThread, DiffFile, RepoRef } from '../../../../shared/types'
+import { Callout } from '../ui/Callout'
 import { FileTree } from './FileTree'
 import { DiffView } from './DiffView'
 import { LayerNavigator } from './LayerNavigator'
@@ -251,14 +251,15 @@ export function FilesTab({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {filesTruncated && (
-        <p
+        <Callout
+          tone="warning"
+          variant="strip"
           role="status"
           data-testid="files-truncated-banner"
-          className="flex shrink-0 items-start gap-2 border-b border-border bg-warning/10 px-3 py-1.5 text-xs text-warning"
+          className="shrink-0 border-b border-border"
         >
-          <TriangleAlert size={13} className="mt-0.5 shrink-0" />
           {truncatedFilesMessage(files.length, changedFiles, repo.provider, t)}
-        </p>
+        </Callout>
       )}
       <div ref={ref} className="relative flex min-h-0 flex-1">
         {treeIsDrawer

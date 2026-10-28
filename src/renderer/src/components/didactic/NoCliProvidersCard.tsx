@@ -1,7 +1,9 @@
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AI_PROVIDER_IDS, AI_PROVIDER_CATALOG } from '../../../../shared/ai-providers'
 import { CLI_META } from '../../lib/cli-meta'
+import { Button } from '../ui/Button'
+import { Callout } from '../ui/Callout'
 
 interface NoCliProvidersCardProps {
   loading: boolean
@@ -24,11 +26,8 @@ interface NoCliProvidersCardProps {
 export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardProps): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
-      <p className="mb-1 flex items-center gap-2 font-medium text-warning">
-        <AlertTriangle size={16} className="shrink-0" />
-        {t('didactic.noCli.title')}
-      </p>
+    <Callout tone="warning">
+      <p className="mb-1 text-sm font-medium text-text">{t('didactic.noCli.title')}</p>
       <p className="mb-3 text-xs text-muted">
         {t('didactic.noCli.body')}
       </p>
@@ -54,15 +53,14 @@ export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardPro
         })}
       </ul>
 
-      <button
-        type="button"
+      <Button
+        size="xs"
         onClick={onRecheck}
         disabled={loading}
-        className="flex items-center gap-1.5 rounded-md border border-warning/40 px-2.5 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-60"
+        icon={<RefreshCw size={12} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
       >
-        <RefreshCw size={12} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />
         {t('didactic.noCli.recheck')}
-      </button>
-    </div>
+      </Button>
+    </Callout>
   )
 }

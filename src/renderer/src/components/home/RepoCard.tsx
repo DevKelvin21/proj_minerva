@@ -1,6 +1,7 @@
 import { Layers, TriangleAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { repoOwnerLabel, type RepoSummary } from '../../lib/dashboard'
+import { Badge } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 
 function CountBadge({
@@ -15,19 +16,10 @@ function CountBadge({
   tone: 'accent' | 'warning' | 'neutral'
 }): React.JSX.Element | null {
   if (value === 0) return null
-  const toneClass =
-    tone === 'warning'
-      ? 'bg-warning/15 text-warning'
-      : tone === 'accent'
-        ? 'bg-accent/15 text-accent'
-        : 'bg-border/60 text-muted'
   return (
-    <span
-      title={title}
-      className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[11px] font-medium ${toneClass}`}
-    >
+    <Badge tone={tone} size="sm" title={title}>
       {label}
-    </span>
+    </Badge>
   )
 }
 

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey as toPrKey, type RepoRef } from '../../../../shared/scm'
 import { useChatStore } from '../../stores/chat-store'
@@ -7,7 +7,8 @@ import { ChatComposer } from './ChatComposer'
 import { ChatTranscript } from './ChatTranscript'
 import { ConversationSwitcher } from './ConversationSwitcher'
 import { EmptyState } from '../ui/EmptyState'
-import { InlineError } from '../ui/InlineError'
+import { Callout } from '../ui/Callout'
+import { IconButton } from '../ui/IconButton'
 
 interface AskTabProps {
   repo: RepoRef
@@ -54,14 +55,26 @@ function ChatEmptyState(): React.JSX.Element {
 }
 
 function ChatError({ prKey }: { prKey: string }): React.JSX.Element | null {
+  const { t } = useTranslation()
   const error = useChatStore((s) => s.errors[prKey] ?? null)
   const dismissError = useChatStore((s) => s.dismissError)
   if (!error) return null
   return (
-    <InlineError
-      message={error}
-      onDismiss={() => dismissError(prKey)}
-      className="shrink-0 border-t border-border bg-danger/10 px-3 py-1.5"
-    />
+    <Callout
+      tone="danger"
+      variant="strip"
+      role="alert"
+      className="shrink-0 border-t border-border"
+      action={
+        <IconButton
+          size="xs"
+          onClick={() => dismissError(prKey)}
+          label={t('common.dismiss')}
+          icon={<X size={12} />}
+        />
+      }
+    >
+      {error}
+    </Callout>
   )
 }

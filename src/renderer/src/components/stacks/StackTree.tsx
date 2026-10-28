@@ -2,6 +2,8 @@ import { GitPullRequest, GitPullRequestDraft, TriangleAlert } from 'lucide-react
 import { useTranslation } from 'react-i18next'
 import type { StackNode } from '../../../../shared/scm'
 import { orphanExplanation } from '../../lib/stacks'
+import { Badge } from '../ui/Badge'
+import { Callout } from '../ui/Callout'
 import { RetargetPanel } from './RetargetPanel'
 import { Spinner } from '../ui/Spinner'
 
@@ -34,13 +36,9 @@ export function StackStateIcon({
 export function OrphanBadge(): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <span
-      data-orphan-badge
-      className="inline-flex shrink-0 items-center gap-0.5 rounded border border-warning/50 bg-warning/10 px-1 text-[10px] font-medium text-warning"
-    >
-      <TriangleAlert size={10} aria-hidden />
+    <Badge tone="warning" size="sm" data-orphan-badge icon={<TriangleAlert size={10} aria-hidden />}>
       {t('stacks.tree.orphaned')}
-    </span>
+    </Badge>
   )
 }
 
@@ -50,22 +48,24 @@ export function OrphanNotice({ node }: { node: StackNode }): React.JSX.Element |
   const explanation = orphanExplanation(t, node)
   if (!node.orphan || !explanation) return null
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <p className="text-xs text-warning/90">{explanation}</p>
-      <RetargetPanel
-        // Remount when the PR or its base changes: a stale panel must not retarget.
-        key={node.prKey + '\n' + node.baseRef}
-        repo={node.repo}
-        number={node.number}
-        currentBase={node.baseRef}
-        headRef={node.headRef}
-        mode={{
-          kind: 'orphan',
-          suggestedBase: node.orphan.suggestedBase,
-          parentNumber: node.orphan.parent.number,
-        }}
-      />
-    </div>
+    <Callout tone="warning">
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <p>{explanation}</p>
+        <RetargetPanel
+          // Remount when the PR or its base changes: a stale panel must not retarget.
+          key={node.prKey + '\n' + node.baseRef}
+          repo={node.repo}
+          number={node.number}
+          currentBase={node.baseRef}
+          headRef={node.headRef}
+          mode={{
+            kind: 'orphan',
+            suggestedBase: node.orphan.suggestedBase,
+            parentNumber: node.orphan.parent.number,
+          }}
+        />
+      </div>
+    </Callout>
   )
 }
 
@@ -137,9 +137,7 @@ export function StackTree({
             {node.headRef} → {node.baseRef}
           </span>
           {node.isDraft && (
-            <span className="shrink-0 rounded border border-border px-1 text-[10px]">
-              {t('stacks.tree.draftChip')}
-            </span>
+            <Badge size="sm">{t('stacks.tree.draftChip')}</Badge>
           )}
           {node.orphan && <OrphanBadge />}
         </span>
