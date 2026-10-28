@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { FileTreeNode as FileTreeNodeModel } from '../../lib/file-tree'
+import { FileRow } from '../ui/FileRow'
 import { FileStatusIcon } from './FileStatusIcon'
 
 interface FileTreeNodeProps {
@@ -59,25 +60,18 @@ export function FileTreeNode({
     )
   }
 
-  const active = node.path === selectedPath
   return (
     <li>
-      <button
-        type="button"
-        onClick={() => onSelectFile(node.path)}
-        aria-current={active}
-        style={{ paddingLeft }}
-        className={`flex w-full items-center gap-1.5 py-1 pr-2 text-left text-sm transition-colors duration-100 ${
-          active ? 'bg-accent/15 text-text' : 'text-muted hover:bg-border/40 hover:text-text'
-        }`}
-      >
-        <FileStatusIcon status={node.file.status} />
-        <span className="truncate font-mono text-xs">{node.file.path.split('/').pop()}</span>
-        <span className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px]">
-          <span className="text-success">+{node.file.additions}</span>
-          <span className="text-danger">-{node.file.deletions}</span>
-        </span>
-      </button>
+      <FileRow
+        icon={<FileStatusIcon status={node.file.status} />}
+        name={node.file.path.split('/').pop() ?? node.file.path}
+        path={node.file.path}
+        additions={node.file.additions}
+        deletions={node.file.deletions}
+        selected={node.path === selectedPath}
+        onSelect={() => onSelectFile(node.path)}
+        indent={paddingLeft}
+      />
     </li>
   )
 }

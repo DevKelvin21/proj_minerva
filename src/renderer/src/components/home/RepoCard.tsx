@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { repoOwnerLabel, type RepoSummary } from '../../lib/dashboard'
 import { Badge } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
+import { SelectableCard } from '../ui/SelectableCard'
 
 function CountBadge({
   value,
@@ -38,12 +39,11 @@ export function RepoCard({
   const { t } = useTranslation()
   const { repo } = summary
   return (
-    <button
-      type="button"
+    <SelectableCard
       data-testid="repo-card"
       data-repo-key={summary.key}
       onClick={() => onOpen(summary.key)}
-      className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-panel p-3 text-left transition-colors duration-150 hover:border-accent focus-visible:border-accent focus-visible:outline-none"
+      padding="md"
     >
       <span className="flex min-w-0 items-start gap-2">
         <span className="mt-0.5 text-muted">
@@ -112,6 +112,6 @@ export function RepoCard({
           )}
         </span>
       )}
-    </button>
+    </SelectableCard>
   )
 }

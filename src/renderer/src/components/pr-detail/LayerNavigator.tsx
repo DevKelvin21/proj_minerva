@@ -12,6 +12,7 @@ import {
   type LayerRef,
   layerVerdictKey,
 } from '../../lib/walkthrough'
+import { FileRow } from '../ui/FileRow'
 import { FileStatusIcon } from './FileStatusIcon'
 import { InlineError } from '../ui/InlineError'
 import { Spinner } from '../ui/Spinner'
@@ -177,24 +178,20 @@ export function LayerNavigator({
             {t('prDetail.layers.unassigned')}
           </h3>
           <ul>
-            {leftovers.map((file) => {
-              const active = activeLayer === null && file.path === selectedPath
-              return (
-                <li key={file.path}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectUnassignedFile(file.path)}
-                    aria-current={active}
-                    className={`flex w-full items-center gap-1.5 px-3 py-1 text-left text-sm transition-colors duration-100 ${
-                      active ? 'bg-accent/15 text-text' : 'text-muted hover:bg-border/40 hover:text-text'
-                    }`}
-                  >
-                    <FileStatusIcon status={file.status} />
-                    <span className="truncate font-mono text-xs">{file.path}</span>
-                  </button>
-                </li>
-              )
-            })}
+            {leftovers.map((file) => (
+              <li key={file.path}>
+                <FileRow
+                  icon={<FileStatusIcon status={file.status} />}
+                  name={file.path}
+                  path={file.path}
+                  additions={file.additions}
+                  deletions={file.deletions}
+                  selected={activeLayer === null && file.path === selectedPath}
+                  onSelect={() => onSelectUnassignedFile(file.path)}
+                  indent={12}
+                />
+              </li>
+            ))}
           </ul>
         </section>
       )}

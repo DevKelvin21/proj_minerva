@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import i18next from 'i18next'
 import { messageKeys } from '../../../shared/locale'
 import { en } from './locales/en'
 import { es } from './locales/es'
@@ -32,5 +33,19 @@ describe('renderer locales', () => {
       if (key.endsWith('_one')) expect(enKeys, key).toContain(key.replace(/_one$/, '_other'))
       if (key.endsWith('_other')) expect(enKeys, key).toContain(key.replace(/_other$/, '_one'))
     }
+  })
+
+  it('the diff-stat sentence nests a plural per count (ui/DiffStat)', async () => {
+    const instance = i18next.createInstance()
+    await instance.init({
+      lng: 'en',
+      resources: { en: { translation: en }, es: { translation: es } },
+      interpolation: { escapeValue: false },
+    })
+    const summary = (lng: 'en' | 'es', additions: number, deletions: number): string =>
+      instance.getFixedT(lng)('diffStat.summary', { additions, deletions })
+    expect(summary('en', 6, 2)).toBe('6 additions, 2 deletions')
+    expect(summary('en', 1, 1)).toBe('1 addition, 1 deletion')
+    expect(summary('es', 1, 0)).toBe('1 línea agregada, 0 líneas eliminadas')
   })
 })

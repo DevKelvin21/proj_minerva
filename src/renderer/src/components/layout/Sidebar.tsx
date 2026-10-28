@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 import { RefreshCw, Search } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
@@ -28,6 +28,7 @@ import { IconButton } from '../ui/IconButton'
 import { Input } from '../ui/Input'
 import { SignInHint } from './SignInHint'
 import { SidebarRail } from './SidebarRail'
+import { ResizeHandle } from '../ui/ResizeHandle'
 import { CountBadge } from '../ui/CountBadge'
 import { InlineError } from '../ui/InlineError'
 
@@ -197,7 +198,6 @@ export function Sidebar(): React.JSX.Element | null {
   const walkthroughFocus = useAppStore((s) => s.walkthroughFocus)
   const preferredWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
-  const columnRef = useRef<HTMLDivElement>(null)
 
   // Esc cierra el drawer (solo cuando está abierto y no hay un modal encima:
   // `SettingsModal` monta su propio listener y también cierra con Esc).
@@ -386,39 +386,21 @@ export function Sidebar(): React.JSX.Element | null {
   }
 
   // Docked: the column wraps the scrolling aside so the drag handle on its
-  // right edge neither scrolls away nor gets clipped. Pointer capture keeps
-  // the drag alive when the pointer leaves the 6px strip (as in
-  // `DidacticPanel`); arrows nudge it from the keyboard; double-click goes
-  // back to the tier's default width.
+  // right edge neither scrolls away nor gets clipped; double-click goes back
+  // to the tier's default width.
   return (
-    <div ref={columnRef} style={{ width }} className="relative flex shrink-0">
+    <div style={{ width }} className="relative flex shrink-0">
       {aside}
-      <div
-        role="separator"
-        tabIndex={0}
-        aria-orientation="vertical"
-        aria-label={t('layout.sidebar.resize')}
-        aria-valuenow={width}
-        aria-valuemin={SIDEBAR_MIN_WIDTH}
-        aria-valuemax={maxWidth}
+      <ResizeHandle
+        edge="right"
+        value={width}
+        min={SIDEBAR_MIN_WIDTH}
+        max={maxWidth}
+        onChange={setSidebarWidth}
+        onReset={() => setSidebarWidth(null)}
+        label={t('layout.sidebar.resize')}
         title={t('layout.sidebar.resizeHint')}
         data-testid="sidebar-resize"
-        className="absolute inset-y-0 -right-[3px] z-10 w-1.5 cursor-col-resize touch-none transition-colors duration-150 hover:bg-accent/50 focus-visible:bg-accent/70 focus-visible:outline-none active:bg-accent/70"
-        onPointerDown={(e) => {
-          e.preventDefault()
-          e.currentTarget.setPointerCapture(e.pointerId)
-        }}
-        onPointerMove={(e) => {
-          if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-          const left = columnRef.current?.getBoundingClientRect().left ?? 0
-          setSidebarWidth(e.clientX - left)
-        }}
-        onDoubleClick={() => setSidebarWidth(null)}
-        onKeyDown={(e) => {
-          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
-          e.preventDefault()
-          setSidebarWidth(width + (e.key === 'ArrowRight' ? 16 : -16))
-        }}
       />
     </div>
   )

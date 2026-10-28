@@ -4,6 +4,7 @@ import type { DiffFile } from '../../../../shared/types'
 import type { DiffViewMode } from '../../stores/app-store'
 import { SPLIT_DIFF_MIN_WIDTH } from '../../lib/layout'
 import { IconButton } from '../ui/IconButton'
+import { DiffStat } from '../ui/DiffStat'
 
 interface DiffToolbarProps {
   file: DiffFile
@@ -71,10 +72,7 @@ export function DiffToolbar({
         )}
       </span>
 
-      <span className="flex shrink-0 items-center gap-1.5 font-mono text-xs">
-        <span className="text-success">+{file.additions}</span>
-        <span className="text-danger">-{file.deletions}</span>
-      </span>
+      <DiffStat additions={file.additions} deletions={file.deletions} size="md" />
 
       <div className="flex shrink-0 gap-0.5 border-l border-border pl-2">
         <IconButton

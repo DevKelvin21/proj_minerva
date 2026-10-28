@@ -12,6 +12,7 @@ import { useAppStore } from '../../stores/app-store'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
+import { DiffStat } from '../ui/DiffStat'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { prKey } from '../../../../shared/scm'
 import { reviewDecisionLabelKey } from '../../lib/scm-labels'
@@ -191,10 +192,7 @@ export function PrListItem({
           !showRepo &&
           pr.additions !== null &&
           pr.deletions !== null && (
-            <span className="ml-auto flex items-center gap-1.5 font-mono text-[11px]">
-              <span className="text-success">+{pr.additions}</span>
-              <span className="text-danger">-{pr.deletions}</span>
-            </span>
+            <DiffStat additions={pr.additions} deletions={pr.deletions} className="ml-auto" />
           )
         )}
       </div>

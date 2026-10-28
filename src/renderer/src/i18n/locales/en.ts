@@ -725,6 +725,15 @@ export const en = {
       },
     },
   },
+  diffStat: {
+    additions_one: '{{count}} addition',
+    additions_other: '{{count}} additions',
+    deletions_one: '{{count}} deletion',
+    deletions_other: '{{count}} deletions',
+    // Screen-reader sentence of a `+n −n` diff stat (i18next nesting keeps each count's plural).
+    summary:
+      '$t(diffStat.additions, {"count": {{additions}} }), $t(diffStat.deletions, {"count": {{deletions}} })',
+  },
   review: {
     breadcrumbAriaLabel: 'Review location',
     home: 'Home',

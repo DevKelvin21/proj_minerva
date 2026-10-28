@@ -5,6 +5,7 @@ import type { DiffFile } from '../../../../shared/types'
 import type { FileTreeMode } from '../../stores/app-store'
 import { buildFileTree } from '../../lib/file-tree'
 import { IconButton } from '../ui/IconButton'
+import { FileRow } from '../ui/FileRow'
 import { FileStatusIcon } from './FileStatusIcon'
 import { FileTreeNode } from './FileTreeNode'
 
@@ -106,26 +107,17 @@ export function FileTree({
         ) : (
           <ul>
             {sortedFlatFiles.map((file) => {
-              const active = file.path === selectedPath
               return (
                 <li key={file.path}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectFile(file.path)}
-                    aria-current={active}
-                    className={`flex w-full items-center gap-1.5 px-2 py-1 text-left text-sm transition-colors duration-100 ${
-                      active
-                        ? 'bg-accent/15 text-text'
-                        : 'text-muted hover:bg-border/40 hover:text-text'
-                    }`}
-                  >
-                    <FileStatusIcon status={file.status} />
-                    <span className="truncate font-mono text-xs">{file.path}</span>
-                    <span className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px]">
-                      <span className="text-success">+{file.additions}</span>
-                      <span className="text-danger">-{file.deletions}</span>
-                    </span>
-                  </button>
+                  <FileRow
+                    icon={<FileStatusIcon status={file.status} />}
+                    name={file.path}
+                    path={file.path}
+                    additions={file.additions}
+                    deletions={file.deletions}
+                    selected={file.path === selectedPath}
+                    onSelect={() => onSelectFile(file.path)}
+                  />
                 </li>
               )
             })}

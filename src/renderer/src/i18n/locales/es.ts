@@ -737,6 +737,15 @@ export const es: MessageShape<typeof en> = {
       },
     },
   },
+  diffStat: {
+    additions_one: '{{count}} línea agregada',
+    additions_other: '{{count}} líneas agregadas',
+    deletions_one: '{{count}} línea eliminada',
+    deletions_other: '{{count}} líneas eliminadas',
+    // Screen-reader sentence of a `+n −n` diff stat (i18next nesting keeps each count's plural).
+    summary:
+      '$t(diffStat.additions, {"count": {{additions}} }), $t(diffStat.deletions, {"count": {{deletions}} })',
+  },
   review: {
     breadcrumbAriaLabel: 'Ubicación de la revisión',
     home: 'Inicio',
