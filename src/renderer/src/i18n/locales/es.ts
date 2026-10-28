@@ -365,6 +365,7 @@ export const es: MessageShape<typeof en> = {
       treeView: 'Vista de árbol',
       listView: 'Vista de lista',
       layersView: 'Vista por capas (recorrido guiado)',
+      drawerLabel: 'Archivos modificados',
     },
     layers: {
       verdict: {

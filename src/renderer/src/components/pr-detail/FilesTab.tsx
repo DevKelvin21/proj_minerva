@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useElementWidth } from '../../hooks/use-element-width'
 import { useWalkthrough } from '../../hooks/use-walkthrough'
-import { FILE_TREE_COLUMN_MIN_WIDTH } from '../../lib/layout'
+import { DRAWER_WIDTH, drawerWidth, FILE_TREE_COLUMN_MIN_WIDTH } from '../../lib/layout'
 import { truncatedFilesMessage } from '../../lib/scm-labels'
 import {
   findFlatLayer,
@@ -17,6 +17,7 @@ import { useAppStore, type LayerVerdict } from '../../stores/app-store'
 import { prKey } from '../../../../shared/scm'
 import type { CommentThread, DiffFile, RepoRef } from '../../../../shared/types'
 import { Callout } from '../ui/Callout'
+import { Drawer } from '../ui/Drawer'
 import { FileTree } from './FileTree'
 import { DiffView } from './DiffView'
 import { LayerNavigator } from './LayerNavigator'
@@ -264,14 +265,14 @@ export function FilesTab({
       <div ref={ref} className="relative flex min-h-0 flex-1">
         {treeIsDrawer
           ? treeOpen && (
-              <>
-                <div
-                  className="absolute inset-0 z-30 bg-black/50"
-                  onClick={() => setTreeOpen(false)}
-                  aria-hidden
-                />
+              <Drawer
+                side="left"
+                label={t('prDetail.fileTree.drawerLabel')}
+                width={drawerWidth(DRAWER_WIDTH.files, width)}
+                onClose={() => setTreeOpen(false)}
+              >
                 {tree}
-              </>
+              </Drawer>
             )
           : tree}
         <DiffView

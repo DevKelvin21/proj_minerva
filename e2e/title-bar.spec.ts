@@ -50,6 +50,8 @@ test('Cmd/Ctrl+K jumps to a PR by number, to a command, and Esc only closes it',
   await window.keyboard.press('Escape')
   await expect(palette(window)).toHaveCount(0)
   await expect(prHeader(window)).toContainText('#482')
+  // Focus goes back to what opened it.
+  await expect(switcher).toBeFocused()
 
   // A command: arrows move the highlight, Enter runs it.
   await window.keyboard.press(MOD + '+k')

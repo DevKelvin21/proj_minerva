@@ -226,6 +226,11 @@ test('narrow window: the chat is an overlay and adding a line leaves the diff in
     .poll(async () => (await askTab.boundingBox())?.width ?? Infinity)
     .toBeLessThanOrEqual(360)
   await expect(question(window)).toBeVisible()
+  // A drawer: Esc closes it too, the title bar toggle brings it back.
+  await window.keyboard.press('Escape')
+  await expect(askTab).toHaveCount(0)
+  await window.locator('header button[aria-label="AI panel"]').click()
+  await expect(askTab).toBeVisible()
   await window.getByRole('button', { name: 'Close AI panel' }).click()
   await expect(askTab).toHaveCount(0)
 

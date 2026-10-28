@@ -7,8 +7,11 @@ import {
   clampDidacticWidth,
   DIDACTIC_PANEL_DEFAULT_WIDTH,
   DIDACTIC_PANEL_MIN_WIDTH,
+  DRAWER_WIDTH,
+  drawerWidth,
   sidebarFootprint,
 } from '../../lib/layout'
+import { Drawer } from '../ui/Drawer'
 import { IconButton } from '../ui/IconButton'
 import { ResizeHandle } from '../ui/ResizeHandle'
 import { DidacticAnalysisArea } from '../didactic/DidacticAnalysisArea'
@@ -98,19 +101,18 @@ export function DidacticPanel(): React.JSX.Element {
   const isOverlay = tier.w === 'sm'
 
   return (
-    <>
-      {isOverlay && (
-        <div
-          className="absolute inset-0 z-30 bg-black/50"
-          onClick={toggleDidacticPanel}
-          aria-hidden
-        />
-      )}
+    <Drawer
+      side="right"
+      docked={!isOverlay}
+      label={t('chat.panel.title')}
+      width={drawerWidth(DRAWER_WIDTH.didactic, tier.width)}
+      onClose={toggleDidacticPanel}
+    >
       <aside
         style={isOverlay ? undefined : { width: panelWidth }}
         className={
           isOverlay
-            ? 'absolute inset-y-0 right-0 z-40 flex w-[min(360px,85%)] flex-col border-l border-border bg-panel shadow-2xl'
+            ? 'flex h-full min-w-0 flex-col bg-panel'
             : 'relative flex shrink-0 flex-col border-l border-border bg-panel'
         }
       >
@@ -203,7 +205,7 @@ export function DidacticPanel(): React.JSX.Element {
           )}
         </div>
       </aside>
-    </>
+    </Drawer>
   )
 }
 

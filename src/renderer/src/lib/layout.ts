@@ -115,3 +115,18 @@ export function sidebarFootprint(
   if (sidebarIsDrawer(widthTier(viewportWidth))) return 0
   return collapsed ? SIDEBAR_RAIL_WIDTH : dockedSidebarWidth(preferred, viewportWidth)
 }
+
+/** Preferred width (px) of each narrow-tier drawer, before `drawerWidth` clamps it. */
+export const DRAWER_WIDTH = { sidebar: 300, files: 260, didactic: 360 } as const
+/** Most of its container a drawer may cover: the scrim beside it stays a visible way out. */
+const DRAWER_MAX_FRACTION = 0.85
+
+/**
+ * Width a drawer is painted at: its preferred width, never more than 85% of
+ * the container it slides over (the window row for the PR list and the AI
+ * panel, the Files tab for the file column). `null` = not measured yet.
+ */
+export function drawerWidth(preferred: number, containerWidth: number | null): number {
+  if (containerWidth === null) return preferred
+  return Math.max(0, Math.min(preferred, Math.round(containerWidth * DRAWER_MAX_FRACTION)))
+}

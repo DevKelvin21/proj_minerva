@@ -15,7 +15,7 @@ interface FileTreeProps {
   onModeChange: (mode: FileTreeMode) => void
   selectedPath: string | null
   onSelectFile: (path: string) => void
-  /** Drawer sobre el diff en vez de columna (F16/T85, panel angosto). */
+  /** Inside `ui/Drawer` over the diff instead of a column (F16/T85, narrow panel): it fills the drawer. */
   overlay?: boolean
   /** Body of the `layers` mode (the AI walkthrough navigator), rendered instead of the tree/list. */
   layers: ReactNode
@@ -57,7 +57,7 @@ export function FileTree({
     <aside
       className={
         overlay
-          ? 'absolute inset-y-0 left-0 z-40 flex w-[260px] max-w-[85%] flex-col border-r border-border bg-panel shadow-2xl'
+          ? 'flex h-full min-w-0 flex-1 flex-col'
           : 'flex w-[260px] shrink-0 flex-col border-r border-border'
       }
     >

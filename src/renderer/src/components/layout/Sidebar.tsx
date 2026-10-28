@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { RefreshCw, Search } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
@@ -12,6 +12,8 @@ import { useLayoutTier } from '../../hooks/use-layout-tier'
 import {
   clampSidebarWidth,
   dockedSidebarWidth,
+  DRAWER_WIDTH,
+  drawerWidth,
   SIDEBAR_MIN_WIDTH,
   sidebarIsDrawer,
 } from '../../lib/layout'
@@ -31,6 +33,7 @@ import { SidebarRail } from './SidebarRail'
 import { ResizeHandle } from '../ui/ResizeHandle'
 import { CountBadge } from '../ui/CountBadge'
 import { InlineError } from '../ui/InlineError'
+import { Drawer } from '../ui/Drawer'
 
 const STATE_FILTER_OPTIONS: readonly PrStateFilter[] = ['open', 'closed', 'all']
 
@@ -199,21 +202,6 @@ export function Sidebar(): React.JSX.Element | null {
   const preferredWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
 
-  // Esc cierra el drawer (solo cuando está abierto y no hay un modal encima:
-  // `SettingsModal` monta su propio listener y también cierra con Esc).
-  const settingsOpen = useAppStore((s) => s.settingsOpen)
-  useEffect(() => {
-    if (!isDrawer || !sidebarOpen || settingsOpen) return
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
-      // Claimed: a dashboard page's Esc (`useEscapeBack`) must not also go back.
-      event.preventDefault()
-      closeSidebar()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [isDrawer, sidebarOpen, settingsOpen, closeSidebar])
-
   const groups = useMemo(() => groupByRepo(pullRequests), [pullRequests])
   const signInErrors = providerErrors.filter(isSignInError)
   // Full-panel sign-in CTA (one hint per provider that needs it) only when
@@ -235,8 +223,10 @@ export function Sidebar(): React.JSX.Element | null {
   // Docked tiers, folded by the TitleBar toggle / Cmd+B (persisted): the rail.
   if (!isDrawer && sidebarCollapsed) return <SidebarRail />
 
+  // As a drawer, `ui/Drawer` draws the edge and the shadow (and claims Esc,
+  // so a dashboard page's `useEscapeBack` does not also go back).
   const asideClass = isDrawer
-    ? 'absolute inset-y-0 left-0 z-40 flex w-[300px] max-w-[85%] flex-col overflow-y-auto border-r border-border bg-panel shadow-2xl'
+    ? 'flex h-full w-full min-w-0 flex-col overflow-y-auto bg-panel'
     : 'flex w-full min-w-0 flex-col overflow-y-auto border-r border-border bg-panel'
   const width = dockedSidebarWidth(preferredWidth, tier.width)
   const maxWidth = clampSidebarWidth(Number.POSITIVE_INFINITY, tier.width)
@@ -378,10 +368,14 @@ export function Sidebar(): React.JSX.Element | null {
 
   if (isDrawer) {
     return (
-      <>
-        <div className="absolute inset-0 z-30 bg-black/50" onClick={closeSidebar} aria-hidden />
+      <Drawer
+        side="left"
+        label={t('layout.sidebar.ariaLabel')}
+        width={drawerWidth(DRAWER_WIDTH.sidebar, tier.width)}
+        onClose={closeSidebar}
+      >
         {aside}
-      </>
+      </Drawer>
     )
   }
 

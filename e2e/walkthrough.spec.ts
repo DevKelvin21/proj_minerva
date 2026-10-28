@@ -124,8 +124,16 @@ test('layers view works in the narrow tier where the file column is a drawer', a
   await window.getByRole('button', { name: 'PR list' }).click()
   await window.getByText('Fix race condition in payment webhook').first().click()
   await window.getByText('Files').first().click()
-  // The column is a drawer: open it from the "N files" toolbar button.
-  await window.getByRole('button', { name: /2 files/ }).click()
+  // The column is a drawer: open it from the "N files" toolbar button. Esc
+  // closes it and gives focus back to the button.
+  const filesToggle = window.getByRole('button', { name: /2 files/ })
+  const drawer = window.getByRole('dialog', { name: 'Changed files' })
+  await filesToggle.click()
+  await expect(drawer).toBeVisible()
+  await window.keyboard.press('Escape')
+  await expect(drawer).toHaveCount(0)
+  await expect(filesToggle).toBeFocused()
+  await filesToggle.click()
   await window.getByRole('button', { name: 'Layers view (guided walkthrough)' }).click()
   await window.getByTestId('layers-placeholder').getByRole('button', { name: 'Analyze PR' }).click()
   await expect(window.getByTestId('layer-navigator').getByTestId('layer-item')).toHaveCount(2, {
