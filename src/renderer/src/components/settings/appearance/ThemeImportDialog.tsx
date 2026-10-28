@@ -17,6 +17,10 @@ import { parseThemeText } from '../../../../../shared/theme/import-text'
 import { useAppearanceStore } from '../../../stores/appearance-store'
 import { useLocale } from '../../../i18n/use-locale'
 import { errorText } from '../../../lib/error-text'
+import { Button } from '../../ui/Button'
+import { Input } from '../../ui/Input'
+import { Select } from '../../ui/Select'
+import { TextArea } from '../../ui/TextArea'
 import { OverlayDialog } from './OverlayDialog'
 import { useImportErrorText } from './library-errors'
 
@@ -137,14 +141,16 @@ function FileImport({ onDone }: { onDone: () => void }): React.JSX.Element {
       </label>
       <label className="text-xs text-muted">
         {t('settings.appearance.import.paste')}
-        <textarea
+        <TextArea
           data-testid="theme-import-text"
+          fieldSize="sm"
+          mono
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder={t('settings.appearance.import.pastePlaceholder')}
           spellCheck={false}
           rows={8}
-          className="mt-1 block w-full resize-y rounded-md border border-border bg-bg p-2 font-mono text-[11px] text-text outline-none focus:border-accent/60"
+          className="mt-1 block w-full resize-y"
         />
       </label>
       {error && (
@@ -152,15 +158,15 @@ function FileImport({ onDone }: { onDone: () => void }): React.JSX.Element {
           {error}
         </p>
       )}
-      <button
-        type="button"
+      <Button
+        variant="primary"
         data-testid="theme-import-submit"
         disabled={busy || text.trim().length === 0 || text.length > MAX_IMPORT_BYTES}
         onClick={() => void importText(text)}
-        className="self-end rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg hover:opacity-90 disabled:opacity-50"
+        className="self-end"
       >
         {busy ? t('common.saving') : t('settings.appearance.import.submit')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -234,38 +240,38 @@ function OpenVsxImport(): React.JSX.Element {
           void search()
         }}
       >
-        <input
+        <Input
           data-testid="open-vsx-query"
           value={query}
           maxLength={100}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t('settings.appearance.import.openVsx.placeholder')}
           aria-label={t('settings.appearance.import.openVsx.search')}
-          className="min-w-0 flex-1 rounded-md border border-border bg-bg px-2 py-1 text-sm text-text outline-none focus:border-accent/60"
+          className="min-w-0 flex-1"
         />
-        <select
+        <Select
+          fieldSize="sm"
           value={sortBy}
           aria-label={t('settings.appearance.import.openVsx.sort')}
           onChange={(event) => setSortBy(event.target.value as OpenVsxSort)}
-          className="rounded-md border border-border bg-bg px-2 py-1 text-xs text-text"
         >
           {OPEN_VSX_SORTS.map((sort) => (
             <option key={sort} value={sort}>
               {sortLabel[sort]}
             </option>
           ))}
-        </select>
-        <button
+        </Select>
+        <Button
           type="submit"
+          variant="primary"
           data-testid="open-vsx-search"
           disabled={searching || query.trim().length === 0}
-          className="inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg hover:opacity-90 disabled:opacity-50"
+          icon={<Search size={12} aria-hidden />}
         >
-          <Search size={12} aria-hidden />
           {searching
             ? t('settings.appearance.import.openVsx.searching')
             : t('settings.appearance.import.openVsx.search')}
-        </button>
+        </Button>
       </form>
       {error && (
         <p role="alert" className="text-xs text-danger" data-testid="open-vsx-error">
@@ -301,14 +307,12 @@ function OpenVsxImport(): React.JSX.Element {
                 <p className="line-clamp-2 text-xs text-muted">{extension.description}</p>
               )}
             </div>
-            <button
-              type="button"
+            <Button
               data-testid="open-vsx-install"
               disabled={installing !== null}
               onClick={() => void install(extension)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-text hover:bg-border/40 disabled:opacity-50"
+              icon={<Download size={12} aria-hidden />}
             >
-              <Download size={12} aria-hidden />
               {installing === extension.id
                 ? t('settings.appearance.import.openVsx.installing')
                 : installed[extension.id] !== undefined
@@ -316,7 +320,7 @@ function OpenVsxImport(): React.JSX.Element {
                       count: installed[extension.id],
                     })
                   : t('settings.appearance.import.openVsx.install')}
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

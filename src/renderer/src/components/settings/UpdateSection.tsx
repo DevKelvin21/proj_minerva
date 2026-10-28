@@ -4,6 +4,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import type { AppLocale } from '../../../../shared/locale'
 import { useLocale } from '../../i18n/use-locale'
 import { useUpdater } from '../../hooks/use-updater'
+import { Button } from '../ui/Button'
 import type { UpdaterStatus } from '../../../../shared/types'
 
 type UnsupportedReason = Extract<UpdaterStatus, { phase: 'unsupported' }>['reason']
@@ -117,7 +118,9 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
               )}
               {status.phase === 'error' && (
                 <>
-                  <p className="text-xs text-danger">{status.message}</p>
+                  <p role="alert" className="text-xs text-danger">
+                    {status.message}
+                  </p>
                   {status.lastCheckedAt && (
                     <p className="text-[11px] text-muted">
                       {t('updater.lastSuccessfulCheck', {
@@ -128,14 +131,9 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
                 </>
               )}
             </div>
-            <button
-              type="button"
-              disabled={checking}
-              onClick={() => void check()}
-              className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-text transition-colors duration-150 hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <Button disabled={checking} onClick={() => void check()}>
               {status.phase === 'error' ? t('updater.retry') : t('updater.check')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -144,13 +142,9 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
             <p className="min-w-0 truncate text-sm text-text">
               {t('updater.available', { version: status.info.version })}
             </p>
-            <button
-              type="button"
-              onClick={() => void download()}
-              className="shrink-0 rounded-md border border-accent/50 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-            >
+            <Button variant="primary" onClick={() => void download()}>
               {t('updater.download')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -203,29 +197,26 @@ export function UpdateSection({ compact = false }: UpdateSectionProps): React.JS
               al tick del scheduler para que aparezca "Ver la release".
             */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => void check()}
-                className="rounded-md border border-border px-2.5 py-1 text-xs text-text transition-colors duration-150 hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {t('updater.check')}
-              </button>
+              <Button onClick={() => void check()}>{t('updater.check')}</Button>
               {status.available && (
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
                   disabled={openingRelease}
                   onClick={() => void handleOpenRelease()}
-                  className="rounded-md border border-accent/50 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t('updater.viewRelease')}
-                </button>
+                </Button>
               )}
             </div>
           </div>
         )}
       </div>
 
-      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

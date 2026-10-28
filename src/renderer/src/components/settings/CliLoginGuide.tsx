@@ -2,6 +2,7 @@ import { RefreshCw } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { AiProviderStatus } from '../../../../shared/types'
 import { CLI_META, type CliProvider } from '../../lib/cli-meta'
+import { Button } from '../ui/Button'
 
 /** Enlace externo consistente con el resto del design system (`Markdown.tsx`/`TitleBar.tsx`): `target="_blank"` lo intercepta `external-link-guard` en main y lo abre en el navegador del sistema. */
 function ExternalLink({
@@ -116,15 +117,14 @@ export function CliLoginGuide({
         </p>
       )}
 
-      <button
-        type="button"
+      <Button
         onClick={onRecheck}
         disabled={loading}
-        className="mt-2 flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-text transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-60"
+        className="mt-2"
+        icon={<RefreshCw size={12} className={loading ? 'animate-spin' : ''} />}
       >
-        <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
         {t('settings.cliGuide.recheck')}
-      </button>
+      </Button>
     </div>
   )
 }

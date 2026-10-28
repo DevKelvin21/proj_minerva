@@ -5,6 +5,8 @@ import { findModelInList, type AiProviderId } from '../../../../shared/ai-provid
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
 import { useProviderModels } from '../../hooks/use-provider-models'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
+import { Input } from '../ui/Input'
 import { ModelOptionPicker } from './ModelOptionPicker'
 import { CliLoginGuide } from './CliLoginGuide'
 
@@ -161,40 +163,43 @@ export function ProviderModelPanel({
               {customIsActive && <Badge tone="success">{t('settings.models.active')}</Badge>}
             </div>
             <div className="flex gap-1.5">
-              <input
-                type="text"
+              <Input
+                fieldSize="sm"
+                mono
                 value={customValue}
                 onChange={(event) => setCustomValue(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') void activate(customValue)
                 }}
                 disabled={anyActivating}
+                aria-label={t('settings.models.custom')}
                 placeholder={
                   viewedProvider === 'opencode' ? t('settings.models.customPlaceholderOpencode') : ''
                 }
                 maxLength={100}
-                className="w-full rounded-md border border-border bg-bg px-2 py-1 font-mono text-xs text-text placeholder:text-muted focus:border-accent disabled:opacity-60"
+                className="w-full min-w-0"
               />
-              <button
-                type="button"
+              <Button
                 disabled={anyActivating || customValue.trim().length === 0}
                 onClick={() => void activate(customValue)}
-                className={
-                  !anyActivating && customValue.trim().length > 0
-                    ? 'flex shrink-0 items-center gap-1.5 rounded-md border border-accent/40 bg-accent/15 px-3 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/25'
-                    : 'flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-border/40 px-3 py-1 text-xs font-medium text-muted'
+                icon={
+                  activating === customValue.trim() ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : undefined
                 }
               >
-                {activating === customValue.trim() && <Loader2 size={13} className="animate-spin" />}
                 {t('settings.models.use')}
-              </button>
+              </Button>
             </div>
           </div>
         )}
       </div>
 
-      {activateError && <p className="mt-2 text-xs text-danger">{activateError}</p>}
-      {!activateError && error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      {(activateError ?? error) && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {activateError ?? error}
+        </p>
+      )}
 
       {isActiveTab ? (
         activeModel?.options && activeModel.options.length > 0 && (

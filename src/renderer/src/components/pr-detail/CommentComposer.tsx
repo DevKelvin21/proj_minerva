@@ -5,6 +5,7 @@ import { Lightbulb } from 'lucide-react'
 import { buildSuggestionBlock, insertSuggestion } from '../../lib/suggestions'
 import { errorText } from '../../lib/error-text'
 import { Button } from '../ui/Button'
+import { TextArea } from '../ui/TextArea'
 
 /** How the composer gets the lines a suggestion starts from, or why it can't. */
 export type SuggestionSource =
@@ -139,7 +140,7 @@ export function CommentComposer({
       }}
       className={`flex flex-col gap-2 ${className}`}
     >
-      <textarea
+      <TextArea
         ref={textareaRef}
         autoFocus={autoFocus}
         aria-label={label}
@@ -154,7 +155,8 @@ export function CommentComposer({
         disabled={posting}
         rows={rows}
         placeholder={placeholder}
-        className="min-w-0 resize-y rounded-md border border-border bg-bg px-2 py-1.5 font-sans text-sm text-text placeholder:text-muted focus:border-accent"
+        fieldSize="lg"
+        className="resize-y"
       />
       {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex flex-wrap items-center justify-end gap-2">

@@ -5,6 +5,7 @@ import type { RepoRef } from '../../../../shared/scm'
 import { isConversationBusy, useChatDraft, useChatStore } from '../../stores/chat-store'
 import { ContextChip } from './ContextChip'
 import { IconButton } from '../ui/IconButton'
+import { TextArea } from '../ui/TextArea'
 
 interface ChatComposerProps {
   repo: RepoRef
@@ -72,8 +73,10 @@ export function ChatComposer({
           </div>
         </div>
       )}
-      <div className="flex min-w-0 items-end gap-1.5 rounded-md border border-border bg-bg px-2 py-1.5 focus-within:border-accent">
-        <textarea
+      <div className="flex min-w-0 items-end gap-1.5 rounded-md border border-border bg-bg px-2 py-1.5 transition-colors duration-150 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
+        <TextArea
+          bare
+          autoGrow
           rows={2}
           value={draft.text}
           maxLength={MAX_CHAT_MESSAGE_LEN}
@@ -88,7 +91,7 @@ export function ChatComposer({
           placeholder={
             conversationId ? t('chat.composer.followUpPlaceholder') : t('chat.composer.placeholder')
           }
-          className="max-h-48 min-h-[2.5rem] min-w-0 flex-1 resize-none bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
+          className="max-h-48 min-h-[2.5rem] flex-1 resize-none"
         />
         {busy && conversationId ? (
           <IconButton

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { APP_LOCALES, isAppLocale, type AppLocale } from '../../../../shared/locale'
 import { useLocale } from '../../i18n/use-locale'
+import { Select } from '../ui/Select'
 
 /**
  * Each language named in itself (never translated): someone who can't read
@@ -47,21 +48,24 @@ export function LanguageSection({ compact = false }: LanguageSectionProps): Reac
         {t('settings.language.title')}
       </h3>
       {!compact && <p className="mb-2 text-xs text-muted">{t('settings.language.description')}</p>}
-      <select
+      <Select
         data-testid="language-picker"
         aria-label={t('settings.language.label')}
         value={locale}
         disabled={saving}
         onChange={(event) => void change(event.target.value)}
-        className="rounded-md border border-border bg-bg px-2 py-1 text-sm text-text outline-none focus:border-accent/60 disabled:opacity-60"
       >
         {APP_LOCALES.map((code) => (
           <option key={code} value={code} lang={code}>
             {LANGUAGE_NAMES[code]}
           </option>
         ))}
-      </select>
-      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      </Select>
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
