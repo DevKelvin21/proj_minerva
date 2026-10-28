@@ -6,15 +6,17 @@ import { useElementWidth } from '../../hooks/use-element-width'
 import {
   findPullRequest,
   matchesViewerFilter,
+  stackOrder,
   type ViewerFilter,
   type ViewerIdentity,
 } from '../../lib/dashboard'
-import { OrphanNotice, StackStateIcon } from '../stacks/StackTree'
+import { OrphanNotice } from '../stacks/StackTree'
+import { RetargetNote } from '../stacks/RetargetNote'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { SelectableCard } from '../ui/SelectableCard'
-import { PrCard } from './PrCard'
+import { PrCard, PrStateIcon } from './PrCard'
 
 /**
  * Below this board width the chains run top-to-bottom instead of left-to-right
@@ -54,7 +56,7 @@ function NodeFallbackCard({
     >
       <span className="flex min-w-0 items-start gap-1.5">
         <span className="mt-0.5">
-          <StackStateIcon isDraft={node.isDraft} />
+          <PrStateIcon isDraft={node.isDraft} />
         </span>
         <span className="shrink-0 font-mono text-xs text-muted">#{node.number}</span>
         <span className="line-clamp-2 min-w-0 text-sm leading-snug text-text/80">{node.title}</span>
@@ -161,34 +163,40 @@ function ChainNode({
   )
 }
 
+/**
+ * One stack: its size and "Review stack" (secondary: the page's one filled
+ * button is "Continue reviewing"), then the chain from its base branch. An
+ * orphaned stack says so once: a warning border here, the badge on the PR
+ * card and the notice with its action under the chain. The last retarget's
+ * outcome shows under the stack it was about.
+ */
 function StackRow({
   stack,
   ctx,
+  noteKey,
   onReviewStack,
 }: {
   stack: PrStack
   ctx: BoardContext
+  noteKey: string | null
   onReviewStack: (stack: PrStack) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   const horizontal = ctx.orientation === 'horizontal'
   const orphan = stack.root.orphan !== undefined
+  const showNote = noteKey !== null && stackOrder(stack).includes(noteKey)
   return (
     <Card
       as="section"
-      tone="inset"
+      tone={orphan ? 'warning' : 'inset'}
       aria-label={t('home.stackBoard.stackAriaLabel', { number: stack.root.number })}
       data-stack-root={stack.root.prKey}
+      data-orphan={orphan || undefined}
     >
-      <header className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted">
-        <span className="font-semibold uppercase tracking-wide text-[10px]">
+      <header className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
           {t('home.stackBoard.prCount', { count: stack.size })}
         </span>
-        {orphan && (
-          <Badge tone="warning" size="sm">
-            {t('home.stackBoard.orphaned')}
-          </Badge>
-        )}
         <Button
           size="xs"
           onClick={() => onReviewStack(stack)}
@@ -202,16 +210,15 @@ function StackRow({
       </header>
       <div className={horizontal ? 'overflow-x-auto pb-1' : ''}>
         <div className={horizontal ? 'flex w-max items-start' : 'flex flex-col'}>
-          <span
+          <Badge
+            tone="outline"
             data-testid="stack-base"
             title={t('home.stackBoard.base', { branch: stack.root.baseRef })}
-            className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-panel px-2 py-0.5 font-mono text-[11px] text-muted ${
-              horizontal ? 'mt-3.5' : 'ml-3 self-start'
-            } ${orphan ? 'border-warning/50 text-warning' : ''}`}
+            icon={<GitBranch size={11} aria-hidden />}
+            className={`font-mono ${horizontal ? 'mt-3.5' : 'ml-3 self-start'}`}
           >
-            <GitBranch size={11} aria-hidden />
             {stack.root.baseRef}
-          </span>
+          </Badge>
           <Connector orientation={ctx.orientation} />
           <ChainNode node={stack.root} stack={stack} ctx={ctx} />
         </div>
@@ -220,6 +227,12 @@ function StackRow({
         <div className="max-w-xl">
           <OrphanNotice node={stack.root} />
         </div>
+      )}
+      {showNote && (
+        <RetargetNote
+          onlyFor={noteKey}
+          className="max-w-xl rounded-md border border-border bg-panel px-3 py-2"
+        />
       )}
     </Card>
   )
@@ -231,6 +244,8 @@ interface StackBoardProps {
   identity: ViewerIdentity
   filter: ViewerFilter
   pendingKey: string | null
+  /** `prKey` of the PR the last retarget note is about, when it is on this board. */
+  noteKey?: string | null
   onOpenNode: (node: StackNode, stack: PrStack) => void
   onReviewStack: (stack: PrStack) => void
 }
@@ -248,6 +263,7 @@ export function StackBoard({
   identity,
   filter,
   pendingKey,
+  noteKey = null,
   onOpenNode,
   onReviewStack,
 }: StackBoardProps): React.JSX.Element {
@@ -266,7 +282,13 @@ export function StackBoard({
       className="flex min-w-0 flex-col gap-3"
     >
       {stacks.map((stack) => (
-        <StackRow key={stack.root.prKey} stack={stack} ctx={ctx} onReviewStack={onReviewStack} />
+        <StackRow
+          key={stack.root.prKey}
+          stack={stack}
+          ctx={ctx}
+          noteKey={noteKey}
+          onReviewStack={onReviewStack}
+        />
       ))}
     </div>
   )

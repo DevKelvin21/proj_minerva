@@ -111,13 +111,30 @@ test('overview: feature and repo cards; Home from a repo page and a feature page
     if (count > 0) await expect(repoCard(window, name)).toContainText(count + ' to review')
     else await expect(repoCard(window, name)).not.toContainText('to review')
   }
+  // Totals are plain numbers in the page header, in the filters' words.
   const total = Object.values(needsReview).reduce((sum, n) => sum + n, 0)
+  const totals = window.getByTestId('home-totals')
   if (total > 0) {
-    await expect(overview(window)).toContainText(total + ' need')
+    await expect(totals).toContainText(total + ' to review')
   } else {
-    await expect(overview(window)).not.toContainText('your review')
+    await expect(totals).not.toContainText('to review')
   }
+  await expect(totals).toContainText('1 orphaned')
+  await expect(totals.getByRole('button')).toHaveCount(0)
   await attachScreenshot(window, testInfo, 'home-overview')
+
+  // Quarter screen: the header, totals and cards still fit, no horizontal scroll.
+  await setViewport(window, 960, 540)
+  await window.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  )
+  await expect(totals).toContainText('1 orphaned')
+  await expect(repoCard(window, 'orders-api')).toBeVisible()
+  await attachScreenshot(window, testInfo, 'home-overview-960x540')
+  expect(
+    await window.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0)
+  await setViewport(window, 1600, 1000)
 
   // Home button from a repo page and from a feature page: both land on the overview.
   await openRepo(window, 'orders-api')
@@ -336,6 +353,7 @@ test('stack navigator: prev/next, next disabled on the last PR, cleared by a PR 
   await window.getByTestId('home-button').click()
   await expect(overview(window)).toBeVisible()
   await expect(overview(window).getByTestId('continue-review')).toContainText('#102')
+  await attachScreenshot(window, testInfo, 'home-overview-continue')
   await overview(window).getByTestId('continue-review').click()
   await expect(prHeader(window)).toContainText('#102')
   await expect(window.getByRole('button', { name: /^Files/ })).toHaveAttribute('aria-pressed', 'true')
@@ -404,6 +422,39 @@ test('tiled sizes: overview, repo page (vertical board) and feature page keep th
       () => document.documentElement.scrollWidth - window.innerWidth,
     )
     expect(overflow, viewport.name + ': page overflows horizontally').toBeLessThanOrEqual(0)
+  }
+})
+
+// eslint-disable-next-line no-empty-pattern
+test('repo page: the orphan said once, and the retarget outcome next to its stack', async ({}, testInfo) => {
+  const app = await launchMinerva(testInfo.outputPath('user-data'), {
+    env: { MINERVA_TEST_CONFIRM: 'accept' },
+  })
+  try {
+    const win = await mainWindow(app)
+    await setViewport(win, 1600, 1000)
+    await openRepo(win, 'orders-api')
+    const orphanStack = repoPage(win).locator('section[data-orphan]')
+    await expect(orphanStack).toHaveCount(1, { timeout: 20_000 })
+    // One badge (on the PR card), the notice and its action; nothing else repeats it.
+    await expect(orphanStack.locator('[data-orphan-badge]')).toHaveCount(1)
+    await expect(orphanStack).toContainText('Parent #100 was completed into main')
+    await expect(orphanStack.getByRole('button', { name: 'Retarget to main' })).toBeVisible()
+    await attachScreenshot(win, testInfo, 'home-orphan')
+
+    await orphanStack.getByRole('button', { name: 'Retarget to main' }).click()
+    await orphanStack.getByRole('button', { name: 'Retarget #105' }).click()
+    const note = repoPage(win).getByRole('status').filter({ hasText: 'now targets' })
+    await expect(note).toContainText('#105 now targets main (was feature/refund-schema)')
+    // Fixed: #105 is no stack any more, so the note sits with the PRs not in
+    // a stack, where #105 now is (not at the top of the page).
+    await expect(repoPage(win).locator('section[data-orphan]')).toHaveCount(0, { timeout: 20_000 })
+    const loose = repoPage(win).getByRole('region', { name: 'Pull requests' })
+    await expect(loose.getByRole('status')).toContainText('#105 now targets main')
+    await expect(loose.getByTestId('pr-card').filter({ hasText: '#105' })).toBeVisible()
+    await attachScreenshot(win, testInfo, 'home-retarget-done')
+  } finally {
+    await closeMinerva(app)
   }
 })
 
