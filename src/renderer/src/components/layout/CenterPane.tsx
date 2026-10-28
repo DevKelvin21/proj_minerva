@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { usePullRequestDetail } from '../../hooks/use-pull-request-detail'
@@ -110,6 +110,18 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
     applyThreadStatus,
   } = useCommentThreads(repo, number)
   const { files, loading: filesLoading, error: filesError } = usePullRequestFiles(repo, number)
+
+  // The activity inbox opened this PR again (`openPrAt`): a comment may have
+  // arrived after the threads were fetched. The first value is the mount's
+  // own fetch, so only a later change reloads.
+  const threadsRefreshToken = useAppStore((s) => s.threadsRefreshToken)
+  const [seenRefreshToken] = useState(threadsRefreshToken)
+  useEffect(() => {
+    if (threadsRefreshToken === seenRefreshToken) return
+    void (async () => {
+      await reloadThreads()
+    })()
+  }, [threadsRefreshToken, seenRefreshToken, reloadThreads])
 
   const headSha = detail.headSha
   const actions: ThreadActions = useMemo(() => {

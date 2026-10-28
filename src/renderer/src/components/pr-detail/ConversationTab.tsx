@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
@@ -31,7 +31,21 @@ export function ConversationTab({
 }: ConversationTabProps): React.JSX.Element {
   const { t } = useTranslation()
   const openLineThread = useAppStore((s) => s.openLineThread)
+  const expandedThreadId = useAppStore((s) => s.expandedThreadId)
+  const pendingFocus = useAppStore((s) => s.pendingConversationFocus)
+  const clearPendingFocus = useAppStore((s) => s.clearPendingConversationFocus)
   const tier = useLayoutTier()
+
+  // Arriving from the activity inbox: scroll to the thread once it is listed.
+  // Until then wait: the threads may still be (re)loading, and the effect
+  // re-runs when they land. Opening another PR drops the request.
+  useEffect(() => {
+    if (!pendingFocus || !threads.some((thread) => thread.id === pendingFocus)) return
+    document
+      .querySelector(`[data-thread-id="${CSS.escape(pendingFocus)}"]`)
+      ?.scrollIntoView({ block: 'center' })
+    clearPendingFocus()
+  }, [pendingFocus, threads, clearPendingFocus])
   const [draft, setDraft] = useState('')
   const [posting, setPosting] = useState(false)
   const [postError, setPostError] = useState<string | null>(null)
@@ -88,6 +102,7 @@ export function ConversationTab({
             <ThreadCard
               key={thread.id}
               thread={thread}
+              highlighted={thread.id === expandedThreadId}
               onNavigateToLine={
                 thread.isLineThread && thread.path && thread.line !== undefined
                   ? () => openLineThread(thread.path!, thread.line!, thread.id)
@@ -111,7 +126,9 @@ export function ConversationTab({
           className="resize-y rounded-md border border-border bg-panel px-3 py-2 text-sm text-text placeholder:text-muted focus:border-accent"
         />
         {postError && (
-          <p className="text-sm text-danger">{t('comments.conversation.postError', { error: postError })}</p>
+          <p className="text-sm text-danger">
+            {t('comments.conversation.postError', { error: postError })}
+          </p>
         )}
         <button
           type="submit"

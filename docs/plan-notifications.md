@@ -1,7 +1,6 @@
 # Plan: activity inbox + notifications
 
-Status (2026-10-28): step 1 (activity engine in main) done on `feat/activity-inbox`, not yet
-committed. Verified: `npm run verify`, `npm run test:e2e`, and a live mock run where the scripted
+Status (2026-10-28): steps 1 (engine) and 2 (Inbox UI) done on `feat/activity-inbox`. Verified: `npm run verify`, `npm run test:e2e`, and a live mock run where the scripted
 comment reached `activity:get`. GitHub's PR `updatedAt` was checked against real data and does move
 on line comments (microsoft/vscode#344792, #344785: `updatedAt` equals the last review comment).
 
@@ -85,11 +84,17 @@ Inbox                         Mark all read
 
 - Unread = a small accent dot. No bold color blocks; read items fade.
 - Click a line comment: the PR opens on the Files tab, file selected, thread open and
-  centered. A conversation comment: the Conversation tab with the thread highlighted. An
-  orphan: the existing retarget panel.
+  centered. Any other comment (conversation, file-level, outdated): the Conversation tab
+  with the thread highlighted. An orphan: the PR itself, whose header already shows the
+  orphan warning and the one-click retarget.
 - New store action `openPrAt(pr, target)` selects the PR and arms the focus together
   (`selectPr` alone clears it). New focus path for conversation threads.
-- Read when opened, when its thread is shown in the review, or with "Mark all read".
+- Read when opened from the Inbox, per PR (✓✓ on its header), or with "Mark all read".
+  (Marking read when a thread merely scrolls into view in the review was left out: too easy
+  to clear something without reading it.)
+- Opening an item for a PR that is already open refetches its threads first
+  (`threadsRefreshToken`), so a comment that arrived after the PR was opened is there to
+  land on. Focus requests wait for their thread instead of giving up.
 - The collapsed rail shows the same unread count.
 
 ### 3. Notifications

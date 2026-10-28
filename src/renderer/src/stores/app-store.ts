@@ -37,7 +37,7 @@ export type FileTreeMode = 'tree' | 'list' | 'layers'
 /** How many recently opened PRs the collapsed sidebar rail keeps. */
 const MAX_RECENT_PRS = 5
 
-export type SidebarView = 'queue' | 'list' | 'stacks'
+export type SidebarView = 'queue' | 'list' | 'stacks' | 'inbox'
 /** The reviewer's call on one walkthrough layer (full-screen walkthrough footer). */
 export type LayerVerdict = 'good' | 'changes' | 'question'
 
@@ -139,6 +139,16 @@ interface PendingThreadFocus {
   threadId: string
 }
 
+/**
+ * Where `openPrAt` lands inside the review (the activity inbox's deep links):
+ * a line thread in the Files tab, a thread in the Conversation tab, or just
+ * the PR.
+ */
+export type PrFocusTarget =
+  | { kind: 'line'; path: string; line: number; threadId: string }
+  | { kind: 'conversation'; threadId: string }
+  | { kind: 'overview' }
+
 interface AppState {
   selectedPr: PullRequestSummary | null
   searchQuery: string
@@ -181,6 +191,16 @@ interface AppState {
    */
   expandedThreadId: string | null
   pendingThreadFocus: PendingThreadFocus | null
+  /**
+   * Conversation-tab twin of `pendingThreadFocus`: the thread to scroll to
+   * (and highlight, through `expandedThreadId`) once the threads load.
+   */
+  pendingConversationFocus: string | null
+  /**
+   * Bumped by `openPrAt`: the open review refetches its threads, so a comment
+   * that arrived after the PR was opened is there to land on.
+   */
+  threadsRefreshToken: number
 
   /**
    * Per-provider SCM auth status: single source of truth for TitleBar,
@@ -290,6 +310,12 @@ interface AppState {
   /** Navega al tab Archivos, selecciona `path` y deja el hilo `threadId` expandido/enfocado. */
   openLineThread: (path: string, line: number, threadId: string) => void
   clearPendingThreadFocus: () => void
+  clearPendingConversationFocus: () => void
+  /**
+   * `selectPr` plus a landing spot, in one go (`selectPr` alone clears any
+   * focus). Used by the activity inbox.
+   */
+  openPrAt: (pr: PullRequestSummary, target: PrFocusTarget) => void
   setScmAuth: (statuses: Record<ScmProviderId, ScmAuthStatus>) => void
   setScmSettings: (info: ScmSettingsInfo) => void
   openSettings: () => void
@@ -323,6 +349,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   expandedThreadId: null,
   pendingThreadFocus: null,
+  pendingConversationFocus: null,
+  threadsRefreshToken: 0,
 
   scmAuth: null,
   scmSettings: null,
@@ -368,6 +396,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         : state.recentPrs,
       expandedThreadId: null,
       pendingThreadFocus: null,
+      pendingConversationFocus: null,
       // Elegir un PR cierra el drawer de la lista (F16/T82): en `md`/`sm` la
       // lista tapa el centro, y el gesto natural tras elegir es ver el PR.
       sidebarOpen: false,
@@ -469,6 +498,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       pendingThreadFocus: { path, line, threadId },
     }),
   clearPendingThreadFocus: () => set({ pendingThreadFocus: null }),
+  clearPendingConversationFocus: () => set({ pendingConversationFocus: null }),
+  openPrAt: (pr, target) => {
+    get().selectPr(pr)
+    set((state) => ({ threadsRefreshToken: state.threadsRefreshToken + 1 }))
+    if (target.kind === 'line') {
+      get().openLineThread(target.path, target.line, target.threadId)
+    } else if (target.kind === 'conversation') {
+      set({
+        centerTab: 'conversation',
+        expandedThreadId: target.threadId,
+        pendingConversationFocus: target.threadId,
+      })
+    }
+  },
   setScmAuth: (statuses) => set({ scmAuth: statuses }),
   setScmSettings: (info) => set({ scmSettings: info }),
   openSettings: () => set({ settingsOpen: true, commandPaletteOpen: false }),
