@@ -11,6 +11,8 @@ import {
 } from '../../lib/dashboard'
 import { OrphanNotice, StackStateIcon } from '../stacks/StackTree'
 import { Badge } from '../ui/Badge'
+import { Card } from '../ui/Card'
+import { SelectableCard } from '../ui/SelectableCard'
 import { PrCard } from './PrCard'
 
 /**
@@ -42,14 +44,12 @@ function NodeFallbackCard({
   onOpen: () => void
 }): React.JSX.Element {
   return (
-    <button
-      type="button"
+    <SelectableCard
       data-testid="stack-card"
       data-pr-key={node.prKey}
       onClick={onOpen}
       disabled={pending}
       title={'#' + node.number + ' ' + node.title}
-      className="flex w-full min-w-0 flex-col gap-1 rounded-md border border-border bg-panel p-2.5 text-left transition-colors duration-150 hover:border-accent focus-visible:border-accent focus-visible:outline-none disabled:cursor-wait"
     >
       <span className="flex min-w-0 items-start gap-1.5">
         <span className="mt-0.5">
@@ -59,7 +59,7 @@ function NodeFallbackCard({
         <span className="line-clamp-2 min-w-0 text-sm leading-snug text-text/80">{node.title}</span>
       </span>
       <span className="truncate pl-5 font-mono text-[10px] text-muted">{node.headRef}</span>
-    </button>
+    </SelectableCard>
   )
 }
 
@@ -173,10 +173,11 @@ function StackRow({
   const horizontal = ctx.orientation === 'horizontal'
   const orphan = stack.root.orphan !== undefined
   return (
-    <section
+    <Card
+      as="section"
+      tone="inset"
       aria-label={t('home.stackBoard.stackAriaLabel', { number: stack.root.number })}
       data-stack-root={stack.root.prKey}
-      className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-bg/40 p-3"
     >
       <header className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted">
         <span className="font-semibold uppercase tracking-wide text-[10px]">
@@ -219,7 +220,7 @@ function StackRow({
           <OrphanNotice node={stack.root} />
         </div>
       )}
-    </section>
+    </Card>
   )
 }
 

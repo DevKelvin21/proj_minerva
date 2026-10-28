@@ -131,6 +131,43 @@ test('Resize: drag the sidebar edge, the width is remembered, double-click resto
   expect(await widthOf()).toBe(280)
 })
 
+test('AI panel resize: arrows, Home/End and double-click on its left edge', async ({
+  window,
+}, testInfo) => {
+  await setViewport(window, 1600, 1000)
+  await queue(window)
+    .getByRole('button', { name: /Fix cart rounding/ })
+    .first()
+    .click()
+  await expect(window.locator('header:has(h1)')).toContainText('#108')
+  const handle = window.getByRole('separator', { name: 'Resize AI panel' })
+  const panel = handle.locator('xpath=..')
+  const widthOf = async (): Promise<number> => Math.round((await panel.boundingBox())?.width ?? 0)
+  await expect(handle).toHaveAttribute('aria-valuenow', '380')
+  expect(await widthOf()).toBe(380)
+
+  // The edge is on the left: ArrowLeft widens the panel, ArrowRight narrows it.
+  await handle.focus()
+  await window.keyboard.press('ArrowLeft')
+  await expect(handle).toHaveAttribute('aria-valuenow', '396')
+  expect(await widthOf()).toBe(396)
+  await window.keyboard.press('ArrowRight')
+  await window.keyboard.press('ArrowRight')
+  await expect(handle).toHaveAttribute('aria-valuenow', '364')
+
+  await window.keyboard.press('Home')
+  await expect(handle).toHaveAttribute('aria-valuenow', '300')
+  expect(await widthOf()).toBe(300)
+  await window.keyboard.press('End')
+  const max = await handle.getAttribute('aria-valuemax')
+  await expect(handle).toHaveAttribute('aria-valuenow', max ?? '')
+  expect(await widthOf()).toBe(Number(max))
+  await attachScreenshot(window, testInfo, 'ai-panel-resized')
+
+  await handle.dblclick()
+  await expect(handle).toHaveAttribute('aria-valuenow', '380')
+})
+
 test('Didactic panel closed takes no room: no folded strip on the right', async ({
   window,
 }, testInfo) => {

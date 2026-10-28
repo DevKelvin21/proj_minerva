@@ -9,6 +9,8 @@ import { Avatar } from '../ui/Avatar'
 import { Badge, type BadgeTone } from '../ui/Badge'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
 import { Spinner } from '../ui/Spinner'
+import { DiffStat } from '../ui/DiffStat'
+import { SelectableCard } from '../ui/SelectableCard'
 import { OrphanBadge, StackStateIcon } from '../stacks/StackTree'
 
 const MAX_LABELS = 3
@@ -95,17 +97,15 @@ export function PrCard({
   const authorName = pr.author.displayName ?? pr.author.login
 
   return (
-    <button
-      type="button"
+    <SelectableCard
       data-testid={testId}
       data-pr-key={prKey(pr.repo, pr.number)}
       data-dimmed={dimmed || undefined}
       onClick={() => onOpen(pr)}
       disabled={pending}
       title={'#' + pr.number + ' ' + pr.title}
-      className={`flex w-full min-w-0 flex-col gap-1.5 rounded-md border bg-panel p-2.5 text-left transition-colors duration-150 hover:border-accent focus-visible:border-accent focus-visible:outline-none disabled:cursor-wait ${
-        orphan ? 'border-warning/50' : 'border-border'
-      } ${dimmed ? 'opacity-45 hover:opacity-100' : ''}`}
+      tone={orphan ? 'warning' : 'default'}
+      className={dimmed ? 'opacity-45 hover:opacity-100 focus-visible:opacity-100' : ''}
     >
       <span className="flex min-w-0 items-start gap-1.5">
         {pending ? (
@@ -155,10 +155,7 @@ export function PrCard({
           </span>
         )}
         {pr.additions !== null && pr.deletions !== null && (
-          <span className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[10px]">
-            <span className="text-success">+{pr.additions}</span>
-            <span className="text-danger">-{pr.deletions}</span>
-          </span>
+          <DiffStat additions={pr.additions} deletions={pr.deletions} size="xs" className="ml-auto" />
         )}
       </span>
       {(pr.viewer || orphan || pr.isDraft || shownLabels.length > 0) && (
@@ -193,6 +190,6 @@ export function PrCard({
           )}
         </span>
       )}
-    </button>
+    </SelectableCard>
   )
 }

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { FeatureGroup } from '../../lib/dashboard'
 import { Badge } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
+import { SelectableCard } from '../ui/SelectableCard'
 
 /** "x of n approved" as a thin bar (theme tokens only). */
 export function ApprovalBar({
@@ -43,12 +44,11 @@ export function FeatureCard({
 }): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <button
-      type="button"
+    <SelectableCard
       data-testid="feature-card"
       data-feature-key={group.key}
       onClick={() => onOpen(group.key)}
-      className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-panel p-3 text-left transition-colors duration-150 hover:border-accent focus-visible:border-accent focus-visible:outline-none"
+      padding="md"
     >
       <span className="flex min-w-0 items-start gap-2">
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -102,6 +102,6 @@ export function FeatureCard({
           {t('home.featureCard.approved', { approved: group.approved, total: group.prCount })}
         </span>
       </span>
-    </button>
+    </SelectableCard>
   )
 }

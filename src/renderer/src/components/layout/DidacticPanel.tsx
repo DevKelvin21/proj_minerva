@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { ExternalLink, GraduationCap, MessageCircle, Sparkles, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, type AiPanelTab } from '../../stores/app-store'
@@ -7,9 +6,11 @@ import { useLayoutTier } from '../../hooks/use-layout-tier'
 import {
   clampDidacticWidth,
   DIDACTIC_PANEL_DEFAULT_WIDTH,
+  DIDACTIC_PANEL_MIN_WIDTH,
   sidebarFootprint,
 } from '../../lib/layout'
 import { IconButton } from '../ui/IconButton'
+import { ResizeHandle } from '../ui/ResizeHandle'
 import { DidacticAnalysisArea } from '../didactic/DidacticAnalysisArea'
 import { DidacticPlaceholder } from '../didactic/DidacticPlaceholder'
 import { AskTab } from '../chat/AskTab'
@@ -46,12 +47,10 @@ const AI_PANEL_TABS: readonly AiPanelTab[] = ['ask', 'analysis']
  * este botón solo se renderiza en esa rama) justo después de pedir la
  * ventana, para que quede una sola superficie mostrando el PR desacoplado.
  *
- * Resize (T23): el borde izquierdo es un handle de arrastre (pointer events
- * con `setPointerCapture`: el puntero puede salirse del handle de 6px durante
- * el arrastre y los `pointermove` siguen llegando igual — sin listeners
- * globales que limpiar). El ancho vive en el store (`didacticPanelWidth`,
- * clampeado y persistido en `localStorage` por `setDidacticPanelWidth`);
- * doble click en el handle vuelve al ancho por defecto.
+ * Resize (T23): the left edge is a `ResizeHandle` (drag, arrow keys,
+ * Home/End, double-click back to the default width). The width lives in the
+ * store (`didacticPanelWidth`, clamped and persisted in `localStorage` by
+ * `setDidacticPanelWidth`).
  */
 export function DidacticPanel(): React.JSX.Element {
   const { t } = useTranslation()
@@ -76,7 +75,6 @@ export function DidacticPanel(): React.JSX.Element {
   const askPanel = tabs.panelProps('ask')
   const analysisPanel = tabs.panelProps('analysis')
   const tier = useLayoutTier()
-  const asideRef = useRef<HTMLElement>(null)
 
   // F16/T87: el ancho PINTADO es el preferido clampeado contra el viewport
   // ACTUAL. Antes el clamp solo corría al arrastrar, así que un ancho guardado
@@ -84,11 +82,9 @@ export function DidacticPanel(): React.JSX.Element {
   // El valor del store no se toca: al ensanchar de nuevo, el panel recupera su
   // ancho preferido solo.
   // The center's share also depends on the left column's real width (dragged or folded).
-  const panelWidth = clampDidacticWidth(
-    preferredWidth,
-    tier.width,
-    sidebarFootprint(sidebarWidth, sidebarCollapsed, tier.width),
-  )
+  const footprint = sidebarFootprint(sidebarWidth, sidebarCollapsed, tier.width)
+  const panelWidth = clampDidacticWidth(preferredWidth, tier.width, footprint)
+  const maxPanelWidth = clampDidacticWidth(Number.POSITIVE_INFINITY, tier.width, footprint)
 
   // The full-screen walkthrough shows the layer's explanation inline instead.
   // Closed, it takes no room at all: the title bar's toggle (and the command
@@ -111,7 +107,6 @@ export function DidacticPanel(): React.JSX.Element {
         />
       )}
       <aside
-        ref={asideRef}
         style={isOverlay ? undefined : { width: panelWidth }}
         className={
           isOverlay
@@ -119,26 +114,18 @@ export function DidacticPanel(): React.JSX.Element {
             : 'relative flex shrink-0 flex-col border-l border-border bg-panel'
         }
       >
-        {/* Handle de resize (T23): franja de 6px sobre el borde izquierdo. El
-          ancho nuevo es la distancia del puntero al borde DERECHO del aside
-          (el panel crece hacia la izquierda); el clamp vive en el store. */}
+        {/* Resize handle (T23) on the left edge: the panel grows leftward;
+          the store still clamps what it persists. */}
         {!isOverlay && (
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={t('didactic.panel.resize')}
+          <ResizeHandle
+            edge="left"
+            value={panelWidth}
+            min={DIDACTIC_PANEL_MIN_WIDTH}
+            max={maxPanelWidth}
+            onChange={setPanelWidth}
+            onReset={() => setPanelWidth(DIDACTIC_PANEL_DEFAULT_WIDTH)}
+            label={t('didactic.panel.resize')}
             title={t('didactic.panel.resizeHint')}
-            className="absolute inset-y-0 -left-[3px] z-10 w-1.5 cursor-col-resize touch-none hover:bg-accent/50 active:bg-accent/70"
-            onPointerDown={(e) => {
-              e.preventDefault()
-              e.currentTarget.setPointerCapture(e.pointerId)
-            }}
-            onPointerMove={(e) => {
-              if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-              const right = asideRef.current?.getBoundingClientRect().right ?? window.innerWidth
-              setPanelWidth(right - e.clientX)
-            }}
-            onDoubleClick={() => setPanelWidth(DIDACTIC_PANEL_DEFAULT_WIDTH)}
           />
         )}
         <header className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-1.5">
