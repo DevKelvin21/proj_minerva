@@ -66,6 +66,9 @@ test('a new line comment lands in the Inbox and opens the review at its line', a
   await expect(inbox(window)).toContainText('1 unread')
   // The baseline stayed silent: none of api#482's earlier comments are listed.
   await expect(inbox(window).locator('[data-activity-item]')).toHaveCount(1)
+  // Unread is said, not only drawn; the excerpt is the row's description.
+  await expect(incoming(window)).toHaveAccessibleName(/^Unread: jrivas commented on /)
+  await expect(incoming(window)).toHaveAccessibleDescription(/Should this retry on 409/)
   await attachScreenshot(window, testInfo, 'inbox-unread')
 
   await incoming(window).click()
@@ -128,10 +131,18 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
   await railInbox.click()
   await expect(inbox(window)).toBeVisible()
 
-  await inbox(window).getByRole('button', { name: 'Mark all read' }).click()
+  const markAll = inbox(window).getByRole('button', { name: 'Mark all read' })
+  await markAll.click()
   await expect(badge(window)).toHaveCount(0)
   await expect(incoming(window)).toHaveAttribute('data-read', 'true')
-  await expect(inbox(window).getByRole('button', { name: 'Mark all read' })).toBeDisabled()
+  await expect(incoming(window)).toHaveAccessibleName(/^jrivas commented on /)
+  // Both mark-read controls stay put once everything is read: focus is not dropped.
+  await expect(markAll).toBeDisabled()
+  await expect(markAll).toBeFocused()
+  await expect(inbox(window).getByRole('button', { name: /^Mark #\d+ read$/ })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
 
   // Tiled: the sidebar is a drawer; the four views still fit and the row still reads.
   await setViewport(window, 960, 540)

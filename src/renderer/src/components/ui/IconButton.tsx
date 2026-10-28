@@ -37,7 +37,7 @@ export function IconButton({
       title={label}
       aria-label={label}
       aria-pressed={active}
-      className={`inline-flex shrink-0 items-center justify-center rounded-md border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${sizeClasses[size]} ${
+      className={`inline-flex shrink-0 items-center justify-center rounded-md border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 ${sizeClasses[size]} ${
         tone === 'primary'
           ? 'border-transparent bg-accent text-accent-fg hover:bg-accent/90'
           : active
