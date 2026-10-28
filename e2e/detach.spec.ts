@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot, openInsightTab } from './fixtures'
+import { test, expect, attachScreenshot, openInsightTab, openAnalysisTab } from './fixtures'
 import { buildDidacticHash } from '../src/shared/didactic-route'
 import type { RepoRef } from '../src/shared/scm'
 
@@ -37,6 +37,7 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaciÃ
 
   // T22: se cliquea el botÃ³n REAL "Abrir en ventana" (el efecto de cerrar el
   // panel acoplado vive en el onClick de DidacticPanel, no en el canal IPC).
+  await openAnalysisTab(window)
   const detachedPromise = minerva.context.waitForEvent('page')
   await window.locator('button[aria-label="Open in window"]').click()
   const detached = await detachedPromise
@@ -45,9 +46,9 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaciÃ
 
   // El panel acoplado se CIERRA tras desacoplar (T22), sin dejar franja: el
   // toggle del title bar queda apagado.
-  const panelToggle = window.locator('header button[aria-label="Didactic panel"]')
+  const panelToggle = window.locator('header button[aria-label="AI panel"]')
   await expect(panelToggle).toHaveAttribute('aria-pressed', 'false')
-  await expect(window.locator('button[aria-label="Close didactic panel"]')).toHaveCount(0)
+  await expect(window.locator('button[aria-label="Close AI panel"]')).toHaveCount(0)
 
   // La ventana muestra el anÃ¡lisis desde cache SIN pulsar nada.
   await expect(detached.getByText(/Summary|Endpoint/).first()).toBeVisible()
@@ -63,8 +64,12 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaciÃ
   await expect(detached.getByText(/^\d+%$/).first()).toBeVisible()
   const overlaySvg = overlay.locator('svg[id*="mermaid"], svg[aria-roledescription]').first()
   await expect(overlaySvg).toBeVisible({ timeout: 10_000 })
-  const svgBox = await overlaySvg.boundingBox()
-  expect(svgBox && svgBox.width, 'diagrama con tamaÃ±o real dentro del visor').toBeGreaterThan(100)
+  // The viewer lays the diagram out a frame after it shows: wait for a real box.
+  await expect
+    .poll(async () => (await overlaySvg.boundingBox())?.width ?? 0, {
+      message: 'diagrama con tamaÃ±o real dentro del visor',
+    })
+    .toBeGreaterThan(100)
   const zoomAreaH = await overlaySvg.evaluate(
     (svg) => svg.closest('[class*="overflow-hidden"]')?.getBoundingClientRect().height ?? 0,
   )

@@ -82,13 +82,19 @@ void app.whenReady().then(async () => {
   // appearance before any window exists.
   initNativeAppearance()
 
-  const { stopPrWatcher } = await registerIpcHandlers()
+  const { stopPrWatcher, stopChat } = await registerIpcHandlers()
 
   // Watcher de PRs en background (T51, F10): para el timer antes de que la
   // app termine de cerrarse — sin esto seguiría re-armándose (`setTimeout`)
   // tras destruir todas las ventanas, hasta que el proceso muriera solo.
   app.on('before-quit', () => {
     stopPrWatcher()
+  })
+  // Stops running chat answers (saved as `interrupted`) and closes
+  // `chat.sqlite`. On `will-quit`, the last step before quitting: a quit
+  // cancelled during `before-quit` must leave the chat working.
+  app.on('will-quit', () => {
+    stopChat()
   })
 
   // Auto-updater (T91, F17): decide capacidad (`disabled`/`auto`/`notify`,

@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot, openInsightTab } from './fixtures'
+import { test, expect, attachScreenshot, openInsightTab, openAnalysisTab } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -10,6 +10,7 @@ import type { Page } from './fixtures'
 
 async function analyze(window: Page, prTitle: string): Promise<void> {
   await window.getByText(prTitle).first().click()
+  await openAnalysisTab(window)
   await window.getByRole('button', { name: 'Analyze PR' }).click()
   await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,

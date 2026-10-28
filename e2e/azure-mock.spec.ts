@@ -4,6 +4,7 @@ import {
   attachScreenshot,
   closeMinerva,
   openPrDetails,
+  openAnalysisTab,
   openReposView,
   launchMinerva,
   type MinervaApp,
@@ -279,6 +280,7 @@ test('AI (MINERVA_MOCK_AI=1) analyzes an Azure PR through the real context pipel
 
   // And the panel shows it for the PR.
   await aside(window).getByText('Fix cart rounding').first().click()
+  await openAnalysisTab(window)
   await expect(window.getByText('repository snapshot ready').first()).toBeVisible()
   await openPrDetails(window)
   await expect(window.getByText('Open in Azure DevOps').first()).toBeVisible()

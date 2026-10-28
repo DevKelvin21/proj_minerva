@@ -40,7 +40,7 @@ import { prFixtures } from '../scm/github/fixtures'
 import * as fixturesEn from './fixtures'
 import * as fixturesEs from './fixtures.es'
 import { getMainLocale, mt } from '../i18n'
-import type { AiService, AnalyzePullRequestOptions, AnalyzeResult } from './service'
+import type { AiService, AnalyzePullRequestOptions, AnalyzeResult, ChatTurnInput } from './service'
 import type { PrContextSource } from './pr-context'
 import { StreamSectionParser, stringifySections } from './stream-parser'
 import { createActivityTracker, type ActivityTracker } from './activity-tracker'
@@ -103,6 +103,78 @@ async function streamActivityPrelude(
   await delay(STREAM_CHUNK_DELAY_MS)
 
   return activity
+}
+
+/** Steps of a mock chat answer: short enough for e2e (about 1.2 s in total), long enough to see it stream. */
+const CHAT_CHUNKS = 6
+const CHAT_STEP_DELAY_MS = 150
+/** A chat message containing this fails after the prelude (e2e of the failed state and retry). */
+export const MOCK_CHAT_FAIL_TRIGGER = 'mock:fail'
+
+/** `delay` that rejects with the "cancelled" error as soon as `signal` aborts. */
+function abortableDelay(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error(mt('ai.errors.cancelled')))
+      return
+    }
+    const onAbort = (): void => {
+      clearTimeout(timer)
+      reject(new Error(mt('ai.errors.cancelled')))
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/**
+ * A mock chat answer (`chat:send`): one read + "thinking" in the activity
+ * log, then the canned answer in `CHAT_CHUNKS` steps through the real parser,
+ * like `streamFixture` but shorter, and abortable at every step.
+ */
+async function streamChatAnswer(
+  turn: ChatTurnInput,
+  language: AppLocale,
+  options: AnalyzePullRequestOptions,
+): Promise<DidacticSection[]> {
+  const { chatAnswerSection } = language === 'es' ? fixturesEs : fixturesEn
+  const { onProgress, signal } = options
+  const parser = new StreamSectionParser()
+  const activity = createActivityTracker({
+    language,
+    onEdge: () => {
+      onProgress?.(parser.snapshot(), {
+        done: false,
+        phase: 'exploring',
+        activity: activity.buffer(),
+      })
+    },
+  })
+  const firstPath = turn.context[0]?.path ?? 'src/api/routes.ts'
+
+  activity.begin('mock-chat-read', 'read', firstPath)
+  await abortableDelay(CHAT_STEP_DELAY_MS, signal)
+  activity.complete('mock-chat-read', firstPath)
+  activity.thinking('mock-chat-thinking')
+  await abortableDelay(CHAT_STEP_DELAY_MS, signal)
+  activity.settleThinking()
+
+  if (turn.text.includes(MOCK_CHAT_FAIL_TRIGGER)) {
+    throw new Error(mt('ai.errors.providerError', { provider: 'Mock AI', detail: 'mock failure' }))
+  }
+
+  for (const chunk of chunkText(stringifySections([chatAnswerSection(turn)]), CHAT_CHUNKS)) {
+    parser.push(chunk)
+    onProgress?.(parser.snapshot(), { done: false, phase: 'writing', activity: activity.buffer() })
+    await abortableDelay(CHAT_STEP_DELAY_MS, signal)
+  }
+
+  const final = parser.finalize()
+  onProgress?.(final, { done: true })
+  return final
 }
 
 /**
@@ -209,7 +281,7 @@ export class MockAiService implements AiService {
     options?: AnalyzePullRequestOptions,
   ): Promise<AnalyzeResult> {
     const language = options?.language ?? getMainLocale()
-    const { genericSummarySection, lineAnswerSection, richDidacticSections } =
+    const { genericSummarySection, richDidacticSections } =
       language === 'es' ? fixturesEs : fixturesEn
     const prId = prKey(req.repo, req.number)
     const rich = richDidacticSections[prId]
@@ -219,13 +291,9 @@ export class MockAiService implements AiService {
     // Same head commit the mock SCM reports, so staleness checks line up.
     const headSha = fixture?.detail.headSha ?? ''
 
-    // A reviewer's question about some lines: one canned answer, any PR.
-    if (options?.question) {
-      const sections = await streamFixture(
-        [lineAnswerSection(options.question)],
-        language,
-        options.onProgress,
-      )
+    // A chat message: one canned answer, any PR.
+    if (options?.chat) {
+      const sections = await streamChatAnswer(options.chat, language, options)
       return { prId, headSha, sections, generatedAt: new Date().toISOString() }
     }
 

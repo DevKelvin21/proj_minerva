@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Sparkles } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
@@ -11,14 +11,15 @@ import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
-import { LineAskAiCard } from './LineAskAiCard'
+import { LineChatInput } from './LineChatInput'
 import {
   asHunk,
   KIND_BG,
   LAYER_ROW_CLASS,
   rangeClasses,
+  samePosition,
   type DiffBodyProps,
-  type OpenComposer,
+  type LinePosition,
 } from './diff-body'
 
 const SIDES = ['left', 'right'] as const
@@ -35,13 +36,9 @@ interface RowMeta {
   rightKey?: string
   leftThreads: CommentThread[]
   rightThreads: CommentThread[]
-  onAddLeft?: () => void
-  onAddRight?: () => void
-  onAskLeft?: () => void
-  onAskRight?: () => void
-  /** The side's line has an AI conversation. */
-  askedLeft: boolean
-  askedRight: boolean
+  /** Where a new comment (or a chat note) on each side goes; absent = none there. */
+  leftPosition?: LinePosition
+  rightPosition?: LinePosition
 }
 
 type Item = { type: 'full'; key: string; node: React.ReactNode } | { type: 'row'; meta: RowMeta }
@@ -56,12 +53,14 @@ interface SideCellsProps {
   model: DiffThreadsModel
   inLayer: boolean
   onAdd?: () => void
-  /** Opens "Ask AI" on this line; absent = no button (feature off or no position). */
-  onAsk?: () => void
-  /** Reserve the "Ask AI" slot even without a button here, so gutters line up. */
-  askSlot: boolean
-  /** This line has an AI conversation: its button stays lit. */
-  asked: boolean
+  /** Opens (or closes) the line's chat note input; absent = no sparkle (feature off or no position). */
+  onChat?: () => void
+  /** Reserve the sparkle's slot even without a button here, so gutters line up. */
+  chatSlot: boolean
+  /** The line has a chip in the chat draft: its sparkle stays lit. */
+  pending: boolean
+  /** Its note input is open. */
+  noteOpen: boolean
   getTokens: (content: string) => HighlightToken[] | undefined
 }
 
@@ -79,9 +78,10 @@ function SideCells({
   model,
   inLayer,
   onAdd,
-  onAsk,
-  askSlot,
-  asked,
+  onChat,
+  chatSlot,
+  pending,
+  noteOpen,
   getTokens,
 }: SideCellsProps): React.JSX.Element {
   const { t } = useTranslation()
@@ -111,15 +111,16 @@ function SideCells({
         ) : (
           <span className="inline-block h-4 w-4 shrink-0" />
         )}
-        {onAsk ? (
+        {onChat ? (
           <button
             type="button"
-            onClick={onAsk}
-            aria-label={t('comments.askAi.button', { line: cell?.number ?? 0 })}
-            title={asked ? t('comments.askAi.buttonTitleActive') : t('comments.askAi.buttonTitle')}
-            data-asked={asked || undefined}
+            onClick={onChat}
+            aria-label={t('chat.line.button', { line: cell?.number ?? 0 })}
+            title={pending ? t('chat.line.buttonTitlePending') : t('chat.line.buttonTitle')}
+            aria-expanded={noteOpen}
+            data-pending={pending || undefined}
             className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded hover:text-accent ${
-              asked
+              pending || noteOpen
                 ? 'text-accent'
                 : 'text-muted opacity-0 focus:opacity-100 group-hover/row:opacity-100'
             }`}
@@ -127,7 +128,7 @@ function SideCells({
             <Sparkles size={11} />
           </button>
         ) : (
-          askSlot && <span className="inline-block h-4 w-4 shrink-0" />
+          chatSlot && <span className="inline-block h-4 w-4 shrink-0" />
         )}
         <span className="select-none">{cell?.number ?? ''}</span>
       </span>
@@ -166,9 +167,9 @@ export function SplitDiff({
   layerKeys,
   expander,
   onCreateThread,
-  askAi,
+  composer,
+  chat,
 }: DiffBodyProps): React.JSX.Element {
-  const [openComposer, setOpenComposer] = useState<OpenComposer | null>(null)
 
   const rowsBySection = useMemo(
     () =>
@@ -213,48 +214,8 @@ export function SplitDiff({
       rightKey,
       leftThreads,
       rightThreads,
-      onAddLeft:
-        leftPosition && row.left
-          ? () =>
-              setOpenComposer({
-                key: rowKey,
-                content: row.left!.content,
-                kind: 'comment',
-                ...leftPosition,
-              })
-          : undefined,
-      onAddRight:
-        rightPosition && row.right
-          ? () =>
-              setOpenComposer({
-                key: rowKey,
-                content: row.right!.content,
-                kind: 'comment',
-                ...rightPosition,
-              })
-          : undefined,
-      askedLeft: Boolean(leftPosition && leftKey && askAi?.askedLines.has(leftKey)),
-      askedRight: Boolean(rightPosition && rightKey && askAi?.askedLines.has(rightKey)),
-      onAskLeft:
-        askAi && leftPosition && row.left
-          ? () =>
-              setOpenComposer({
-                key: rowKey,
-                content: row.left!.content,
-                kind: 'ask',
-                ...leftPosition,
-              })
-          : undefined,
-      onAskRight:
-        askAi && rightPosition && row.right
-          ? () =>
-              setOpenComposer({
-                key: rowKey,
-                content: row.right!.content,
-                kind: 'ask',
-                ...rightPosition,
-              })
-          : undefined,
+      leftPosition,
+      rightPosition,
     }
   }
 
@@ -276,42 +237,53 @@ export function SplitDiff({
               thread={thread}
               highlighted={thread.id === model.focusedThreadId}
               onHide={() => model.toggleHidden(key)}
-              ask={askAi?.thread}
             />
           ),
         })
       }
     }
-    if (openComposer?.key === meta.rowKey) {
-      const composer = openComposer
-      items.push({
-        type: 'full',
-        key: `composer-${meta.rowKey}`,
-        node:
-          composer.kind === 'ask' && askAi ? (
-            <LineAskAiCard
-              askAi={askAi}
-              line={composer.line}
-              side={composer.side}
-              onUseAsComment={(markdown) =>
-                setOpenComposer({ ...composer, kind: 'comment', draft: markdown })
-              }
-              onClose={() => setOpenComposer(null)}
+    const sides = [
+      { position: meta.leftPosition, content: meta.row.left?.content ?? '' },
+      { position: meta.rightPosition, content: meta.row.right?.content ?? '' },
+    ]
+    for (const { position, content } of sides) {
+      if (!position) continue
+      if (chat && samePosition(chat.noteTarget, position)) {
+        items.push({
+          type: 'full',
+          key: `chat-${meta.rowKey}-${position.side}`,
+          node: (
+            <LineChatInput
+              line={position.line}
+              side={position.side}
+              initialNote={chat.noteFor(position.side, position.line)}
+              onAdd={(note) => chat.addLine(position.side, position.line, content, note)}
+              onClose={chat.closeNote}
             />
-          ) : (
+          ),
+        })
+      }
+      const target = composer.target
+      if (target && samePosition(target, position)) {
+        items.push({
+          type: 'full',
+          key: `composer-${meta.rowKey}-${position.side}`,
+          node: (
             <LineCommentComposer
-              line={composer.line}
-              side={composer.side}
-              lineContent={composer.content}
-              initialValue={composer.draft}
-              onCancel={() => setOpenComposer(null)}
+              key={target.token}
+              line={target.line}
+              side={target.side}
+              lineContent={content}
+              initialValue={target.draft}
+              onCancel={composer.close}
               onSubmit={async (bodyMarkdown) => {
-                await onCreateThread(composer.line, composer.side, bodyMarkdown)
-                setOpenComposer(null)
+                await onCreateThread(target.line, target.side, bodyMarkdown)
+                composer.close()
               }}
             />
           ),
-      })
+        })
+      }
     }
     return items
   }
@@ -353,6 +325,7 @@ export function SplitDiff({
   })
 
   function cells(meta: RowMeta, side: 'left' | 'right', contentClass: string): React.JSX.Element {
+    const position = side === 'left' ? meta.leftPosition : meta.rightPosition
     return (
       <SideCells
         cell={side === 'left' ? meta.row.left : meta.row.right}
@@ -368,17 +341,23 @@ export function SplitDiff({
             : meta.rightKey !== undefined && layerKeys.has(meta.rightKey)
         }
         onAdd={
-          side === 'left'
-            ? meta.leftThreads.length === 0
-              ? meta.onAddLeft
-              : undefined
-            : meta.rightThreads.length === 0
-              ? meta.onAddRight
-              : undefined
+          position && (side === 'left' ? meta.leftThreads : meta.rightThreads).length === 0
+            ? () => composer.open(position.side, position.line)
+            : undefined
         }
-        onAsk={side === 'left' ? meta.onAskLeft : meta.onAskRight}
-        askSlot={askAi !== undefined}
-        asked={side === 'left' ? meta.askedLeft : meta.askedRight}
+        onChat={
+          chat && position
+            ? () =>
+                samePosition(chat.noteTarget, position)
+                  ? chat.closeNote()
+                  : chat.openNote(position.side, position.line)
+            : undefined
+        }
+        chatSlot={chat !== undefined}
+        pending={Boolean(
+          chat && position && chat.pendingLines.has(lineThreadKey(position.line, position.side)),
+        )}
+        noteOpen={Boolean(chat && samePosition(chat.noteTarget, position))}
         getTokens={getTokens}
       />
     )
@@ -417,8 +396,8 @@ export function SplitDiff({
   }
 
   // Without wrap: runs of rows go in two panels; full-width items cut the run.
-  // Digits + padding + the "+" slot, plus the "Ask AI" slot when it is on.
-  const gutterWidth = `calc(${gutterDigits}ch + ${askAi ? '3.5rem' : '2.25rem'})`
+  // Digits + padding + the "+" slot, plus the chat sparkle slot when it is on.
+  const gutterWidth = `calc(${gutterDigits}ch + ${chat ? '3.5rem' : '2.25rem'})`
   const segments: Array<{ key: string; rows: RowMeta[] } | { key: string; node: React.ReactNode }> =
     []
   let run: RowMeta[] = []

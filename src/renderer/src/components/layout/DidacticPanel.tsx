@@ -1,7 +1,8 @@
 import { useRef } from 'react'
-import { ExternalLink, GraduationCap, X } from 'lucide-react'
+import { ExternalLink, GraduationCap, MessageCircle, Sparkles, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useAppStore } from '../../stores/app-store'
+import { useAppStore, type AiPanelTab } from '../../stores/app-store'
+import { prKey } from '../../../../shared/scm'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import {
   clampDidacticWidth,
@@ -11,8 +12,15 @@ import {
 import { IconButton } from '../ui/IconButton'
 import { DidacticAnalysisArea } from '../didactic/DidacticAnalysisArea'
 import { DidacticPlaceholder } from '../didactic/DidacticPlaceholder'
+import { AskTab } from '../chat/AskTab'
 
 /**
+ * Right-hand AI panel, two tabs: **Ask** (default; the side-panel chat,
+ * `components/chat/`) and **Analysis** (the didactic analysis below). The
+ * chosen tab is remembered (`aiPanelTab`). Both stay mounted while the panel
+ * is open, so switching keeps a half-typed question and a streaming analysis.
+ * The detached window (`#didactic/…`) shows the analysis only.
+ *
  * Panel didáctico (F3): resumen + diagramas Mermaid (C4/ER) + snippets
  * copiables de endpoint, generados por `ai:analyzePullRequest`. Detrás de
  * un `AiService` mock por ahora (T9 mock/T10); la implementación real con
@@ -53,6 +61,8 @@ export function DidacticPanel(): React.JSX.Element {
   const openLayer = useAppStore((s) => s.openLayer)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
+  const tab = useAppStore((s) => s.aiPanelTab)
+  const setTab = useAppStore((s) => s.setAiPanelTab)
   const tier = useLayoutTier()
   const asideRef = useRef<HTMLElement>(null)
 
@@ -119,38 +129,77 @@ export function DidacticPanel(): React.JSX.Element {
             onDoubleClick={() => setPanelWidth(DIDACTIC_PANEL_DEFAULT_WIDTH)}
           />
         )}
-        <header className="flex flex-col gap-0.5 border-b border-border px-3 py-2.5">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-text">
-              <GraduationCap size={16} className="text-accent" />
-              {t('didactic.panel.title')}
-            </span>
-            <div className="flex items-center gap-1">
-              {selectedPr && (
-                <IconButton
-                  icon={<ExternalLink size={16} />}
-                  label={t('didactic.panel.openInWindow')}
-                  onClick={() => {
-                    void window.minerva.window.openDidactic({
-                      repo: selectedPr.repo,
-                      number: selectedPr.number,
-                      title: selectedPr.title,
-                    })
-                    toggleDidacticPanel()
-                  }}
-                />
-              )}
+        <header className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-1.5">
+          <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-text">
+            <Sparkles size={15} className="text-accent" aria-hidden />
+            {t('chat.panel.title')}
+          </span>
+          <div
+            role="tablist"
+            aria-label={t('chat.panel.tabsLabel')}
+            className="flex min-w-0 items-center gap-0.5 rounded-md bg-bg p-0.5"
+          >
+            <PanelTab
+              tab="ask"
+              active={tab === 'ask'}
+              onSelect={setTab}
+              icon={<MessageCircle size={13} aria-hidden />}
+              label={t('chat.panel.tabs.ask')}
+            />
+            <PanelTab
+              tab="analysis"
+              active={tab === 'analysis'}
+              onSelect={setTab}
+              icon={<GraduationCap size={13} aria-hidden />}
+              label={t('chat.panel.tabs.analysis')}
+            />
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {selectedPr && tab === 'analysis' && (
               <IconButton
-                icon={<X size={16} />}
-                label={t('didactic.panel.close')}
-                onClick={toggleDidacticPanel}
+                icon={<ExternalLink size={16} />}
+                label={t('didactic.panel.openInWindow')}
+                onClick={() => {
+                  void window.minerva.window.openDidactic({
+                    repo: selectedPr.repo,
+                    number: selectedPr.number,
+                    title: selectedPr.title,
+                  })
+                  toggleDidacticPanel()
+                }}
               />
-            </div>
+            )}
+            <IconButton
+              icon={<X size={16} />}
+              label={t('didactic.panel.close')}
+              onClick={toggleDidacticPanel}
+            />
           </div>
         </header>
 
         <div
-          className={`flex flex-1 flex-col gap-3 overflow-y-auto ${tier.w === 'xl' ? 'p-4' : 'p-3'}`}
+          id="ai-panel-ask"
+          role="tabpanel"
+          aria-label={t('chat.panel.tabs.ask')}
+          hidden={tab !== 'ask'}
+          className={`min-h-0 flex-1 flex-col ${tab === 'ask' ? 'flex' : 'hidden'}`}
+        >
+          {selectedPr ? (
+            <AskTab
+              key={prKey(selectedPr.repo, selectedPr.number)}
+              repo={selectedPr.repo}
+              number={selectedPr.number}
+            />
+          ) : (
+            <p className="p-4 text-sm text-muted">{t('chat.noPr')}</p>
+          )}
+        </div>
+        <div
+          id="ai-panel-analysis"
+          role="tabpanel"
+          aria-label={t('chat.panel.tabs.analysis')}
+          hidden={tab !== 'analysis'}
+          className={`min-h-0 flex-1 flex-col gap-3 overflow-y-auto ${tab === 'analysis' ? 'flex' : 'hidden'} ${tier.w === 'xl' ? 'p-4' : 'p-3'}`}
         >
           {selectedPr ? (
             <DidacticAnalysisArea
@@ -166,5 +215,35 @@ export function DidacticPanel(): React.JSX.Element {
         </div>
       </aside>
     </>
+  )
+}
+
+function PanelTab({
+  tab,
+  active,
+  onSelect,
+  icon,
+  label,
+}: {
+  tab: AiPanelTab
+  active: boolean
+  onSelect: (tab: AiPanelTab) => void
+  icon: React.ReactNode
+  label: string
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      aria-controls={`ai-panel-${tab}`}
+      onClick={() => onSelect(tab)}
+      className={`flex min-w-0 items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors duration-150 ${
+        active ? 'bg-panel text-text shadow-sm' : 'text-muted hover:text-text'
+      }`}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+    </button>
   )
 }

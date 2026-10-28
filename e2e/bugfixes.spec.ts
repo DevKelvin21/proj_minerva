@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot } from './fixtures'
+import { test, expect, attachScreenshot, openAnalysisTab } from './fixtures'
 
 /**
  * Port de scripts/smoke-bugfixes.mjs (regresiones de 2026-07-06), triado:
@@ -46,6 +46,7 @@ test('snippet: Copiar y Expandir separados y cliqueables; CSP img-src sana', asy
   })
 
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
+  await openAnalysisTab(window)
   await window.getByRole('button', { name: 'Analyze PR' }).click()
   await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,

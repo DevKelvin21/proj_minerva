@@ -9,8 +9,12 @@
 
 export const en = {
   ai: {
-    lineQuestion: {
-      empty: 'The AI finished without an answer to your question. Try asking it again.',
+    chat: {
+      empty: 'The AI finished without an answer to your message. Try sending it again.',
+      busy: 'The AI is still answering in this conversation. Wait for it to finish, or stop it first.',
+      notFound: 'This conversation no longer exists.',
+      notRetryable: 'There is no failed or stopped answer to retry in this conversation.',
+      tooMany: 'The AI is already answering in other conversations. Wait for one to finish, or stop it.',
     },
     errors: {
       inactivityTimeout:
@@ -19,6 +23,7 @@ export const en = {
       providerError: '{{provider}} returned an error: {{detail}}',
       spawnFailed: 'Could not launch the "{{binary}}" process: {{detail}}',
       noValidSection: 'None of the sections streamed by the model had a valid format.',
+      cancelled: 'Cancelled.',
     },
     provider: {
       notLoggedIn:

@@ -7,23 +7,36 @@ import type { DiffSection, HiddenGap } from '../../lib/expand-context'
 import type { DiffThreadsModel } from '../../lib/diff-threads'
 import type { HighlightToken } from '../../lib/highlighter'
 import type { LineSide } from '../../lib/line-threads'
-import type { CommentThread } from '../../../../shared/types'
-import type { AskRunner, AskSubject } from '../../stores/ask-ai-store'
 
-/** "Ask AI" from a comment thread of this file (`DiffView`). */
-export interface ThreadAskBinding {
-  subject: (thread: CommentThread) => AskSubject
-  /** Asks with the thread (and the earlier exchanges) as context. */
-  run: (thread: CommentThread) => AskRunner
+/** A diff line: its side and its number on that side. */
+export interface LinePosition {
+  side: LineSide
+  line: number
 }
 
-/** "Ask AI" in this file's diff (`DiffView`). */
-export interface AskAiBinding {
-  lineSubject: (line: number, side: LineSide) => AskSubject
-  runLine: (line: number, side: LineSide) => AskRunner
-  /** `lineThreadKey`s of the lines with a conversation: their button stays lit. */
-  askedLines: ReadonlySet<string>
-  thread: ThreadAskBinding
+/**
+ * The new-comment composer of this file (`DiffView`, state in `app-store`
+ * so the chat's "Use as comment" can open it with a draft).
+ */
+export interface LineComposerBinding {
+  /** Where it is open in this file (`null` = closed, or open in another file). */
+  target: (LinePosition & { draft?: string; token: number }) | null
+  open: (side: LineSide, line: number) => void
+  close: () => void
+}
+
+/** "Add to chat" on this file's lines (`DiffView`): the sparkle and its one-line note input. */
+export interface ChatLineBinding {
+  /** `lineThreadKey`s of the lines with a chip in the chat draft: their sparkle stays lit. */
+  pendingLines: ReadonlySet<string>
+  /** The line whose note input is open. */
+  noteTarget: LinePosition | null
+  openNote: (side: LineSide, line: number) => void
+  closeNote: () => void
+  /** The note of the line's chip, to edit it. */
+  noteFor: (side: LineSide, line: number) => string | undefined
+  /** Adds the line (content + note) to the chat draft; `false` when the draft is full. */
+  addLine: (side: LineSide, line: number, code: string, note: string) => boolean
 }
 
 export interface DiffBodyProps {
@@ -44,8 +57,9 @@ export interface DiffBodyProps {
     onExpand: (gap: HiddenGap, direction: 'up' | 'down' | 'all') => void
   }
   onCreateThread: (line: number, side: LineSide, bodyMarkdown: string) => Promise<void>
-  /** "Ask AI" on lines and threads (`ai:askAboutLines`); absent = no "Ask AI" buttons. */
-  askAi?: AskAiBinding
+  composer: LineComposerBinding
+  /** "Add to chat" on lines; absent = no sparkle. */
+  chat?: ChatLineBinding
 }
 
 export const KIND_BG: Partial<Record<DiffLineKind, string>> = {
@@ -63,14 +77,12 @@ export function rangeClasses(inRange: boolean, focused: boolean): string {
 /** Marker of a row inside the active walkthrough layer (distinct from the thread marks: `info`, not accent). */
 export const LAYER_ROW_CLASS = 'shadow-[inset_3px_0_0_var(--color-info)]'
 
-export interface OpenComposer {
-  key: string
-  side: LineSide
-  line: number
-  content: string
-  /** A new comment (optionally prefilled with `draft`) or a question to the AI. */
-  kind: 'comment' | 'ask'
-  draft?: string
+/** `position` is where `target` points. */
+export function samePosition(
+  target: LinePosition | null | undefined,
+  position: LinePosition | undefined,
+): boolean {
+  return Boolean(target && position && target.side === position.side && target.line === position.line)
 }
 
 /** A section's lines as a pseudo-hunk, for the row builders. */

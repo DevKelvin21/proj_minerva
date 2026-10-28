@@ -216,6 +216,26 @@ export async function openReposView(page: Page): Promise<void> {
     .click()
 }
 
+/**
+ * Shows the Analysis tab of the right AI panel. The panel opens on Ask (the
+ * chat) by default; the choice is remembered, so this is a no-op when the
+ * analysis is already on screen.
+ */
+export async function openAnalysisTab(page: Page): Promise<void> {
+  await aiPanelTab(page, 'Analysis').click()
+}
+
+/** Shows the Ask tab (the side-panel chat) of the right AI panel. */
+export async function openAskTab(page: Page): Promise<void> {
+  await aiPanelTab(page, 'Ask').click()
+}
+
+function aiPanelTab(page: Page, name: 'Ask' | 'Analysis'): Locator {
+  return page
+    .getByRole('tablist', { name: 'AI panel views' })
+    .getByRole('tab', { name, exact: true })
+}
+
 /** Picks a tab of the didactic panel (Overview, Architecture, Endpoints, Data). */
 export async function openInsightTab(page: Page, name: string): Promise<void> {
   await page.getByTestId('insight-tabs').first().getByRole('tab', { name, exact: true }).click()

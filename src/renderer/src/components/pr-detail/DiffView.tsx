@@ -7,8 +7,9 @@ import type { DiffViewMode } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
 import { parsePatch } from '../../lib/diff-parser'
 import { indexLineThreads, lineThreadKey, threadSide, type LineSide } from '../../lib/line-threads'
-import { askContext, threadContext, threadQuestionLines } from '../../lib/ask-ai'
-import { isLiveConversation, useAskAiStore } from '../../stores/ask-ai-store'
+import { diffSide, lineContextItem } from '../../lib/chat-context'
+import { useChatStore } from '../../stores/chat-store'
+import type { ChatContextItem } from '../../../../shared/chat'
 import {
   autoRevealRanges,
   buildDiffSections,
@@ -34,9 +35,10 @@ import { DiffToolbar } from './DiffToolbar'
 import { SplitDiff } from './SplitDiff'
 import { InlineDiff } from './InlineDiff'
 import { InlineThreadCard } from './InlineThreadCard'
-import type { AskAiBinding } from './diff-body'
+import type { ChatLineBinding, LineComposerBinding, LinePosition } from './diff-body'
 
 const EMPTY_KEYS: ReadonlySet<string> = new Set()
+const NO_ITEMS: ChatContextItem[] = []
 
 interface DiffViewProps {
   file: DiffFile
@@ -110,6 +112,13 @@ export function DiffView({
   const setExpandedThreadId = useAppStore((s) => s.setExpandedThreadId)
   const pendingThreadFocus = useAppStore((s) => s.pendingThreadFocus)
   const clearPendingThreadFocus = useAppStore((s) => s.clearPendingThreadFocus)
+  const pendingLineFocus = useAppStore((s) => s.pendingLineFocus)
+  const clearPendingLineFocus = useAppStore((s) => s.clearPendingLineFocus)
+  const lineComposer = useAppStore((s) => s.lineComposer)
+  const openLineComposer = useAppStore((s) => s.openLineComposer)
+  const closeLineComposer = useAppStore((s) => s.closeLineComposer)
+  const openAskPanel = useAppStore((s) => s.openAskPanel)
+  const [noteTarget, setNoteTarget] = useState<LinePosition | null>(null)
 
   const fileThreads = useMemo(
     () => threads.filter((t) => t.path === file.path),
@@ -186,54 +195,53 @@ export function DiffView({
     }
   }, [byPosition, hiddenKeys, toggleHidden, expandedThreadId, lineThreads])
 
-  // "Ask AI": the old side asks about the file as it was (its previous path
-  // when renamed), the new side about the PR head. Conversations live in
-  // `ask-ai-store` for the session; a follow-up carries the earlier ones.
+  // The old side's lines belong to the file as it was (its previous path
+  // when renamed), the new side's to the PR head: chat chips and the comment
+  // composer name the file of their side.
   const pr = prKey(repo, number)
   const oldPath = file.previousPath ?? file.path
-  const conversations = useAskAiStore((s) => s.conversations)
-  const askAi: AskAiBinding = useMemo(() => {
+  const draftItems = useChatStore((s) => s.drafts[pr]?.items ?? NO_ITEMS)
+  const addContextItem = useChatStore((s) => s.addContextItem)
+
+  const chat: ChatLineBinding = useMemo(() => {
     const pathOf = (side: LineSide): string => (side === 'LEFT' ? oldPath : file.path)
-    const askedLines = new Set<string>()
-    for (const conversation of conversations.values()) {
-      const { subject } = conversation
-      if (subject.kind !== 'line' || subject.pr !== pr || subject.path !== pathOf(subject.side)) {
-        continue
-      }
-      if (isLiveConversation(conversation))
-        askedLines.add(lineThreadKey(subject.line, subject.side))
+    const notes = new Map<string, string>()
+    for (const item of draftItems) {
+      if (item.kind !== 'line') continue
+      const side = diffSide(item.side)
+      if (item.path === pathOf(side)) notes.set(lineThreadKey(item.line, side), item.note)
     }
     return {
-      askedLines,
-      lineSubject: (line, side) => ({ kind: 'line', pr, path: pathOf(side), side, line }),
-      runLine: (line, side) => (question, history) =>
-        window.minerva.ai.askAboutLines({
-          repo,
-          number,
-          path: pathOf(side),
-          side: side === 'LEFT' ? 'old' : 'new',
-          startLine: line,
-          endLine: line,
-          question,
-          ...askContext(history),
-        }),
-      thread: {
-        subject: (thread) => ({ kind: 'thread', pr, threadId: thread.id }),
-        run: (thread) => (question, history) => {
-          const side = threadSide(thread)
-          return window.minerva.ai.askAboutLines({
-            repo,
-            number,
-            path: pathOf(side),
-            side: side === 'LEFT' ? 'old' : 'new',
-            ...threadQuestionLines(thread),
-            question,
-            ...askContext(history, threadContext(thread)),
-          })
-        },
+      pendingLines: new Set(notes.keys()),
+      noteTarget,
+      openNote: (side, line) => setNoteTarget({ side, line }),
+      closeNote: () => setNoteTarget(null),
+      noteFor: (side, line) => notes.get(lineThreadKey(line, side)),
+      addLine: (side, line, code, note) => {
+        const added = addContextItem(
+          pr,
+          lineContextItem({ path: pathOf(side), side, line, code, note }),
+        )
+        if (added) {
+          setNoteTarget(null)
+          openAskPanel(true)
+        }
+        return added
       },
     }
-  }, [conversations, pr, repo, number, oldPath, file.path])
+  }, [draftItems, noteTarget, oldPath, file.path, addContextItem, pr, openAskPanel])
+
+  const composer: LineComposerBinding = useMemo(() => {
+    const pathOf = (side: LineSide): string => (side === 'LEFT' ? oldPath : file.path)
+    const here =
+      lineComposer &&
+      (lineComposer.path === pathOf(lineComposer.side) || lineComposer.path === file.path)
+    return {
+      target: here ? lineComposer : null,
+      open: (side, line) => openLineComposer({ path: pathOf(side), side, line }),
+      close: closeLineComposer,
+    }
+  }, [lineComposer, oldPath, file.path, openLineComposer, closeLineComposer])
 
   // Arriving from the Comments view or a `path:line` chip: scroll to the
   // thread once its row exists. While the file is still being fetched to
@@ -259,6 +267,19 @@ export function DiffView({
     // `layerToken` is the "scroll again" signal, not a value this effect reads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layerFirst?.side, layerFirst?.line, layerToken, sections])
+
+  // Arriving from a chat chip or "Use as comment": scroll to the line once
+  // its row exists (after the layer scroll above, so this one wins). A line
+  // in a collapsed gap has no row: nothing to scroll to.
+  useEffect(() => {
+    if (!pendingLineFocus || !scrollRef.current) return
+    if (pendingLineFocus.path !== file.path && pendingLineFocus.path !== oldPath) return
+    const attr = pendingLineFocus.side === 'LEFT' ? 'data-old-line' : 'data-new-line'
+    const el = scrollRef.current.querySelector(`[${attr}="${pendingLineFocus.line}"]`)
+    if (!el && head.status === 'loading') return
+    el?.scrollIntoView({ block: 'center' })
+    clearPendingLineFocus()
+  }, [pendingLineFocus, file.path, oldPath, head.status, sections, clearPendingLineFocus])
 
   function handleExpand(gap: HiddenGap, direction: 'up' | 'down' | 'all'): void {
     setUserRanges((prev) => [...prev, expandRange(gap, direction)])
@@ -310,7 +331,6 @@ export function DiffView({
               thread={thread}
               placement="above"
               highlighted={thread.id === expandedThreadId}
-              ask={askAi.thread}
             />
           ))}
       </div>
@@ -334,7 +354,8 @@ export function DiffView({
       onExpand: handleExpand,
     },
     onCreateThread: handleCreateThread,
-    askAi,
+    composer,
+    chat,
   }
 
   return (

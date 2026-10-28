@@ -14,6 +14,7 @@
  * cada proveedor arme su propio mensaje final con su propio nombre ("timeout
  * total de Codex" vs. "timeout total de Claude Code").
  */
+import { mt } from '../i18n'
 
 /** Timeout total del análisis completo (desde que arranca hasta el último delta). */
 export const REQUEST_TIMEOUT_MS = 120_000
@@ -79,4 +80,29 @@ export function createAnalysisTimeouts(
     clearAll,
     getAbortReason: () => abortReason,
   }
+}
+
+/**
+ * Forwards an external abort (`AnalyzePullRequestOptions.signal`: the
+ * reviewer cancelled a chat answer) to the provider's own controller, the one
+ * its transport and timeouts already use. Returns the unlink, to call when
+ * the run ends. Already aborted = aborts at once.
+ */
+export function forwardAbort(
+  signal: AbortSignal | undefined,
+  controller: AbortController,
+): () => void {
+  if (!signal) return () => {}
+  if (signal.aborted) {
+    controller.abort()
+    return () => {}
+  }
+  const onAbort = (): void => controller.abort()
+  signal.addEventListener('abort', onAbort, { once: true })
+  return () => signal.removeEventListener('abort', onAbort)
+}
+
+/** Throws the "cancelled" error when the external signal already fired (checkpoint between awaits). */
+export function throwIfCancelled(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new Error(mt('ai.errors.cancelled'))
 }

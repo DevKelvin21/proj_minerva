@@ -29,10 +29,15 @@ import type {
   SetProviderSettingsRequest,
   SetThreadStatusRequest,
   UpdaterStatus,
-  LineAnswer,
-  LineQuestion,
 } from './types'
 import type { FileContent, ScmAuthStatus, ScmProviderId } from './scm'
+import type {
+  ChatConversationSummary,
+  ChatEvent,
+  ChatPage,
+  ChatSendRequest,
+  ChatSendResult,
+} from './chat'
 import type { AiModelOption, AiProviderId } from './ai-providers'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
@@ -158,15 +163,6 @@ export interface IpcContract {
 
   'ai:analyzePullRequest': { req: { repo: RepoRef; number: number }; res: DidacticAnalysis }
   /**
-   * The reviewer asks about some lines of one file. Same jailed, read-only
-   * agent as the analysis (snapshot at the PR commit, `Read`/`Grep`/`Glob`
-   * only), with its own prompt; the answer is one Markdown block. Not
-   * streamed and not cached: each question is its own short run, and a
-   * follow-up carries the earlier exchanges (`history`). Asked from a comment
-   * thread, it carries the thread too (`thread`).
-   */
-  'ai:askAboutLines': { req: { repo: RepoRef; number: number } & LineQuestion; res: LineAnswer }
-  /**
    * Lectura pura del cache de análisis en main (T14, `../main/ai/analysis-cache.ts`):
    * a diferencia de `ai:analyzePullRequest`, NUNCA dispara un análisis nuevo ni
    * llama al `AiService` — solo devuelve lo que ya haya cacheado, o `null` si no
@@ -216,6 +212,24 @@ export interface IpcContract {
    * del resto de Settings.
    */
   'ai:getProviderModels': { req: { provider: AiProviderId }; res: readonly AiModelOption[] }
+
+  /**
+   * Side-panel chat (`./chat.ts`, store in `main/chat/`). `chat:list` = the
+   * PR's conversations, newest first (summaries only). `chat:get` = one page
+   * of a conversation, oldest first (`before` = a message id: the page just
+   * older than it). `chat:send` saves the question, starts the jailed run and
+   * returns at once; the answer streams through `events.onChatEvent`.
+   * `chat:retry` reruns the last question of a conversation whose last
+   * answer failed, was cancelled or interrupted (replacing that answer).
+   * `chat:cancel` stops the running answer; `chat:delete` drops the whole
+   * conversation (cancelling its run first).
+   */
+  'chat:list': { req: { repo: RepoRef; number: number }; res: ChatConversationSummary[] }
+  'chat:get': { req: { conversationId: string; before?: string; limit?: number }; res: ChatPage }
+  'chat:send': { req: ChatSendRequest; res: ChatSendResult }
+  'chat:retry': { req: { conversationId: string }; res: ChatSendResult }
+  'chat:cancel': { req: { conversationId: string }; res: void }
+  'chat:delete': { req: { conversationId: string }; res: void }
 
   /**
    * Selección efectiva de proveedor+modelo (T26) más el catálogo completo de
@@ -358,12 +372,17 @@ export const IPC_CHANNELS = [
   'scm:getStacks',
   'scm:getDashboard',
   'ai:analyzePullRequest',
-  'ai:askAboutLines',
   'ai:getCachedAnalysis',
   'ai:invalidateAnalysis',
   'ai:getAnalysisState',
   'ai:getProviderStatus',
   'ai:getProviderModels',
+  'chat:list',
+  'chat:get',
+  'chat:send',
+  'chat:retry',
+  'chat:cancel',
+  'chat:delete',
   'settings:get',
   'settings:setAiProvider',
   'settings:setProviderModel',
@@ -441,6 +460,8 @@ interface EventsApi {
   onLanguageChanged(callback: (payload: LanguageChangedEvent) => void): () => void
   /** The appearance settings changed (from any window); same concrete-method pattern. */
   onAppearanceChanged(callback: (payload: AppearanceChangedEvent) => void): () => void
+  /** Side-panel chat messages, summaries and deletions (`./chat.ts`); same concrete-method pattern. */
+  onChatEvent(callback: (payload: ChatEvent) => void): () => void
 }
 
 export type MinervaApi = InvokeApi & { events: EventsApi }

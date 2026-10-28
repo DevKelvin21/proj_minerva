@@ -81,3 +81,70 @@ describe('MockAiService language', () => {
     }
   })
 })
+
+describe('MockAiService chat', () => {
+  const repo = githubRepo('shopwave', 'api')
+  const context = [
+    {
+      kind: 'line' as const,
+      id: 'l1',
+      path: 'src/routes/carts.ts',
+      side: 'new' as const,
+      line: 12,
+      code: 'x',
+      note: '',
+    },
+    {
+      kind: 'thread' as const,
+      id: 't1',
+      threadId: 'PRRT_1',
+      path: 'src/routes/carts.ts',
+      side: 'new' as const,
+      startLine: 3,
+      endLine: 5,
+      outdated: false,
+      comments: [{ author: 'alice', body: 'Hm' }],
+    },
+  ]
+
+  it('streams a canned answer in steps that counts the context items, in the asked language', async () => {
+    const texts: string[] = []
+    const result = await new MockAiService().analyzePullRequest(
+      { repo, number: 482 },
+      {
+        chat: { text: 'Why?', context, history: [] },
+        onProgress: (sections, meta) => {
+          if (!meta.done && meta.phase === 'writing') texts.push(sections[0]?.markdown ?? '')
+        },
+      },
+    )
+    expect(texts.length).toBeGreaterThanOrEqual(3)
+    expect(texts[0].length).toBeLessThan(texts.at(-1)?.length ?? 0)
+    expect(result.sections).toHaveLength(1)
+    expect(result.sections[0].markdown).toContain('Mock answer with 2 context items.')
+    expect(result.sections[0].markdown).toContain('`src/routes/carts.ts:3-5` (thread)')
+
+    const es = await new MockAiService().analyzePullRequest(
+      { repo, number: 482 },
+      { language: 'es', chat: { text: 'Why?', context: [context[0]], history: [] } },
+    )
+    expect(es.sections[0].markdown).toContain('Respuesta mock con 1 elemento de contexto.')
+  })
+
+  it('stops as soon as the signal aborts, and fails on the e2e trigger', async () => {
+    const controller = new AbortController()
+    const run = new MockAiService().analyzePullRequest(
+      { repo, number: 482 },
+      { chat: { text: 'Why?', context: [], history: [] }, signal: controller.signal },
+    )
+    controller.abort()
+    await expect(run).rejects.toThrow('Cancelled.')
+
+    await expect(
+      new MockAiService().analyzePullRequest(
+        { repo, number: 482 },
+        { chat: { text: 'please mock:fail', context: [], history: [] } },
+      ),
+    ).rejects.toThrow('mock failure')
+  })
+})

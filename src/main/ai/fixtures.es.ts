@@ -18,36 +18,51 @@
  */
 import { prKey } from '../../shared/scm'
 import { githubRepo } from '../../shared/scm-guards'
-import type { DidacticSection, LineQuestion, PullRequestDetail } from '../../shared/types'
+import type { ChatContextItem } from '../../shared/chat'
+import type { DidacticSection, PullRequestDetail } from '../../shared/types'
+import type { ChatTurnInput } from './service'
 
-/** Respuesta mock a la pregunta del revisor sobre unas líneas (`ai:askAboutLines`). */
-export function lineAnswerSection(question: LineQuestion): DidacticSection {
-  const where =
-    question.startLine === undefined
-      ? question.path
-      : question.startLine === question.endLine
-        ? question.path + ':' + question.startLine
-        : question.path + ':' + question.startLine + '-' + question.endLine
-  const turn = (question.history?.length ?? 0) + 1
+/** Dónde apunta un elemento de contexto, para la respuesta mock (`path:12`, `path:3-5` o `path`). */
+function contextWhere(item: ChatContextItem): string {
+  if (item.kind === 'line') return item.path + ':' + item.line
+  if (item.startLine === undefined || item.endLine === undefined) return item.path
+  return item.startLine === item.endLine
+    ? item.path + ':' + item.startLine
+    : item.path + ':' + item.startLine + '-' + item.endLine
+}
+
+/**
+ * Respuesta mock a un mensaje del chat (`chat:send`). Dice cuántos elementos
+ * de contexto llegaron con el mensaje para que e2e pueda verificarlo
+ * ("Respuesta mock con 2 elementos de contexto.").
+ */
+export function chatAnswerSection(turn: ChatTurnInput): DidacticSection {
+  const count = turn.context.length
+  const followUp = turn.history.length + 1
   return {
     kind: 'summary',
     markdown:
-      'Respuesta mock para `' +
-      where +
-      '`: estas líneas son parte del cambio que hace este PR. Con un proveedor de IA real, el ' +
-      'agente lee el archivo en el commit del PR antes de responder tu pregunta.\n\n' +
-      (question.thread
-        ? 'Preguntaste desde un hilo de ' +
-          question.thread.comments.length +
-          ' comentario(s); el primero es de ' +
-          question.thread.comments[0].author +
-          '.\n\n'
+      'Respuesta mock con ' +
+      count +
+      (count === 1 ? ' elemento de contexto.' : ' elementos de contexto.') +
+      ' Con un proveedor de IA real, el agente lee el PR en su commit antes de responder tu ' +
+      'mensaje.\n\n' +
+      (count > 0
+        ? turn.context
+            .map(
+              (item) =>
+                '- `' +
+                contextWhere(item) +
+                '` (' +
+                (item.kind === 'line' ? 'línea' : 'hilo') +
+                ')',
+            )
+            .join('\n') + '\n\n'
         : '') +
-      (turn > 1
-        ? 'Seguimiento ' + turn + ': las respuestas anteriores llegaron como contexto.\n\n'
+      (followUp > 1
+        ? 'Seguimiento ' + followUp + ': los intercambios anteriores llegaron como contexto.\n\n'
         : '') +
-      'Siguiente paso: compáralas con el código que las llama y decide si necesitan un ' +
-      'comentario.',
+      'Siguiente paso: compara la respuesta con el código y decide si necesita un comentario de revisión.',
   }
 }
 

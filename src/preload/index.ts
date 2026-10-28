@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import type { ChatConversationSummary, ChatEvent, ChatMessage } from '../shared/chat'
 import type { IpcChannel, IpcRequest, IpcResponse, MinervaApi } from '../shared/ipc'
 import {
   MINERVA_EVENTS,
@@ -221,6 +222,80 @@ function onAppearanceChanged(callback: (payload: AppearanceChangedEvent) => void
   return () => ipcRenderer.removeListener(MINERVA_EVENTS.appearanceChanged, listener)
 }
 
+/** Top-level shape of a `ChatMessage` (main built it from validated rows). */
+function isChatMessage(value: unknown): value is ChatMessage {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.id === 'string' &&
+    typeof v.conversationId === 'string' &&
+    (v.role === 'user' || v.role === 'assistant') &&
+    typeof v.text === 'string' &&
+    Array.isArray(v.context) &&
+    (v.status === 'done' ||
+      v.status === 'streaming' ||
+      v.status === 'failed' ||
+      v.status === 'interrupted' ||
+      v.status === 'cancelled') &&
+    (v.error === undefined || typeof v.error === 'string') &&
+    typeof v.createdAt === 'string' &&
+    typeof v.updatedAt === 'string'
+  )
+}
+
+/** Top-level shape of a `ChatConversationSummary`. */
+function isChatConversationSummary(value: unknown): value is ChatConversationSummary {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.id === 'string' &&
+    typeof v.prKey === 'string' &&
+    typeof v.repo === 'object' &&
+    v.repo !== null &&
+    typeof v.number === 'number' &&
+    typeof v.title === 'string' &&
+    typeof v.messageCount === 'number' &&
+    typeof v.lastMessagePreview === 'string' &&
+    typeof v.running === 'boolean'
+  )
+}
+
+/**
+ * Guard of the `chat` push (`../shared/chat.ts`): one of the three event
+ * types with its top-level shape; `activity` items are checked one by one
+ * like `isAnalysisProgressPayload` does (the renderer paints `label` as is).
+ */
+function isChatEventPayload(value: unknown): value is ChatEvent {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  switch (v.type) {
+    case 'message':
+      return (
+        typeof v.prKey === 'string' &&
+        isChatMessage(v.message) &&
+        (v.activity === undefined ||
+          (Array.isArray(v.activity) && v.activity.every(isActivityItem)))
+      )
+    case 'conversation':
+      return isChatConversationSummary(v.conversation)
+    case 'deleted':
+      return typeof v.prKey === 'string' && typeof v.conversationId === 'string'
+    default:
+      return false
+  }
+}
+
+/** Side-panel chat changes (any window's runs). Hardcoded channel, payload guard. */
+function onChatEvent(callback: (payload: ChatEvent) => void): () => void {
+  const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+    if (isChatEventPayload(payload)) {
+      callback(payload)
+    }
+  }
+  ipcRenderer.on(MINERVA_EVENTS.chat, listener)
+  return () => ipcRenderer.removeListener(MINERVA_EVENTS.chat, listener)
+}
+
 const minervaApi = {
   system: {
     ping: invoke('minerva:ping'),
@@ -247,12 +322,19 @@ const minervaApi = {
   },
   ai: {
     analyzePullRequest: invoke('ai:analyzePullRequest'),
-    askAboutLines: invoke('ai:askAboutLines'),
     getCachedAnalysis: invoke('ai:getCachedAnalysis'),
     invalidateAnalysis: invoke('ai:invalidateAnalysis'),
     getAnalysisState: invoke('ai:getAnalysisState'),
     getProviderStatus: invoke('ai:getProviderStatus'),
     getProviderModels: invoke('ai:getProviderModels'),
+  },
+  chat: {
+    list: invoke('chat:list'),
+    get: invoke('chat:get'),
+    send: invoke('chat:send'),
+    retry: invoke('chat:retry'),
+    cancel: invoke('chat:cancel'),
+    delete: invoke('chat:delete'),
   },
   settings: {
     get: invoke('settings:get'),
@@ -284,6 +366,7 @@ const minervaApi = {
     onUpdaterStatus,
     onLanguageChanged,
     onAppearanceChanged,
+    onChatEvent,
   },
 } satisfies MinervaApi
 

@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot, openInsightTab } from './fixtures'
+import { test, expect, attachScreenshot, openInsightTab, openAnalysisTab } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -17,6 +17,7 @@ import type { Page } from './fixtures'
 /** Selecciona un PR por título y lanza el análisis didáctico. */
 async function analyze(window: Page, prTitle: string): Promise<void> {
   await window.getByText(prTitle).first().click()
+  await openAnalysisTab(window)
   await window.getByRole('button', { name: 'Analyze PR' }).click()
   // Señal inequívoca de término (regla de la suite legacy): "Re-analizar"
   // solo existe con resultado y está deshabilitado mientras carga. NO esperar

@@ -139,7 +139,9 @@ import {
   AGENTIC_INACTIVITY_TIMEOUT_MS,
   AGENTIC_REQUEST_TIMEOUT_MS,
   createAnalysisTimeouts,
+  forwardAbort,
   PROGRESS_THROTTLE_MS,
+  throwIfCancelled,
 } from '../analysis-timeouts'
 
 export interface ParsedOpencodeModelSlug {
@@ -278,14 +280,15 @@ export class OpenCodeAiService implements AiService {
 
     // Server compartido (T55): ya accionable si el binario falta o no arranca.
     const server = await getOpencodeServer()
+    throwIfCancelled(options?.signal)
     const client = createOpencodeClient({
       baseUrl: server.url,
       directory: snapshotDir,
       throwOnError: true,
     })
 
-    // The full analysis, or a reviewer's question about some lines (`ai:askAboutLines`).
-    const prompts = agenticPrompts(detail, files, language, options?.question)
+    // The full analysis, or a reviewer's chat message (`chat:send`).
+    const prompts = agenticPrompts(detail, files, language, options?.chat)
     const userMessage = prompts.userMessage
 
     const controller = new AbortController()
@@ -293,6 +296,10 @@ export class OpenCodeAiService implements AiService {
       totalMs: AGENTIC_REQUEST_TIMEOUT_MS,
       inactivityMs: AGENTIC_INACTIVITY_TIMEOUT_MS,
     })
+    // A cancel from the caller aborts the same controller as the timeouts:
+    // the event stream and the prompt request stop, and the `finally` below
+    // aborts the session on the server.
+    const unlinkAbort = forwardAbort(options?.signal, controller)
 
     const abortErrorMessage = (): string | null => {
       const reason = timeouts.getAbortReason()
@@ -496,10 +503,12 @@ export class OpenCodeAiService implements AiService {
 
       await sessionDone
     } catch (error) {
+      throwIfCancelled(options?.signal)
       const abortMessage = abortErrorMessage()
       if (abortMessage) throw new Error(abortMessage, { cause: error })
       throw mapOpencodeError(error)
     } finally {
+      unlinkAbort()
       // Se ejecuta SIEMPRE (éxito, error o timeout): cierra la conexión SSE y
       // le avisa al server que la sesión terminó, best-effort (puede ya
       // estar muerta — de ahí el `catch` vacío).
@@ -509,6 +518,8 @@ export class OpenCodeAiService implements AiService {
         await client.session.abort({ sessionID: sessionId }, { throwOnError: true }).catch(() => {})
       }
     }
+
+    throwIfCancelled(options?.signal)
 
     if (!sawAnyDelta) {
       throw new Error(mt('ai.opencode.noStreamingContent'))

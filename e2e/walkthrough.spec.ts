@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot, setViewport } from './fixtures'
+import { test, expect, attachScreenshot, setViewport, openAnalysisTab } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -46,6 +46,7 @@ test('layers view offers the analysis, then lists cohorts and layers with their 
   await expect(window.locator('[data-layer-line][data-new-line="8"]')).toHaveCount(0)
   await expect(window.locator('[data-layer-line][data-new-line="1"]')).toHaveCount(0)
 
+  await openAnalysisTab(window)
   // Wait for the analysis to finish so the second layer's diagram is final.
   await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({ timeout: 90_000 })
 
@@ -86,6 +87,7 @@ test('layers view offers the analysis, then lists cohorts and layers with their 
 
 test('the didactic panel card jumps to a layer in the Files tab, two cohorts for PR #201', async ({ window }, testInfo) => {
   await window.getByText('Refactor checkout state machine').first().click()
+  await openAnalysisTab(window)
   await window.getByRole('button', { name: 'Analyze PR' }).click()
   await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({ timeout: 90_000 })
 

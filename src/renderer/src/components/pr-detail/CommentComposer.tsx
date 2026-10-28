@@ -1,4 +1,4 @@
-import { useImperativeHandle, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
@@ -9,14 +9,17 @@ import { errorText } from '../../lib/error-text'
 export type SuggestionSource =
   { kind: 'lines'; load: () => Promise<string[]> } | { kind: 'disabled'; reason: string }
 
-/** Lets a parent add text to the draft (an AI answer) without losing what was typed. */
-export interface CommentComposerHandle {
-  /** Appends `text` after the current draft (or fills an empty one) and focuses the box. */
-  append: (text: string) => void
+/**
+ * Text to add to the draft (an AI answer) without losing what was typed:
+ * appended after the current draft (or filling an empty one), then the box
+ * is focused. `token` tells one request from the next.
+ */
+export interface AppendRequest {
+  text: string
+  token: number
 }
 
 interface CommentComposerProps {
-  ref?: React.Ref<CommentComposerHandle>
   onSubmit: (bodyMarkdown: string) => Promise<void>
   onCancel?: () => void
   placeholder: string
@@ -29,6 +32,9 @@ interface CommentComposerProps {
   clearOnSubmit?: boolean
   /** Starting text (an AI answer the reviewer turns into a comment): the box grows to show it. */
   initialValue?: string
+  appendRequest?: AppendRequest
+  /** Called once `appendRequest` is in the box (the parent drops it). */
+  onAppendApplied?: (token: number) => void
   className?: string
 }
 
@@ -43,7 +49,6 @@ function toErrorMessage(error: unknown): string {
  * posting/error states.
  */
 export function CommentComposer({
-  ref,
   onSubmit,
   onCancel,
   placeholder,
@@ -54,6 +59,8 @@ export function CommentComposer({
   clearOnSubmit = false,
   className = '',
   initialValue = '',
+  appendRequest,
+  onAppendApplied,
 }: CommentComposerProps): React.JSX.Element {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(initialValue)
@@ -64,18 +71,25 @@ export function CommentComposer({
   // A prefilled draft (an AI answer) is shown whole, not hidden in two rows.
   const [rows, setRows] = useState(() => draftRows(initialValue))
 
-  useImperativeHandle(ref, () => ({
-    append(text) {
-      const next = draft.trim() ? draft.trimEnd() + '\n\n' + text : text
-      // Commit the text and place the caret in the same task, like Insert suggestion.
-      flushSync(() => {
-        setDraft(next)
-        setRows((current) => Math.max(current, draftRows(next)))
-      })
-      textareaRef.current?.focus()
-      textareaRef.current?.setSelectionRange(next.length, next.length)
-    },
-  }))
+  // An appended answer goes in while rendering (no extra pass); the caret
+  // and the hand-back to the parent wait for the commit.
+  const [appliedToken, setAppliedToken] = useState<number | null>(null)
+  if (appendRequest && appendRequest.token !== appliedToken) {
+    const next = draft.trim() ? draft.trimEnd() + '\n\n' + appendRequest.text : appendRequest.text
+    setAppliedToken(appendRequest.token)
+    setDraft(next)
+    setRows((current) => Math.max(current, draftRows(next)))
+  }
+  const appendToken = appendRequest?.token
+  useEffect(() => {
+    if (appendToken === undefined) return
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.focus()
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+    }
+    onAppendApplied?.(appendToken)
+  }, [appendToken, onAppendApplied])
 
   async function submit(): Promise<void> {
     const bodyMarkdown = draft.trim()

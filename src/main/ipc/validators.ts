@@ -24,14 +24,8 @@ import {
   OPEN_VSX_SORTS,
 } from '../../shared/theme/open-vsx'
 import { SETTABLE_THREAD_STATUSES, type ThreadStatus } from '../../shared/scm'
-import {
-  MAX_ASK_AUTHOR_LEN,
-  MAX_ASK_CONTEXT_LEN,
-  MAX_ASK_HISTORY_TURNS,
-  MAX_ASK_THREAD_COMMENTS,
-  MAX_LINE_QUESTION_LEN,
-  MAX_LINE_QUESTION_SPAN,
-} from '../../shared/types'
+import { MAX_CHAT_MESSAGE_LEN, MAX_CHAT_PAGE } from '../../shared/chat'
+import { isChatContext, isChatId } from '../chat/chat-guards'
 import {
   isAzureOrganizationName,
   isAzureProjectName,
@@ -160,78 +154,36 @@ function isGetFileContentPayload(value: unknown): boolean {
 }
 
 /**
- * `ai:askAboutLines`: a repo file path, a side, a 1-based line range no wider
- * than `MAX_LINE_QUESTION_SPAN`, and a non-empty question up to
- * `MAX_LINE_QUESTION_LEN` characters (it goes into a prompt, fenced there).
- * The range may be left out only with a `thread` (a file-level thread).
- * `history` and `thread` are optional context; together they fit
- * `MAX_ASK_CONTEXT_LEN` characters.
+ * `chat:send`: the PR, an optional existing conversation id, a non-empty
+ * message up to `MAX_CHAT_MESSAGE_LEN` characters (it goes into a prompt,
+ * fenced there) and the context items (`../chat/chat-guards.ts`: count,
+ * per-field shape and lengths, total characters).
  */
-function isAskAboutLinesPayload(value: unknown): boolean {
+function isChatSendPayload(value: unknown): boolean {
   if (!isPlainObject(value)) return false
-  const keys = [
-    'repo',
-    'number',
-    'path',
-    'side',
-    'startLine',
-    'endLine',
-    'question',
-    'history',
-    'thread',
-  ]
-  if (!hasOnlyKeys(value, keys)) return false
+  if (!hasOnlyKeys(value, ['repo', 'number', 'conversationId', 'text', 'context'])) return false
   if (!isRepoRef(value.repo)) return false
   if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
-  if (!isRepoFilePath(value.path)) return false
-  if (value.side !== 'old' && value.side !== 'new') return false
-  if (value.startLine === undefined && value.endLine === undefined) {
-    if (value.thread === undefined) return false
-  } else {
-    if (!isIntInRange(value.startLine, 1, MAX_LINE)) return false
-    if (!isIntInRange(value.endLine, 1, MAX_LINE)) return false
-    const start = value.startLine
-    const end = value.endLine
-    if (end < start || end - start + 1 > MAX_LINE_QUESTION_SPAN) return false
-  }
-  if (typeof value.question !== 'string' || value.question.trim().length === 0) return false
-  if (value.question.length > MAX_LINE_QUESTION_LEN) return false
-  const history = askHistoryLength(value.history)
-  const thread = askThreadLength(value.thread)
-  if (history === null || thread === null) return false
-  return history + thread <= MAX_ASK_CONTEXT_LEN
+  if (value.conversationId !== undefined && !isChatId(value.conversationId)) return false
+  if (typeof value.text !== 'string' || value.text.trim().length === 0) return false
+  if (value.text.length > MAX_CHAT_MESSAGE_LEN) return false
+  return isChatContext(value.context)
 }
 
-/** Characters of a valid `history` (0 when absent), or `null` when it is not valid. */
-function askHistoryLength(value: unknown): number | null {
-  if (value === undefined) return 0
-  if (!Array.isArray(value) || value.length > MAX_ASK_HISTORY_TURNS) return null
-  let total = 0
-  for (const turn of value) {
-    if (!isPlainObject(turn) || !hasOnlyKeys(turn, ['question', 'answer'])) return null
-    if (!isNonEmptyString(turn.question, MAX_LINE_QUESTION_LEN)) return null
-    if (!isNonEmptyString(turn.answer, MAX_ASK_CONTEXT_LEN)) return null
-    total += turn.question.length + turn.answer.length
-  }
-  return total
+/** `chat:retry` / `chat:cancel` / `chat:delete`: exactly a conversation id. */
+function isChatConversationPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['conversationId'])) return false
+  return isChatId(value.conversationId)
 }
 
-/** Characters of a valid `thread` (0 when absent), or `null` when it is not valid. */
-function askThreadLength(value: unknown): number | null {
-  if (value === undefined) return 0
-  if (!isPlainObject(value) || !hasOnlyKeys(value, ['outdated', 'comments'])) return null
-  if (typeof value.outdated !== 'boolean') return null
-  const comments = value.comments
-  if (!Array.isArray(comments) || comments.length === 0) return null
-  if (comments.length > MAX_ASK_THREAD_COMMENTS) return null
-  let total = 0
-  for (const comment of comments) {
-    if (!isPlainObject(comment) || !hasOnlyKeys(comment, ['author', 'body'])) return null
-    if (!isNonEmptyString(comment.author, MAX_ASK_AUTHOR_LEN)) return null
-    if (typeof comment.body !== 'string' || comment.body.length > MAX_ASK_CONTEXT_LEN) return null
-    total += comment.author.length + comment.body.length
-  }
-  return total
+/** `chat:get`: a conversation id, an optional message id cursor and page size 1..`MAX_CHAT_PAGE`. */
+function isChatGetPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, ['conversationId', 'before', 'limit'])) return false
+  if (!isChatId(value.conversationId)) return false
+  if (value.before !== undefined && !isChatId(value.before)) return false
+  return value.limit === undefined || isIntInRange(value.limit, 1, MAX_CHAT_PAGE)
 }
 
 /** `scm:retarget`: two valid, different short branch names. The rest is re-checked in main. */
@@ -429,12 +381,17 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:getStacks': isGetStacksPayload,
   'scm:getDashboard': isGetDashboardPayload,
   'ai:analyzePullRequest': isRepoAndNumberPayload,
-  'ai:askAboutLines': isAskAboutLinesPayload,
   'ai:getCachedAnalysis': isRepoAndNumberPayload,
   'ai:invalidateAnalysis': isRepoAndNumberPayload,
   'ai:getAnalysisState': isRepoAndNumberPayload,
   'ai:getProviderStatus': isVoidPayload,
   'ai:getProviderModels': isGetProviderModelsPayload,
+  'chat:list': isRepoAndNumberPayload,
+  'chat:get': isChatGetPayload,
+  'chat:send': isChatSendPayload,
+  'chat:retry': isChatConversationPayload,
+  'chat:cancel': isChatConversationPayload,
+  'chat:delete': isChatConversationPayload,
   'settings:get': isVoidPayload,
   'settings:setAiProvider': isSetAiProviderPayload,
   'settings:setProviderModel': isSetProviderModelPayload,

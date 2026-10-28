@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot, setViewport } from './fixtures'
+import { test, expect, attachScreenshot, setViewport, openAnalysisTab } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -69,6 +69,7 @@ test('the AI chip follows the analysis of the PR under review', async ({ window 
   await expect(chip).toHaveAttribute('data-ai-status', 'idle', { timeout: 20_000 })
   await expect(chip).toContainText('Not analyzed')
 
+  await openAnalysisTab(window)
   await window.getByRole('button', { name: 'Analyze PR' }).click()
   await expect(chip).toHaveAttribute('data-ai-status', 'ready', { timeout: 90_000 })
   await expect(chip).toContainText('Ready')
