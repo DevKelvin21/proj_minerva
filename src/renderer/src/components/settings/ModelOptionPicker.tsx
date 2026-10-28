@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { resolveOptionValue } from '../../../../shared/ai-providers'
 import type { AiModelOption, AiProviderId } from '../../../../shared/ai-providers'
 import { choiceDescription, choiceLabel, optionLabel } from '../../lib/model-labels'
+import { Chip } from '../ui/Chip'
+import { Spinner } from '../ui/Spinner'
 
 interface ModelOptionPickerProps {
   provider: AiProviderId
@@ -77,22 +78,16 @@ export function ModelOptionPicker({
                 const checked = currentValue === choice.value
                 const isSaving = savingValue === choice.value
                 return (
-                  <button
+                  <Chip
                     key={choice.value}
-                    type="button"
                     title={choiceDescription(t, choice)}
-                    aria-pressed={checked}
+                    selected={checked}
                     disabled={savingValue !== null}
                     onClick={() => void handleSelect(descriptor.id, choice.value)}
-                    className={
-                      checked
-                        ? 'flex items-center gap-1 rounded-md border border-accent/50 bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent transition-colors'
-                        : 'flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs text-muted transition-colors hover:border-accent/30 hover:text-text'
-                    }
+                    icon={isSaving ? <Spinner size={11} /> : undefined}
                   >
-                    {isSaving && <Loader2 size={11} className="animate-spin" />}
                     {choiceLabel(t, choice)}
-                  </button>
+                  </Chip>
                 )
               })}
             </div>

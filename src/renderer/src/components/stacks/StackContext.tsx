@@ -11,6 +11,7 @@ import { descendantsOf, flattenStackNodes as flattenStack, locatePrInStacks } fr
 import { stackPosition } from '../../lib/dashboard'
 import { useAppStore } from '../../stores/app-store'
 import { useDashboardStore } from '../../stores/dashboard-store'
+import { Chip } from '../ui/Chip'
 import { IconButton } from '../ui/IconButton'
 import { OrphanBadge, OrphanNotice, StackStateIcon } from './StackTree'
 import { InlineError } from '../ui/InlineError'
@@ -45,16 +46,15 @@ function NodeChip({
     )
   }
   return (
-    <li className="min-w-0 max-w-full">
-      <button
-        type="button"
+    <li className="min-w-0 max-w-[min(16rem,100%)]">
+      <Chip
+        size="sm"
         onClick={() => onOpen(node)}
         disabled={pending}
         title={'#' + node.number + ' ' + node.title + ' (' + node.headRef + ')'}
-        className="flex min-w-0 max-w-[16rem] items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted transition-colors duration-150 hover:border-accent hover:text-text disabled:opacity-60"
       >
         {label}
-      </button>
+      </Chip>
     </li>
   )
 }

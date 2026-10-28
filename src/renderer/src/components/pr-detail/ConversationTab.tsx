@@ -4,6 +4,7 @@ import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import type { CommentThread, PullRequestDetail } from '../../../../shared/types'
 import { Avatar } from '../ui/Avatar'
+import { Button } from '../ui/Button'
 import { Markdown } from '../ui/Markdown'
 import { ThreadCard } from './ThreadCard'
 import { errorText } from '../../lib/error-text'
@@ -132,13 +133,15 @@ export function ConversationTab({
         {postError && (
           <InlineError message={t('comments.conversation.postError', { error: postError })} />
         )}
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          size="md"
           disabled={posting || draft.trim().length === 0}
-          className="self-end rounded-md border border-border bg-accent/90 px-3 py-1.5 text-sm font-medium text-accent-fg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
+          className="self-end"
         >
           {posting ? t('comments.conversation.posting') : t('comments.conversation.submit')}
-        </button>
+        </Button>
       </form>
     </div>
   )

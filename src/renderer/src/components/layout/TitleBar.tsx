@@ -14,6 +14,7 @@ import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { sidebarIsDrawer } from '../../lib/layout'
 import { useUpdater } from '../../hooks/use-updater'
 import { MOD_KEY_LABEL } from '../../lib/platform'
+import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 import { Kbd } from '../ui/Kbd'
 import { AccountsMenu, ScmAttentionChips, type AuthChipDensity } from './ScmAuthChips'
@@ -134,16 +135,19 @@ export function TitleBar(): React.JSX.Element {
     >
       {/* Full-screen walkthrough: one way out (Esc too) instead of the navigation. */}
       {focusPr ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="md"
           onClick={closeFocus}
           data-testid="walkthrough-exit"
-          className="flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-text transition-colors duration-150 hover:bg-border/60"
+          // Narrow: the label is hidden, so it moves to the name and the tooltip.
+          aria-label={tier.w === 'sm' ? t('prDetail.focus.exit') : undefined}
+          title={tier.w === 'sm' ? t('prDetail.focus.exit') : undefined}
+          icon={<ChevronLeft size={16} aria-hidden />}
         >
-          <ChevronLeft size={16} aria-hidden />
           {tier.w !== 'sm' && t('prDetail.focus.exit')}
           <Kbd>{ESC_KEY}</Kbd>
-        </button>
+        </Button>
       ) : /* PR list toggle: the drawer on narrow tiers (its label is what the
           e2e suite looks for), the hideable docked column on wide ones. */
       showDrawerToggle ? (

@@ -12,6 +12,7 @@ import {
   type LayerRef,
   layerVerdictKey,
 } from '../../lib/walkthrough'
+import { Button } from '../ui/Button'
 import { FileRow } from '../ui/FileRow'
 import { FileStatusIcon } from './FileStatusIcon'
 import { InlineError } from '../ui/InlineError'
@@ -97,9 +98,9 @@ export function LayerNavigator({
         <p className="text-xs text-muted">
           {missing ? t('prDetail.layers.missingHint') : t('prDetail.layers.placeholderHint')}
         </p>
-        <button type="button" onClick={onAnalyze} className={primaryButton}>
+        <Button variant="primary" onClick={onAnalyze} className="self-start">
           {missing ? t('prDetail.layers.reanalyze') : t('prDetail.layers.analyze')}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -198,6 +199,3 @@ export function LayerNavigator({
     </nav>
   )
 }
-
-const primaryButton =
-  'self-start rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg transition-opacity hover:opacity-90'

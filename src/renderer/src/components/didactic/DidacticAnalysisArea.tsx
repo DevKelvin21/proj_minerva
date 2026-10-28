@@ -578,16 +578,21 @@ export function DidacticAnalysisArea({
       {hasResult && !error && (
         <div className="flex items-center justify-between gap-2">
           <ActiveModelHint generatedWith={analysis?.generatedWith} />
-          <button
-            type="button"
+          <Button
+            size="xs"
             onClick={reanalyze}
             disabled={loading}
             title={t('didactic.analysis.reanalyzeHint')}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted transition-colors hover:bg-border/60 hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
+            icon={
+              <RefreshCw
+                size={12}
+                aria-hidden
+                className={loading ? 'animate-spin motion-reduce:animate-none' : undefined}
+              />
+            }
           >
-            <RefreshCw size={12} className={loading ? 'animate-spin motion-reduce:animate-none' : undefined} />
             {t('didactic.analysis.reanalyze')}
-          </button>
+          </Button>
         </div>
       )}
       {isStale && analysis && currentHeadSha && (

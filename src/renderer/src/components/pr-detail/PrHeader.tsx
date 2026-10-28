@@ -18,6 +18,7 @@ import { StackContext, StackOrphanFlag } from '../stacks/StackContext'
 import { useElementWidth } from '../../hooks/use-element-width'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
 import { REVIEWER_VOTE_TONE, reviewerVoteLabel, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import type { ScmTone } from '../../lib/scm-labels'
 import { labelStyle } from '../../lib/label-colors'
@@ -85,16 +86,16 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
         </span>
       </span>
       {pr.state === 'open' && !editingBase && (
-        <button
-          type="button"
+        <Button
+          variant="link"
+          size="xs"
           onClick={() => {
             if (detailsRef.current) detailsRef.current.open = false
             setEditingBase(true)
           }}
-          className="underline decoration-dotted transition-colors hover:text-text"
         >
           {t('prDetail.header.changeTargetBranch')}
-        </button>
+        </Button>
       )}
       <span>{t('prDetail.header.commitCount', { count: pr.commits })}</span>
       <a
@@ -369,14 +370,15 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
             </div>
           </details>
           {onWalkthrough && (
-            <button
-              type="button"
+            <Button
               onClick={onWalkthrough}
-              className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-text transition-colors duration-150 hover:border-accent"
+              // Narrow: icon only, so the label moves to the name and the tooltip.
+              aria-label={barWidth < 560 ? t('prDetail.header.walkthrough') : undefined}
+              title={barWidth < 560 ? t('prDetail.header.walkthrough') : undefined}
+              icon={<Layers size={14} aria-hidden />}
             >
-              <Layers size={14} aria-hidden />
               {barWidth >= 560 && t('prDetail.header.walkthrough')}
-            </button>
+            </Button>
           )}
         </div>
       </div>

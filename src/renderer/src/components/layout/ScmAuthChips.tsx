@@ -18,6 +18,7 @@ import {
 import { CREDENTIAL_SOURCE_KEY, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { Spinner } from '../ui/Spinner'
@@ -90,20 +91,22 @@ function ProviderAuthChip({
 
   if (density === 'icon') {
     return (
-      <button
-        type="button"
+      <IconButton
         {...common}
+        size="sm"
         onClick={openSettings}
-        title={providerStateText(view, t)}
-        aria-label={providerStateText(view, t)}
-        className="relative flex shrink-0 items-center rounded-md border border-border px-1.5 py-1 text-muted transition-colors duration-150 hover:border-accent hover:text-text"
-      >
-        {icon}
-        <span
-          className={`absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full ring-2 ring-panel ${READINESS_DOT[readiness]}`}
-          aria-hidden
-        />
-      </button>
+        label={providerStateText(view, t)}
+        className="relative"
+        icon={
+          <>
+            {icon}
+            <span
+              className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ring-2 ring-panel ${READINESS_DOT[readiness]}`}
+              aria-hidden
+            />
+          </>
+        }
+      />
     )
   }
 
@@ -148,13 +151,9 @@ function ProviderAuthChip({
       >
         {icon}
         <span className="truncate text-muted">{text}</span>
-        <button
-          type="button"
-          onClick={openSettings}
-          className="shrink-0 rounded-md border border-border px-2 py-1 text-muted transition-colors duration-150 hover:border-accent hover:text-text"
-        >
+        <Button size="xs" onClick={openSettings}>
           {t('layout.auth.openSettings')}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -171,14 +170,15 @@ function ProviderAuthChip({
     >
       {icon}
       <Spinner size={12} />
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        size="xs"
         title={t('layout.auth.copyCommandNamed', { command })}
         onClick={() => void navigator.clipboard?.writeText(command).catch(() => {})}
-        className="shrink-0 rounded-md border border-accent/50 bg-accent/10 px-2 py-1 font-mono text-sm font-semibold text-accent transition-colors duration-150 hover:bg-accent/20"
+        className="font-mono"
       >
         {shown}
-      </button>
+      </Button>
       {density === 'full' && (
         <span className="truncate text-muted">{t('layout.auth.waitingForSession')}</span>
       )}
@@ -335,16 +335,16 @@ export function AccountsMenu(): React.JSX.Element {
               <li className="text-xs text-muted">{t('layout.titleBar.connection.no_providers')}</li>
             )}
           </ul>
-          <button
-            type="button"
+          <Button
+            size="xs"
             onClick={() => {
               setOpen(false)
               openSettings()
             }}
-            className="self-start rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors duration-150 hover:border-accent hover:text-text"
+            className="self-start"
           >
             {t('layout.accounts.manage')}
-          </button>
+          </Button>
         </div>
       )}
     </div>

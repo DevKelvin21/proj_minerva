@@ -14,6 +14,7 @@ import {
 import { useAppStore } from '../../stores/app-store'
 import { useDashboardStore } from '../../stores/dashboard-store'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { ApprovalBar } from './FeatureCard'
@@ -55,15 +56,14 @@ function FeatureName({ group }: { group: FeatureGroup }): React.JSX.Element {
         <h1 className="min-w-0 truncate text-base font-semibold text-text" title={group.name}>
           {group.name}
         </h1>
-        <button
-          type="button"
+        <Button
+          size="xs"
           data-testid="feature-rename"
           onClick={startEditing}
-          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted transition-colors duration-150 hover:border-accent hover:text-text"
+          icon={<Pencil size={12} aria-hidden />}
         >
-          <Pencil size={12} aria-hidden />
           {t('home.featurePage.rename')}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -93,29 +93,16 @@ function FeatureName({ group }: { group: FeatureGroup }): React.JSX.Element {
         placeholder={t('home.featurePage.namePlaceholder')}
         className="min-w-[12rem] rounded-md border border-border bg-bg px-2 py-1 text-sm text-text placeholder:text-muted focus:border-accent"
       />
-      <button
-        type="submit"
-        className="inline-flex items-center gap-1 rounded-md border border-accent/50 bg-accent/10 px-2 py-1 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-      >
-        <Check size={12} aria-hidden />
+      <Button type="submit" variant="primary" size="xs" icon={<Check size={12} aria-hidden />}>
         {t('home.featurePage.save')}
-      </button>
-      <button
-        type="button"
-        onClick={() => setEditing(false)}
-        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors duration-150 hover:text-text"
-      >
-        <X size={12} aria-hidden />
+      </Button>
+      <Button size="xs" onClick={() => setEditing(false)} icon={<X size={12} aria-hidden />}>
         {t('home.featurePage.cancel')}
-      </button>
+      </Button>
       {group.renamed && (
-        <button
-          type="button"
-          onClick={reset}
-          className="text-xs text-muted underline decoration-dotted transition-colors duration-150 hover:text-text"
-        >
+        <Button variant="link" size="xs" onClick={reset}>
           {t('home.featurePage.resetToTag')}
-        </button>
+        </Button>
       )}
     </form>
   )
@@ -193,16 +180,16 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
         <header className="flex min-w-0 flex-col gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <FeatureName key={group.name + '\n' + String(group.renamed)} group={group} />
-            <button
-              type="button"
+            <Button
+              size="xs"
               data-testid="feature-hide"
               aria-pressed={group.hidden}
               onClick={() => setFeatureHidden(group.key, !group.hidden)}
-              className="ml-auto inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted transition-colors duration-150 hover:border-accent hover:text-text"
+              className="ml-auto"
+              icon={group.hidden ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
             >
-              {group.hidden ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
               {group.hidden ? t('home.featurePage.unhide') : t('home.featurePage.hide')}
-            </button>
+            </Button>
           </div>
           {group.hidden && (
             <p className="text-[11px] text-muted">{t('home.featurePage.hiddenHint')}</p>

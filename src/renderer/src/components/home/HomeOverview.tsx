@@ -11,6 +11,7 @@ import { enabledProviders, isSignInError } from '../../lib/scm-connection'
 import { countOrphans } from '../../lib/stacks'
 import { useAppStore } from '../../stores/app-store'
 import { useDashboardStore } from '../../stores/dashboard-store'
+import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 import { SignInHint } from '../layout/SignInHint'
 import { RetargetNote } from '../stacks/RetargetNote'
@@ -108,13 +109,9 @@ export function HomeOverview(): React.JSX.Element {
       <div data-testid="home-no-providers" className="flex flex-col items-center gap-3 py-10 text-center">
         <p className="text-sm font-medium text-text">{t('home.overview.noProvidersTitle')}</p>
         <p className="max-w-sm text-xs text-muted">{t('home.overview.noProvidersHint')}</p>
-        <button
-          type="button"
-          onClick={openSettings}
-          className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-        >
+        <Button variant="primary" onClick={openSettings}>
           {t('home.overview.openSettings')}
-        </button>
+        </Button>
       </div>
     )
   } else if (needsLogin) {
@@ -135,13 +132,9 @@ export function HomeOverview(): React.JSX.Element {
             azureOrganization={azureOrganization}
           />
         ))}
-        <button
-          type="button"
-          onClick={openSettings}
-          className="rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
-        >
+        <Button variant="primary" onClick={openSettings}>
           {t('home.overview.openSettings')}
-        </button>
+        </Button>
         <ProviderErrorList errors={otherErrors} />
       </div>
     )
@@ -173,20 +166,19 @@ export function HomeOverview(): React.JSX.Element {
             hint={t('home.overview.features.hint')}
             trailing={
               hiddenGroups.length > 0 ? (
-                <button
-                  type="button"
+                <Button
+                  size="xs"
                   data-testid="features-hidden-toggle"
                   aria-pressed={showHidden}
                   onClick={() => setShowHidden((value) => !value)}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted transition-colors duration-150 hover:text-text"
+                  icon={showHidden ? <EyeOff size={11} aria-hidden /> : <Eye size={11} aria-hidden />}
                 >
-                  {showHidden ? <EyeOff size={11} aria-hidden /> : <Eye size={11} aria-hidden />}
                   {t('home.overview.features.hidden', { count: hiddenGroups.length })}
                   {' — '}
                   {showHidden
                     ? t('home.overview.features.hideAgain')
                     : t('home.overview.features.showHidden')}
-                </button>
+                </Button>
               ) : undefined
             }
           />
@@ -215,14 +207,15 @@ export function HomeOverview(): React.JSX.Element {
                         onOpen={(featureKey) => navigateHome({ kind: 'feature', featureKey })}
                       />
                     </div>
-                    <button
-                      type="button"
+                    <Button
+                      variant="link"
+                      size="xs"
                       data-testid="feature-unhide"
                       onClick={() => setFeatureHidden(group.key, false)}
-                      className="self-start text-[11px] text-muted underline decoration-dotted transition-colors duration-150 hover:text-text"
+                      className="self-start"
                     >
                       {t('home.featureCard.unhide')}
-                    </button>
+                    </Button>
                   </div>
                 ))}
             </div>

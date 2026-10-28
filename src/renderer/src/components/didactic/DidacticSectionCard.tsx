@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Maximize2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { IconButton } from '../ui/IconButton'
 
 interface DidacticSectionCardProps {
   icon: ReactNode
@@ -37,15 +38,13 @@ export function DidacticSectionCard({
           {title}
         </span>
         {onExpandMarkdown && (
-          <button
-            type="button"
+          <IconButton
+            size="xs"
             onClick={onExpandMarkdown}
+            label={t('didactic.resources.expandSectionLabel')}
             title={t('didactic.resources.expandSection')}
-            aria-label={t('didactic.resources.expandSectionLabel')}
-            className="rounded p-1 text-muted transition-colors hover:bg-border/60 hover:text-text"
-          >
-            <Maximize2 size={14} />
-          </button>
+            icon={<Maximize2 size={14} />}
+          />
         )}
       </header>
       <div className="flex flex-col gap-3 p-3">{children}</div>

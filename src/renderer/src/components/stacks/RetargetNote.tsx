@@ -3,6 +3,8 @@ import { Trans, useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
 import { useStacksStore } from '../../stores/stacks-store'
+import { Button } from '../ui/Button'
+import { IconButton } from '../ui/IconButton'
 
 interface RetargetNoteProps {
   /** Only show the note when it is about this PR (`prKey`). */
@@ -34,14 +36,7 @@ export function RetargetNote({
   if (except && key === except) return null
 
   const dismissButton = (
-    <button
-      type="button"
-      onClick={dismiss}
-      aria-label={t('stacks.retarget.dismiss')}
-      className="shrink-0 text-muted hover:text-text"
-    >
-      <X size={12} />
-    </button>
+    <IconButton size="xs" onClick={dismiss} label={t('stacks.retarget.dismiss')} icon={<X size={12} />} />
   )
 
   if (note.kind === 'conflict') {
@@ -79,11 +74,7 @@ export function RetargetNote({
           values={{ number: pr.number, base: pr.baseRef, oldBase }}
           components={{
             pr: onOpenPr ? (
-              <button
-                type="button"
-                onClick={() => onOpenPr(pr)}
-                className="font-medium underline decoration-dotted hover:text-text"
-              />
+              <Button variant="link" size="xs" onClick={() => onOpenPr(pr)} />
             ) : (
               <span className="font-medium" />
             ),

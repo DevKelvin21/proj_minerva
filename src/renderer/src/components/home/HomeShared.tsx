@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { ScmListError } from '../../../../shared/types'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { useAppStore } from '../../stores/app-store'
+import { Button } from '../ui/Button'
 import { Skeleton } from '../ui/Skeleton'
 import { Callout } from '../ui/Callout'
 
@@ -18,21 +19,22 @@ export function ContinueReviewButton(): React.JSX.Element | null {
   const showReview = useAppStore((s) => s.showReview)
   if (!selectedPr) return null
   return (
-    <button
-      type="button"
+    <Button
+      variant="primary"
+      size="xs"
       data-testid="continue-review"
       onClick={showReview}
       title={t('home.overview.continueReviewTitle', {
         number: selectedPr.number,
         title: selectedPr.title,
       })}
-      className="inline-flex max-w-[16rem] items-center gap-1 rounded-md border border-accent/50 bg-accent/10 px-2 py-1 text-xs font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
+      className="max-w-[16rem]"
     >
-      <span className="truncate">
+      <span className="min-w-0 truncate">
         {t('home.overview.continueReview', { number: selectedPr.number })}
       </span>
       <ArrowRight size={12} aria-hidden className="shrink-0" />
-    </button>
+    </Button>
   )
 }
 
