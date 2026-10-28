@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import { handle } from './register'
 import { createAiService } from '../ai'
@@ -11,6 +12,8 @@ import { isMockScmMode } from '../scm/mock-mode'
 import { createDefaultScm, type DefaultScm } from '../scm/default-scm'
 import { createPrContextSource } from '../scm/pr-context-source'
 import { createPrWatcher, type PrWatcher } from '../scm/pr-watcher'
+import { createActivityService } from '../scm/activity-service'
+import { createActivityStore } from '../scm/activity-store'
 import { createAzureOrgAccess } from '../scm/azure-org-access'
 import { nativeConfirm } from '../scm/confirm'
 import { getAuthStatusMap, listAcrossProviders } from '../scm/registry'
@@ -24,6 +27,7 @@ import { createFakeOpenVsxFetch } from '../theme/open-vsx-fake'
 import * as updaterService from '../updater/updater'
 import {
   MINERVA_EVENTS,
+  type ActivityChangedEvent,
   type AnalysisActivityItem,
   type AnalysisProgressEvent,
   type AppearanceChangedEvent,
@@ -49,6 +53,15 @@ function broadcastPrListChanged(payload: PrListChangedEvent): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
       win.webContents.send(MINERVA_EVENTS.prListChanged, payload)
+    }
+  }
+}
+
+/** Pushes the activity inbox's full state to every open window. */
+function broadcastActivityChanged(payload: ActivityChangedEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(MINERVA_EVENTS.activityChanged, payload)
     }
   }
 }
@@ -206,6 +219,18 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     }
   })
 
+  // Activity inbox (`docs/plan-notifications.md`): fed by every watcher
+  // listing, it fetches threads only for PRs with a reason to and keeps
+  // `activity.json`. Pushes the full state to every window on each change.
+  const activity = createActivityService({
+    store: createActivityStore(() => join(app.getPath('userData'), 'activity.json')),
+    getThreads: (repo, number) => scm.forRepo(repo).getCommentThreads(repo, number),
+    getStacks: () => scmRoot.stacks.get(),
+    onChange: (state) => broadcastActivityChanged({ state }),
+  })
+  handle('activity:get', () => activity.get())
+  handle('activity:markRead', (req) => activity.markRead(req))
+
   // Background PR watcher: lists `{ state: 'all' }` across providers on an
   // interval and pushes `prListChanged` when something changed. Not decorated
   // with `unread` (it only diffs state/updatedAt/commentCount).
@@ -215,6 +240,11 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     // first, or the dashboard/stacks would answer with the pre-change data.
     onChanges: () => scmRoot.invalidateListCaches(),
     broadcast: broadcastPrListChanged,
+    onListing: (result) => {
+      void activity.onListing(result).catch((error: unknown) => {
+        console.warn('[activity] listing failed:', error)
+      })
+    },
     intervalMs: resolveWatchIntervalMs(),
   })
   prWatcher.start()

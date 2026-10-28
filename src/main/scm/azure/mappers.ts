@@ -389,13 +389,15 @@ export function threadWebUrl(repo: AzureRepoRef, prNumber: number, threadId: num
   return prWebUrl(repo, prNumber) + '?discussionId=' + threadId
 }
 
+/** `viewerId`: the signed-in identity's id; a match sets `isViewer` (GUIDs, case-insensitive). */
 export function mapComment(
   comment: AzComment,
   threadId: number,
   repo: AzureRepoRef,
   prNumber: number,
+  viewerId?: string | null,
 ): PrComment {
-  return {
+  const mapped: PrComment = {
     id: commentKey(threadId, comment.id),
     author: mapUser(comment.author),
     bodyMarkdown: comment.content ?? '',
@@ -403,6 +405,10 @@ export function mapComment(
     isMinimized: false,
     htmlUrl: threadWebUrl(repo, prNumber, threadId),
   }
+  if (viewerId && comment.author?.id?.toLowerCase() === viewerId.toLowerCase()) {
+    mapped.isViewer = true
+  }
+  return mapped
 }
 
 export function threadAnchor(thread: AzThread): AzureThreadAnchor {
@@ -452,11 +458,12 @@ export function mapThread(
   thread: AzThread,
   repo: AzureRepoRef,
   prNumber: number,
+  viewerId?: string | null,
 ): CommentThread | null {
   if (thread.isDeleted) return null
   const comments = thread.comments
     .filter(isUserComment)
-    .map((comment) => mapComment(comment, thread.id, repo, prNumber))
+    .map((comment) => mapComment(comment, thread.id, repo, prNumber, viewerId))
   if (comments.length === 0) return null
 
   const context = thread.threadContext ?? null

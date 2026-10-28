@@ -741,6 +741,34 @@ describe('payloadValidators', () => {
     })
   })
 
+  describe('activity:markRead', () => {
+    const validate = payloadValidators['activity:markRead']
+    it('accepts { all: true } or a list of ids', () => {
+      expect(validate({ all: true })).toBe(true)
+      expect(validate({ ids: ['comment:github:shopwave/api#1:c1'] })).toBe(true)
+    })
+
+    it('rejects anything else', () => {
+      expect(validate(undefined)).toBe(false)
+      expect(validate({})).toBe(false)
+      expect(validate({ all: false })).toBe(false)
+      expect(validate({ all: true, ids: ['a'] })).toBe(false)
+      expect(validate({ ids: [] })).toBe(false)
+      expect(validate({ ids: [''] })).toBe(false)
+      expect(validate({ ids: [1] })).toBe(false)
+      expect(validate({ ids: 'a' })).toBe(false)
+      expect(validate({ ids: ['x'.repeat(601)] })).toBe(false)
+      expect(validate({ ids: Array.from({ length: 501 }, (_, i) => 'id' + i) })).toBe(false)
+    })
+  })
+
+  describe('activity:get', () => {
+    it('takes no payload', () => {
+      expect(payloadValidators['activity:get'](undefined)).toBe(true)
+      expect(payloadValidators['activity:get']({})).toBe(false)
+    })
+  })
+
   describe('scm:getDashboard', () => {
     const validate = payloadValidators['scm:getDashboard']
     it('accepts nothing or { refresh: boolean }', () => {

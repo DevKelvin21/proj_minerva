@@ -72,6 +72,29 @@ function fakeClient(owner: { number: number; nameWithOwner: string } | null, cha
           : null,
       }
     }
+    if (op === 'PullRequestThreads') {
+      const node = (id: string, viewerDidAuthor: boolean) => ({
+        id,
+        body: id,
+        createdAt: '',
+        isMinimized: false,
+        url: '',
+        viewerDidAuthor,
+        author: { login: 'someone', avatarUrl: '' },
+      })
+      return {
+        repository: {
+          pullRequest: {
+            reviewThreads: {
+              nodes: [
+                { ...thread, comments: { nodes: [node('mine', true), node('theirs', false)] } },
+              ],
+            },
+            comments: { nodes: [node('general', false)] },
+          },
+        },
+      }
+    }
     if (op === 'ResolveReviewThread') return { resolveReviewThread: { thread } }
     if (op === 'AddReviewThreadReply') {
       return {
@@ -109,6 +132,18 @@ describe('RealGithubService detail', () => {
     expect(big).toMatchObject({ changedFiles: 512, filesTruncated: true })
     const small = await service(fakeClient(null, MAX_PR_FILES).client).getPullRequestDetail(repo, 7)
     expect(small.filesTruncated).toBeUndefined()
+  })
+})
+
+describe('RealGithubService threads', () => {
+  it("marks the user's own comments from viewerDidAuthor", async () => {
+    const threads = await service(fakeClient(null).client).getCommentThreads(repo, 7)
+    const flags = threads.flatMap((t) => t.comments.map((c) => [c.id, c.isViewer]))
+    expect(flags).toEqual([
+      ['mine', true],
+      ['theirs', undefined],
+      ['general', undefined],
+    ])
   })
 })
 

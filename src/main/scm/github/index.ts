@@ -34,7 +34,12 @@ function mockGhListError(override: MockAuthOverride): ScmError | null {
 import type { ScmAuthStatus } from '../../../shared/scm'
 import { ScmError } from '../errors'
 import { mt } from '../../i18n'
-import { isMockScmMode, mockAuthOverride, type MockAuthOverride } from '../mock-mode'
+import {
+  isMockScmMode,
+  mockAuthOverride,
+  mockIncomingCommentDelayMs,
+  type MockAuthOverride,
+} from '../mock-mode'
 import type { ScmDataSource, ScmProvider } from '../provider'
 import { ghCliAuth } from './gh-cli-auth'
 import { withGhCliTokenRetry } from './gh-retry'
@@ -43,9 +48,17 @@ import { MockGithubService } from './mock-service'
 import { RealGithubService } from './real-service'
 
 export function createGithubProvider(): ScmProvider {
-  const data: ScmDataSource = isMockScmMode()
-    ? new MockGithubService()
-    : withGhCliTokenRetry(new RealGithubService(() => ghCliAuth.getTokenSync()))
+  let data: ScmDataSource
+  if (isMockScmMode()) {
+    const mock = new MockGithubService()
+    const incomingDelay = mockIncomingCommentDelayMs()
+    if (incomingDelay !== null) {
+      setTimeout(() => mock.simulateIncomingComment(), incomingDelay).unref()
+    }
+    data = mock
+  } else {
+    data = withGhCliTokenRetry(new RealGithubService(() => ghCliAuth.getTokenSync()))
+  }
   const override = mockAuthOverride('MINERVA_MOCK_GH_AUTH')
   const listError = override ? mockGhListError(override) : null
   return {

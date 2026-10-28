@@ -1,7 +1,9 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { IpcChannel, IpcRequest, IpcResponse, MinervaApi } from '../shared/ipc'
+import { isActivityState } from '../shared/activity'
 import {
   MINERVA_EVENTS,
+  type ActivityChangedEvent,
   type AnalysisActivityItem,
   type AnalysisProgressEvent,
   type AppearanceChangedEvent,
@@ -221,6 +223,21 @@ function onAppearanceChanged(callback: (payload: AppearanceChangedEvent) => void
   return () => ipcRenderer.removeListener(MINERVA_EVENTS.appearanceChanged, listener)
 }
 
+/** The activity inbox changed; the payload is checked item by item (its text reaches the UI). */
+function onActivityChanged(callback: (payload: ActivityChangedEvent) => void): () => void {
+  const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+    if (
+      typeof payload === 'object' &&
+      payload !== null &&
+      isActivityState((payload as Record<string, unknown>).state)
+    ) {
+      callback(payload as ActivityChangedEvent)
+    }
+  }
+  ipcRenderer.on(MINERVA_EVENTS.activityChanged, listener)
+  return () => ipcRenderer.removeListener(MINERVA_EVENTS.activityChanged, listener)
+}
+
 const minervaApi = {
   system: {
     ping: invoke('minerva:ping'),
@@ -244,6 +261,10 @@ const minervaApi = {
     retarget: invoke('scm:retarget'),
     getStacks: invoke('scm:getStacks'),
     getDashboard: invoke('scm:getDashboard'),
+  },
+  activity: {
+    get: invoke('activity:get'),
+    markRead: invoke('activity:markRead'),
   },
   ai: {
     analyzePullRequest: invoke('ai:analyzePullRequest'),
@@ -284,6 +305,7 @@ const minervaApi = {
     onUpdaterStatus,
     onLanguageChanged,
     onAppearanceChanged,
+    onActivityChanged,
   },
 } satisfies MinervaApi
 

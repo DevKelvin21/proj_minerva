@@ -33,11 +33,13 @@ import type {
   LineQuestion,
 } from './types'
 import type { FileContent, ScmAuthStatus, ScmProviderId } from './scm'
+import type { ActivityState, MarkActivityReadRequest } from './activity'
 import type { AiModelOption, AiProviderId } from './ai-providers'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
 import type { OpenVsxExtension, OpenVsxSort, OpenVsxThemePackage } from './theme/open-vsx'
 import type {
+  ActivityChangedEvent,
   AnalysisProgressEvent,
   AppearanceChangedEvent,
   LanguageChangedEvent,
@@ -155,6 +157,11 @@ export interface IpcContract {
    * cache (throttled like `scm:getStacks`).
    */
   'scm:getDashboard': { req: { refresh?: boolean } | void; res: DashboardResult }
+
+  /** The activity inbox (`shared/activity.ts`): every item, newest first, plus the unread count. */
+  'activity:get': { req: void; res: ActivityState }
+  /** Marks some items (`ids`) or every one (`all`) as read; answers the new state. */
+  'activity:markRead': { req: MarkActivityReadRequest; res: ActivityState }
 
   'ai:analyzePullRequest': { req: { repo: RepoRef; number: number }; res: DidacticAnalysis }
   /**
@@ -357,6 +364,8 @@ export const IPC_CHANNELS = [
   'scm:retarget',
   'scm:getStacks',
   'scm:getDashboard',
+  'activity:get',
+  'activity:markRead',
   'ai:analyzePullRequest',
   'ai:askAboutLines',
   'ai:getCachedAnalysis',
@@ -441,6 +450,8 @@ interface EventsApi {
   onLanguageChanged(callback: (payload: LanguageChangedEvent) => void): () => void
   /** The appearance settings changed (from any window); same concrete-method pattern. */
   onAppearanceChanged(callback: (payload: AppearanceChangedEvent) => void): () => void
+  /** The activity inbox changed (full state); same concrete-method pattern. */
+  onActivityChanged(callback: (payload: ActivityChangedEvent) => void): () => void
 }
 
 export type MinervaApi = InvokeApi & { events: EventsApi }
