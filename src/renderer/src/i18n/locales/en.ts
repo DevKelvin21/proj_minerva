@@ -154,8 +154,6 @@ export const en = {
       noMatches: 'No activity matches "{{query}}".',
     },
     queue: {
-      toReview_one: '{{count}} pull request waits for your review',
-      toReview_other: '{{count}} pull requests wait for your review',
       loadFailed: 'Could not load the queue: {{error}}',
       empty: 'No open pull requests in your scope.',
       section: {
@@ -209,8 +207,6 @@ export const en = {
         stacks: 'Stacks',
         inbox: 'Inbox',
       },
-      orphans_one: '{{count}} orphaned PR',
-      orphans_other: '{{count}} orphaned PRs',
       refresh: 'Refresh',
       stateFilter: {
         open: 'Open',

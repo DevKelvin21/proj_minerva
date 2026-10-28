@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
 import { buildSuggestionBlock, insertSuggestion } from '../../lib/suggestions'
 import { errorText } from '../../lib/error-text'
+import { Button } from '../ui/Button'
 
 /** How the composer gets the lines a suggestion starts from, or why it can't. */
 export type SuggestionSource =
@@ -174,22 +175,13 @@ export function CommentComposer({
           </button>
         )}
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={posting}
-            className="rounded-md px-2.5 py-1 text-xs text-muted hover:text-text"
-          >
+          <Button variant="ghost" onClick={onCancel} disabled={posting}>
             {t('common.cancel')}
-          </button>
+          </Button>
         )}
-        <button
-          type="submit"
-          disabled={posting || draft.trim().length === 0}
-          className="rounded-md border border-border bg-accent/90 px-2.5 py-1 text-xs font-medium text-accent-fg transition-colors duration-150 hover:bg-accent disabled:cursor-not-allowed disabled:bg-border/40 disabled:text-muted"
-        >
+        <Button type="submit" variant="primary" disabled={posting || draft.trim().length === 0}>
           {posting ? t('comments.composer.posting') : submitLabel}
-        </button>
+        </Button>
       </div>
     </form>
   )

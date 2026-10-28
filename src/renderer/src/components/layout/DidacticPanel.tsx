@@ -13,6 +13,9 @@ import { IconButton } from '../ui/IconButton'
 import { DidacticAnalysisArea } from '../didactic/DidacticAnalysisArea'
 import { DidacticPlaceholder } from '../didactic/DidacticPlaceholder'
 import { AskTab } from '../chat/AskTab'
+import { useRovingTabs, type RovingTabProps } from '../../hooks/use-roving-tabs'
+
+const AI_PANEL_TABS: readonly AiPanelTab[] = ['ask', 'analysis']
 
 /**
  * Right-hand AI panel, two tabs: **Ask** (default; the side-panel chat,
@@ -63,6 +66,15 @@ export function DidacticPanel(): React.JSX.Element {
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
   const tab = useAppStore((s) => s.aiPanelTab)
   const setTab = useAppStore((s) => s.setAiPanelTab)
+  const tabs = useRovingTabs<AiPanelTab>({
+    keys: AI_PANEL_TABS,
+    value: tab,
+    onChange: setTab,
+    tabId: (key) => `ai-panel-tab-${key}`,
+    panelId: (key) => `ai-panel-${key}`,
+  })
+  const askPanel = tabs.panelProps('ask')
+  const analysisPanel = tabs.panelProps('analysis')
   const tier = useLayoutTier()
   const asideRef = useRef<HTMLElement>(null)
 
@@ -140,16 +152,12 @@ export function DidacticPanel(): React.JSX.Element {
             className="flex min-w-0 items-center gap-0.5 rounded-md bg-bg p-0.5"
           >
             <PanelTab
-              tab="ask"
-              active={tab === 'ask'}
-              onSelect={setTab}
+              tabProps={tabs.tabProps('ask')}
               icon={<MessageCircle size={13} aria-hidden />}
               label={t('chat.panel.tabs.ask')}
             />
             <PanelTab
-              tab="analysis"
-              active={tab === 'analysis'}
-              onSelect={setTab}
+              tabProps={tabs.tabProps('analysis')}
               icon={<GraduationCap size={13} aria-hidden />}
               label={t('chat.panel.tabs.analysis')}
             />
@@ -178,10 +186,7 @@ export function DidacticPanel(): React.JSX.Element {
         </header>
 
         <div
-          id="ai-panel-ask"
-          role="tabpanel"
-          aria-label={t('chat.panel.tabs.ask')}
-          hidden={tab !== 'ask'}
+          {...askPanel}
           className={`min-h-0 flex-1 flex-col ${tab === 'ask' ? 'flex' : 'hidden'}`}
         >
           {selectedPr ? (
@@ -195,10 +200,7 @@ export function DidacticPanel(): React.JSX.Element {
           )}
         </div>
         <div
-          id="ai-panel-analysis"
-          role="tabpanel"
-          aria-label={t('chat.panel.tabs.analysis')}
-          hidden={tab !== 'analysis'}
+          {...analysisPanel}
           className={`min-h-0 flex-1 flex-col gap-3 overflow-y-auto ${tab === 'analysis' ? 'flex' : 'hidden'} ${tier.w === 'xl' ? 'p-4' : 'p-3'}`}
         >
           {selectedPr ? (
@@ -219,27 +221,20 @@ export function DidacticPanel(): React.JSX.Element {
 }
 
 function PanelTab({
-  tab,
-  active,
-  onSelect,
+  tabProps,
   icon,
   label,
 }: {
-  tab: AiPanelTab
-  active: boolean
-  onSelect: (tab: AiPanelTab) => void
+  tabProps: RovingTabProps
   icon: React.ReactNode
   label: string
 }): React.JSX.Element {
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={active}
-      aria-controls={`ai-panel-${tab}`}
-      onClick={() => onSelect(tab)}
+      {...tabProps}
       className={`flex min-w-0 items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors duration-150 ${
-        active ? 'bg-panel text-text shadow-sm' : 'text-muted hover:text-text'
+        tabProps['aria-selected'] ? 'bg-panel text-text shadow-sm' : 'text-muted hover:text-text'
       }`}
     >
       {icon}

@@ -8,6 +8,7 @@ import { threadContextItem } from '../../lib/chat-context'
 import { useAppStore } from '../../stores/app-store'
 import { useChatStore } from '../../stores/chat-store'
 import { ThreadCard } from './ThreadCard'
+import { IconButton } from '../ui/IconButton'
 
 interface InlineThreadCardProps {
   thread: CommentThread
@@ -85,14 +86,12 @@ export function InlineThreadCard({
         extraHeaderContent={
           <>
             {canAdd && (
-              <button
-                type="button"
+              <IconButton
+                size="xs"
                 onClick={toggleChat}
                 disabled={blocked}
-                aria-pressed={pending}
-                aria-label={
-                  pending ? t('chat.thread.buttonRemove') : t('chat.thread.button')
-                }
+                active={pending}
+                label={pending ? t('chat.thread.buttonRemove') : t('chat.thread.button')}
                 title={
                   pending
                     ? t('chat.thread.buttonTitlePending')
@@ -101,23 +100,17 @@ export function InlineThreadCard({
                       : t('chat.thread.buttonTitle')
                 }
                 data-pending={pending || undefined}
-                className={`inline-flex h-5 w-5 items-center justify-center rounded hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 ${
-                  pending ? 'text-accent' : 'text-muted'
-                }`}
-              >
-                <Sparkles size={13} />
-              </button>
+                icon={<Sparkles size={12} />}
+              />
             )}
             {onHide && (
-              <button
-                type="button"
+              <IconButton
+                size="xs"
                 onClick={onHide}
-                aria-label={t('comments.line.hideComments')}
+                label={t('comments.line.hideComments')}
                 title={t('comments.line.hideCommentsTitle')}
-                className="inline-flex h-5 w-5 items-center justify-center rounded text-muted hover:text-text"
-              >
-                <EyeOff size={13} />
-              </button>
+                icon={<EyeOff size={12} />}
+              />
             )}
           </>
         }

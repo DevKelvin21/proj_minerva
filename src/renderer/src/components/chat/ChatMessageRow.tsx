@@ -6,6 +6,7 @@ import { HarnessActivityLog } from '../didactic/HarnessActivityLog'
 import { Markdown } from '../ui/Markdown'
 import { AnswerActions } from './AnswerActions'
 import { ContextChip } from './ContextChip'
+import { Button } from '../ui/Button'
 
 const NO_CONTEXT: ChatContextItem[] = []
 
@@ -42,7 +43,7 @@ function UserMessage({ message }: { message: ChatMessage }): React.JSX.Element {
     <div
       data-testid="chat-message"
       data-role="user"
-      className="flex max-w-[92%] flex-col gap-1.5 self-end rounded-lg bg-accent/15 px-3 py-2"
+      className="flex max-w-[92%] flex-col gap-1.5 self-end rounded-lg border border-border bg-code-bg px-3 py-2"
     >
       {message.context.length > 0 && (
         <div className="flex flex-col gap-1">
@@ -106,7 +107,10 @@ function AssistantMessage({
 
       {settledWithoutAnswer && (
         <div className="flex flex-col gap-1.5">
-          <p role={message.status === 'failed' ? 'alert' : undefined} className="text-xs text-danger">
+          <p
+            role={message.status === 'failed' ? 'alert' : undefined}
+            className={`text-xs ${message.status === 'failed' ? 'text-danger' : 'text-muted'}`}
+          >
             {message.status === 'failed'
               ? t('chat.message.failed', { error: message.error ?? t('common.unknownError') })
               : message.status === 'cancelled'
@@ -114,14 +118,14 @@ function AssistantMessage({
                 : t('chat.message.interrupted')}
           </p>
           {isLast && (
-            <button
-              type="button"
+            <Button
+              size="xs"
+              className="w-fit"
+              icon={<RotateCcw size={12} aria-hidden />}
               onClick={() => void retry(prKey, message.conversationId)}
-              className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs font-medium text-text hover:border-accent"
             >
-              <RotateCcw size={12} aria-hidden />
               {t('chat.message.retry')}
-            </button>
+            </Button>
           )}
         </div>
       )}

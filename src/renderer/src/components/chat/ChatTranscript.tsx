@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useChatStore } from '../../stores/chat-store'
 import { ChatMessageRow } from './ChatMessageRow'
+import { Button } from '../ui/Button'
 
 const NO_IDS: string[] = []
 /** Within this many px of the bottom, new content keeps the view pinned there. */
@@ -81,14 +82,15 @@ export function ChatTranscript({ conversationId, prKey }: ChatTranscriptProps): 
     >
       <div ref={contentRef} className="flex min-w-0 flex-col gap-3 p-3">
         {hasMore && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="xs"
+            className="self-center"
             onClick={handleLoadOlder}
             disabled={loadingOlder}
-            className="self-center rounded-md border border-border px-2.5 py-0.5 text-xs text-muted hover:text-text disabled:opacity-50"
           >
             {loadingOlder ? t('chat.transcript.loadingOlder') : t('chat.transcript.loadOlder')}
-          </button>
+          </Button>
         )}
         {loading && ids.length === 0 && (
           <p role="status" className="flex items-center gap-1.5 text-xs text-muted">
@@ -99,13 +101,9 @@ export function ChatTranscript({ conversationId, prKey }: ChatTranscriptProps): 
         {error && (
           <div role="alert" className="flex flex-col gap-1.5 text-xs text-danger">
             <p>{t('chat.transcript.loadError', { error })}</p>
-            <button
-              type="button"
-              onClick={() => void loadConversation(conversationId, true)}
-              className="w-fit rounded-md border border-border px-2 py-0.5 text-text hover:border-accent"
-            >
+            <Button size="xs" className="w-fit" onClick={() => void loadConversation(conversationId, true)}>
               {t('common.retry')}
-            </button>
+            </Button>
           </div>
         )}
         {ids.map((id, i) => (

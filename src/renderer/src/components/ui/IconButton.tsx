@@ -1,16 +1,33 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 
-interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  icon: ReactNode
-  label: string
-  active?: boolean
+export type IconButtonSize = 'xs' | 'sm' | 'md'
+
+const sizeClasses: Record<IconButtonSize, string> = {
+  xs: 'h-5 w-5',
+  sm: 'h-7 w-7',
+  md: 'h-8 w-8',
 }
 
-/** Botón cuadrado de icono con estado activo opcional; `label` sirve de tooltip y a11y. */
+interface IconButtonProps extends ComponentPropsWithRef<'button'> {
+  icon: ReactNode
+  label: string
+  /**
+   * Makes it a toggle: `aria-pressed` follows it and `true` paints the
+   * accent. Leave it out for a plain action (close, copy, delete).
+   */
+  active?: boolean
+  size?: IconButtonSize
+  /** `primary` fills it with the accent: the one action of a surface (Send). */
+  tone?: 'default' | 'primary'
+}
+
+/** Square icon button; `label` is its tooltip and accessible name. */
 export function IconButton({
   icon,
   label,
-  active = false,
+  active,
+  size = 'md',
+  tone = 'default',
   className = '',
   ...rest
 }: IconButtonProps): React.JSX.Element {
@@ -20,10 +37,12 @@ export function IconButton({
       title={label}
       aria-label={label}
       aria-pressed={active}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
-        active
-          ? 'border-accent/40 bg-accent/15 text-accent'
-          : 'border-transparent text-muted hover:bg-border/60 hover:text-text'
+      className={`inline-flex shrink-0 items-center justify-center rounded-md border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${sizeClasses[size]} ${
+        tone === 'primary'
+          ? 'border-transparent bg-accent text-accent-fg hover:bg-accent/90'
+          : active
+            ? 'border-accent/40 bg-accent/15 text-accent'
+            : 'border-transparent text-muted hover:bg-border/60 hover:text-text'
       } ${className}`}
       {...rest}
     >

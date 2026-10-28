@@ -27,6 +27,7 @@ import { useNeedsReviewCount } from '../../hooks/use-needs-review-count'
 import { IconButton } from '../ui/IconButton'
 import { SignInHint } from './SignInHint'
 import { SidebarRail } from './SidebarRail'
+import { CountBadge } from '../ui/CountBadge'
 
 const STATE_FILTER_OPTIONS: readonly PrStateFilter[] = ['open', 'closed', 'all']
 
@@ -92,6 +93,12 @@ function SidebarViewSwitch({
   const orphans = useStacksStore((s) => (s.result ? countOrphans(s.result.stacks) : 0))
   const toReview = useNeedsReviewCount()
   const unreadActivity = useUnreadActivityCount()
+  const count: Record<SidebarView, number> = {
+    queue: toReview,
+    list: 0,
+    stacks: orphans,
+    inbox: unreadActivity,
+  }
   const options: { value: SidebarView; label: string }[] = [
     { value: 'queue', label: t('layout.sidebar.views.queue') },
     { value: 'list', label: t('layout.sidebar.views.list') },
@@ -109,36 +116,24 @@ function SidebarViewSwitch({
           key={option.value}
           type="button"
           aria-pressed={value === option.value}
+          // The badge is decorative: the name says the count in words, like the rail.
+          aria-label={
+            count[option.value] > 0
+              ? t(`layout.rail.view.${option.value}WithCount`, { count: count[option.value] })
+              : undefined
+          }
           onClick={() => onChange(option.value)}
           className={`flex min-w-0 flex-auto items-center justify-center gap-0.5 rounded px-1 py-1 font-medium transition-colors duration-150 ${
             value === option.value ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
           }`}
         >
           <span className="truncate">{option.label}</span>
-          {option.value === 'queue' && toReview > 0 && (
-            <span
-              className="shrink-0 rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-fg"
-              title={t('layout.queue.toReview', { count: toReview })}
-            >
-              {toReview}
-            </span>
-          )}
-          {option.value === 'inbox' && unreadActivity > 0 && (
-            <span
-              data-testid="inbox-unread-badge"
-              className="shrink-0 rounded-full bg-accent/15 px-1 text-[10px] font-semibold text-accent"
-              title={t('layout.inbox.unread', { count: unreadActivity })}
-            >
-              {unreadActivity}
-            </span>
-          )}
-          {option.value === 'stacks' && orphans > 0 && (
-            <span
-              className="shrink-0 rounded-full bg-warning/20 px-1 text-[10px] text-warning"
-              title={t('layout.sidebar.orphans', { count: orphans })}
-            >
-              {orphans}
-            </span>
+          {count[option.value] > 0 && (
+            <CountBadge
+              count={count[option.value]}
+              tone={option.value === 'stacks' ? 'warning' : 'accent'}
+              data-testid={option.value === 'inbox' ? 'inbox-unread-badge' : undefined}
+            />
           )}
         </button>
       ))}
