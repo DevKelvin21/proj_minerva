@@ -77,6 +77,14 @@ describe('activityTarget', () => {
       threadId: 't-c',
     })
     expect(activityTarget(orphan)).toEqual({ kind: 'overview' })
+    expect(
+      activityTarget({
+        ...orphan,
+        kind: 'review',
+        reviewer: { login: 'dkumar' },
+        vote: 'approved',
+      }),
+    ).toEqual({ kind: 'overview' })
   })
 })
 

@@ -1,7 +1,7 @@
 # Plan: activity inbox + notifications
 
-Status (2026-10-28): steps 1 (engine), 2 (Inbox UI) and 3 (notifications) done on
-`feat/activity-inbox`. Verified: `npm run verify`, `npm run test:e2e`, and a live mock run where the scripted
+Status (2026-10-28): steps 1–3 and the review events of step 4 done on `feat/activity-inbox`.
+The "N new" chip in the review header is not built yet (see step 4). Verified: `npm run verify`, `npm run test:e2e`, and a live mock run where the scripted
 comment reached `activity:get`. GitHub's PR `updatedAt` was checked against real data and does move
 on line comments (microsoft/vscode#344792, #344785: `updatedAt` equals the last review comment).
 
@@ -48,8 +48,12 @@ reviewer).
 - **Orphans the user owns.** Every 5 minutes, from the cached `stacks-service` result: an
   orphan node whose PR the user authored (`viewer.isAuthor` in the watcher listing). The
   item goes away by itself once the PR is retargeted.
-- **Review events** (later, step 4): diff reviewer votes between ticks (changes requested /
-  approved on my PR, added as a required reviewer). Costs no extra calls.
+- **Review events** (step 4, built): reviewer votes and "asked to review me" are diffed
+  between listings (persisted per PR in `activity.json`, silent baseline). A vote that
+  changed on MY PR (approved, with suggestions, changes requested, rejected) and a review
+  newly asked of me (added, or re-requested after voting; required = direct, optional = not)
+  become items. An unknown identity (`viewer` absent) never fires a request once it
+  resolves. No extra API calls.
 - **No flood.** The first time a PR is seen, its comments become the baseline silently (the
   watcher's own rule). That covers first launch and newly involved PRs.
 - **Direct vs. everything.** An item is `direct` when it is on the user's own PR, or a
@@ -113,10 +117,12 @@ Inbox                         Mark all read
 - macOS build is unsigned: the first notification may prompt for permission, and dev builds
   show as "Electron". The badge works regardless.
 
-### 4. Later
+### 4. Extras
 
-- Review-event items (votes diff).
-- "N new" chip in the PR header that steps through unread threads (`N`).
+- Review-event items (votes diff): built.
+- Not built yet: an "N new" chip in the PR header that steps through unread threads (`N`).
+  The Inbox already deep-links to each thread, so this is a convenience, left for a
+  follow-up.
 
 ## Decisions (2026-10-28, defaults accepted)
 
@@ -138,4 +144,4 @@ Inbox                         Mark all read
 2. **Inbox UI**: sidebar tab, rail badge, `openPrAt`, conversation thread focus, en + es
    strings, e2e at tiled sizes.
 3. **Notifications**: badge, batched system notifications, Settings section.
-4. **Extras**: review events, "new since you looked" chip.
+4. **Extras**: review events (built); "new since you looked" chip (follow-up).

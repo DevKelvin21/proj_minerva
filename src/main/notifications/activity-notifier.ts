@@ -44,6 +44,11 @@ export type NotificationTextKey =
   | 'activity.notification.manyTitle'
   | 'activity.notification.manyBody'
   | 'activity.notification.manyBodyOnePr'
+  | 'activity.notification.reviewTitle'
+  | 'activity.notification.requestTitle'
+  | 'activity.notification.requestBody'
+  | 'activity.notification.requestBodyOptional'
+  | `activity.notification.vote.${'approved' | 'approved_with_suggestions' | 'changes_requested' | 'rejected'}`
 
 export interface ActivityNotifier {
   /** After every inbox change: badge always, a notification for `added` when due. */
@@ -70,6 +75,27 @@ export function notificationFor(
   if (items.length === 1) {
     const [item] = items
     const pr = { number: item.number, title: item.prTitle }
+    if (item.kind === 'review') {
+      return {
+        title: text('activity.notification.reviewTitle', pr),
+        body: text(`activity.notification.vote.${item.vote}`, {
+          reviewer: item.reviewer.displayName ?? item.reviewer.login,
+        }),
+        itemId: item.id,
+      }
+    }
+    if (item.kind === 'review_request') {
+      return {
+        title: text('activity.notification.requestTitle', pr),
+        body: text(
+          item.required
+            ? 'activity.notification.requestBody'
+            : 'activity.notification.requestBodyOptional',
+          pr,
+        ),
+        itemId: item.id,
+      }
+    }
     if (item.kind === 'orphan') {
       return {
         title: text('activity.notification.orphanTitle', pr),

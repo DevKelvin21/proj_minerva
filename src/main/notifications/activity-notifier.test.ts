@@ -88,6 +88,30 @@ describe('notificationFor', () => {
     })
   })
 
+  it('names the reviewer and the vote, or the review request', () => {
+    expect(
+      notificationFor(
+        [
+          {
+            ...orphan,
+            kind: 'review',
+            id: 'r',
+            reviewer: { login: 'dkumar' },
+            vote: 'changes_requested',
+          },
+        ],
+        text,
+      ),
+    ).toEqual({ title: '#9 Child', body: 'dkumar requested changes.', itemId: 'r' })
+    expect(
+      notificationFor([{ ...orphan, kind: 'review_request', id: 'q', required: true }], text),
+    ).toEqual({
+      title: 'Review requested: #9',
+      body: 'You were asked to review "Child".',
+      itemId: 'q',
+    })
+  })
+
   it('batches several items into one count that opens the Inbox', () => {
     expect(notificationFor([comment('a'), comment('b')], text)).toEqual({
       title: '2 new updates on your pull requests',

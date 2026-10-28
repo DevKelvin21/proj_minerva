@@ -279,6 +279,26 @@ export class MockGithubService implements ScmDataSource {
     return true
   }
 
+  /**
+   * `dkumar`, the required reviewer of "my" api#482, requests changes, like a
+   * review submitted on github.com (`MINERVA_MOCK_INCOMING_REVIEW_MS`).
+   * Returns `false` when it already ran.
+   */
+  simulateIncomingReview(now: Date = new Date()): boolean {
+    const record = this.records.get(prKey(githubRepo('shopwave', 'api'), 482))
+    const entry = record?.detail.reviewers.find((reviewer) => reviewer.user.login === 'dkumar')
+    if (!record || !entry || entry.vote === 'changes_requested') return false
+    record.detail = {
+      ...record.detail,
+      updatedAt: now.toISOString(),
+      reviewDecision: 'changes_requested',
+      reviewers: record.detail.reviewers.map((reviewer) =>
+        reviewer === entry ? { ...reviewer, vote: 'changes_requested' } : reviewer,
+      ),
+    }
+    return true
+  }
+
   async setThreadStatus(req: SetThreadStatusRequest): Promise<CommentThread> {
     await delay(LATENCY_MS.postComment)
     const record = this.getRecord(req.repo, req.number)

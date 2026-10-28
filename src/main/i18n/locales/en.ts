@@ -136,6 +136,16 @@ export const en = {
       manyTitle: '{{count}} new updates on your pull requests',
       manyBody: 'On {{prs}} pull requests. Open the Inbox to see them.',
       manyBodyOnePr: 'On one pull request. Open the Inbox to see them.',
+      reviewTitle: '#{{number}} {{title}}',
+      requestTitle: 'Review requested: #{{number}}',
+      requestBody: 'You were asked to review "{{title}}".',
+      requestBodyOptional: 'You were added as an optional reviewer of "{{title}}".',
+      vote: {
+        approved: '{{reviewer}} approved your pull request.',
+        approved_with_suggestions: '{{reviewer}} approved with suggestions.',
+        changes_requested: '{{reviewer}} requested changes.',
+        rejected: '{{reviewer}} rejected your pull request.',
+      },
     },
   },
   windows: {

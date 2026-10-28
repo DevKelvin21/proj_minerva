@@ -199,8 +199,9 @@ author's Spanish logs, not maintained)
 - `MINERVA_MOCK_GH_AUTH` / `MINERVA_MOCK_AZURE_AUTH` = `signed_in|unauthenticated|cli_unavailable`
   (mock only): force a provider's auth state. The `gh` probe is real even in mock mode, so e2e
   that assert GitHub's header/sign-in state must set `MINERVA_MOCK_GH_AUTH` (`provider-aware.spec.ts`).
-- `MINERVA_MOCK_INCOMING_COMMENT_MS=<ms>` (mock only): a reviewer opens a line thread on api#482
-  that long after startup, to exercise the activity inbox. Pair with a short `MINERVA_WATCH_INTERVAL_MS`.
+- `MINERVA_MOCK_INCOMING_COMMENT_MS=<ms>` / `MINERVA_MOCK_INCOMING_REVIEW_MS=<ms>` (mock only): a
+  reviewer opens a line thread on / requests changes on api#482 that long after startup, to exercise
+  the activity inbox. Pair with a short `MINERVA_WATCH_INTERVAL_MS`.
 - `MINERVA_MOCK_UPDATER=1|notify|error` scripted updater UI · `MINERVA_UPDATER=off` kill switch (e2e default).
 - Packaging: `npm run dist:mac:dir` / `dist:mac`, `dist:dir` / `dist` (Linux).
 

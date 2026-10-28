@@ -104,3 +104,15 @@ describe('MockGithubService comments', () => {
     expect(threads.at(-1)?.comments[0].isViewer).toBeUndefined()
   })
 })
+
+describe('MockGithubService incoming review', () => {
+  it('dkumar requests changes on api#482, once', async () => {
+    const mock = new MockGithubService()
+    expect(mock.simulateIncomingReview(new Date('2026-10-28T12:00:00.000Z'))).toBe(true)
+    expect(mock.simulateIncomingReview()).toBe(false)
+    const pr = (await mock.listPullRequests({})).find((p) => p.number === 482)
+    expect(pr?.reviewers).toEqual([expect.objectContaining({ vote: 'changes_requested' })])
+    expect(pr?.reviewDecision).toBe('changes_requested')
+    expect(pr?.updatedAt).toBe('2026-10-28T12:00:00.000Z')
+  })
+})

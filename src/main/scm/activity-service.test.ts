@@ -5,6 +5,7 @@ import {
   prKey,
   type AzureRepoRef,
   type RepoRef,
+  type ReviewerVote,
   type ScmProviderId,
   type StackNode,
 } from '../../shared/scm'
@@ -21,6 +22,8 @@ import {
   orphanItems,
   pickDue,
   pruneItems,
+  reviewItems,
+  reviewTrackOf,
   toPlainLine,
 } from './activity-service'
 import type { WatcherListResult } from './pr-watcher'
@@ -101,13 +104,17 @@ function listing(
 }
 
 function memoryStore(initial?: ActivityData): ActivityStore & { saves: number } {
-  let data: ActivityData = initial ?? { prs: new Map(), items: [] }
+  let data: ActivityData = initial ?? { prs: new Map(), reviews: new Map(), items: [] }
   return {
     saves: 0,
-    load: () => ({ prs: new Map(data.prs), items: [...data.items] }),
+    load: () => ({
+      prs: new Map(data.prs),
+      reviews: new Map(data.reviews),
+      items: [...data.items],
+    }),
     save(next) {
       this.saves++
-      data = { prs: new Map(next.prs), items: [...next.items] }
+      data = { prs: new Map(next.prs), reviews: new Map(next.reviews), items: [...next.items] }
     },
   }
 }
@@ -438,5 +445,100 @@ describe('createActivityService', () => {
     await service.onListing(listing([pr(2)]))
     expect(service.get().items).toEqual([])
     expect(changes).toHaveLength(2)
+  })
+})
+
+describe('review events', () => {
+  const nowIso = '2026-10-28T12:00:00.000Z'
+  const reviewer = (login: string, vote: ReviewerVote) => ({
+    user: { login },
+    vote,
+    isRequired: true,
+  })
+
+  it('reports a vote that changed on my PR, never a reset to none', () => {
+    const before = pr(1, { reviewers: [reviewer('dkumar', 'none'), reviewer('lchen', 'approved')] })
+    const after = pr(1, {
+      reviewers: [reviewer('dkumar', 'changes_requested'), reviewer('lchen', 'none')],
+    })
+    const previous = reviewTrackOf(before, undefined, nowIso)
+    const items = reviewItems(after, previous, reviewTrackOf(after, previous, nowIso), nowIso)
+    expect(items).toEqual([
+      expect.objectContaining({
+        kind: 'review',
+        reviewer: { login: 'dkumar' },
+        vote: 'changes_requested',
+        direct: true,
+        number: 1,
+      }),
+    ])
+  })
+
+  it('ignores votes on PRs I do not author', () => {
+    const notMine = { viewer: { isAuthor: false, reviewer: null } }
+    const before = pr(1, { ...notMine, reviewers: [reviewer('dkumar', 'none')] })
+    const after = pr(1, { ...notMine, reviewers: [reviewer('dkumar', 'approved')] })
+    const previous = reviewTrackOf(before, undefined, nowIso)
+    expect(reviewItems(after, previous, reviewTrackOf(after, previous, nowIso), nowIso)).toEqual([])
+  })
+
+  it('reports a review newly asked of me (required = direct), not one I already had', () => {
+    const before = pr(2, { viewer: { isAuthor: false, reviewer: null } })
+    const asked = pr(2, { viewer: { isAuthor: false, reviewer: 'required', vote: 'none' } })
+    const previous = reviewTrackOf(before, undefined, nowIso)
+    const next = reviewTrackOf(asked, previous, nowIso)
+    expect(reviewItems(asked, previous, next, nowIso)).toEqual([
+      expect.objectContaining({ kind: 'review_request', required: true, direct: true }),
+    ])
+    expect(reviewItems(asked, next, reviewTrackOf(asked, next, nowIso), nowIso)).toEqual([])
+
+    const optional = pr(2, { viewer: { isAuthor: false, reviewer: 'optional' } })
+    expect(
+      reviewItems(optional, previous, reviewTrackOf(optional, previous, nowIso), nowIso),
+    ).toEqual([expect.objectContaining({ required: false, direct: false })])
+  })
+
+  it('a re-request after voting is a new request', () => {
+    const voted = pr(3, { viewer: { isAuthor: false, reviewer: 'required', vote: 'approved' } })
+    const again = pr(3, { viewer: { isAuthor: false, reviewer: 'required', vote: 'none' } })
+    const previous = reviewTrackOf(voted, undefined, nowIso)
+    expect(previous.requested).toBe(false)
+    expect(
+      reviewItems(again, previous, reviewTrackOf(again, previous, nowIso), nowIso),
+    ).toHaveLength(1)
+  })
+
+  it('an unknown identity never fires a request once it resolves', () => {
+    const unknown = pr(4, { viewer: undefined })
+    const known = pr(4, { viewer: { isAuthor: false, reviewer: 'required', vote: 'none' } })
+    const previous = reviewTrackOf(unknown, undefined, nowIso)
+    expect(previous.requested).toBeNull()
+    expect(reviewItems(known, previous, reviewTrackOf(known, previous, nowIso), nowIso)).toEqual([])
+  })
+
+  it('a listing without reviewers keeps the last known votes', () => {
+    const before = pr(5, { reviewers: [reviewer('dkumar', 'approved')] })
+    const previous = reviewTrackOf(before, undefined, nowIso)
+    expect(reviewTrackOf(pr(5), previous, nowIso).votes).toEqual({ dkumar: 'approved' })
+  })
+
+  it('end to end: baseline silent, then one item for the new vote', async () => {
+    const store = memoryStore()
+    const changes: ActivityItem[][] = []
+    const service = createActivityService({
+      store,
+      getThreads: async () => [],
+      onChange: (_state, added) => changes.push(added),
+      now: () => NOW,
+    })
+    await service.onListing(listing([pr(6, { reviewers: [reviewer('dkumar', 'none')] })]))
+    expect(changes).toEqual([])
+    await service.onListing(
+      listing([pr(6, { reviewers: [reviewer('dkumar', 'changes_requested')] })]),
+    )
+    expect(changes).toEqual([[expect.objectContaining({ kind: 'review', number: 6 })]])
+    expect(store.load().reviews.get(prKey(api, 6))?.votes).toEqual({
+      dkumar: 'changes_requested',
+    })
   })
 })

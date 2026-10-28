@@ -38,6 +38,7 @@ import {
   isMockScmMode,
   mockAuthOverride,
   mockIncomingCommentDelayMs,
+  mockIncomingReviewDelayMs,
   type MockAuthOverride,
 } from '../mock-mode'
 import type { ScmDataSource, ScmProvider } from '../provider'
@@ -54,6 +55,10 @@ export function createGithubProvider(): ScmProvider {
     const incomingDelay = mockIncomingCommentDelayMs()
     if (incomingDelay !== null) {
       setTimeout(() => mock.simulateIncomingComment(), incomingDelay).unref()
+    }
+    const reviewDelay = mockIncomingReviewDelayMs()
+    if (reviewDelay !== null) {
+      setTimeout(() => mock.simulateIncomingReview(), reviewDelay).unref()
     }
     data = mock
   } else {

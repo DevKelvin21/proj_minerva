@@ -21,6 +21,11 @@
  * Orphans: every `orphanIntervalMs`, from the (cached) stacks result, the
  * orphan PRs the user authored. The item goes away once the PR is retargeted.
  *
+ * Review events, from the listing itself (no extra calls): a reviewer's vote
+ * that changed on one of MY PRs (approved, changes requested…), and a review
+ * newly asked of me (added as reviewer, or re-requested after voting). Same
+ * silent baseline the first time a PR is seen.
+ *
  * Comment text is untrusted: `toPlainLine` flattens and caps every string
  * that ends up in an item; the renderer shows it as plain text.
  */
@@ -29,12 +34,20 @@ import {
   type ActivityCommentItem,
   type ActivityItem,
   type ActivityOrphanItem,
+  type ActivityReviewItem,
+  type ActivityReviewRequestItem,
   type ActivityState,
   type MarkActivityReadRequest,
 } from '../../shared/activity'
-import { prKey, type RepoRef, type ScmProviderId, type StackNode } from '../../shared/scm'
+import {
+  prKey,
+  type RepoRef,
+  type ReviewerVote,
+  type ScmProviderId,
+  type StackNode,
+} from '../../shared/scm'
 import type { CommentThread, GetStacksResult, PullRequestSummary } from '../../shared/types'
-import type { ActivityData, ActivityStore, PrTrack } from './activity-store'
+import type { ActivityData, ActivityStore, PrTrack, ReviewTrack } from './activity-store'
 import { toScmError } from './errors'
 import type { WatcherListResult } from './pr-watcher'
 
@@ -230,6 +243,91 @@ export function orphanItems(
   return items
 }
 
+/** The review state a listing shows for `pr` (exported for tests). */
+export function reviewTrackOf(
+  pr: PullRequestSummary,
+  previous: ReviewTrack | undefined,
+  nowIso: string,
+): ReviewTrack {
+  // Prototype-less: logins are keys.
+  const votes: Record<string, ReviewerVote> = Object.create(null)
+  if (pr.reviewers) {
+    for (const reviewer of pr.reviewers) votes[reviewer.user.login] = reviewer.vote
+  } else if (previous) {
+    // A listing without reviewers keeps the last known votes.
+    Object.assign(votes, previous.votes)
+  }
+  // Without the viewer relation the request is unknown: keep what we knew.
+  const requested = pr.viewer
+    ? !pr.viewer.isAuthor &&
+      pr.viewer.reviewer !== null &&
+      (pr.viewer.vote === undefined || pr.viewer.vote === 'none')
+    : (previous?.requested ?? null)
+  return { votes, requested, seenAt: nowIso }
+}
+
+function sameReviewState(a: ReviewTrack, b: ReviewTrack): boolean {
+  const aKeys = Object.keys(a.votes)
+  return (
+    a.requested === b.requested &&
+    aKeys.length === Object.keys(b.votes).length &&
+    aKeys.every((login) => a.votes[login] === b.votes[login])
+  )
+}
+
+/**
+ * Review items between two listings of the same PR (exported for tests):
+ * votes that changed to something on MY PR, and a request that just appeared.
+ * `reviewers` absent = the listing did not report them: no vote is diffed.
+ */
+export function reviewItems(
+  pr: PullRequestSummary,
+  previous: ReviewTrack,
+  next: ReviewTrack,
+  nowIso: string,
+): (ActivityReviewItem | ActivityReviewRequestItem)[] {
+  const key = prKey(pr.repo, pr.number)
+  const base = {
+    prKey: key,
+    repo: pr.repo,
+    number: pr.number,
+    prTitle: toPlainLine(pr.title, MAX_TITLE_LEN),
+    at: nowIso,
+    read: false,
+  }
+  const items: (ActivityReviewItem | ActivityReviewRequestItem)[] = []
+  if (pr.viewer?.isAuthor && pr.reviewers) {
+    for (const reviewer of pr.reviewers) {
+      const vote = reviewer.vote
+      if (vote === 'none' || previous.votes[reviewer.user.login] === vote) continue
+      const login = toPlainLine(reviewer.user.login, MAX_LOGIN_LEN)
+      const item: ActivityReviewItem = {
+        ...base,
+        kind: 'review',
+        id: 'review:' + key + ':' + login + ':' + vote + ':' + nowIso,
+        direct: true,
+        reviewer: { login },
+        vote,
+      }
+      if (reviewer.user.displayName) {
+        item.reviewer.displayName = toPlainLine(reviewer.user.displayName, MAX_LOGIN_LEN)
+      }
+      items.push(item)
+    }
+  }
+  if (next.requested === true && previous.requested === false) {
+    const required = pr.viewer?.reviewer === 'required'
+    items.push({
+      ...base,
+      kind: 'review_request',
+      id: 'request:' + key + ':' + nowIso,
+      direct: required,
+      required,
+    })
+  }
+  return items
+}
+
 /** Newest first, read items past their age dropped, capped (exported for tests). */
 export function pruneItems(items: readonly ActivityItem[], now: number): ActivityItem[] {
   return items
@@ -308,6 +406,33 @@ export function createActivityService(deps: ActivityServiceDeps): ActivityServic
     return due.length
   }
 
+  /**
+   * Diffs every open PR's review state against the last listing (no API
+   * calls). Returns whether any track changed (new PR, vote or request).
+   */
+  function checkReviews(
+    state: ActivityData,
+    open: readonly PullRequestSummary[],
+    added: ActivityItem[],
+  ): boolean {
+    const nowIso = new Date(now()).toISOString()
+    let changed = false
+    for (const pr of open) {
+      const key = prKey(pr.repo, pr.number)
+      const previous = state.reviews.get(key)
+      const next = reviewTrackOf(pr, previous, nowIso)
+      if (!previous || !sameReviewState(previous, next)) changed = true
+      if (previous) {
+        for (const item of reviewItems(pr, previous, next, nowIso)) {
+          state.items.push(item)
+          added.push(item)
+        }
+      }
+      state.reviews.set(key, next)
+    }
+    return changed
+  }
+
   async function checkOrphans(
     state: ActivityData,
     open: readonly PullRequestSummary[],
@@ -359,26 +484,36 @@ export function createActivityService(deps: ActivityServiceDeps): ActivityServic
         const itemsBefore = state.items.length
 
         const checked = await checkComments(state, open, added)
+        const reviewsChanged = checkReviews(state, open, added)
         const orphansChanged = await checkOrphans(state, open, added)
 
         // Forget closed/merged PRs, and PRs no listing has shown for a month.
         const listedState = new Map(listed.map((pr) => [prKey(pr.repo, pr.number), pr.state]))
         let forgotten = 0
-        for (const [key, track] of state.prs) {
+        const forget = (key: string, lastSeen: string): boolean => {
           const listedAs = listedState.get(key)
-          const stale = now() - Date.parse(track.checkedAt) > TRACK_MAX_AGE_MS
-          if (
-            (listedAs !== undefined && listedAs !== 'open') ||
-            (listedAs === undefined && stale)
-          ) {
+          const stale = now() - Date.parse(lastSeen) > TRACK_MAX_AGE_MS
+          return (
+            (listedAs !== undefined && listedAs !== 'open') || (listedAs === undefined && stale)
+          )
+        }
+        for (const [key, track] of state.prs) {
+          if (forget(key, track.checkedAt)) {
             state.prs.delete(key)
+            forgotten++
+          }
+        }
+        for (const [key, track] of state.reviews) {
+          if (forget(key, track.seenAt)) {
+            state.reviews.delete(key)
             forgotten++
           }
         }
         state.items = pruneItems(state.items, now())
         const itemsChanged =
           added.length > 0 || orphansChanged || state.items.length !== itemsBefore
-        if (checked > 0 || forgotten > 0 || itemsChanged) persist(state)
+        // `seenAt` alone does not force a write; it rides along with the next one.
+        if (checked > 0 || forgotten > 0 || reviewsChanged || itemsChanged) persist(state)
         if (itemsChanged) deps.onChange(toState(state.items), added)
       } finally {
         running = false

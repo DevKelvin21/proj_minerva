@@ -48,11 +48,28 @@ describe('createActivityStore', () => {
       checkedUpdatedAt: '2026-10-28T11:00:00.000Z',
       checkedAt: '2026-10-28T12:00:00.000Z',
     }
-    store.save({ prs: new Map([[item.prKey, track]]), items: [item] })
+    store.save({ prs: new Map([[item.prKey, track]]), reviews: new Map(), items: [item] })
     const data = createActivityStore(file).load()
     expect(data.prs.get(item.prKey)).toEqual(track)
     expect(data.items).toEqual([item])
     expect(JSON.parse(readFileSync(file(), 'utf-8')).version).toBe(1)
+  })
+
+  it('round-trips review tracks, and drops malformed ones', () => {
+    const review = { votes: { dkumar: 'approved' as const }, requested: false, seenAt: 'x' }
+    createActivityStore(file).save({ prs: new Map(), reviews: new Map([['k', review]]), items: [] })
+    expect(createActivityStore(file).load().reviews.get('k')).toEqual(review)
+
+    writeFileSync(
+      file(),
+      JSON.stringify({
+        version: 1,
+        prs: {},
+        reviews: { bad: { votes: { a: 'maybe' }, requested: false, seenAt: 'x' } },
+        items: [],
+      }),
+    )
+    expect(createActivityStore(file).load().reviews.size).toBe(0)
   })
 
   it('falls back to empty on corrupt JSON or another version', () => {

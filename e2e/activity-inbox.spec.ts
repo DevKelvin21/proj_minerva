@@ -169,3 +169,35 @@ test('Settings → Notifications: defaults to "aimed at me", saves the level and
     window.getByTestId('notifications-section').getByRole('checkbox', { name: /unread count/ }),
   ).not.toBeChecked()
 })
+
+base(
+  'a reviewer requesting changes on my PR shows up as a vote row and opens the PR',
+  async (
+    // eslint-disable-next-line no-empty-pattern
+    {},
+    testInfo,
+  ) => {
+    const app = await launchMinerva(testInfo.outputPath('user-data'), {
+      env: { MINERVA_WATCH_INTERVAL_MS: '1000', MINERVA_MOCK_INCOMING_REVIEW_MS: '6000' },
+    })
+    try {
+      const window = await mainWindow(app)
+      await setViewport(window, 1600, 1000)
+      await viewSwitch(window)
+        .getByRole('button', { name: /^Inbox/ })
+        .click()
+      await expect(badge(window)).toHaveText('1', { timeout: 30_000 })
+      const row = inbox(window).locator(
+        '[data-activity-item^="review:github:shopwave/api#482:dkumar:"]',
+      )
+      await expect(row).toContainText('dkumar requested changes.')
+      await attachScreenshot(window, testInfo, 'inbox-vote')
+
+      await row.click()
+      await expect(window.locator('header:has(h1)')).toContainText('#482')
+      await expect(badge(window)).toHaveCount(0)
+    } finally {
+      await closeMinerva(app)
+    }
+  },
+)

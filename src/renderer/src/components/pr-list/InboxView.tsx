@@ -1,7 +1,15 @@
 import { useMemo } from 'react'
-import { CheckCheck, GitPullRequestArrow, LoaderCircle } from 'lucide-react'
+import {
+  CheckCheck,
+  CircleCheck,
+  CircleX,
+  Eye,
+  GitPullRequestArrow,
+  LoaderCircle,
+  MessageSquareWarning,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ActivityItem } from '../../../../shared/activity'
+import type { ActivityItem, ActivityReviewItem } from '../../../../shared/activity'
 import { useActivity, useOpenActivityItem } from '../../hooks/use-activity'
 import { useLocale } from '../../i18n/use-locale'
 import {
@@ -24,6 +32,50 @@ function UnreadDot({ unread }: { unread: boolean }): React.JSX.Element {
   )
 }
 
+/** Icon and tone of a vote: green approvals, warning for changes, danger for a rejection. */
+function VoteIcon({ vote }: { vote: ActivityReviewItem['vote'] }): React.JSX.Element {
+  if (vote === 'approved' || vote === 'approved_with_suggestions') {
+    return <CircleCheck size={14} className="mt-0.5 shrink-0 text-success" aria-hidden />
+  }
+  if (vote === 'rejected') {
+    return <CircleX size={14} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+  }
+  return <MessageSquareWarning size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+}
+
+/** One-line rows (orphan, vote, review request): icon, sentence, time. */
+function EventRow({
+  item,
+  icon,
+  children,
+  onOpen,
+}: {
+  item: ActivityItem
+  icon: React.ReactNode
+  children: React.ReactNode
+  onOpen: (item: ActivityItem) => void
+}): React.JSX.Element {
+  const { locale } = useLocale()
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(item)}
+      data-activity-item={item.id}
+      data-read={item.read || undefined}
+      className={`flex w-full items-start gap-1.5 px-3 py-1.5 text-left transition-colors duration-150 hover:bg-bg/60 ${
+        item.read ? 'opacity-60' : ''
+      }`}
+    >
+      <UnreadDot unread={!item.read} />
+      {icon}
+      <span className="min-w-0 flex-1 text-xs text-text">{children}</span>
+      <span className="shrink-0 text-[11px] text-muted" title={formatAbsoluteTime(item.at, locale)}>
+        {formatRelativeTime(item.at, locale)}
+      </span>
+    </button>
+  )
+}
+
 function ItemRow({
   item,
   onOpen,
@@ -38,25 +90,41 @@ function ItemRow({
 
   if (item.kind === 'orphan') {
     return (
-      <button
-        type="button"
-        onClick={() => onOpen(item)}
-        data-activity-item={item.id}
-        data-read={item.read || undefined}
-        className={`flex w-full items-start gap-1.5 px-3 py-1.5 text-left transition-colors duration-150 hover:bg-bg/60 ${tone}`}
+      <EventRow
+        item={item}
+        onOpen={onOpen}
+        icon={
+          <GitPullRequestArrow size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+        }
       >
-        <UnreadDot unread={!item.read} />
-        <GitPullRequestArrow size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-        <span className="min-w-0 flex-1 text-xs text-text">
-          {t('layout.inbox.orphan', {
-            parent: item.parent.number,
-            base: item.parent.mergedInto,
-          })}{' '}
-          <span className="text-warning">
-            {t('layout.inbox.retargetTo', { base: item.suggestedBase })}
-          </span>
+        {t('layout.inbox.orphan', {
+          parent: item.parent.number,
+          base: item.parent.mergedInto,
+        })}{' '}
+        <span className="text-warning">
+          {t('layout.inbox.retargetTo', { base: item.suggestedBase })}
         </span>
-      </button>
+      </EventRow>
+    )
+  }
+  if (item.kind === 'review') {
+    return (
+      <EventRow item={item} onOpen={onOpen} icon={<VoteIcon vote={item.vote} />}>
+        {t(`layout.inbox.vote.${item.vote}`, {
+          reviewer: item.reviewer.displayName ?? item.reviewer.login,
+        })}
+      </EventRow>
+    )
+  }
+  if (item.kind === 'review_request') {
+    return (
+      <EventRow
+        item={item}
+        onOpen={onOpen}
+        icon={<Eye size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />}
+      >
+        {t(item.required ? 'layout.inbox.requested' : 'layout.inbox.requestedOptional')}
+      </EventRow>
     )
   }
 

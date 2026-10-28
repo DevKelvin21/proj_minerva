@@ -41,10 +41,11 @@ export function groupActivity(items: readonly ActivityItem[]): ActivityGroup[] {
 /**
  * Where an item opens: a line comment at its line in the Files tab, any
  * other comment (conversation, file-level, outdated) highlighted in the
- * Conversation tab, an orphan on the PR itself (its header offers the fix).
+ * Conversation tab; an orphan (its header offers the fix), a vote or a
+ * review request on the PR itself.
  */
 export function activityTarget(item: ActivityItem): PrFocusTarget {
-  if (item.kind === 'orphan') return { kind: 'overview' }
+  if (item.kind !== 'comment') return { kind: 'overview' }
   if (item.isLineThread && item.path && item.line !== undefined) {
     return { kind: 'line', path: item.path, line: item.line, threadId: item.threadId }
   }
@@ -58,6 +59,7 @@ export function matchesActivityQuery(group: ActivityGroup, query: string): boole
   const parts = [group.prTitle, group.repo.fullName, '#' + group.number]
   for (const item of group.items) {
     if (item.kind === 'comment') parts.push(item.author.login, item.excerpt, item.path ?? '')
+    if (item.kind === 'review') parts.push(item.reviewer.login)
   }
   const haystack = parts.join('\n').toLowerCase()
   return tokens.every((token) => haystack.includes(token))

@@ -37,8 +37,20 @@ export function mockAuthOverride(
  * exercised end to end without a real org. `null` = off (the default).
  */
 export function mockIncomingCommentDelayMs(): number | null {
+  return mockDelay('MINERVA_MOCK_INCOMING_COMMENT_MS')
+}
+
+/**
+ * `MINERVA_MOCK_INCOMING_REVIEW_MS`: same idea for a vote: the required
+ * reviewer of "my" api#482 requests changes (`simulateIncomingReview`).
+ */
+export function mockIncomingReviewDelayMs(): number | null {
+  return mockDelay('MINERVA_MOCK_INCOMING_REVIEW_MS')
+}
+
+function mockDelay(variable: string): number | null {
   if (!isMockScmMode()) return null
-  const raw = process.env.MINERVA_MOCK_INCOMING_COMMENT_MS
+  const raw = process.env[variable]
   if (!raw) return null
   const parsed = Number.parseInt(raw, 10)
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null

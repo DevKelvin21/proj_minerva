@@ -8,7 +8,7 @@
  * UNTRUSTED: main flattens and caps it, and the renderer shows it as plain
  * text, never as Markdown or HTML.
  */
-import type { RepoRef } from './scm'
+import type { RepoRef, ReviewerVote } from './scm'
 import { isRepoRef } from './scm-guards'
 import type { UserRef } from './types'
 
@@ -16,7 +16,10 @@ import type { UserRef } from './types'
 export const ACTIVITY_EXCERPT_MAX = 160
 
 interface ActivityItemBase {
-  /** Stable id: `comment:<prKey>:<commentId>` or `orphan:<prKey>:<parentNumber>`. */
+  /**
+   * Stable id: `comment:<prKey>:<commentId>`, `orphan:<prKey>:<parentNumber>`,
+   * `review:<prKey>:<login>:<vote>:<at>` or `request:<prKey>:<at>`.
+   */
   id: string
   /** `prKey(repo, number)` of the PR the item is about. */
   prKey: string
@@ -57,7 +60,29 @@ export interface ActivityOrphanItem extends ActivityItemBase {
   suggestedBase: string
 }
 
-export type ActivityItem = ActivityCommentItem | ActivityOrphanItem
+/** A vote on one of the user's own PRs (approved, changes requested, rejected…). */
+export interface ActivityReviewItem extends ActivityItemBase {
+  kind: 'review'
+  reviewer: UserRef
+  vote: Exclude<ReviewerVote, 'none'>
+}
+
+/** The user was asked to review (newly added, or re-requested after voting). */
+export interface ActivityReviewRequestItem extends ActivityItemBase {
+  kind: 'review_request'
+  /** Required reviewer (direct) vs. optional. */
+  required: boolean
+}
+
+export type ActivityItem =
+  ActivityCommentItem | ActivityOrphanItem | ActivityReviewItem | ActivityReviewRequestItem
+
+const REVIEW_VOTES: readonly ReviewerVote[] = [
+  'approved',
+  'approved_with_suggestions',
+  'changes_requested',
+  'rejected',
+]
 
 /** Answer of `activity:get` and payload of the `activityChanged` push: always the full state. */
 export interface ActivityState {
@@ -145,6 +170,12 @@ export function isActivityItem(value: unknown): value is ActivityItem {
       (value.side === undefined || value.side === 'LEFT' || value.side === 'RIGHT') &&
       typeof value.isReply === 'boolean'
     )
+  }
+  if (value.kind === 'review') {
+    return isUserRef(value.reviewer) && REVIEW_VOTES.includes(value.vote as ReviewerVote)
+  }
+  if (value.kind === 'review_request') {
+    return typeof value.required === 'boolean'
   }
   if (value.kind === 'orphan') {
     const parent = value.parent

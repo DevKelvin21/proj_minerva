@@ -5,14 +5,16 @@
  * tolerant (missing, corrupt or another version = empty state, never a
  * throw), and the write is atomic (tmp + rename).
  *
- * It holds two things:
+ * It holds three things:
  * - per PR (`prKey`), the comment ids already known and when the PR was last
  *   checked, so a restart neither re-reports old comments nor floods;
+ * - per PR, the reviewer votes and "asked to review me" of the last listing;
  * - the inbox items themselves, with their read flag.
  * Pruning (caps, age) is the service's job; the store only loads and saves.
  */
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { isActivityItem, type ActivityItem } from '../../shared/activity'
+import type { ReviewerVote } from '../../shared/scm'
 
 const ACTIVITY_STORE_VERSION = 1
 
@@ -26,8 +28,22 @@ export interface PrTrack {
   checkedAt: string
 }
 
+/**
+ * Review state of one PR at the last listing, diffed to find new votes on my
+ * PRs and new review requests (no extra API calls: listings carry it).
+ */
+export interface ReviewTrack {
+  /** Reviewer login -> vote. */
+  votes: Record<string, ReviewerVote>
+  /** I am asked to review and have not voted; `null` = unknown (identity not resolved). */
+  requested: boolean | null
+  /** When a listing last showed the PR (ISO). */
+  seenAt: string
+}
+
 export interface ActivityData {
   prs: Map<string, PrTrack>
+  reviews: Map<string, ReviewTrack>
   items: ActivityItem[]
 }
 
@@ -39,11 +55,34 @@ export interface ActivityStore {
 interface PersistedActivity {
   version: typeof ACTIVITY_STORE_VERSION
   prs: Record<string, PrTrack>
+  /** Absent in files written before review events. */
+  reviews?: Record<string, ReviewTrack>
   items: ActivityItem[]
 }
 
 function emptyData(): ActivityData {
-  return { prs: new Map(), items: [] }
+  return { prs: new Map(), reviews: new Map(), items: [] }
+}
+
+const VOTES: readonly ReviewerVote[] = [
+  'approved',
+  'approved_with_suggestions',
+  'none',
+  'changes_requested',
+  'rejected',
+]
+
+function isReviewTrack(value: unknown): value is ReviewTrack {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.votes === 'object' &&
+    v.votes !== null &&
+    !Array.isArray(v.votes) &&
+    Object.values(v.votes).every((vote) => VOTES.includes(vote as ReviewerVote)) &&
+    (v.requested === null || typeof v.requested === 'boolean') &&
+    typeof v.seenAt === 'string'
+  )
 }
 
 function isPrTrack(value: unknown): value is PrTrack {
@@ -66,6 +105,14 @@ function fromPersisted(value: unknown): ActivityData {
   if (typeof v.prs === 'object' && v.prs !== null && !Array.isArray(v.prs)) {
     for (const [key, track] of Object.entries(v.prs)) {
       if (isPrTrack(track)) data.prs.set(key, track)
+    }
+  }
+  if (typeof v.reviews === 'object' && v.reviews !== null && !Array.isArray(v.reviews)) {
+    for (const [key, track] of Object.entries(v.reviews)) {
+      if (isReviewTrack(track)) {
+        // Prototype-less: logins are keys, and a `__proto__` login must stay data.
+        data.reviews.set(key, { ...track, votes: Object.assign(Object.create(null), track.votes) })
+      }
     }
   }
   if (Array.isArray(v.items)) data.items = v.items.filter(isActivityItem)
@@ -93,6 +140,7 @@ export function createActivityStore(filePath: () => string): ActivityStore {
       const persisted: PersistedActivity = {
         version: ACTIVITY_STORE_VERSION,
         prs: Object.fromEntries(data.prs),
+        reviews: Object.fromEntries(data.reviews),
         items: data.items,
       }
       const finalPath = filePath()

@@ -132,6 +132,16 @@ export const es: MessageShape<typeof en> = {
       manyTitle: '{{count}} novedades en tus pull requests',
       manyBody: 'En {{prs}} pull requests. Abre la Bandeja para verlas.',
       manyBodyOnePr: 'En un pull request. Abre la Bandeja para verlas.',
+      reviewTitle: '#{{number}} {{title}}',
+      requestTitle: 'Revisión solicitada: #{{number}}',
+      requestBody: 'Te pidieron revisar "{{title}}".',
+      requestBodyOptional: 'Te agregaron como revisor opcional de "{{title}}".',
+      vote: {
+        approved: '{{reviewer}} aprobó tu pull request.',
+        approved_with_suggestions: '{{reviewer}} aprobó con sugerencias.',
+        changes_requested: '{{reviewer}} pidió cambios.',
+        rejected: '{{reviewer}} rechazó tu pull request.',
+      },
     },
   },
   windows: {
