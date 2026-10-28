@@ -25,6 +25,7 @@ import { InboxView } from '../pr-list/InboxView'
 import { useUnreadActivityCount } from '../../hooks/use-activity'
 import { useNeedsReviewCount } from '../../hooks/use-needs-review-count'
 import { IconButton } from '../ui/IconButton'
+import { Input } from '../ui/Input'
 import { SignInHint } from './SignInHint'
 import { SidebarRail } from './SidebarRail'
 import { CountBadge } from '../ui/CountBadge'
@@ -247,20 +248,16 @@ export function Sidebar(): React.JSX.Element | null {
       </div>
       {/* Filters both views: a provider-side search for the list (GitHub
           qualifiers work), a text filter for the stacks. */}
-      <div className="relative shrink-0 px-2 pt-2">
-        <Search
-          size={14}
-          className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted"
-          aria-hidden
-        />
-        <input
+      <div className="shrink-0 px-2 pt-2">
+        <Input
           type="search"
+          fieldSize="lg"
+          icon={<Search size={14} />}
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder={t('layout.sidebar.searchPlaceholder')}
           aria-label={t('layout.sidebar.search')}
           title={t('layout.sidebar.searchPlaceholder')}
-          className="w-full rounded-md border border-border bg-bg py-1.5 pl-8 pr-2 text-sm text-text transition-colors duration-150 placeholder:text-muted focus:border-accent"
         />
       </div>
       {sidebarView === 'inbox' ? (

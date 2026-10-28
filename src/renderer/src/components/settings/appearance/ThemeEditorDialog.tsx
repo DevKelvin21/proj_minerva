@@ -22,6 +22,9 @@ import {
   type ThemeDefinition,
 } from '../../../../../shared/theme/themes'
 import { useAppearanceStore } from '../../../stores/appearance-store'
+import { Button } from '../../ui/Button'
+import { Checkbox } from '../../ui/Checkbox'
+import { Input } from '../../ui/Input'
 import { OverlayDialog } from './OverlayDialog'
 import { ThemeColorField } from './ThemeColorField'
 import { ThemeWireframe } from './ThemePreviews'
@@ -254,22 +257,15 @@ export function ThemeEditorDialog({
               {error}
             </p>
           )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-border px-3 py-1 text-xs text-text hover:bg-border/40"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="button"
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant="primary"
             data-testid="theme-editor-save"
             disabled={saving}
             onClick={() => void submit()}
-            className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg hover:opacity-90 disabled:opacity-50"
           >
             {saving ? t('common.saving') : t('settings.appearance.editor.save')}
-          </button>
+          </Button>
         </>
       }
     >
@@ -277,14 +273,14 @@ export function ThemeEditorDialog({
         <div className="min-w-0 flex-1">
           <label className="mb-3 block text-xs text-muted">
             {t('settings.appearance.editor.name')}
-            <input
+            <Input
               data-testid="theme-editor-name"
               value={draft.label}
               maxLength={48}
               onChange={(event) =>
                 setDraft((current) => ({ ...current, label: event.target.value }))
               }
-              className="mt-1 block w-full rounded-md border border-border bg-bg px-2 py-1 text-sm text-text outline-none focus:border-accent/60"
+              className="mt-1 block w-full"
             />
           </label>
 
@@ -316,14 +312,14 @@ export function ThemeEditorDialog({
                   {modeName(appearance)}
                 </button>
               ) : (
-                <button
+                <Button
                   key={appearance}
-                  type="button"
+                  size="xs"
                   onClick={() => addVariant(appearance)}
-                  className="rounded-md border border-dashed border-border px-2 py-1 text-xs text-muted hover:bg-border/40"
+                  className="border-dashed"
                 >
                   {t('settings.appearance.editor.addVariant', { mode: modeName(appearance) })}
-                </button>
+                </Button>
               ),
             )}
             {draft.variants.light && draft.variants.dark && (
@@ -370,16 +366,15 @@ export function ThemeEditorDialog({
                     />
                     {t('settings.appearance.editor.roles.accent')}
                   </label>
-                  <button
-                    type="button"
+                  <Button
+                    size="xs"
                     data-testid="theme-editor-generate"
                     onClick={() =>
                       updateColors(createVividThemeColors(mode, seed.canvas, seed.accent))
                     }
-                    className="rounded-md border border-border px-2 py-0.5 text-xs text-text hover:bg-border/40"
                   >
                     {t('settings.appearance.editor.generate')}
-                  </button>
+                  </Button>
                 </div>
               </section>
 
@@ -437,15 +432,12 @@ export function ThemeEditorDialog({
 
         <aside className="w-full shrink-0 md:w-60">
           <ThemeWireframe className="aspect-[16/10]" panes={colors ? [{ colors, mode }] : []} />
-          <label className="mt-2 flex items-center gap-2 text-xs text-muted">
-            <input
-              type="checkbox"
-              checked={livePreview}
-              onChange={(event) => setLivePreview(event.target.checked)}
-              className="accent-[var(--theme-accent)]"
-            />
-            {t('settings.appearance.editor.livePreview')}
-          </label>
+          <Checkbox
+            className="mt-2"
+            checked={livePreview}
+            onChange={(event) => setLivePreview(event.target.checked)}
+            label={t('settings.appearance.editor.livePreview')}
+          />
         </aside>
       </div>
     </OverlayDialog>

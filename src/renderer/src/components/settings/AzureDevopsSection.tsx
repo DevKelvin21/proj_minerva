@@ -8,6 +8,9 @@ import { useAzureProjects } from '../../hooks/use-azure-projects'
 import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { CREDENTIAL_SOURCE_KEY } from '../../lib/scm-labels'
+import { Button } from '../ui/Button'
+import { Checkbox } from '../ui/Checkbox'
+import { Input } from '../ui/Input'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 
 /** Auth feedback for Azure DevOps (`AzureScmProvider.getAuthStatus`). */
@@ -106,15 +109,12 @@ function AzureSettingsForm({
 
   return (
     <div className="mt-3 space-y-3">
-      <label className="flex items-center gap-2 text-xs text-text">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(event) => setEnabled(event.target.checked)}
-          aria-label={t('settings.azure.enable')}
-        />
-        {t('settings.azure.enable')}
-      </label>
+      {/* A checkbox, not a Switch: it is part of the form below and waits for Save. */}
+      <Checkbox
+        checked={enabled}
+        onChange={(event) => setEnabled(event.target.checked)}
+        label={t('settings.azure.enable')}
+      />
 
       {info.mockScm ? (
         <p className="text-[11px] text-muted">{t('settings.azure.demoMode')}</p>
@@ -128,23 +128,23 @@ function AzureSettingsForm({
           {t('settings.azure.organization')}
         </label>
         <div className="flex min-w-0 items-center gap-2">
-          <input
+          <Input
             id="azure-org"
             value={organization}
             onChange={(event) => setOrganization(event.target.value)}
             placeholder={t('settings.azure.organizationPlaceholder')}
             spellCheck={false}
-            className="min-w-0 flex-1 rounded-md border border-border bg-bg px-2 py-1 text-sm text-text outline-none focus:border-accent/60"
+            className="min-w-0 flex-1"
           />
-          <button
-            type="button"
+          <Button
             disabled={!orgValid || loading}
             onClick={() => void load(organization.trim())}
-            className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors hover:text-text disabled:opacity-50"
+            icon={
+              loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />
+            }
           >
-            {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             {t('settings.azure.loadProjects')}
-          </button>
+          </Button>
         </div>
         {!compact && (
           <p className="mt-1 text-[11px] text-muted">
@@ -154,7 +154,11 @@ function AzureSettingsForm({
             />
           </p>
         )}
-        {projectsError && <p className="mt-1 text-xs text-danger">{projectsError}</p>}
+        {projectsError && (
+          <p role="alert" className="mt-1 text-xs text-danger">
+            {projectsError}
+          </p>
+        )}
       </div>
 
       <div>
@@ -174,14 +178,12 @@ function AzureSettingsForm({
           >
             {options.map((name) => (
               <li key={name}>
-                <label className="flex min-w-0 items-center gap-2 text-xs text-text">
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(name)}
-                    onChange={() => toggleProject(name)}
-                  />
-                  <span className="truncate">{name}</span>
-                </label>
+                <Checkbox
+                  checked={selected.includes(name)}
+                  onChange={() => toggleProject(name)}
+                  label={<span className="block truncate">{name}</span>}
+                  className="min-w-0"
+                />
               </li>
             ))}
           </ul>
@@ -192,19 +194,22 @@ function AzureSettingsForm({
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={() => void save()}
           disabled={saving || !dirty || (organization.trim() !== '' && !orgValid)}
-          className="rounded-md bg-accent/90 px-3 py-1 text-xs font-medium text-accent-fg transition-colors hover:bg-accent disabled:opacity-50"
         >
           {saving ? t('settings.azure.saving') : t('settings.azure.save')}
-        </button>
+        </Button>
         {info.azureSettingsSource === 'az-cli-defaults' && (
           <span className="text-[11px] text-muted">{t('settings.azure.usingAzDefaults')}</span>
         )}
       </div>
-      {saveError && <p className="text-xs text-danger">{saveError}</p>}
+      {saveError && (
+        <p role="alert" className="text-xs text-danger">
+          {saveError}
+        </p>
+      )}
     </div>
   )
 }

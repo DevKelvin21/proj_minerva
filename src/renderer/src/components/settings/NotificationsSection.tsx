@@ -6,6 +6,8 @@ import {
   type NotificationSettings,
 } from '../../../../shared/activity'
 import { errorText } from '../../lib/error-text'
+import { Radio } from '../ui/Checkbox'
+import { Switch } from '../ui/Switch'
 
 interface NotificationsSectionProps {
   /** Short window: drop the explanatory text, keep the controls. */
@@ -41,8 +43,13 @@ export function NotificationsSection({
     }
   }, [t])
 
-  /** Optimistic: the control moves at once, and goes back if main refuses. */
+  /**
+   * Optimistic: the control moves at once, and goes back if main refuses.
+   * While a save is in flight the controls stay enabled (so keyboard focus
+   * stays put) but `aria-disabled`, and changes are ignored.
+   */
   async function save(next: NotificationSettings): Promise<void> {
+    if (saving) return
     const previous = settings
     setSettings(next)
     setSaving(true)
@@ -67,42 +74,36 @@ export function NotificationsSection({
       )}
       {settings && (
         <div className="flex flex-col gap-2">
-          <fieldset className="flex flex-col gap-1" disabled={saving}>
+          <fieldset className="flex flex-col gap-1">
             <legend className="sr-only">{t('settings.notifications.levelLabel')}</legend>
             {NOTIFICATION_LEVELS.map((level: NotificationLevel) => (
-              <label key={level} className="flex items-start gap-2 text-sm text-text">
-                <input
-                  type="radio"
-                  name="notification-level"
-                  value={level}
-                  checked={settings.level === level}
-                  onChange={() => void save({ ...settings, level })}
-                  className="mt-1 accent-[var(--theme-accent)]"
-                />
-                <span className="min-w-0">
-                  {t(`settings.notifications.level.${level}`)}
-                  {!compact && (
-                    <span className="block text-xs text-muted">
-                      {t(`settings.notifications.levelHint.${level}`)}
-                    </span>
-                  )}
-                </span>
-              </label>
+              <Radio
+                key={level}
+                fieldSize="md"
+                name="notification-level"
+                value={level}
+                checked={settings.level === level}
+                aria-disabled={saving || undefined}
+                onChange={() => void save({ ...settings, level })}
+                label={t(`settings.notifications.level.${level}`)}
+                hint={compact ? undefined : t(`settings.notifications.levelHint.${level}`)}
+              />
             ))}
           </fieldset>
-          <label className="flex items-center gap-2 text-sm text-text">
-            <input
-              type="checkbox"
-              checked={settings.badge}
-              disabled={saving}
-              onChange={(event) => void save({ ...settings, badge: event.target.checked })}
-              className="accent-[var(--theme-accent)]"
-            />
-            {t('settings.notifications.badge')}
-          </label>
+          <Switch
+            fieldSize="md"
+            checked={settings.badge}
+            aria-disabled={saving || undefined}
+            onCheckedChange={(badge) => void save({ ...settings, badge })}
+            label={t('settings.notifications.badge')}
+          />
         </div>
       )}
-      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

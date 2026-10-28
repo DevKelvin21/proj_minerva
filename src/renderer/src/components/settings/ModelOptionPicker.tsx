@@ -81,6 +81,7 @@ export function ModelOptionPicker({
                     key={choice.value}
                     type="button"
                     title={choiceDescription(t, choice)}
+                    aria-pressed={checked}
                     disabled={savingValue !== null}
                     onClick={() => void handleSelect(descriptor.id, choice.value)}
                     className={
@@ -101,7 +102,11 @@ export function ModelOptionPicker({
           </div>
         )
       })}
-      {saveError && <p className="text-xs text-danger">{saveError}</p>}
+      {saveError && (
+        <p role="alert" className="text-xs text-danger">
+          {saveError}
+        </p>
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { themeColorToHex, toCanonicalThemeColor } from '../../../../../shared/theme/color'
+import { Input } from '../../ui/Input'
 
 interface ThemeColorFieldProps {
   /** Visible label (translated family name, or the raw role id for advanced roles). */
@@ -52,8 +53,9 @@ export function ThemeColorField({
       <span className={'min-w-0 flex-1 truncate text-xs text-text ' + (mono ? 'font-mono' : '')}>
         {label}
       </span>
-      <input
-        type="text"
+      <Input
+        fieldSize="xs"
+        mono
         spellCheck={false}
         value={draft ?? hex}
         aria-label={t('settings.appearance.editor.valueLabel', { role: label })}
@@ -70,10 +72,7 @@ export function ThemeColorField({
             setDraft(null)
           }
         }}
-        className={
-          'w-28 shrink-0 rounded-md border bg-bg px-1.5 py-0.5 font-mono text-[11px] text-text outline-none ' +
-          (invalid ? 'border-danger' : 'border-border focus:border-accent/60')
-        }
+        className="w-28 shrink-0"
       />
     </div>
   )

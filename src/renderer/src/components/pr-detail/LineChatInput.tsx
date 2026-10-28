@@ -5,6 +5,7 @@ import { MAX_CHAT_CONTEXT_ITEMS, MAX_CHAT_NOTE_LEN } from '../../../../shared/ch
 import type { LineSide } from '../../lib/line-threads'
 import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
+import { Input } from '../ui/Input'
 
 interface LineChatInputProps {
   line: number
@@ -53,9 +54,8 @@ export function LineChatInput({
         }}
       >
         <Sparkles size={13} className="shrink-0 text-muted" aria-hidden />
-        <input
+        <Input
           autoFocus
-          type="text"
           value={note}
           maxLength={MAX_CHAT_NOTE_LEN}
           onChange={(event) => {
@@ -71,7 +71,7 @@ export function LineChatInput({
           }}
           aria-label={label}
           placeholder={t('chat.line.placeholder')}
-          className="min-w-0 flex-1 rounded-md border border-border bg-panel px-2 py-1 text-sm text-text placeholder:text-muted focus:border-accent"
+          className="min-w-0 flex-1"
         />
         <Button type="submit" variant="primary" size="xs">
           {initialNote !== undefined ? t('chat.line.update') : t('chat.line.add')}

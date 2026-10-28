@@ -166,14 +166,14 @@ test('Settings → Notifications: defaults to "aimed at me", saves the level and
   const section = window.getByTestId('notifications-section')
   await expect(section).toContainText('Notifications')
   await expect(section.getByRole('radio', { name: /Only what is aimed at me/ })).toBeChecked()
-  await expect(section.getByRole('checkbox', { name: /unread count/ })).toBeChecked()
+  await expect(section.getByRole('switch', { name: /unread count/ })).toBeChecked()
   await section.scrollIntoViewIfNeeded()
   await attachScreenshot(window, testInfo, 'settings-notifications')
 
   await section.getByRole('radio', { name: /^Off/ }).check()
-  await section.getByRole('checkbox', { name: /unread count/ }).uncheck()
+  await section.getByRole('switch', { name: /unread count/ }).uncheck()
   await expect(section.getByRole('radio', { name: /^Off/ })).toBeChecked()
-  await expect(section.getByRole('checkbox', { name: /unread count/ })).not.toBeChecked()
+  await expect(section.getByRole('switch', { name: /unread count/ })).not.toBeChecked()
 
   // Saved in main: a fresh Settings shows the same choice.
   await window.getByRole('button', { name: 'Close settings' }).click()
@@ -182,7 +182,7 @@ test('Settings → Notifications: defaults to "aimed at me", saves the level and
     window.getByTestId('notifications-section').getByRole('radio', { name: /^Off/ }),
   ).toBeChecked()
   await expect(
-    window.getByTestId('notifications-section').getByRole('checkbox', { name: /unread count/ }),
+    window.getByTestId('notifications-section').getByRole('switch', { name: /unread count/ }),
   ).not.toBeChecked()
 })
 

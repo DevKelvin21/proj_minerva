@@ -7,7 +7,9 @@ import { useGhAccounts } from '../../hooks/use-gh-accounts'
 import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { Badge } from '../ui/Badge'
+import { Button } from '../ui/Button'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
+import { Switch } from '../ui/Switch'
 import { AzureDevopsSection } from './AzureDevopsSection'
 
 /** External link consistent with the design system (see `CliLoginGuide.tsx`): main's link guard opens it in the system browser. */
@@ -155,22 +157,16 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
         </p>
       )}
 
-      <label className="mb-3 flex items-center gap-2 text-xs text-text">
-        <input
-          type="checkbox"
-          checked={info.providers.github.enabled}
-          disabled={togglingGithub}
-          aria-label={t('settings.github.enable')}
-          onChange={(event) => {
-            const enabled = event.target.checked
-            setTogglingGithub(true)
-            void saveProviderSettings({ github: { enabled } }).finally(() =>
-              setTogglingGithub(false),
-            )
-          }}
-        />
-        {t('settings.github.enable')}
-      </label>
+      <Switch
+        className="mb-3"
+        checked={info.providers.github.enabled}
+        aria-disabled={togglingGithub || undefined}
+        label={t('settings.github.enable')}
+        onCheckedChange={(enabled) => {
+          setTogglingGithub(true)
+          void saveProviderSettings({ github: { enabled } }).finally(() => setTogglingGithub(false))
+        }}
+      />
 
       {info.mockScm && (
         <p className="mb-3 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
@@ -193,7 +189,11 @@ function GithubAccessSection({ compact }: { compact: boolean }): React.JSX.Eleme
         />
       )}
 
-      {saveError && <p className="mt-2 text-xs text-danger">{saveError}</p>}
+      {saveError && (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {saveError}
+        </p>
+      )}
     </div>
   )
 }
@@ -240,15 +240,15 @@ function GithubSessionDetails({
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
           {t('settings.github.account')}
         </h4>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={() => void reload()}
           disabled={loading || busy}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted transition-colors duration-150 hover:text-text disabled:opacity-50"
+          icon={<RefreshCw size={11} className={loading ? 'animate-spin' : ''} />}
         >
-          <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
           {t('settings.github.refresh')}
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-2">

@@ -30,6 +30,7 @@ import {
 } from '../../../../../shared/theme/themes'
 import { useAppearanceStore } from '../../../stores/appearance-store'
 import { errorText } from '../../../lib/error-text'
+import { Button } from '../../ui/Button'
 import { IconButton } from '../../ui/IconButton'
 import { ThemeOrb, ThemeWireframe } from './ThemePreviews'
 import { ThemeEditorDialog, type ThemeEditorTarget } from './ThemeEditorDialog'
@@ -179,27 +180,25 @@ export function AppearanceSection({ compact = false }: AppearanceSectionProps): 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-xs font-semibold text-text">{t('settings.appearance.themes.title')}</h4>
         <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
+          <Button
+            size="xs"
             data-testid="theme-create"
+            icon={<Paintbrush size={12} aria-hidden />}
             onClick={() => {
               const { systemDark } = useAppearanceStore.getState()
               setEditor({ kind: 'new', seedId: resolveAppearance(settings, systemDark).theme.id })
             }}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-text hover:bg-border/40"
           >
-            <Paintbrush size={12} aria-hidden />
             {t('settings.appearance.themes.create')}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="xs"
             data-testid="theme-import"
+            icon={<Plus size={12} aria-hidden />}
             onClick={() => setImportOpen(true)}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-text hover:bg-border/40"
           >
-            <Plus size={12} aria-hidden />
             {t('settings.appearance.themes.import')}
-          </button>
+          </Button>
         </div>
       </div>
       {!compact && (
@@ -313,25 +312,21 @@ export function AppearanceSection({ compact = false }: AppearanceSectionProps): 
           <span className="min-w-0 flex-1">
             {t('settings.appearance.themes.deleteConfirm', { name: pendingDelete.label })}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="xs"
             data-testid="theme-delete-confirm"
             onClick={() => {
               const id = pendingDelete.id
               setPendingDelete(null)
               apply((current) => removeCustomThemes(current, [id]))
             }}
-            className="rounded-md bg-danger px-2 py-1 font-medium text-white hover:opacity-90"
           >
             {t('settings.appearance.themes.deleteButton')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPendingDelete(null)}
-            className="rounded-md border border-border px-2 py-1 text-text hover:bg-border/40"
-          >
+          </Button>
+          <Button size="xs" onClick={() => setPendingDelete(null)}>
             {t('common.cancel')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -375,7 +370,7 @@ export function AppearanceSection({ compact = false }: AppearanceSectionProps): 
           onPointerUp={commitContrast}
           onKeyUp={commitContrast}
           onBlur={commitContrast}
-          className="w-full accent-[var(--theme-accent)]"
+          className="w-full accent-accent"
         />
       </div>
 
