@@ -18,6 +18,12 @@ interface MermaidDiagramProps {
   naturalSize?: boolean
   /** Se dispara cuando el SVG ya está montado en el DOM (para auto-ajustar zoom). */
   onRendered?: () => void
+  /**
+   * `false` drops the bordered box: the analysis cards draw the diagram
+   * straight on the card (no box inside a box). Default `true` (the Files
+   * tab's layer bar keeps its framed diagram).
+   */
+  framed?: boolean
 }
 
 /**
@@ -212,6 +218,7 @@ export function MermaidDiagram({
   code,
   naturalSize = false,
   onRendered,
+  framed = true,
 }: MermaidDiagramProps): React.JSX.Element {
   const { t } = useTranslation()
   const rawId = useId().replace(/:/g, '')
@@ -279,7 +286,9 @@ export function MermaidDiagram({
       className={
         naturalSize
           ? 'w-max'
-          : 'overflow-x-auto rounded-md border border-border bg-bg p-3 [&_svg]:mx-auto'
+          : framed
+            ? 'overflow-x-auto rounded-md border border-border bg-bg p-3 [&_svg]:mx-auto'
+            : 'overflow-x-auto py-1 [&_svg]:mx-auto'
       }
       dangerouslySetInnerHTML={{ __html: svg }}
     />

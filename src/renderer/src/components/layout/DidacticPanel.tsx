@@ -190,7 +190,7 @@ export function DidacticPanel(): React.JSX.Element {
         </div>
         <div
           {...analysisPanel}
-          className={`min-h-0 flex-1 flex-col gap-3 overflow-y-auto ${tab === 'analysis' ? 'flex' : 'hidden'} ${tier.w === 'xl' ? 'p-4' : 'p-3'}`}
+          className={`min-h-0 flex-1 flex-col gap-3 overflow-y-auto bg-bg ${tab === 'analysis' ? 'flex' : 'hidden'} ${tier.w === 'xl' ? 'p-4' : 'p-3'}`}
         >
           {selectedPr ? (
             <DidacticAnalysisArea
