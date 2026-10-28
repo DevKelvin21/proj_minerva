@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot } from './fixtures'
+import { test, expect, attachScreenshot, openAnalysisTab } from './fixtures'
 
 /**
  * Port de scripts/smoke-harness-activity.mjs (F13): el mini-log de actividad
@@ -24,6 +24,7 @@ test('los eventos de progreso llevan el buffer activity y la UI lo pinta', async
   // El PR bajo prueba tiene que estar SELECCIONADO para que el panel lo pinte
   // (el análisis se dispara por IPC directo, no con el botón).
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
+  await openAnalysisTab(window)
 
   const result = await window.evaluate(async () => {
     const repo = { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }

@@ -4,8 +4,12 @@ import type { en } from './en'
 /** Spanish messages of the main process; same shape as `en.ts` (a missing key is a type error). */
 export const es: MessageShape<typeof en> = {
   ai: {
-    lineQuestion: {
-      empty: 'La IA terminó sin responder tu pregunta. Intenta preguntar de nuevo.',
+    chat: {
+      empty: 'La IA terminó sin responder tu mensaje. Intenta enviarlo de nuevo.',
+      busy: 'La IA todavía está respondiendo en esta conversación. Espera a que termine, o detenla primero.',
+      notFound: 'Esta conversación ya no existe.',
+      notRetryable: 'No hay una respuesta fallida o detenida que reintentar en esta conversación.',
+      tooMany: 'La IA ya está respondiendo en otras conversaciones. Espera a que termine una, o detenla.',
     },
     errors: {
       inactivityTimeout:
@@ -14,6 +18,7 @@ export const es: MessageShape<typeof en> = {
       providerError: '{{provider}} devolvió un error: {{detail}}',
       spawnFailed: 'No se pudo lanzar el proceso "{{binary}}": {{detail}}',
       noValidSection: 'Ninguna sección del stream del modelo tuvo un formato válido.',
+      cancelled: 'Cancelado.',
     },
     provider: {
       notLoggedIn:

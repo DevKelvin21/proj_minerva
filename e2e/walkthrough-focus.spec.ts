@@ -1,11 +1,11 @@
-import { test, expect, attachScreenshot, setViewport } from './fixtures'
+import { test, expect, attachScreenshot, setViewport, openAnalysisTab } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
  * Full-screen walkthrough (Walkthrough button in the PR bar): the Files tab
  * in layers mode with the sidebar, PR bar and didactic panel out of the way,
- * a verdict bar, the title bar's Exit + progress, and "Ask AI" on a diff line
- * (`ai:askAboutLines`, mock answer with MINERVA_MOCK_AI=1).
+ * a verdict bar, the title bar's Exit + progress, and gathering diff lines and
+ * threads for the side-panel chat while the panel is out of the way.
  */
 
 const sidebar = (page: Page) => page.locator('aside[aria-label="Pull request list"]')
@@ -15,6 +15,7 @@ const layers = (page: Page) => page.getByTestId('layer-item')
 async function openWalkthrough(window: Page): Promise<void> {
   await setViewport(window, 1600, 1000)
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
+  await openAnalysisTab(window)
   await window.getByRole('button', { name: 'Analyze PR' }).click()
   await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,
@@ -68,89 +69,52 @@ test('full screen: only the layers and the diff, verdicts by key, Esc back to th
   )
 })
 
-test('Ask AI on a line: the conversation keeps every answer, survives closing, and can become a comment draft', async ({
+test('in the walkthrough, lines and threads go to the chat draft; the panel shows them on the way out', async ({
   window,
 }, testInfo) => {
   await openWalkthrough(window)
 
-  // The coupon service layer: ask about line 18 (new side).
-  const lineButton = window.getByRole('button', { name: 'Ask AI about line 18' }).first()
+  // The coupon service layer: a note on line 18 (new side). Enter adds it and closes the input.
+  const lineButton = window.getByRole('button', { name: 'Add line 18 to the AI chat' }).first()
   await lineButton.click()
-  const card = window.getByTestId('ask-ai-card')
-  await expect(card).toBeVisible()
-  await card.getByRole('textbox').fill('Why multiply by (1 - discountRate) here?')
-  await card.getByRole('button', { name: 'Ask', exact: true }).click()
-  const answers = card.getByTestId('ask-ai-answer')
-  await expect(answers.nth(0)).toContainText('src/services/coupon-service.ts:18', {
-    timeout: 30_000,
-  })
-  await expect(card).toContainText('Why multiply by (1 - discountRate) here?')
+  const input = window.getByRole('textbox', { name: 'Note for the AI about line 18' })
+  await expect(input).toBeFocused()
+  await input.fill('Why multiply by (1 - discountRate) here?')
+  await input.press('Enter')
+  await expect(window.getByTestId('line-chat-input')).toHaveCount(0)
+  await expect(lineButton).toHaveAttribute('data-pending', 'true')
 
-  // A follow-up keeps the first answer on screen and carries it to the AI.
-  await card.getByRole('textbox').fill('Could the rate ever be above 1?')
-  await card
-    .getByRole('textbox')
-    .press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter')
-  await expect(answers).toHaveCount(2, { timeout: 30_000 })
-  await expect(answers.nth(1)).toContainText('Follow-up 2')
-  await expect(answers.nth(0)).not.toContainText('Follow-up')
-  await expect(card).toContainText('Could the rate ever be above 1?')
-  await attachScreenshot(window, testInfo, 'walkthrough-ask-ai-history')
+  // Esc closes the input without adding anything (and without leaving the walkthrough).
+  await window.getByRole('button', { name: 'Add line 9 to the AI chat' }).first().click()
+  await window.getByRole('textbox', { name: 'Note for the AI about line 9' }).press('Escape')
+  await expect(window.getByTestId('line-chat-input')).toHaveCount(0)
+  await expect(focusBar(window)).toBeVisible()
 
-  // Closing loses nothing: the line's button stays lit and reopens the same conversation.
-  await card.getByRole('button', { name: 'Close' }).click()
-  await expect(card).toHaveCount(0)
-  await expect(lineButton).toHaveAttribute('data-asked', 'true')
-  await lineButton.click()
-  await expect(window.getByTestId('ask-ai-exchange')).toHaveCount(2)
-  await expect(card).toContainText('Why multiply by (1 - discountRate) here?')
-
-  // "Use as comment": the line's composer opens with that answer as a draft; nothing is posted.
-  await card.getByRole('button', { name: 'Use as comment' }).first().click()
-  await expect(card).toHaveCount(0)
-  const draft = window.getByRole('textbox', { name: /Comment on line 18/ })
-  await expect(draft).toBeVisible()
-  await expect(draft).toHaveValue(/Mock answer for `src\/services\/coupon-service.ts:18`/)
-})
-
-test('Ask AI from a comment thread: the thread is the context and the answer becomes a reply draft', async ({
-  window,
-}, testInfo) => {
-  await openWalkthrough(window)
-
-  // The thread on coupon-service.ts:16 (two comments, folded under its line).
+  // The thread sparkle toggles: lit while the thread is in the draft.
   const thread = window.locator('[data-thread-id="thread-482-1"]')
-  await expect(thread).toBeVisible()
-  const threadButton = thread.getByRole('button', { name: 'Ask AI about this thread' })
-  await threadButton.click()
-  const card = window.getByTestId('ask-ai-card')
-  await expect(card).toContainText('Ask AI about this thread')
+  await thread.getByRole('button', { name: 'Add this thread to the AI chat' }).click()
+  const remove = thread.getByRole('button', { name: 'Remove this thread from the AI chat' })
+  await expect(remove).toHaveAttribute('aria-pressed', 'true')
+  await remove.click()
+  await expect(
+    thread.getByRole('button', { name: 'Add this thread to the AI chat' }),
+  ).toHaveAttribute('aria-pressed', 'false')
+  await thread.getByRole('button', { name: 'Add this thread to the AI chat' }).click()
+  await attachScreenshot(window, testInfo, 'walkthrough-chat-pending')
 
-  // A quick question asks in one click; the thread reached the AI.
-  await card.getByRole('button', { name: 'Is this concern valid?' }).click()
-  const answer = card.getByTestId('ask-ai-answer')
-  await expect(answer).toContainText('a thread of 2 comment(s); the first one is by dkumar', {
-    timeout: 30_000,
-  })
-  await expect(answer).toContainText('src/services/coupon-service.ts:16')
-  await expect(card).toContainText('Is this concern valid?')
-  await expect(threadButton).toHaveAttribute('data-asked', 'true')
-  await attachScreenshot(window, testInfo, 'walkthrough-ask-ai-thread')
-
-  // "Use as reply": the thread opens with the answer in its reply box; nothing is posted.
-  await card.getByRole('button', { name: 'Use as reply' }).click()
-  await expect(card).toHaveCount(0)
-  const reply = thread.getByRole('textbox', { name: 'Reply to this thread' })
-  await expect(reply).toBeFocused()
-  await expect(reply).toHaveValue(/Mock answer for `src\/services\/coupon-service.ts:16`/)
-  await expect(thread.locator('li')).toHaveCount(2)
-
-  // With the thread open, a second answer goes after what the reviewer typed, never over it.
-  await reply.fill('My own note.')
-  await threadButton.click()
-  await expect(card.getByTestId('ask-ai-exchange')).toHaveCount(1)
-  await card.getByRole('button', { name: 'Use as reply' }).click()
-  await expect(card).toHaveCount(0)
-  await expect(reply).toHaveValue(/^My own note\.\n\nMock answer for /)
-  await expect(reply).toBeFocused()
+  // The walkthrough keeps the panel out of the way; leaving it shows the chat with both chips.
+  await expect(window.getByTestId('ask-tab')).toHaveCount(0)
+  await window.keyboard.press('Escape')
+  await expect(focusBar(window)).toHaveCount(0)
+  const composer = window.getByTestId('chat-composer')
+  await expect(window.getByRole('tab', { name: 'Ask', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(composer.getByTestId('chat-chip')).toHaveCount(2)
+  await expect(composer.getByTestId('chat-chip').nth(0)).toContainText('coupon-service.ts:18')
+  await expect(composer.getByTestId('chat-chip').nth(0)).toContainText('discountRate')
+  await expect(composer.getByTestId('chat-chip').nth(1)).toContainText(
+    'Thread · coupon-service.ts:16',
+  )
 })

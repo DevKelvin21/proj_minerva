@@ -109,11 +109,17 @@ export function FilesTab({
   )
 
   // Selecciona el primer archivo automáticamente cuando cargan los archivos
-  // del PR (o si el seleccionado ya no existe en la lista actual).
+  // del PR (o si el seleccionado ya no existe en la lista actual). A jump
+  // from the chat to a removed line of a renamed file names its OLD path:
+  // that is the renamed file.
   useEffect(() => {
     if (files.length === 0) return
     const stillExists = selectedFilePath && files.some((f) => f.path === selectedFilePath)
-    if (!stillExists) setSelectedFilePath(files[0].path)
+    if (stillExists) return
+    const renamed = selectedFilePath
+      ? files.find((f) => f.previousPath === selectedFilePath)
+      : undefined
+    setSelectedFilePath((renamed ?? files[0]).path)
   }, [files, selectedFilePath, setSelectedFilePath])
 
   function selectLayer(layerRef: LayerRef | null): void {
@@ -192,7 +198,10 @@ export function FilesTab({
     return <p className="p-4 text-sm text-muted">{t('prDetail.files.empty')}</p>
   }
 
-  const selectedFile = files.find((f) => f.path === selectedFilePath) ?? files[0]
+  const selectedFile =
+    files.find((f) => f.path === selectedFilePath) ??
+    files.find((f) => f.previousPath === selectedFilePath) ??
+    files[0]
 
   function handleSelectFile(path: string): void {
     setSelectedFilePath(path)

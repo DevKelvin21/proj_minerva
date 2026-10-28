@@ -35,7 +35,8 @@
  */
 import type { IpcRequest } from '../../shared/ipc'
 import type { AppLocale } from '../../shared/locale'
-import type { GeneratedAnalysis, LineQuestion } from '../../shared/types'
+import type { ChatContextItem } from '../../shared/chat'
+import type { GeneratedAnalysis } from '../../shared/types'
 import type { AnalysisActivityItem, DraftDidacticSection } from '../../shared/events'
 
 export interface AnalyzeProgressMeta {
@@ -79,12 +80,34 @@ export interface AnalyzePullRequestOptions {
    */
   language?: AppLocale
   /**
-   * Set by `ai:askAboutLines`: answer this reviewer question about some
-   * lines instead of writing the full analysis (`../task-prompts.ts`). The
-   * run is the same (snapshot, read-only tools, timeouts); the result holds
-   * one `summary` section with the answer.
+   * Set by the side-panel chat (`../chat/chat-service.ts`): answer this
+   * reviewer message instead of writing the full analysis
+   * (`./task-prompts.ts`). The run is the same (snapshot, read-only tools,
+   * timeouts); the result holds one `summary` section with the answer.
    */
-  question?: LineQuestion
+  chat?: ChatTurnInput
+  /**
+   * Stops the run (the reviewer cancelled, or deleted the conversation). The
+   * provider aborts its transport and the promise rejects soon after; the
+   * caller knows it asked, so the rejection's message is not shown.
+   */
+  signal?: AbortSignal
+}
+
+/** One earlier exchange of a chat conversation, read from the database by main. */
+export interface ChatHistoryTurn {
+  question: string
+  /** Where the earlier question pointed (paths and lines), as a short label; may be empty. */
+  contextLabel: string
+  answer: string
+}
+
+/** A chat message to answer, with what it carries (`../../shared/chat.ts`). */
+export interface ChatTurnInput {
+  text: string
+  context: ChatContextItem[]
+  /** Earlier done exchanges, oldest first, already trimmed to `MAX_CHAT_HISTORY_LEN`. */
+  history: ChatHistoryTurn[]
 }
 
 /**

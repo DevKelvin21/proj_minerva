@@ -36,18 +36,19 @@ function changeStats(detail: PullRequestDetail, files: DiffFile[]): string {
  * The `<` that opens any `<pr_data>` / `</pr_data>` tag (any case, whitespace
  * or slashes before the name, with or without a closing `>`) in untrusted
  * text. Without this a PR body could close the data block early and write
- * "instructions" outside of it. The `<reviewer_question>` block of
- * `ai:askAboutLines` (./prompts/ask-lines.ts) is escaped too: it is the one
- * trusted instruction block besides the system message, so a diff line, a
- * comment or an earlier answer must never be able to forge one.
+ * "instructions" outside of it. The `<reviewer_question>` and
+ * `<reviewer_note>` blocks of the chat prompt (./prompts/ask-chat.ts) are
+ * escaped too: they are the only trusted instruction blocks besides the
+ * system message, so a diff line, a comment or an earlier answer must never
+ * be able to forge one.
  *
  * Only the `<` is matched, through a lookahead over ONE character class: the
  * scan is linear. (Matching the whole tag with `<\s*\/?\s*…[^>]*>` backtracked
  * quadratically on a `<` followed by a long run of spaces, freezing main.)
  */
-const PR_DATA_TAG_OPEN_RE = /<(?=[\s/]*(?:pr_data|reviewer_question)\b)/gi
+const PR_DATA_TAG_OPEN_RE = /<(?=[\s/]*(?:pr_data|reviewer_question|reviewer_note)\b)/gi
 
-/** Escapes every `<pr_data>`/`<reviewer_question>`-like tag so untrusted text can't open or close a block. */
+/** Escapes every `<pr_data>`/`<reviewer_question>`/`<reviewer_note>`-like tag so untrusted text can't open or close a block. */
 export function neutralizePrDataTags(text: string): string {
   return text.replace(PR_DATA_TAG_OPEN_RE, '&lt;')
 }

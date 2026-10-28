@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { test, expect, launchMinerva, closeMinerva, mainWindow, attachScreenshot } from './fixtures'
+import { test, expect, launchMinerva, closeMinerva, mainWindow, attachScreenshot, openAnalysisTab } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -37,6 +37,7 @@ test('el banner del panel sella la config de generación (no la vigente)', async
   await expect(window.getByText('apply-coupon').first()).toBeVisible({ timeout: 20_000 })
 
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
+  await openAnalysisTab(window)
   await window.getByRole('button', { name: 'Analyze PR' }).click()
   await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,
@@ -88,6 +89,7 @@ test('análisis con headSha viejo muestra la barra de staleness y "Actualizar" l
   try {
     const win2 = await mainWindow(app2)
     await win2.getByText('Add POST /carts/:id/apply-coupon').first().click()
+    await openAnalysisTab(win2)
     await expect(win2.getByText(/new commits/).first()).toBeVisible()
     // Escopado a la barra: el refresh de la lista (aside) también se llama
     // "Actualizar". El div más interno con el texto de aviso ES la barra.

@@ -1,7 +1,7 @@
 import {
   ChevronLeft,
   ChevronRight,
-  GraduationCap,
+  Sparkles,
   Home,
   PanelLeft,
   PanelLeftClose,
@@ -202,7 +202,7 @@ export function TitleBar(): React.JSX.Element {
         {/* The didactic panel only exists in the review view. */}
         {mainView === 'review' && !focusPr && selectedPr && (
           <IconButton
-            icon={<GraduationCap size={16} />}
+            icon={<Sparkles size={16} />}
             label={t('layout.titleBar.didacticPanel')}
             active={didacticPanelOpen}
             onClick={toggleDidacticPanel}

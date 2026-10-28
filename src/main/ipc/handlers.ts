@@ -29,6 +29,8 @@ import {
   refreshDidacticWindowTitle,
 } from '../windows/didactic-window'
 import { getMainLocale, mt, setMainLocale } from '../i18n'
+import { CHAT_DB_FILE_NAME, openChatDbSafely } from '../chat/chat-db'
+import { createChatService, type ChatService } from '../chat/chat-service'
 import { applyNativeAppearance } from '../theme/appearance-service'
 import { createOpenVsxClient } from '../theme/open-vsx'
 import { createFakeOpenVsxFetch } from '../theme/open-vsx-fake'
@@ -43,6 +45,7 @@ import {
   type LanguageChangedEvent,
   type PrListChangedEvent,
 } from '../../shared/events'
+import type { ChatEvent } from '../../shared/chat'
 import type { IpcResponse } from '../../shared/ipc'
 import { prKey } from '../../shared/scm'
 import type { DidacticAnalysis, ScmSettingsInfo } from '../../shared/types'
@@ -146,6 +149,15 @@ function broadcastAppearanceChanged(payload: AppearanceChangedEvent): void {
   }
 }
 
+/** Pushes a chat change to every open window (same pattern as `broadcastProgress`). */
+function broadcastChat(payload: ChatEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(MINERVA_EVENTS.chat, payload)
+    }
+  }
+}
+
 /**
  * PR watcher interval: `MINERVA_WATCH_INTERVAL_MS` overrides it (e2e uses it
  * to avoid waiting 60 real seconds). Only a positive integer is accepted;
@@ -174,9 +186,13 @@ function getScmSettings(root: DefaultScm): ScmSettingsInfo {
  * whatever the SCM layer serves (mock or real) without knowing which.
  *
  * Async because `createAiService` may probe a CLI before picking a service.
- * Returns `stopPrWatcher` so `../index.ts` can stop the watcher on quit.
+ * Returns `stopPrWatcher` and `stopChat` so `../index.ts` can stop the
+ * watcher and close the chat database on quit.
  */
-export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void }> {
+export async function registerIpcHandlers(): Promise<{
+  stopPrWatcher: () => void
+  stopChat: () => void
+}> {
   // Main's own text (dialogs, error messages, window titles, the AI prompt)
   // follows the saved UI language from the first call on.
   setMainLocale(settingsStore.getLanguage())
@@ -522,28 +538,31 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     return { status: 'idle' as const }
   })
 
-  // A reviewer's question about some lines (walkthrough, diff): the same
-  // jailed agent as the analysis, with its own prompt (`../ai/task-prompts.ts`).
-  // Not cached and not broadcast: the answer belongs to whoever asked, and
-  // only becomes a review comment if they post it themselves.
-  handle('ai:askAboutLines', async (req) => {
-    const providerToWarm = providerNeedingCatalogWarmup()
-    if (providerToWarm) await warmProviderModels(providerToWarm)
-    // Captured at start, like the analysis' seal.
-    const selectionAtStart = getEffectiveAiSelection()
-    const languageAtStart = getMainLocale()
-    const aiService = await createAiService(prContext)
-    const { repo, number, ...question } = req
-    const generated = await aiService.analyzePullRequest(
-      { repo, number },
-      { language: languageAtStart, question },
-    )
-    const answer = generated.sections.find((section) => section.kind === 'summary')
-    if (!answer || answer.markdown.trim().length === 0) {
-      throw new Error(mt('ai.lineQuestion.empty'))
-    }
-    return { markdown: answer.markdown, generatedWith: selectionAtStart, language: languageAtStart }
+  // Side-panel chat (`../chat/`): saved conversations in `chat.sqlite`
+  // (userData, so e2e's `MINERVA_USER_DATA_DIR` isolates it too), answered by
+  // the same jailed agent as the analysis with its own prompt
+  // (`../ai/task-prompts.ts`). Each run resolves its provider when it starts
+  // and seals the selection captured before it, like the analysis.
+  const chat: ChatService = createChatService({
+    db: openChatDbSafely(join(app.getPath('userData'), CHAT_DB_FILE_NAME)),
+    prepareRun: async () => {
+      const providerToWarm = providerNeedingCatalogWarmup()
+      if (providerToWarm) await warmProviderModels(providerToWarm)
+      const generatedWith = getEffectiveAiSelection()
+      const service = await createAiService(prContext)
+      return { service, generatedWith }
+    },
+    currentLanguage: getMainLocale,
+    broadcast: broadcastChat,
   })
+  handle('chat:list', (req) => chat.list(req.repo, req.number))
+  handle('chat:get', (req) =>
+    chat.get(req.conversationId, { before: req.before, limit: req.limit }),
+  )
+  handle('chat:send', (req) => chat.send(req))
+  handle('chat:retry', (req) => chat.retry(req.conversationId))
+  handle('chat:cancel', (req) => chat.cancel(req.conversationId))
+  handle('chat:delete', (req) => chat.delete(req.conversationId))
 
   // Lectura pura del cache (T14): la usa la ventana desacoplada para pintar
   // un análisis ya pagado al montar, sin pasar por `ai:analyzePullRequest`
@@ -631,5 +650,5 @@ export async function registerIpcHandlers(): Promise<{ stopPrWatcher: () => void
     return { ok: true as const }
   })
 
-  return { stopPrWatcher: () => prWatcher.stop() }
+  return { stopPrWatcher: () => prWatcher.stop(), stopChat: () => chat.shutdown() }
 }

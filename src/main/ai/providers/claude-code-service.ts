@@ -109,7 +109,9 @@ import {
   AGENTIC_INACTIVITY_TIMEOUT_MS,
   AGENTIC_REQUEST_TIMEOUT_MS,
   createAnalysisTimeouts,
+  forwardAbort,
   PROGRESS_THROTTLE_MS,
+  throwIfCancelled,
 } from '../analysis-timeouts'
 
 /** Nombres EXACTOS de las tools read-only del Agent SDK (`sdk.d.ts` de `@anthropic-ai/claude-agent-sdk`, verificados contra el paquete instalado en T58): sin `Write`/`Edit`/`Bash`/`WebFetch`/`WebSearch`/`Task`. No existe una tool de listado separada de `Glob` en este SDK. */
@@ -226,9 +228,10 @@ export class ClaudeCodeAiService implements AiService {
     // módulo). Dedupeado/cacheado en disco por `ensureSnapshot` (T54): un
     // segundo análisis del mismo repo+sha no vuelve a pagar la descarga.
     const snapshotDir = await this.context.ensureSnapshot(req.repo, detail.headSha)
+    throwIfCancelled(options?.signal)
 
-    // The full analysis, or a reviewer's question about some lines (`ai:askAboutLines`).
-    const prompts = agenticPrompts(detail, files, language, options?.question)
+    // The full analysis, or a reviewer's chat message (`chat:send`).
+    const prompts = agenticPrompts(detail, files, language, options?.chat)
     const userMessage = prompts.userMessage
 
     const controller = new AbortController()
@@ -236,6 +239,9 @@ export class ClaudeCodeAiService implements AiService {
       totalMs: AGENTIC_REQUEST_TIMEOUT_MS,
       inactivityMs: AGENTIC_INACTIVITY_TIMEOUT_MS,
     })
+    // A cancel from the caller aborts the same controller the SDK already
+    // gets (`options.abortController`), so the CLI process stops too.
+    const unlinkAbort = forwardAbort(options?.signal, controller)
 
     // `AbortError` es la clase que exporta el propio SDK (no una
     // `DOMException` nativa), así que se distingue por `instanceof`, no por
@@ -444,6 +450,8 @@ export class ClaudeCodeAiService implements AiService {
       }
     } catch (error) {
       timeouts.clearAll()
+      unlinkAbort()
+      throwIfCancelled(options?.signal)
       const abortMessage = abortErrorMessage(error)
       if (abortMessage) throw new Error(abortMessage, { cause: error })
       if (error instanceof Error && looksLikeMissingCli(error.message)) {
@@ -453,6 +461,10 @@ export class ClaudeCodeAiService implements AiService {
     }
 
     timeouts.clearAll()
+    unlinkAbort()
+    // The SDK may end the stream quietly on abort: a cancelled run never
+    // returns a partial answer as if it were complete.
+    throwIfCancelled(options?.signal)
 
     if (!sawAnyDelta) {
       throw new Error(mt('ai.claude.noStreamingContent'))

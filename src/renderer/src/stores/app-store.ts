@@ -18,6 +18,7 @@ import {
   DIDACTIC_PANEL_MIN_WIDTH,
   SIDEBAR_MIN_WIDTH,
   sidebarFootprint,
+  widthTier,
 } from '../lib/layout'
 import type {
   AiSettingsInfo,
@@ -27,12 +28,15 @@ import type {
 } from '../../../shared/types'
 import { prKey, type ScmAuthStatus, type ScmProviderId } from '../../../shared/scm'
 import type { LayerRef } from '../lib/walkthrough'
+import type { LineSide } from '../lib/line-threads'
 import type { ViewerFilter } from '../lib/dashboard'
 
 export type CenterTab = 'conversation' | 'files' | 'comments'
 export type DiffViewMode = 'split' | 'inline'
 /** Left column of the Files tab: folder tree, flat list, or the AI walkthrough's layers. */
 export type FileTreeMode = 'tree' | 'list' | 'layers'
+/** Tab of the right-hand AI panel: the chat (default) or the didactic analysis. */
+export type AiPanelTab = 'ask' | 'analysis'
 /** What the left column shows: the review queue, the PR list by repo, or the stacked-PR view. */
 /** How many recently opened PRs the collapsed sidebar rail keeps. */
 const MAX_RECENT_PRS = 5
@@ -66,6 +70,7 @@ export interface StackNavContext {
 }
 
 const DIDACTIC_PANEL_WIDTH_KEY = 'minerva.didacticPanelWidth'
+const AI_PANEL_TAB_KEY = 'minerva.aiPanelTab'
 const SIDEBAR_COLLAPSED_KEY = 'minerva.sidebarCollapsed'
 const SIDEBAR_WIDTH_KEY = 'minerva.sidebarWidth'
 
@@ -77,6 +82,15 @@ function readInitialSidebarWidth(): number | null {
     return Number.isFinite(parsed) ? Math.max(Math.round(parsed), SIDEBAR_MIN_WIDTH) : null
   } catch {
     return null
+  }
+}
+
+/** Persisted AI panel tab; anything but the literal 'analysis' = the chat. */
+function readInitialAiPanelTab(): AiPanelTab {
+  try {
+    return window.localStorage.getItem(AI_PANEL_TAB_KEY) === 'analysis' ? 'analysis' : 'ask'
+  } catch {
+    return 'ask'
   }
 }
 
@@ -139,6 +153,43 @@ interface PendingThreadFocus {
   threadId: string
 }
 
+/** A diff line to scroll to once its file is on screen (a chat chip). */
+export interface PendingLineFocus {
+  path: string
+  side: LineSide
+  line: number
+}
+
+/**
+ * The new-comment composer open under one diff line. `path` is the file on
+ * that side (the OLD path of a renamed file for `LEFT`). `draft` prefills it
+ * (an AI answer, "Use as comment"); `token` changes on every open so the
+ * composer remounts with the new draft.
+ */
+export interface LineComposerTarget {
+  path: string
+  side: LineSide
+  line: number
+  draft?: string
+  token: number
+}
+
+/**
+ * An AI answer to put in a thread's reply box ("Use as reply" in the chat).
+ * The thread's card appends it after anything already typed, then clears it
+ * (`consumeReplyRequest`); nothing is posted.
+ */
+export interface ReplyRequest {
+  threadId: string
+  text: string
+  token: number
+}
+
+let uiToken = 0
+function nextToken(): number {
+  uiToken += 1
+  return uiToken
+}
 /**
  * Where `openPrAt` lands inside the review (the activity inbox's deep links):
  * a line thread in the Files tab, a thread in the Conversation tab, or just
@@ -170,6 +221,8 @@ interface AppState {
   didacticPanelOpen: boolean
   /** Ancho en px del panel didáctico acoplado (T23); se arrastra desde su borde izquierdo y persiste en `localStorage`. */
   didacticPanelWidth: number
+  /** Tab of the right panel (chat or analysis), persisted in `localStorage`. */
+  aiPanelTab: AiPanelTab
 
   /** Archivo seleccionado en el tab "Archivos" (T7); se resetea al cambiar de PR. */
   selectedFilePath: string | null
@@ -191,6 +244,9 @@ interface AppState {
    */
   expandedThreadId: string | null
   pendingThreadFocus: PendingThreadFocus | null
+  pendingLineFocus: PendingLineFocus | null
+  lineComposer: LineComposerTarget | null
+  replyRequest: ReplyRequest | null
   /**
    * Conversation-tab twin of `pendingThreadFocus`: the thread to scroll to
    * (and highlight, through `expandedThreadId`) once the threads load.
@@ -303,6 +359,13 @@ interface AppState {
   toggleDidacticPanel: () => void
   /** Fija el ancho del panel didáctico acoplado (clampeado y persistido); ver `clampDidacticPanelWidth`. */
   setDidacticPanelWidth: (width: number) => void
+  setAiPanelTab: (tab: AiPanelTab) => void
+  /**
+   * Shows the chat tab of the right panel, opening the panel. `fromDiff`
+   * (context just added from a diff line or thread): on the narrowest tier
+   * the open panel covers the diff, so it stays closed there.
+   */
+  openAskPanel: (fromDiff?: boolean) => void
   setSelectedFilePath: (path: string | null) => void
   setDiffViewMode: (mode: DiffViewMode) => void
   setFileTreeMode: (mode: FileTreeMode) => void
@@ -315,6 +378,27 @@ interface AppState {
   /** Navega al tab Archivos, selecciona `path` y deja el hilo `threadId` expandido/enfocado. */
   openLineThread: (path: string, line: number, threadId: string) => void
   clearPendingThreadFocus: () => void
+  /** Files tab on `path`, scrolled to `line` (a chat chip). */
+  jumpToLine: (path: string, side: LineSide, line: number) => void
+  clearPendingLineFocus: () => void
+  /**
+   * Opens the new-comment composer under a line. With `navigate` (from the
+   * chat) also switches to the Files tab on that file and scrolls there.
+   */
+  openLineComposer: (
+    target: { path: string; side: LineSide; line: number; draft?: string },
+    navigate?: boolean,
+  ) => void
+  closeLineComposer: () => void
+  /** Files tab on the thread, its reply box getting `text` (`ReplyRequest`). */
+  requestThreadReply: (thread: {
+    threadId: string
+    path: string
+    line?: number
+    text: string
+  }) => void
+  /** Drops the reply request once a card applied it (no-op when a newer one replaced it). */
+  consumeReplyRequest: (token: number) => void
   clearPendingConversationFocus: () => void
   /**
    * `selectPr` plus a landing spot, in one go (`selectPr` alone clears any
@@ -343,6 +427,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarOpen: false,
   didacticPanelOpen: true,
   didacticPanelWidth: readInitialDidacticPanelWidth(),
+  aiPanelTab: readInitialAiPanelTab(),
 
   selectedFilePath: null,
   diffViewMode: 'split',
@@ -354,6 +439,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   expandedThreadId: null,
   pendingThreadFocus: null,
+  pendingLineFocus: null,
+  lineComposer: null,
+  replyRequest: null,
   pendingConversationFocus: null,
   threadsRefreshToken: 0,
 
@@ -401,6 +489,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         : state.recentPrs,
       expandedThreadId: null,
       pendingThreadFocus: null,
+      pendingLineFocus: null,
+      lineComposer: null,
+      replyRequest: null,
       pendingConversationFocus: null,
       // Elegir un PR cierra el drawer de la lista (F16/T82): en `md`/`sm` la
       // lista tapa el centro, y el gesto natural tras elegir es ver el PR.
@@ -488,6 +579,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     set({ didacticPanelWidth: clamped })
   },
+  setAiPanelTab: (tab) => {
+    try {
+      window.localStorage.setItem(AI_PANEL_TAB_KEY, tab)
+    } catch {
+      // Session-only when storage is unavailable.
+    }
+    set({ aiPanelTab: tab })
+  },
+  openAskPanel: (fromDiff = false) => {
+    get().setAiPanelTab('ask')
+    if (fromDiff && widthTier(window.innerWidth) === 'sm') return
+    set({ didacticPanelOpen: true })
+  },
   setSelectedFilePath: (path) => set({ selectedFilePath: path }),
   setDiffViewMode: (mode) => set({ diffViewMode: mode }),
   setFileTreeMode: (mode) => set({ fileTreeMode: mode }),
@@ -516,6 +620,38 @@ export const useAppStore = create<AppState>((set, get) => ({
       pendingThreadFocus: { path, line, threadId },
     }),
   clearPendingThreadFocus: () => set({ pendingThreadFocus: null }),
+  jumpToLine: (path, side, line) =>
+    set({
+      centerTab: 'files',
+      selectedFilePath: path,
+      pendingLineFocus: { path, side, line },
+      pendingThreadFocus: null,
+    }),
+  clearPendingLineFocus: () => set({ pendingLineFocus: null }),
+  openLineComposer: (target, navigate = false) =>
+    set({
+      lineComposer: { ...target, token: nextToken() },
+      ...(navigate
+        ? {
+            centerTab: 'files' as const,
+            selectedFilePath: target.path,
+            pendingLineFocus: { path: target.path, side: target.side, line: target.line },
+            pendingThreadFocus: null,
+          }
+        : {}),
+    }),
+  closeLineComposer: () => set({ lineComposer: null }),
+  requestThreadReply: ({ threadId, path, line, text }) =>
+    set({
+      centerTab: 'files',
+      selectedFilePath: path,
+      expandedThreadId: threadId,
+      pendingThreadFocus: { path, line: line ?? 0, threadId },
+      pendingLineFocus: null,
+      replyRequest: { threadId, text, token: nextToken() },
+    }),
+  consumeReplyRequest: (token) =>
+    set((state) => (state.replyRequest?.token === token ? { replyRequest: null } : {})),
   clearPendingConversationFocus: () => set({ pendingConversationFocus: null }),
   openPrAt: (pr, target) => {
     get().selectPr(pr)

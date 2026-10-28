@@ -586,83 +586,129 @@ describe('payloadValidators', () => {
     })
   })
 
-  describe('ai:askAboutLines', () => {
-    const validate = payloadValidators['ai:askAboutLines']
-    const base = {
-      repo: validRepo,
-      number: 1,
+  describe('chat:send', () => {
+    const validate = payloadValidators['chat:send']
+    const line = {
+      kind: 'line',
+      id: 'l1',
       path: 'src/a.ts',
       side: 'new',
+      line: 12,
+      code: 'const a = 1',
+      note: '',
+    }
+    const thread = {
+      kind: 'thread',
+      id: 't1',
+      threadId: 'PRRT_1',
+      path: 'src/a.ts',
+      side: 'old',
       startLine: 3,
       endLine: 5,
-      question: 'Why?',
+      outdated: false,
+      comments: [{ author: 'alice', body: 'Is this safe?' }],
     }
+    const base = { repo: validRepo, number: 1, text: 'Why?', context: [] as unknown[] }
 
-    it('accepts a path, a side, a line range and a question', () => {
+    it('accepts a message, with or without a conversation and context', () => {
       expect(validate(base)).toBe(true)
-      expect(validate({ ...base, side: 'old', endLine: 3 })).toBe(true)
+      expect(validate({ ...base, conversationId: '3f2c1a9e-0000-4000-8000-000000000001' })).toBe(
+        true,
+      )
+      expect(validate({ ...base, repo: validAzureRepo, context: [line, thread] })).toBe(true)
+      expect(validate({ ...base, context: [{ ...line, side: 'old', code: '', note: 'hm' }] })).toBe(
+        true,
+      )
     })
 
-    it('rejects bad paths, sides, ranges, empty or huge questions and extra keys', () => {
-      expect(validate({ ...base, path: '../etc/passwd' })).toBe(false)
-      expect(validate({ ...base, side: 'head' })).toBe(false)
-      expect(validate({ ...base, startLine: 0 })).toBe(false)
-      expect(validate({ ...base, endLine: 2 })).toBe(false)
-      expect(validate({ ...base, endLine: 3 + 400 })).toBe(false)
-      expect(validate({ ...base, question: '   ' })).toBe(false)
-      expect(validate({ ...base, question: 'x'.repeat(2001) })).toBe(false)
+    it('rejects empty or huge text, bad ids, a missing context and extra keys', () => {
+      expect(validate({ ...base, text: '   ' })).toBe(false)
+      expect(validate({ ...base, text: 'x'.repeat(4001) })).toBe(false)
+      expect(validate({ ...base, conversationId: '' })).toBe(false)
+      expect(validate({ ...base, conversationId: '../x' })).toBe(false)
+      expect(validate({ ...base, conversationId: 'x'.repeat(101) })).toBe(false)
+      expect(validate({ repo: validRepo, number: 1, text: 'Why?' })).toBe(false)
+      expect(validate({ ...base, number: 0 })).toBe(false)
       expect(validate({ ...base, extra: true })).toBe(false)
     })
 
-    const thread = { outdated: false, comments: [{ author: 'alice', body: 'Is this safe?' }] }
-
-    it('accepts earlier exchanges and a thread as context', () => {
-      expect(validate({ ...base, history: [] })).toBe(true)
-      expect(validate({ ...base, history: [{ question: 'Why?', answer: 'Because.' }] })).toBe(true)
-      expect(validate({ ...base, thread })).toBe(true)
-      expect(
-        validate({ ...base, thread: { ...thread, comments: [{ author: 'a', body: '' }] } }),
-      ).toBe(true)
+    it('checks every field of a line item', () => {
+      const bad = [
+        { ...line, kind: 'lines' },
+        { ...line, id: '' },
+        { ...line, path: '../etc/passwd' },
+        { ...line, path: 'x'.repeat(1001) },
+        { ...line, side: 'head' },
+        { ...line, line: 0 },
+        { ...line, line: 1.5 },
+        { ...line, code: 'x'.repeat(2001) },
+        { ...line, note: 'x'.repeat(2001) },
+        { ...line, note: undefined },
+        { ...line, extra: 1 },
+      ]
+      for (const item of bad) expect(validate({ ...base, context: [item] })).toBe(false)
     })
 
-    it('leaves the line range out only for a thread, and only both ends together', () => {
-      const noLines = {
-        repo: base.repo,
-        number: base.number,
-        path: base.path,
-        side: base.side,
-        question: base.question,
+    it('checks every field of a thread item', () => {
+      const noLines = { ...thread, startLine: undefined, endLine: undefined }
+      expect(validate({ ...base, context: [noLines] })).toBe(true)
+      expect(validate({ ...base, context: [{ ...thread, comments: [] }] })).toBe(true)
+      const bad = [
+        { ...thread, threadId: '' },
+        { ...thread, startLine: undefined },
+        { ...thread, endLine: undefined },
+        { ...thread, startLine: 6 },
+        { ...thread, startLine: 0, endLine: 0 },
+        { ...thread, outdated: 'no' },
+        { ...thread, comments: [{ author: '', body: 'x' }] },
+        { ...thread, comments: [{ author: 'x'.repeat(201), body: 'x' }] },
+        { ...thread, comments: [{ author: 'a', body: 'x', extra: 1 }] },
+        { ...thread, comments: Array(51).fill(thread.comments[0]) },
+      ]
+      for (const item of bad) expect(validate({ ...base, context: [item] })).toBe(false)
+    })
+
+    it('caps the item count, rejects duplicate ids, and shares one character budget', () => {
+      const items = Array.from({ length: 10 }, (_, i) => ({ ...line, id: 'l' + i }))
+      expect(validate({ ...base, context: items })).toBe(true)
+      expect(validate({ ...base, context: [...items, { ...line, id: 'l10' }] })).toBe(false)
+      expect(validate({ ...base, context: [line, line] })).toBe(false)
+      const body = 'x'.repeat(12_000)
+      const big = { ...thread, comments: [{ author: 'a', body }] }
+      expect(validate({ ...base, context: [big] })).toBe(true)
+      expect(validate({ ...base, context: [big, { ...big, id: 't2' }] })).toBe(false)
+    })
+  })
+
+  describe('chat:get / retry / cancel / delete', () => {
+    const id = '3f2c1a9e-0000-4000-8000-000000000001'
+
+    it('chat:get takes a conversation, an optional cursor and a bounded page size', () => {
+      const validate = payloadValidators['chat:get']
+      expect(validate({ conversationId: id })).toBe(true)
+      expect(validate({ conversationId: id, before: id, limit: 100 })).toBe(true)
+      expect(validate({ conversationId: id, limit: 0 })).toBe(false)
+      expect(validate({ conversationId: id, limit: 101 })).toBe(false)
+      expect(validate({ conversationId: id, limit: 2.5 })).toBe(false)
+      expect(validate({ conversationId: id, before: '' })).toBe(false)
+      expect(validate({ conversationId: 'a b' })).toBe(false)
+      expect(validate({ conversationId: id, extra: 1 })).toBe(false)
+    })
+
+    it('retry, cancel and delete take exactly a conversation id', () => {
+      for (const channel of ['chat:retry', 'chat:cancel', 'chat:delete'] as const) {
+        const validate = payloadValidators[channel]
+        expect(validate({ conversationId: id })).toBe(true)
+        expect(validate({ conversationId: '' })).toBe(false)
+        expect(validate({ conversationId: id, before: id })).toBe(false)
+        expect(validate(undefined)).toBe(false)
       }
-      expect(validate({ ...noLines, thread })).toBe(true)
-      expect(validate(noLines)).toBe(false)
-      expect(validate({ ...noLines, startLine: 3, thread })).toBe(false)
-      expect(validate({ ...noLines, endLine: 3, thread })).toBe(false)
     })
 
-    it('rejects malformed or oversized context', () => {
-      const turn = { question: 'Why?', answer: 'Because.' }
-      expect(validate({ ...base, history: turn })).toBe(false)
-      expect(validate({ ...base, history: [{ ...turn, answer: '' }] })).toBe(false)
-      expect(validate({ ...base, history: [{ ...turn, extra: 1 }] })).toBe(false)
-      expect(validate({ ...base, history: Array(11).fill(turn) })).toBe(false)
-      expect(validate({ ...base, thread: { ...thread, comments: [] } })).toBe(false)
-      expect(validate({ ...base, thread: { comments: thread.comments } })).toBe(false)
-      expect(
-        validate({ ...base, thread: { ...thread, comments: [{ author: '', body: 'x' }] } }),
-      ).toBe(false)
-      expect(
-        validate({ ...base, thread: { ...thread, comments: Array(51).fill(thread.comments[0]) } }),
-      ).toBe(false)
-      // History and thread share one budget.
-      const half = 'x'.repeat(12_000)
-      expect(validate({ ...base, history: [{ question: 'q', answer: half }] })).toBe(true)
-      expect(
-        validate({
-          ...base,
-          history: [{ question: 'q', answer: half }],
-          thread: { outdated: false, comments: [{ author: 'a', body: half }] },
-        }),
-      ).toBe(false)
+    it('chat:list takes a PR', () => {
+      const validate = payloadValidators['chat:list']
+      expect(validate({ repo: validRepo, number: 3 })).toBe(true)
+      expect(validate({ repo: validRepo })).toBe(false)
     })
   })
 

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Sparkles } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
@@ -10,14 +10,14 @@ import { DiffExpander } from './DiffExpander'
 import { LineThreadIndicator } from './LineThreadIndicator'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
-import { LineAskAiCard } from './LineAskAiCard'
+import { LineChatInput } from './LineChatInput'
 import {
   asHunk,
   KIND_BG,
   LAYER_ROW_CLASS,
   rangeClasses,
+  samePosition,
   type DiffBodyProps,
-  type OpenComposer,
 } from './diff-body'
 
 const KIND_MARKER: Record<DiffLineKind, string> = {
@@ -41,10 +41,10 @@ export function InlineDiff({
   layerKeys,
   expander,
   onCreateThread,
-  askAi,
+  composer,
+  chat,
 }: DiffBodyProps): React.JSX.Element {
   const { t } = useTranslation()
-  const [openComposer, setOpenComposer] = useState<OpenComposer | null>(null)
 
   const rowsBySection = useMemo(
     () =>
@@ -75,9 +75,10 @@ export function InlineDiff({
       (sum, [, list]) => sum + list.reduce((n, t) => n + t.comments.length, 0),
       0,
     )
-    const composerHere = openComposer?.key === rowKey ? openComposer : null
-    const asked = position
-      ? askAi?.askedLines.has(lineThreadKey(position.line, position.side))
+    const composerHere = samePosition(composer.target, position) ? composer.target : null
+    const noteHere = chat && samePosition(chat.noteTarget, position) ? position : undefined
+    const pending = position
+      ? Boolean(chat?.pendingLines.has(lineThreadKey(position.line, position.side)))
       : false
 
     return (
@@ -98,14 +99,7 @@ export function InlineDiff({
             ) : position ? (
               <button
                 type="button"
-                onClick={() =>
-                  setOpenComposer({
-                    key: rowKey,
-                    content: row.content,
-                    kind: 'comment',
-                    ...position,
-                  })
-                }
+                onClick={() => composer.open(position.side, position.line)}
                 aria-label={t('comments.line.addComment')}
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
               >
@@ -114,19 +108,18 @@ export function InlineDiff({
             ) : (
               <span className="inline-block h-4 w-4 shrink-0" />
             )}
-            {askAi && position ? (
+            {chat && position ? (
               <button
                 type="button"
                 onClick={() =>
-                  setOpenComposer({ key: rowKey, content: row.content, kind: 'ask', ...position })
+                  noteHere ? chat.closeNote() : chat.openNote(position.side, position.line)
                 }
-                aria-label={t('comments.askAi.button', { line: position.line })}
-                title={
-                  asked ? t('comments.askAi.buttonTitleActive') : t('comments.askAi.buttonTitle')
-                }
-                data-asked={asked || undefined}
+                aria-label={t('chat.line.button', { line: position.line })}
+                title={pending ? t('chat.line.buttonTitlePending') : t('chat.line.buttonTitle')}
+                aria-expanded={Boolean(noteHere)}
+                data-pending={pending || undefined}
                 className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded hover:text-accent ${
-                  asked
+                  pending || noteHere
                     ? 'text-accent'
                     : 'text-muted opacity-0 focus:opacity-100 group-hover/row:opacity-100'
                 }`}
@@ -134,7 +127,7 @@ export function InlineDiff({
                 <Sparkles size={11} />
               </button>
             ) : (
-              askAi && <span className="inline-block h-4 w-4 shrink-0" />
+              chat && <span className="inline-block h-4 w-4 shrink-0" />
             )}
             <span className="select-none">{row.newNumber ?? ''}</span>
           </span>
@@ -173,36 +166,35 @@ export function InlineDiff({
                     thread={thread}
                     highlighted={thread.id === model.focusedThreadId}
                     onHide={() => model.toggleHidden(key)}
-                    ask={askAi?.thread}
                   />
                 </div>
               )),
         )}
+        {noteHere && chat && (
+          <div style={{ gridColumn: '1 / -1' }} className="min-w-0">
+            <LineChatInput
+              line={noteHere.line}
+              side={noteHere.side}
+              initialNote={chat.noteFor(noteHere.side, noteHere.line)}
+              onAdd={(note) => chat.addLine(noteHere.side, noteHere.line, row.content, note)}
+              onClose={chat.closeNote}
+            />
+          </div>
+        )}
         {composerHere && (
           <div style={{ gridColumn: '1 / -1' }} className="min-w-0">
-            {composerHere.kind === 'ask' && askAi ? (
-              <LineAskAiCard
-                askAi={askAi}
-                line={composerHere.line}
-                side={composerHere.side}
-                onUseAsComment={(markdown) =>
-                  setOpenComposer({ ...composerHere, kind: 'comment', draft: markdown })
-                }
-                onClose={() => setOpenComposer(null)}
-              />
-            ) : (
-              <LineCommentComposer
-                line={composerHere.line}
-                side={composerHere.side}
-                lineContent={composerHere.content}
-                initialValue={composerHere.draft}
-                onCancel={() => setOpenComposer(null)}
-                onSubmit={async (bodyMarkdown) => {
-                  await onCreateThread(composerHere.line, composerHere.side, bodyMarkdown)
-                  setOpenComposer(null)
-                }}
-              />
-            )}
+            <LineCommentComposer
+              key={composerHere.token}
+              line={composerHere.line}
+              side={composerHere.side}
+              lineContent={row.content}
+              initialValue={composerHere.draft}
+              onCancel={composer.close}
+              onSubmit={async (bodyMarkdown) => {
+                await onCreateThread(composerHere.line, composerHere.side, bodyMarkdown)
+                composer.close()
+              }}
+            />
           </div>
         )}
       </Fragment>

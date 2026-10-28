@@ -10,6 +10,7 @@ import {
   setViewport,
   openInsightTab,
   type Page,
+  openAnalysisTab,
 } from './fixtures'
 import { themeColorToHex } from '../src/shared/theme/color'
 import {
@@ -257,6 +258,7 @@ test('screenshots: every built-in theme, light and dark, with a diff and a diagr
 }, testInfo) => {
   test.setTimeout(240_000)
   await window.getByText('apply-coupon').first().click()
+  await openAnalysisTab(window)
   await window.getByRole('button', { name: 'Analyze PR' }).click()
   await expect(window.getByRole('button', { name: /Re-?analyze/i })).toBeEnabled({
     timeout: 90_000,

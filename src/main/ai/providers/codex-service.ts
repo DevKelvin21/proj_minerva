@@ -95,7 +95,9 @@ import {
   AGENTIC_INACTIVITY_TIMEOUT_MS,
   AGENTIC_REQUEST_TIMEOUT_MS,
   createAnalysisTimeouts,
+  forwardAbort,
   PROGRESS_THROTTLE_MS,
+  throwIfCancelled,
 } from '../analysis-timeouts'
 import {
   CodexAppServerClient,
@@ -232,9 +234,10 @@ export class CodexAiService implements AiService {
     // que se le pasa a `thread/start` (ver el comentario del módulo).
     // Dedupeado/cacheado en disco por `ensureSnapshot` (T54).
     const snapshotDir = await this.context.ensureSnapshot(req.repo, detail.headSha)
+    throwIfCancelled(options?.signal)
 
-    // The full analysis, or a reviewer's question about some lines (`ai:askAboutLines`).
-    const prompts = agenticPrompts(detail, files, language, options?.question)
+    // The full analysis, or a reviewer's chat message (`chat:send`).
+    const prompts = agenticPrompts(detail, files, language, options?.chat)
     const userMessage = prompts.userMessage
 
     const controller = new AbortController()
@@ -267,6 +270,9 @@ export class CodexAiService implements AiService {
 
     let client: CodexAppServerClient | null = null
     controller.signal.addEventListener('abort', () => client?.kill())
+    // A cancel from the caller aborts the same controller as the timeouts:
+    // the app-server process is killed (one per run, so that ends the turn).
+    const unlinkAbort = forwardAbort(options?.signal, controller)
 
     const abortErrorMessage = (): string | null => {
       const reason = timeouts.getAbortReason()
@@ -330,6 +336,14 @@ export class CodexAiService implements AiService {
         resolveTurn = resolve
         rejectTurn = reject
       })
+      // Killing the process rejects pending requests but not this promise
+      // (it settles from notifications): an abort (cancel or timeout) must
+      // end the wait too, or it would hang on a dead process.
+      // Rejected before anyone awaits it (abort during `turn/start`): no unhandled rejection.
+      turnDone.catch(() => {})
+      const onAbort = (): void => rejectTurn(new Error(mt('ai.codex.cancelled')))
+      if (controller.signal.aborted) onAbort()
+      else controller.signal.addEventListener('abort', onAbort, { once: true })
 
       const unsubscribe = client.onNotification((notification) => {
         // AGÉNTICO (F11/T58): se resetea con CUALQUIER notificación del
@@ -422,10 +436,13 @@ export class CodexAiService implements AiService {
         })
         await turnDone
       } finally {
+        controller.signal.removeEventListener('abort', onAbort)
         unsubscribe()
       }
     } catch (error) {
       timeouts.clearAll()
+      unlinkAbort()
+      throwIfCancelled(options?.signal)
       const abortMessage = abortErrorMessage()
       if (abortMessage) throw new Error(abortMessage, { cause: error })
       if (error instanceof CodexSpawnError) {
@@ -442,6 +459,8 @@ export class CodexAiService implements AiService {
     }
 
     timeouts.clearAll()
+    unlinkAbort()
+    throwIfCancelled(options?.signal)
 
     if (!sawAnyDelta) {
       throw new Error(mt('ai.codex.noStreamingContent'))

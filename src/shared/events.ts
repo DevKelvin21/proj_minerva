@@ -15,6 +15,7 @@
 import type { ActivityState } from './activity'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
+import type { ChatEvent } from './chat'
 import type { DidacticSnippet, RepoRef, UpdaterStatus, WalkthroughCohort } from './types'
 
 interface DraftSectionCommon {
@@ -225,6 +226,8 @@ export interface EventContract {
   'minerva:event:updaterStatusChanged': UpdaterStatusChangedEvent
   'minerva:event:languageChanged': LanguageChangedEvent
   'minerva:event:appearanceChanged': AppearanceChangedEvent
+  /** Side-panel chat: a message, a conversation summary or a deletion (`./chat.ts`). */
+  'minerva:event:chat': ChatEvent
   'minerva:event:activityChanged': ActivityChangedEvent
   'minerva:event:openActivity': OpenActivityEvent
 }
@@ -243,6 +246,7 @@ export const MINERVA_EVENTS = {
   updaterStatusChanged: 'minerva:event:updaterStatusChanged',
   languageChanged: 'minerva:event:languageChanged',
   appearanceChanged: 'minerva:event:appearanceChanged',
+  chat: 'minerva:event:chat',
   activityChanged: 'minerva:event:activityChanged',
   openActivity: 'minerva:event:openActivity',
 } satisfies Record<string, EventChannel>

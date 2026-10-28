@@ -18,34 +18,44 @@
  */
 import { prKey } from '../../shared/scm'
 import { githubRepo } from '../../shared/scm-guards'
-import type { DidacticSection, LineQuestion, PullRequestDetail } from '../../shared/types'
+import type { ChatContextItem } from '../../shared/chat'
+import type { DidacticSection, PullRequestDetail } from '../../shared/types'
+import type { ChatTurnInput } from './service'
 
-/** Mock answer to a reviewer's question about some lines (`ai:askAboutLines`). */
-export function lineAnswerSection(question: LineQuestion): DidacticSection {
-  const where =
-    question.startLine === undefined
-      ? question.path
-      : question.startLine === question.endLine
-        ? question.path + ':' + question.startLine
-        : question.path + ':' + question.startLine + '-' + question.endLine
-  const turn = (question.history?.length ?? 0) + 1
+/** Where a context item points, for the mock answer (`path:12`, `path:3-5` or `path`). */
+function contextWhere(item: ChatContextItem): string {
+  if (item.kind === 'line') return item.path + ':' + item.line
+  if (item.startLine === undefined || item.endLine === undefined) return item.path
+  return item.startLine === item.endLine
+    ? item.path + ':' + item.startLine
+    : item.path + ':' + item.startLine + '-' + item.endLine
+}
+
+/**
+ * Mock answer to a chat message (`chat:send`). It says how many context
+ * items came with the message so e2e can assert on it
+ * ("Mock answer with 2 context items.").
+ */
+export function chatAnswerSection(turn: ChatTurnInput): DidacticSection {
+  const count = turn.context.length
+  const followUp = turn.history.length + 1
   return {
     kind: 'summary',
     markdown:
-      'Mock answer for `' +
-      where +
-      '`: these lines are part of the change this PR makes. With a real AI provider, the ' +
-      'agent reads the file at the PR commit before answering your question.\n\n' +
-      (question.thread
-        ? 'You asked from a thread of ' +
-          question.thread.comments.length +
-          ' comment(s); the first one is by ' +
-          question.thread.comments[0].author +
-          '.\n\n'
+      'Mock answer with ' +
+      count +
+      (count === 1 ? ' context item.' : ' context items.') +
+      ' With a real AI provider, the agent reads the PR at its commit before answering your ' +
+      'message.\n\n' +
+      (count > 0
+        ? turn.context
+            .map((item) => '- `' + contextWhere(item) + '` (' + item.kind + ')')
+            .join('\n') + '\n\n'
         : '') +
-      (turn > 1 ? 'Follow-up ' + turn + ': the earlier answers came along as context.\n\n' : '') +
-      'Next step: compare them with the code that calls them, then decide whether they need a ' +
-      'comment.',
+      (followUp > 1
+        ? 'Follow-up ' + followUp + ': the earlier exchanges came along as context.\n\n'
+        : '') +
+      'Next step: compare the answer with the code, then decide whether it needs a review comment.',
   }
 }
 
