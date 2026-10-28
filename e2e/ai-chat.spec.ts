@@ -67,6 +67,19 @@ test('lines and a thread become chips, the answer streams in, and it can become 
   )
   await expect(window.getByTestId('ask-tab')).toContainText('Ask about this pull request')
 
+  // Real tabs: one Tab stop, arrows switch and move focus, the panel is labelled by its tab.
+  const askTab = window.getByRole('tab', { name: 'Ask', exact: true })
+  const analysisTab = window.getByRole('tab', { name: 'Analysis', exact: true })
+  await expect(analysisTab).toHaveAttribute('tabindex', '-1')
+  await askTab.focus()
+  await window.keyboard.press('ArrowRight')
+  await expect(analysisTab).toBeFocused()
+  await expect(analysisTab).toHaveAttribute('aria-selected', 'true')
+  await expect(window.getByRole('tabpanel', { name: 'Analysis' })).toBeVisible()
+  await window.keyboard.press('Home')
+  await expect(askTab).toBeFocused()
+  await expect(askTab).toHaveAttribute('aria-selected', 'true')
+
   // Two lines (one with a note) and the thread on line 16.
   await addLine(window, 12, 'Is the expiry check inclusive?')
   await addLine(window, 18, '')
@@ -105,8 +118,19 @@ test('lines and a thread become chips, the answer streams in, and it can become 
   await listToggle(window).click()
 
   // "Use as…": one target per item of the question; the line's composer opens with the answer.
-  await answer.getByRole('button', { name: 'Use as…' }).click()
-  await answer
+  // The menu (portaled to body, so the transcript's scroll never clips it)
+  // opens on its first item; Esc closes it and gives focus back to the trigger.
+  const useAs = answer.getByRole('button', { name: 'Use as…' })
+  const menu = window.getByRole('menu', { name: 'Use as…' })
+  await useAs.click()
+  await expect(menu.getByRole('menuitem').first()).toBeFocused()
+  await window.keyboard.press('Escape')
+  await expect(menu).toHaveCount(0)
+  await expect(useAs).toBeFocused()
+  await window.keyboard.press('ArrowDown')
+  await expect(menu.getByRole('menuitem').first()).toBeFocused()
+  await attachScreenshot(window, testInfo, 'chat-use-as-menu')
+  await menu
     .getByRole('menuitem', { name: 'Use as comment on src/services/coupon-service.ts:18' })
     .click()
   const draft = window.getByRole('textbox', { name: /Comment on line 18/ })

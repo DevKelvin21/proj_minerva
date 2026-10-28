@@ -116,6 +116,11 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
     .click()
   await expect(badge(window)).toHaveText('1', { timeout: 30_000 })
 
+  // The view switch says the count in words, like the rail (the badge itself is decorative).
+  await expect(viewSwitch(window).getByRole('button', { name: /^Inbox/ })).toHaveAccessibleName(
+    'Inbox: 1 unread',
+  )
+
   // Folded to the rail, the Inbox button carries the count.
   await window.getByTestId('sidebar-toggle').click()
   const railInbox = window.getByTestId('sidebar-rail').getByRole('button', { name: /^Inbox/ })

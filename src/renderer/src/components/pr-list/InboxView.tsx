@@ -21,6 +21,8 @@ import {
 import { formatAbsoluteTime, formatRelativeTime } from '../../lib/relative-time'
 import { useAppStore } from '../../stores/app-store'
 import { Avatar } from '../ui/Avatar'
+import { Button } from '../ui/Button'
+import { IconButton } from '../ui/IconButton'
 
 /** The unread mark: a small dot, nothing louder. */
 function UnreadDot({ unread }: { unread: boolean }): React.JSX.Element {
@@ -198,15 +200,12 @@ function GroupSection({
           <LoaderCircle size={13} className="mt-0.5 shrink-0 animate-spin text-muted" aria-hidden />
         )}
         {group.unreadCount > 0 && (
-          <button
-            type="button"
+          <IconButton
+            size="xs"
             onClick={() => onMarkRead(group)}
-            aria-label={t('layout.inbox.markPrRead', { number: group.number })}
-            title={t('layout.inbox.markPrRead', { number: group.number })}
-            className="shrink-0 rounded p-0.5 text-muted transition-colors duration-150 hover:bg-border/60 hover:text-text"
-          >
-            <CheckCheck size={13} aria-hidden />
-          </button>
+            label={t('layout.inbox.markPrRead', { number: group.number })}
+            icon={<CheckCheck size={13} aria-hidden />}
+          />
         )}
       </div>
       <ul>
@@ -245,14 +244,14 @@ export function InboxView(): React.JSX.Element {
         <span className="min-w-0 flex-1 truncate text-xs text-muted">
           {unread > 0 ? t('layout.inbox.unread', { count: unread }) : t('layout.inbox.allRead')}
         </span>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={() => void markRead({ all: true })}
           disabled={unread === 0}
-          className="shrink-0 rounded px-1.5 py-0.5 text-xs text-muted transition-colors duration-150 hover:text-text disabled:cursor-default disabled:opacity-50 disabled:hover:text-muted"
         >
           {t('layout.inbox.markAllRead')}
-        </button>
+        </Button>
       </div>
       {(error || openError) && (
         <p className="px-3 pt-2 text-xs text-danger">

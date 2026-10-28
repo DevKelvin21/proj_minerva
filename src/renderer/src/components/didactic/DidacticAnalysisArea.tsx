@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useRovingTabs } from '../../hooks/use-roving-tabs'
 import type { TFunction } from 'i18next'
 import {
   AlertTriangle,
@@ -64,6 +65,13 @@ function InsightTabStrip({
   onPick: (tab: InsightTab) => void
 }): React.JSX.Element | null {
   const { t } = useTranslation()
+  const baseId = useId()
+  const roving = useRovingTabs<InsightTab>({
+    keys: tabs,
+    value: active,
+    onChange: onPick,
+    tabId: (tab) => `${baseId}-insight-${tab}`,
+  })
   if (tabs.length < 2) return null
   return (
     <div
@@ -76,9 +84,7 @@ function InsightTabStrip({
         <button
           key={tab}
           type="button"
-          role="tab"
-          aria-selected={tab === active}
-          onClick={() => onPick(tab)}
+          {...roving.tabProps(tab)}
           className={`-mb-px whitespace-nowrap border-b-2 px-2.5 py-1.5 text-xs font-medium transition-colors duration-150 ${
             tab === active ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text'
           }`}

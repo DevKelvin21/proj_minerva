@@ -6,6 +6,9 @@ import type { RepoRef } from '../../../../shared/scm'
 import { useLocale } from '../../i18n/use-locale'
 import { formatAbsoluteTime, formatRelativeTime } from '../../lib/relative-time'
 import { useChatStore } from '../../stores/chat-store'
+import { Button } from '../ui/Button'
+import { CountBadge } from '../ui/CountBadge'
+import { IconButton } from '../ui/IconButton'
 
 interface ConversationSwitcherProps {
   repo: RepoRef
@@ -67,29 +70,22 @@ export function ConversationSwitcher({
               aria-label={t('chat.list.running')}
             />
           )}
-          {count > 0 && (
-            <span className="shrink-0 rounded-full bg-border/60 px-1.5 text-[10px] text-muted">
-              {count}
-            </span>
-          )}
+          {count > 0 && <CountBadge count={count} tone="neutral" />}
           <ChevronDown
             size={13}
             className={`ml-auto shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`}
             aria-hidden
           />
         </button>
-        <button
-          type="button"
+        <IconButton
+          size="sm"
           onClick={() => {
             setActive(prKey, null)
             setOpen(false)
           }}
-          aria-label={t('chat.list.new')}
-          title={t('chat.list.new')}
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-border/60 hover:text-text"
-        >
-          <Plus size={15} />
-        </button>
+          label={t('chat.list.new')}
+          icon={<Plus size={14} />}
+        />
       </div>
 
       {open && (
@@ -101,13 +97,9 @@ export function ConversationSwitcher({
           {error ? (
             <div role="alert" className="flex flex-col gap-1.5 p-3 text-xs text-danger">
               <p>{t('chat.list.loadError', { error })}</p>
-              <button
-                type="button"
-                onClick={() => void loadList(repo, number, true)}
-                className="w-fit rounded-md border border-border px-2 py-0.5 text-text hover:border-accent"
-              >
+              <Button size="xs" className="w-fit" onClick={() => void loadList(repo, number, true)}>
                 {t('common.retry')}
-              </button>
+              </Button>
             </div>
           ) : items === null || (loading && items.length === 0) ? (
             <p role="status" className="p-3 text-xs text-muted">
@@ -157,7 +149,7 @@ function ConversationRow({
     <li
       data-testid="chat-conversation"
       aria-current={active || undefined}
-      className={`group/conv flex min-w-0 items-start gap-1 px-2 py-1.5 ${active ? 'bg-accent/10' : 'hover:bg-border/40'}`}
+      className={`group/conv flex min-w-0 items-start gap-1 px-2 py-1.5 ${active ? 'bg-border/50' : 'hover:bg-border/40'}`}
     >
       <button
         type="button"
@@ -191,34 +183,29 @@ function ConversationRow({
       </button>
       {confirming ? (
         <span className="flex shrink-0 items-center gap-1 text-[11px]">
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="xs"
             onClick={() => {
               setConfirming(false)
               void remove(prKey, conversation.id)
             }}
-            className="rounded bg-danger/15 px-1.5 py-0.5 font-medium text-danger hover:bg-danger/25"
           >
             {t('chat.list.confirmDelete')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirming(false)}
-            className="rounded px-1.5 py-0.5 text-muted hover:text-text"
-          >
+          </Button>
+          <Button variant="ghost" size="xs" onClick={() => setConfirming(false)}>
             {t('common.cancel')}
-          </button>
+          </Button>
         </span>
       ) : (
-        <button
-          type="button"
+        <IconButton
+          size="xs"
           onClick={() => setConfirming(true)}
-          aria-label={t('chat.list.delete', { title: conversation.title })}
+          label={t('chat.list.delete', { title: conversation.title })}
           title={t('chat.list.deleteTitle')}
-          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-danger focus:opacity-100 group-hover/conv:opacity-100"
-        >
-          <Trash2 size={12} />
-        </button>
+          icon={<Trash2 size={12} />}
+          className="opacity-0 focus:opacity-100 group-hover/conv:opacity-100"
+        />
       )}
     </li>
   )

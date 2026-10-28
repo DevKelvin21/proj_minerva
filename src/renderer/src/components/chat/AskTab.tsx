@@ -6,6 +6,7 @@ import { useChatStore } from '../../stores/chat-store'
 import { ChatComposer } from './ChatComposer'
 import { ChatTranscript } from './ChatTranscript'
 import { ConversationSwitcher } from './ConversationSwitcher'
+import { IconButton } from '../ui/IconButton'
 
 interface AskTabProps {
   repo: RepoRef
@@ -48,7 +49,7 @@ function ChatEmptyState(): React.JSX.Element {
   const { t } = useTranslation()
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-y-auto px-6 text-center">
-      <Sparkles size={22} className="text-accent" aria-hidden />
+      <Sparkles size={22} className="text-muted" aria-hidden />
       <p className="text-sm font-medium text-text">{t('chat.empty.title')}</p>
       <p className="max-w-xs text-xs text-muted">{t('chat.empty.hint')}</p>
     </div>
@@ -66,15 +67,12 @@ function ChatError({ prKey }: { prKey: string }): React.JSX.Element | null {
       className="flex shrink-0 items-start gap-2 border-t border-border bg-danger/10 px-3 py-1.5 text-xs text-danger"
     >
       <p className="min-w-0 flex-1 break-words">{error}</p>
-      <button
-        type="button"
+      <IconButton
+        size="xs"
         onClick={() => dismissError(prKey)}
-        aria-label={t('common.dismiss')}
-        title={t('common.dismiss')}
-        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded hover:bg-danger/20"
-      >
-        <X size={11} />
-      </button>
+        label={t('common.dismiss')}
+        icon={<X size={12} />}
+      />
     </div>
   )
 }

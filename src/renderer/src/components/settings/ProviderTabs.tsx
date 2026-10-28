@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AI_PROVIDER_IDS } from '../../../../shared/ai-providers'
+import { useRovingTabs } from '../../hooks/use-roving-tabs'
 import type { AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
 
@@ -28,23 +29,18 @@ interface ProviderTabsProps {
  * `AiProviderStatus.status`) y un check (`lucide-react`) SOLO en el tab del
  * proveedor ACTIVO (`info.provider`), sin importar cuál se esté viendo.
  *
- * Patrón `tablist` con activación automática (WAI-ARIA APG): además de
- * Tab/Enter para llegar y entrar al grupo, ArrowLeft/ArrowRight mueven el
- * foco Y cambian la vista al tab vecino (con wrap-around); roving
- * `tabIndex` (0 en el tab visto, -1 en el resto) para que Tab salga del
- * grupo en un solo salto.
+ * Keyboard: `useRovingTabs` (one Tab stop, Left/Right switch with
+ * wrap-around, Home/End), shared with the AI panel's tabs.
  */
 export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsProps): React.JSX.Element {
   const { t } = useTranslation()
-  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number): void {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-    event.preventDefault()
-    const delta = event.key === 'ArrowRight' ? 1 : -1
-    const nextIndex = (index + delta + AI_PROVIDER_IDS.length) % AI_PROVIDER_IDS.length
-    const nextProvider = AI_PROVIDER_IDS[nextIndex]
-    onChange(nextProvider)
-    document.getElementById('settings-tab-' + nextProvider)?.focus()
-  }
+  const tabs = useRovingTabs<AiProviderId>({
+    keys: AI_PROVIDER_IDS,
+    value: viewed,
+    onChange,
+    tabId: (provider) => 'settings-tab-' + provider,
+    panelId: (provider) => 'settings-tabpanel-' + provider,
+  })
 
   return (
     // `overflow-x-auto` + tabs `shrink-0` (F16/T81): con el modal angosto los
@@ -54,7 +50,7 @@ export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsP
       aria-label={t('settings.providerTabs.ariaLabel')}
       className="flex overflow-x-auto border-b border-border bg-panel px-2"
     >
-      {AI_PROVIDER_IDS.map((provider, index) => {
+      {AI_PROVIDER_IDS.map((provider) => {
         const entry = info.catalog[provider]
         const status = statuses?.[provider]
         const isViewed = viewed === provider
@@ -63,15 +59,9 @@ export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsP
         return (
           <button
             key={provider}
-            id={'settings-tab-' + provider}
             type="button"
-            role="tab"
-            aria-selected={isViewed}
-            aria-controls={'settings-tabpanel-' + provider}
-            tabIndex={isViewed ? 0 : -1}
+            {...tabs.tabProps(provider)}
             autoFocus={isViewed}
-            onClick={() => onChange(provider)}
-            onKeyDown={(event) => handleKeyDown(event, index)}
             className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-sm transition-colors duration-150 ${
               isViewed ? '-mb-px border-b-2 border-accent text-text' : 'text-muted hover:text-text'
             }`}

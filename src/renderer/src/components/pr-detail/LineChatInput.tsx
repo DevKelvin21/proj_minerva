@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Sparkles, X } from 'lucide-react'
 import { MAX_CHAT_CONTEXT_ITEMS, MAX_CHAT_NOTE_LEN } from '../../../../shared/chat'
 import type { LineSide } from '../../lib/line-threads'
+import { Button } from '../ui/Button'
+import { IconButton } from '../ui/IconButton'
 
 interface LineChatInputProps {
   line: number
@@ -41,7 +43,7 @@ export function LineChatInput({
   return (
     <div
       data-testid="line-chat-input"
-      className="border-y border-accent/30 bg-bg px-2 py-1.5 font-sans"
+      className="border-y border-border bg-bg px-2 py-1.5 font-sans"
     >
       <form
         className="flex min-w-0 items-center gap-2"
@@ -50,7 +52,7 @@ export function LineChatInput({
           add()
         }}
       >
-        <Sparkles size={13} className="shrink-0 text-accent" aria-hidden />
+        <Sparkles size={13} className="shrink-0 text-muted" aria-hidden />
         <input
           autoFocus
           type="text"
@@ -71,21 +73,10 @@ export function LineChatInput({
           placeholder={t('chat.line.placeholder')}
           className="min-w-0 flex-1 rounded-md border border-border bg-panel px-2 py-1 text-sm text-text placeholder:text-muted focus:border-accent"
         />
-        <button
-          type="submit"
-          className="shrink-0 rounded-md bg-accent px-2.5 py-1 text-xs font-semibold text-accent-fg"
-        >
+        <Button type="submit" variant="primary" size="xs">
           {initialNote !== undefined ? t('chat.line.update') : t('chat.line.add')}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t('common.close')}
-          title={t('common.close')}
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted hover:bg-border/60 hover:text-text"
-        >
-          <X size={14} />
-        </button>
+        </Button>
+        <IconButton size="xs" onClick={onClose} label={t('common.close')} icon={<X size={13} />} />
       </form>
       {full && (
         <p role="alert" className="mt-1 text-xs text-danger">

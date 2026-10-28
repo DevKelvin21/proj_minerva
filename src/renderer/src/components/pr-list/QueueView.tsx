@@ -13,6 +13,7 @@ import {
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { useAppStore } from '../../stores/app-store'
 import { PrListItem } from './PrListItem'
+import { CountBadge } from '../ui/CountBadge'
 
 const STATUS_TONE: Record<Exclude<QueueStatus, null>, string> = {
   optional: 'bg-border/60 text-muted',
@@ -127,13 +128,11 @@ export function QueueView(): React.JSX.Element {
                 <ChevronDown size={13} aria-hidden />
               )}
               <span className="min-w-0 flex-1 truncate">{t(`layout.queue.section.${section}`)}</span>
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
-                  section === 'needsReview' ? 'bg-accent text-accent-fg' : 'bg-border/60 text-muted'
-                }`}
-              >
-                {entries.length}
-              </span>
+              <CountBadge
+                count={entries.length}
+                tone={section === 'needsReview' ? 'accent' : 'neutral'}
+                aria-hidden={false}
+              />
             </button>
             {!isFolded && (
               <ul>

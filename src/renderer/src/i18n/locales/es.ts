@@ -153,8 +153,6 @@ export const es: MessageShape<typeof en> = {
       noMatches: 'Ninguna actividad coincide con "{{query}}".',
     },
     queue: {
-      toReview_one: '{{count}} pull request espera tu revisión',
-      toReview_other: '{{count}} pull requests esperan tu revisión',
       loadFailed: 'No se pudo cargar la cola: {{error}}',
       empty: 'No hay pull requests abiertos en tu alcance.',
       section: {
@@ -208,8 +206,6 @@ export const es: MessageShape<typeof en> = {
         stacks: 'Stacks',
         inbox: 'Bandeja',
       },
-      orphans_one: '{{count}} PR huérfano',
-      orphans_other: '{{count}} PRs huérfanos',
       refresh: 'Actualizar',
       stateFilter: {
         open: 'Abiertos',

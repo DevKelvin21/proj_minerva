@@ -10,16 +10,23 @@ const toneClasses: Record<BadgeTone, string> = {
   warning: 'bg-warning/15 text-warning',
 }
 
+const sizeClasses = {
+  sm: 'px-1.5 text-[10px] leading-4',
+  md: 'px-2 py-0.5 text-xs',
+}
+
 interface BadgeProps {
   children: ReactNode
   tone?: BadgeTone
   icon?: ReactNode
+  /** `sm` fits inside a chip or a dense row. */
+  size?: keyof typeof sizeClasses
 }
 
-export function Badge({ children, tone = 'neutral', icon }: BadgeProps): React.JSX.Element {
+export function Badge({ children, tone = 'neutral', icon, size = 'md' }: BadgeProps): React.JSX.Element {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${toneClasses[tone]}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full font-medium ${sizeClasses[size]} ${toneClasses[tone]}`}
     >
       {icon}
       {children}

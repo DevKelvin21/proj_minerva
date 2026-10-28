@@ -4,6 +4,8 @@ import type { ChatContextItem } from '../../../../shared/chat'
 import { contextItemLocation, diffSide } from '../../lib/chat-context'
 import { useAppStore } from '../../stores/app-store'
 import { widthTier } from '../../lib/layout'
+import { Badge } from '../ui/Badge'
+import { IconButton } from '../ui/IconButton'
 
 interface ContextChipProps {
   item: ChatContextItem
@@ -50,9 +52,9 @@ export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Ele
       className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1 text-xs"
     >
       {item.kind === 'line' ? (
-        <Code2 size={12} className="shrink-0 text-accent" aria-hidden />
+        <Code2 size={12} className="shrink-0 text-muted" aria-hidden />
       ) : (
-        <MessageSquare size={12} className="shrink-0 text-accent" aria-hidden />
+        <MessageSquare size={12} className="shrink-0 text-muted" aria-hidden />
       )}
       <button
         type="button"
@@ -63,9 +65,9 @@ export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Ele
         {label}
       </button>
       {item.kind === 'thread' && item.outdated && (
-        <span className="shrink-0 rounded bg-warning/15 px-1 text-[10px] text-warning">
+        <Badge tone="warning" size="sm">
           {t('chat.chip.outdated')}
-        </span>
+        </Badge>
       )}
       {text && (
         <span className="min-w-0 flex-1 truncate text-muted" title={text}>
@@ -73,15 +75,13 @@ export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Ele
         </span>
       )}
       {onRemove && (
-        <button
-          type="button"
+        <IconButton
+          size="xs"
           onClick={onRemove}
-          aria-label={t('chat.chip.remove', { location })}
-          title={t('chat.chip.remove', { location })}
-          className="ml-auto inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted hover:bg-border/60 hover:text-text"
-        >
-          <X size={11} />
-        </button>
+          label={t('chat.chip.remove', { location })}
+          icon={<X size={12} />}
+          className="ml-auto"
+        />
       )}
     </div>
   )

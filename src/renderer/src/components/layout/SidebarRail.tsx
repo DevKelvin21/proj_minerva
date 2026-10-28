@@ -8,6 +8,7 @@ import { countOrphans } from '../../lib/stacks'
 import { MOD_KEY_LABEL } from '../../lib/platform'
 import { useAppStore, type SidebarView } from '../../stores/app-store'
 import { useStacksStore } from '../../stores/stacks-store'
+import { CountBadge } from '../ui/CountBadge'
 
 const VIEW_ICON: Record<SidebarView, React.JSX.Element> = {
   queue: <ListTodo size={18} aria-hidden />,
@@ -73,14 +74,7 @@ export function SidebarRail(): React.JSX.Element {
           >
             {VIEW_ICON[view]}
             {badge[view] > 0 && (
-              <span
-                aria-hidden
-                className={`absolute right-0.5 top-0.5 min-w-4 rounded-full px-1 text-center text-[9px] font-bold leading-4 ring-2 ring-panel ${
-                  view === 'stacks' ? 'bg-warning text-bg' : 'bg-accent text-accent-fg'
-                }`}
-              >
-                {badge[view]}
-              </span>
+              <CountBadge count={badge[view]} tone={view === 'stacks' ? 'warning' : 'accent'} overlay />
             )}
           </button>
         )

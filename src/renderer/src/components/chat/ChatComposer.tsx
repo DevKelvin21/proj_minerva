@@ -4,6 +4,7 @@ import { MAX_CHAT_CONTEXT_ITEMS, MAX_CHAT_MESSAGE_LEN } from '../../../../shared
 import type { RepoRef } from '../../../../shared/scm'
 import { isConversationBusy, useChatDraft, useChatStore } from '../../stores/chat-store'
 import { ContextChip } from './ContextChip'
+import { IconButton } from '../ui/IconButton'
 
 interface ChatComposerProps {
   repo: RepoRef
@@ -90,25 +91,21 @@ export function ChatComposer({
           className="max-h-48 min-h-[2.5rem] min-w-0 flex-1 resize-none bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
         />
         {busy && conversationId ? (
-          <button
-            type="button"
+          <IconButton
+            size="sm"
             onClick={() => void cancel(prKey, conversationId)}
-            aria-label={t('chat.composer.stop')}
-            title={t('chat.composer.stop')}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-text hover:border-danger hover:text-danger"
-          >
-            <Square size={12} fill="currentColor" />
-          </button>
+            label={t('chat.composer.stop')}
+            icon={<Square size={12} fill="currentColor" />}
+          />
         ) : (
-          <button
+          <IconButton
             type="submit"
+            size="sm"
+            tone="primary"
             disabled={!canSend}
-            aria-label={t('chat.composer.send')}
-            title={t('chat.composer.send')}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent text-accent-fg transition-opacity duration-150 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ArrowUp size={15} />
-          </button>
+            label={t('chat.composer.send')}
+            icon={<ArrowUp size={15} />}
+          />
         )}
       </div>
       <p className="truncate text-[11px] text-muted">
