@@ -362,6 +362,7 @@ export const en = {
       treeView: 'Tree view',
       listView: 'List view',
       layersView: 'Layers view (guided walkthrough)',
+      drawerLabel: 'Changed files',
     },
     layers: {
       verdict: {

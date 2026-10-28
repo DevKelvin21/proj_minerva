@@ -3,6 +3,8 @@ import {
   clampDidacticWidth,
   clampSidebarWidth,
   dockedSidebarWidth,
+  DRAWER_WIDTH,
+  drawerWidth,
   SIDEBAR_MIN_WIDTH,
   SIDEBAR_RAIL_WIDTH,
   sidebarFootprint,
@@ -43,5 +45,20 @@ describe('clampDidacticWidth', () => {
     expect(clampDidacticWidth(2000, 1600)).toBe(900)
     expect(clampDidacticWidth(2000, 1600, 480)).toBe(700)
     expect(clampDidacticWidth(2000, 1600, SIDEBAR_RAIL_WIDTH)).toBe(960)
+  })
+})
+
+describe('drawerWidth', () => {
+  it('keeps the preferred width while the container has room', () => {
+    expect(drawerWidth(DRAWER_WIDTH.sidebar, 900)).toBe(300)
+  })
+
+  it('never covers more than 85% of its container', () => {
+    expect(drawerWidth(DRAWER_WIDTH.didactic, 400)).toBe(340)
+    expect(drawerWidth(DRAWER_WIDTH.files, 280)).toBe(238)
+  })
+
+  it('uses the preferred width before the container is measured', () => {
+    expect(drawerWidth(DRAWER_WIDTH.files, null)).toBe(260)
   })
 })

@@ -28,6 +28,8 @@
   --color-info: var(--theme-info);
   --color-diff-add: color-mix(in oklab, var(--theme-success) var(--diff-mix), var(--theme-canvas));
   --color-diff-del: color-mix(in oklab, var(--theme-error) var(--diff-mix), var(--theme-canvas));
+  /* Behind dialogs and drawers (`ui/Scrim`): the canvas pushed toward black, so it keeps the theme's hue. */
+  --color-scrim: color-mix(in oklab, var(--theme-canvas) 35%, black);
 }
 
 /*
@@ -193,5 +195,13 @@ body {
 }
 
 .app-drag :is(button, a, input, select, textarea, [role='button'], [data-no-drag]) {
+  -webkit-app-region: no-drag;
+}
+
+/*
+ * A window-wide overlay (`ui/Dialog`) paints over the title bar: without
+ * this, a click on its scrim there would move the window instead of closing it.
+ */
+.app-no-drag {
   -webkit-app-region: no-drag;
 }

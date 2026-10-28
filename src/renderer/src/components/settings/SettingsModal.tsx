@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useSettings } from '../../hooks/use-settings'
@@ -7,7 +6,7 @@ import { useProviderStatus } from '../../hooks/use-provider-status'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import type { AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
-import { IconButton } from '../ui/IconButton'
+import { Dialog } from '../ui/Dialog'
 import { ActiveConfigSummary } from './ActiveConfigSummary'
 import { SourceControlSection } from './SourceControlSection'
 import { ProviderTabs } from './ProviderTabs'
@@ -35,8 +34,8 @@ import { AppearanceSection } from './appearance/AppearanceSection'
  * automática la próxima vez que se abra — el mismo patrón de "resetear vía
  * remount" que usa `DidacticPanel` con `useDidacticAnalysis`.
  *
- * Cierra con Esc o con un clic fuera de la card (el overlay tiene el
- * `onClick`; la card detiene la propagación).
+ * The shell is `ui/Dialog`: Esc or a click on the scrim closes it, focus
+ * stays inside while it is open and returns to the opener on close.
  *
  * Responsive (F16/T80) — el modal era el peor caso reportado por Edilson:
  * antes SOLO `ProviderModelPanel` vivía dentro de un `overflow-y-auto`, así que
@@ -62,16 +61,6 @@ export function SettingsModal(): React.JSX.Element {
   const { info, error, selectProvider, saveModel, setModelOption } = useSettings()
   const providerStatus = useProviderStatus()
   const tier = useLayoutTier()
-  const cardRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.key === 'Escape') closeSettings()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [closeSettings])
-
   const isSheet = tier.h === 'xshort'
   const twoColumn = tier.width >= 980
   const sizeClass = isSheet
@@ -79,47 +68,29 @@ export function SettingsModal(): React.JSX.Element {
     : 'h-[min(88vh,700px)] w-full ' + (twoColumn ? 'max-w-[900px]' : 'max-w-lg')
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4"
-      onClick={closeSettings}
+    <Dialog
+      onClose={closeSettings}
+      title={t('settings.modal.title')}
+      closeLabel={t('settings.modal.close')}
+      className={sizeClass}
     >
-      <div
-        ref={cardRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal-title"
-        onClick={(e) => e.stopPropagation()}
-        className={
-          'flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl outline-none ' +
-          sizeClass
-        }
-      >
-        <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
-          <h2 id="settings-modal-title" className="text-sm font-semibold text-text">
-            {t('settings.modal.title')}
-          </h2>
-          <IconButton icon={<X size={16} />} label={t('settings.modal.close')} onClick={closeSettings} />
-        </header>
-
-        {info === null ? (
-          <p className="p-4 text-xs text-muted">{t('common.loading')}</p>
-        ) : (
-          <SettingsModalBody
-            info={info}
-            error={error}
-            statuses={providerStatus.statuses}
-            statusLoading={providerStatus.loading}
-            onRefetchStatus={providerStatus.refetch}
-            selectProvider={selectProvider}
-            saveModel={saveModel}
-            setModelOption={setModelOption}
-            twoColumn={twoColumn}
-            compact={tier.h !== 'tall'}
-          />
-        )}
-      </div>
-    </div>
+      {info === null ? (
+        <p className="p-4 text-xs text-muted">{t('common.loading')}</p>
+      ) : (
+        <SettingsModalBody
+          info={info}
+          error={error}
+          statuses={providerStatus.statuses}
+          statusLoading={providerStatus.loading}
+          onRefetchStatus={providerStatus.refetch}
+          selectProvider={selectProvider}
+          saveModel={saveModel}
+          setModelOption={setModelOption}
+          twoColumn={twoColumn}
+          compact={tier.h !== 'tall'}
+        />
+      )}
+    </Dialog>
   )
 }
 
@@ -194,7 +165,12 @@ function SettingsModalBody({
       */}
       <div className="sticky top-0 z-10 bg-panel">
         <ActiveConfigSummary info={info} statuses={statuses} compact={compact} />
-        <ProviderTabs info={info} statuses={statuses} viewed={viewedProvider} onChange={setViewedProvider} />
+        <ProviderTabs
+          info={info}
+          statuses={statuses}
+          viewed={viewedProvider}
+          onChange={setViewedProvider}
+        />
       </div>
       <ProviderModelPanel
         key={viewedProvider}
