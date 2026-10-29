@@ -18,17 +18,22 @@ export interface FileContentKey {
   headSha: string
   path: string
   side: FileContentSide
+  /** With `side: 'head'`: this PR commit instead of the head (a thread's origin). */
+  commit?: string
 }
 
 const MAX_ENTRIES = 40
 const cache = new Map<string, Promise<FileContent>>()
 
-function cacheKey(key: FileContentKey): string {
-  return [prKey(key.repo, key.number), key.headSha, key.side, key.path].join('\u0000')
+/** Identity of a file read: PR, head, side, path and commit (when reading at one). */
+export function fileContentKeyId(key: FileContentKey): string {
+  return [prKey(key.repo, key.number), key.headSha, key.side, key.path, key.commit ?? ''].join(
+    '\u0000',
+  )
 }
 
 export function loadFileContent(key: FileContentKey): Promise<FileContent> {
-  const id = cacheKey(key)
+  const id = fileContentKeyId(key)
   const hit = cache.get(id)
   if (hit) {
     // Refresh LRU position.
@@ -41,6 +46,7 @@ export function loadFileContent(key: FileContentKey): Promise<FileContent> {
     number: key.number,
     path: key.path,
     side: key.side,
+    ...(key.commit ? { commit: key.commit } : {}),
   })
   cache.set(id, request)
   request.catch(() => {

@@ -511,6 +511,9 @@ export const es: MessageShape<typeof en> = {
       notInDiff: 'no está en el diff',
       notInDiffTitle:
         'El archivo no está en la lista de archivos de este pull request (puede estar limitada o venir de un push anterior)',
+      removed: 'eliminado en un push posterior',
+      removedInPush: 'eliminado en el push {{push}}',
+      removedTitle: 'El archivo ya no existe en la última versión de este pull request',
     },
     thread: {
       fileComment: 'Comentario de archivo',
@@ -555,7 +558,27 @@ export const es: MessageShape<typeof en> = {
       outdatedNote:
         'Este comentario se dejó en una versión anterior del archivo. El código de abajo es de la versión más reciente alrededor de la línea {{line}}; puede haber cambiado desde entonces.',
       loading: 'Cargando código…',
-      loadError: 'No se pudo cargar el código: {{error}}',
+      loadError: 'No se pudo cargar el código.',
+      loadPushError: 'No se pudo cargar el push {{index}} de este archivo.',
+      loadCommitError: 'No se pudo cargar este archivo en el commit {{commit}}.',
+      missingAtPush: 'Este archivo no existe en el push {{index}}.',
+      missingAtCommit: 'Este archivo no existe en el commit {{commit}}.',
+      missingLatest: 'Este archivo ya no existe en la última versión.',
+      pastEndCommented: 'La línea {{line}} está más allá del final del archivo en esa versión.',
+      versions: 'Qué versión',
+      asCommented: 'Como se comentó',
+      latest: 'Última',
+      latestGone: 'El archivo ya no existe en la última versión.',
+      latestGoneInPush: 'Eliminado en el push {{push}}.',
+      pushOf: 'push {{index}} de {{total}}',
+      commitAt: 'commit <commit/>',
+      commentedAt: 'Código del <at/>, cuando se hizo este comentario.',
+      commentedAtRemoved:
+        'Código del <at/>, cuando se hizo este comentario. El archivo se eliminó en un push posterior.',
+      commentedAtRemovedInPush:
+        'Código del <at/>, cuando se hizo este comentario. El archivo se eliminó en el push {{push}}.',
+      latestAround:
+        'Última versión, alrededor de la línea {{line}}. El comentario se hizo en el <at/>.',
       pastEndBase:
         'La línea {{line}} está más allá del final del archivo en su versión base (antes del cambio).',
       pastEndLatest:
