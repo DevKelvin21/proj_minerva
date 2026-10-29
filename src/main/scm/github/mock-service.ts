@@ -50,6 +50,10 @@ interface PrRecord {
   detail: PullRequestDetail
   files: DiffFile[]
   threads: CommentThread[]
+  commitFiles: Record<string, Record<string, string>>
+  headFiles: Record<string, string>
+  /** Paths whose next read at a commit fails once (then succeed). */
+  failNextCommitRead: Set<string>
 }
 
 /** Ids of the scripted incoming comment (`simulateIncomingComment`). */
@@ -140,6 +144,9 @@ export class MockGithubService implements ScmDataSource {
       this.records.set(prKey(detail.repo, detail.number), {
         detail: { ...detail },
         files: fixture.files.map((file) => ({ ...file })),
+        commitFiles: fixture.commitFiles ?? {},
+        headFiles: fixture.headFiles ?? {},
+        failNextCommitRead: new Set(fixture.failFirstCommitRead ?? []),
         threads: fixture.threads.map((thread) => ({
           ...thread,
           comments: thread.comments.map((comment) => ({
@@ -315,10 +322,28 @@ export class MockGithubService implements ScmDataSource {
    * Head side: the file from the snapshot fixture. Base side: the same text
    * (the fixtures carry no separate base tree), except for added files,
    * which do not exist there. Good enough for the demo's context excerpts.
+   * `commit`: only an older commit the fixture lists (`commitFiles`), like the
+   * real service refuses a commit that is not the PR's.
    */
   async getFileContent(req: FileContentRequest): Promise<FileContent> {
     await delay(LATENCY_MS.getPullRequestDetail)
     const record = this.getRecord(req.repo, req.number)
+    if (req.commit !== undefined) {
+      const files = Object.hasOwn(record.commitFiles, req.commit.toLowerCase())
+        ? record.commitFiles[req.commit.toLowerCase()]
+        : null
+      if (!files) throw new ScmError('NOT_FOUND', mt('scm.commitNotInPr'))
+      if (record.failNextCommitRead.delete(req.path)) {
+        throw new ScmError('NETWORK', mt('github.unreachable', { error: 'ECONNRESET' }))
+      }
+      if (!Object.hasOwn(files, req.path)) {
+        throw new ScmError('NOT_FOUND', mt('scm.fileNotAtVersion', { path: req.path }))
+      }
+      return { content: files[req.path], isBinary: false, tooLarge: false }
+    }
+    if (req.side === 'head' && Object.hasOwn(record.headFiles, req.path)) {
+      return { content: record.headFiles[req.path], isBinary: false, tooLarge: false }
+    }
     const diffFile = record.files.find((file) => file.path === req.path)
     if (req.side === 'base' && diffFile?.status === 'added') {
       throw new ScmError('NOT_FOUND', mt('github.mockMissingAtBase', { path: req.path }))
@@ -328,7 +353,7 @@ export class MockGithubService implements ScmDataSource {
     }
     const files = snapshotFixturesByRepo[req.repo.fullName] ?? genericSnapshotFixture
     const file = files.find((entry) => entry.path === req.path)
-    if (!file) throw new ScmError('NOT_FOUND', mt('github.mockFileNotFound', { path: req.path }))
+    if (!file) throw new ScmError('NOT_FOUND', mt('scm.fileNotAtVersion', { path: req.path }))
     return { content: file.content, isBinary: false, tooLarge: false }
   }
 

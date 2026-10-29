@@ -107,6 +107,7 @@ import {
   mapThread,
   mapUser,
   threadAnchor,
+  threadOrigin,
   threadStatusToAzure,
   toAzurePath,
   toRepoPath,
@@ -261,6 +262,16 @@ function latestIteration(iterations: AzIteration[]): AzIteration | null {
   let best: AzIteration | null = null
   for (const iteration of iterations) if (!best || iteration.id > best.id) best = iteration
   return best
+}
+
+/** Iteration id -> its source (PR head) commit, for `threadOrigin`. */
+function iterationCommits(iterations: AzIteration[]): Map<number, string> {
+  const commits = new Map<number, string>()
+  for (const iteration of iterations) {
+    const commit = iteration.sourceRefCommit?.commitId
+    if (commit && COMMIT_SHA_RE.test(commit)) commits.set(iteration.id, commit.toLowerCase())
+  }
+  return commits
 }
 
 function matchesSearch(pr: PullRequestSummary, search: string): boolean {
@@ -972,19 +983,24 @@ export class AzureScmProvider implements ScmProvider {
     thread: AzThread,
     repo: AzureRepoRef,
     number: number,
-    latest: number | null,
+    iterations: AzIteration[],
     paths: ReadonlySet<string> | null,
     viewerId: string | null = null,
   ): CommentThread | null {
     const mapped = mapThread(thread, repo, number, viewerId)
     if (!mapped) return null
+    const latest = latestIteration(iterations)?.id ?? null
     if (isThreadOutdated(mapped, threadAnchor(thread), latest, paths)) mapped.isOutdated = true
+    const origin = threadOrigin(thread, mapped, iterationCommits(iterations), latest)
+    if (origin) mapped.origin = origin
     return mapped
   }
 
   async getCommentThreads(repoRef: RepoRef, number: number): Promise<CommentThread[]> {
     const repo = this.scoped(repoRef)
-    const latest = await this.requireLatestIteration(repo, number)
+    const iterations = await this.iterations(repo, number)
+    const latest = latestIteration(iterations)
+    if (!latest) throw new ScmError('NOT_FOUND', mt('azure.noIterations', { number }))
     const [threads, iteration, me] = await Promise.all([
       this.threadsAt(repo, number, latest.id),
       this.iterationChanges(repo, number, latest.id).catch(() => null),
@@ -993,7 +1009,7 @@ export class AzureScmProvider implements ScmProvider {
     ])
     const paths = AzureScmProvider.knownPaths(iteration)
     return threads
-      .map((thread) => this.finishThread(thread, repo, number, latest.id, paths, me?.id))
+      .map((thread) => this.finishThread(thread, repo, number, iterations, paths, me?.id))
       .filter((thread): thread is CommentThread => thread !== null)
   }
 
@@ -1073,7 +1089,8 @@ export class AzureScmProvider implements ScmProvider {
       method: 'PATCH',
       body: { status: threadStatusToAzure(req.status) },
     })
-    const latest = latestIteration(await this.iterations(repo, req.number))
+    const iterations = await this.iterations(repo, req.number)
+    const latest = latestIteration(iterations)
     const thread = await this.client.json<AzThread>(repo.organization, url, {
       query: latest ? { $iteration: latest.id, $baseIteration: 0 } : undefined,
     })
@@ -1081,17 +1098,31 @@ export class AzureScmProvider implements ScmProvider {
       ? this.iterationFiles.get(prKey(repo, req.number) + '@' + latest.id)
       : undefined
     const paths = AzureScmProvider.knownPaths(cached)
-    const mapped = this.finishThread(thread, repo, req.number, latest?.id ?? null, paths)
+    const mapped = this.finishThread(thread, repo, req.number, iterations, paths)
     if (!mapped) throw new ScmError('NOT_FOUND', mt('scm.threadNotFound', { id: req.threadId }))
     return mapped
   }
 
+  /**
+   * `req.commit` (a thread origin) must be the source commit of one of this
+   * PR's iterations: the only commits `threadOrigin` reports, so a forged one
+   * never reaches the items API. A file missing at that version is a
+   * one-sentence `NOT_FOUND` (Azure's own text, TF401174 + URL, stays out).
+   */
   async getFileContent(req: FileContentRequest): Promise<FileContent> {
     const repo = this.scoped(req.repo)
-    const latest = await this.requireLatestIteration(repo, req.number)
+    const iterations = await this.iterations(repo, req.number)
+    const latest = latestIteration(iterations)
+    if (!latest) throw new ScmError('NOT_FOUND', mt('azure.noIterations', { number: req.number }))
+    if (req.commit !== undefined) {
+      const wanted = req.commit.toLowerCase()
+      if (![...iterationCommits(iterations).values()].includes(wanted)) {
+        throw new ScmError('NOT_FOUND', mt('scm.commitNotInPr'))
+      }
+    }
     const commit =
       req.side === 'head'
-        ? latest.sourceRefCommit?.commitId
+        ? (req.commit ?? latest.sourceRefCommit?.commitId)
         : (latest.commonRefCommit?.commitId ?? latest.targetRefCommit?.commitId)
     if (!commit || !COMMIT_SHA_RE.test(commit)) {
       throw new ScmError(
@@ -1114,6 +1145,9 @@ export class AzureScmProvider implements ScmProvider {
     } catch (error) {
       if (error instanceof AzureTooLargeError) {
         return { content: null, isBinary: false, tooLarge: true }
+      }
+      if (toScmError(error).code === 'NOT_FOUND') {
+        throw new ScmError('NOT_FOUND', mt('scm.fileNotAtVersion', { path: req.path }))
       }
       throw error
     }

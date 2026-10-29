@@ -738,6 +738,16 @@ describe('payloadValidators', () => {
       expect(validate({ ...base, side: 'LEFT' })).toBe(false)
       expect(validate({ ...base, path: 'x'.repeat(501) })).toBe(false)
     })
+
+    it('takes a full hex commit on the head side only', () => {
+      const commit = 'a'.repeat(40)
+      expect(validate({ ...base, commit })).toBe(true)
+      expect(validate({ ...base, commit: 'ABCDEF0123'.repeat(4) })).toBe(true)
+      expect(validate({ ...base, side: 'base', commit })).toBe(false)
+      for (const bad of ['a'.repeat(39), 'a'.repeat(41), 'g'.repeat(40), 'HEAD', 'main', '', 7]) {
+        expect(validate({ ...base, commit: bad })).toBe(false)
+      }
+    })
   })
 
   describe('scm:retarget', () => {

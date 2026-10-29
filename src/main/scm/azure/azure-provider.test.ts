@@ -20,7 +20,7 @@ import { AzureDevOpsClient, type CredentialProvider } from './client'
 import { AzureScmError } from './errors'
 import { createFakeAzureServer, type FakeAzureServer } from './fixtures/fake-server'
 import { buildZip } from './fixtures/test-zip'
-import { MOCK_ORG, MOCK_PROJECT, PEOPLE, REPOS } from './fixtures/universe'
+import { ITERATIONS, MOCK_ORG, MOCK_PROJECT, PEOPLE, REPOS } from './fixtures/universe'
 import type { AzChangeEntry, AzThread } from './api-types'
 import type { DiffBudget } from './diff-files'
 import { mapRepo } from './mappers'
@@ -700,6 +700,21 @@ describe('threads', () => {
     expect(threads.find((thread) => thread.id === '1')?.isOutdated).toBeUndefined()
     expect(threads.find((thread) => thread.id === '2')?.isOutdated).toBe(true)
   })
+
+  it('says where each line thread was written: the push, its commit and its lines', async () => {
+    const threads = await provider().getCommentThreads(apiRepo, 102)
+    const [first, second] = ITERATIONS[102].map((it) => it.sourceRefCommit?.commitId)
+    const byId = (id: string) => threads.find((thread) => thread.id === id)
+    expect(byId('1')?.origin).toEqual({ commit: second, line: 12, push: { index: 2, total: 2 } })
+    expect(byId('2')?.origin).toEqual({ commit: first, line: 17, push: { index: 1, total: 2 } })
+    // On a file push 1 added and push 2 removed: outdated, with its origin.
+    expect(byId('3')).toMatchObject({
+      path: 'src/Services/Checkout/Rules/CheckoutRulesForCustomerGroups.cs',
+      isOutdated: true,
+      status: 'resolved',
+      origin: { commit: first, line: 5, lineEnd: 6, push: { index: 1, total: 2 } },
+    })
+  })
 })
 
 describe('writes (fake server only)', () => {
@@ -837,6 +852,41 @@ describe('file content', () => {
         side: 'base',
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+  })
+
+  it("reads a thread origin's commit, and only a commit of this PR's iterations", async () => {
+    const p = provider()
+    const first = ITERATIONS[102][0].sourceRefCommit?.commitId ?? ''
+    const read = (path: string, commit: string, number = 102) =>
+      p.getFileContent({ repo: apiRepo, number, path, side: 'head', commit })
+    const service = await read('src/Services/CheckoutService.cs', first)
+    expect(service.content?.split('\n')[16]).toBe('        order.Status = OrderStatus.Submitted;')
+    expect(service.content).not.toContain('OrderStatus.Draft')
+    expect(
+      (await read('src/Services/Checkout/Rules/CheckoutRulesForCustomerGroups.cs', first)).content,
+    ).toContain('MaxLinesPerOrder')
+    // Gone at head: one sentence, no URL or server text.
+    const missing = await p
+      .getFileContent({
+        repo: apiRepo,
+        number: 102,
+        path: 'src/Services/Checkout/Rules/CheckoutRulesForCustomerGroups.cs',
+        side: 'head',
+      })
+      .catch((error: Error) => error)
+    expect(missing).toMatchObject({ code: 'NOT_FOUND' })
+    expect((missing as Error).message).toBe(
+      'src/Services/Checkout/Rules/CheckoutRulesForCustomerGroups.cs does not exist in that version.',
+    )
+    // A commit of another PR, or any other SHA: refused before the items API.
+    const before = server.log.length
+    await expect(read('src/Services/CheckoutService.cs', first, 103)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    })
+    await expect(read('src/Services/CheckoutService.cs', 'f'.repeat(40))).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    })
+    expect(server.log.slice(before).some((entry) => entry.path.endsWith('/items'))).toBe(false)
   })
 })
 

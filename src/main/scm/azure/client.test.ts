@@ -147,15 +147,23 @@ describe('auth and errors', () => {
     [409, 'CONFLICT'],
     [412, 'CONFLICT'],
     [500, 'UNKNOWN'],
-  ])('maps %i to %s with the server message', async (status, code) => {
-    const f = fetchSeq(json({ message: 'TF401019: nope', typeKey: 'X' }, { status }))
-    const client = new AzureDevOpsClient({ credentials: creds(), fetch: f })
-    const error = (await client
-      .json('Contoso', orgApiUrl('Contoso', 'x'))
-      .catch((e: Error) => e)) as Error
-    expect(error).toMatchObject({ code, status })
-    expect(error.message).toContain('TF401019')
-  })
+  ])(
+    'maps %i to %s in one sentence; URL and server text only in the dev log',
+    async (status, code) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const f = fetchSeq(json({ message: 'TF401019: nope', typeKey: 'X' }, { status }))
+      const client = new AzureDevOpsClient({ credentials: creds(), fetch: f })
+      const error = (await client
+        .json('Contoso', orgApiUrl('Contoso', 'x'))
+        .catch((e: Error) => e)) as Error
+      expect(error).toMatchObject({ code, status })
+      expect(error.message).not.toContain('TF401019')
+      expect(error.message).not.toContain('dev.azure.com')
+      expect(error.message.split('\n')).toHaveLength(1)
+      expect(warn.mock.calls.flat().join(' ')).toContain('TF401019')
+      warn.mockRestore()
+    },
+  )
 
   it('treats an HTML 200 as UNAUTHENTICATED', async () => {
     const f = fetchSeq(

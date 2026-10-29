@@ -201,20 +201,30 @@ async function serverMessage(response: Response): Promise<string> {
   }
 }
 
-function describeStatus(status: number, endpoint: string, detail: string): string {
-  const base =
-    status === 401 || status === 203
-      ? mt('azure.status.rejected')
-      : status === 403
-        ? mt('azure.status.forbidden')
-        : status === 404
-          ? mt('azure.status.notFound')
-          : status === 409 || status === 412
-            ? mt('azure.status.conflict')
-            : status === 429
-              ? mt('azure.status.rateLimited')
-              : mt('azure.status.other', { status })
-  return base + ' [' + endpoint + ']' + (detail ? ': ' + detail : '')
+/**
+ * One translated sentence for an HTTP failure. The endpoint and the server's
+ * own text (`TF401174: The item … could not be found … '<Commit: …>'`) go to
+ * the dev log only: error messages reach the renderer, and a REST URL or a
+ * server dump is not something a reviewer can act on.
+ */
+function describeStatus(status: number, endpoint: string, detail: string, method = 'GET'): string {
+  logFailure(method, endpoint, 'HTTP ' + status + (detail ? ': ' + detail : ''))
+  return status === 401 || status === 203
+    ? mt('azure.status.rejected')
+    : status === 403
+      ? mt('azure.status.forbidden')
+      : status === 404
+        ? mt('azure.status.notFound')
+        : status === 409 || status === 412
+          ? mt('azure.status.conflict')
+          : status === 429
+            ? mt('azure.status.rateLimited')
+            : mt('azure.status.other', { status })
+}
+
+/** Dev-log line for a failed request (never headers: they carry the credential). */
+function logFailure(method: string, endpoint: string, what: string): void {
+  console.warn('[azure] ' + method + ' ' + endpoint + ' failed: ' + what)
 }
 
 const defaultSleep = (ms: number): Promise<void> =>
@@ -398,10 +408,7 @@ export class AzureDevOpsClient {
 
   private tooLarge(target: URL, maxBytes: number): AzureApiError {
     return new AzureTooLargeError(
-      mt('azure.downloadTooLarge', {
-        mb: Math.floor(maxBytes / (1024 * 1024)),
-        endpoint: endpointOf(target),
-      }),
+      mt('azure.downloadTooLarge', { mb: Math.floor(maxBytes / (1024 * 1024)) }),
       { method: 'GET', endpoint: endpointOf(target) },
     )
   }
@@ -409,10 +416,9 @@ export class AzureDevOpsClient {
   private networkError(target: URL, method: string, error: unknown): AzureApiError {
     const name = error instanceof Error ? error.name : ''
     const timedOut = name === 'TimeoutError' || name === 'AbortError'
-    const message = timedOut
-      ? mt('azure.timeout', { endpoint: endpointOf(target) })
-      : // Never append the raw error text: undici can echo header values in it.
-        mt('azure.unreachable', { endpoint: endpointOf(target) }) + (name ? ' (' + name + ')' : '')
+    // Never log or append the raw error text: undici can echo header values in it.
+    logFailure(method, endpointOf(target), timedOut ? 'timeout' : 'unreachable (' + name + ')')
+    const message = timedOut ? mt('azure.timeout') : mt('azure.unreachable')
     return new AzureApiError('NETWORK', message, { method, endpoint: endpointOf(target) })
   }
 
@@ -477,7 +483,7 @@ export class AzureDevOpsClient {
         const detail = await serverMessage(response)
         throw new AzureApiError(
           statusToErrorCode(response.status),
-          describeStatus(response.status, endpointOf(target), detail),
+          describeStatus(response.status, endpointOf(target), detail, request.method),
           { status: response.status, method: request.method, endpoint: endpointOf(target) },
         )
       }
@@ -522,21 +528,19 @@ export class AzureDevOpsClient {
       if (response.status < 300 || response.status >= 400 || !location) return response
       await response.body?.cancel()
       if (hop >= MAX_REDIRECTS) {
-        throw new AzureApiError('NETWORK', 'Too many redirects [' + endpointOf(start) + ']', {
+        logFailure(method, endpointOf(start), 'too many redirects')
+        throw new AzureApiError('NETWORK', mt('azure.unreachable'), {
           method,
           endpoint: endpointOf(start),
         })
       }
       const next = new URL(location, current)
       if (next.protocol !== 'https:') {
-        throw new AzureApiError(
-          'NETWORK',
-          'Refusing a non-HTTPS redirect [' + endpointOf(start) + ']',
-          {
-            method,
-            endpoint: endpointOf(start),
-          },
-        )
+        logFailure(method, endpointOf(start), 'refused a non-HTTPS redirect')
+        throw new AzureApiError('NETWORK', mt('azure.unreachable'), {
+          method,
+          endpoint: endpointOf(start),
+        })
       }
       if (
         response.status === 303 ||
