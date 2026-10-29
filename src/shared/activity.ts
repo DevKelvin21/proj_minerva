@@ -94,6 +94,11 @@ export interface ActivityState {
 /** Request of `activity:markRead`: some items, or every one. */
 export type MarkActivityReadRequest = { ids: string[] } | { all: true }
 
+/** Request of `activity:dismiss` ("Done"): the items leave the inbox and never come back. */
+export interface DismissActivityRequest {
+  ids: string[]
+}
+
 /**
  * Which new items raise a system notification: none, only the ones aimed at
  * the user (`ActivityItem.direct`), or every one.

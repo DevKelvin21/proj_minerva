@@ -826,6 +826,26 @@ describe('payloadValidators', () => {
     })
   })
 
+  describe('activity:dismiss', () => {
+    const validate = payloadValidators['activity:dismiss']
+    it('accepts exactly { ids } with 1..500 ids', () => {
+      expect(validate({ ids: ['orphan:github:shopwave/api#2:1'] })).toBe(true)
+      expect(validate({ ids: Array.from({ length: 500 }, (_, i) => 'id' + i) })).toBe(true)
+    })
+
+    it('rejects anything else (there is no "dismiss all")', () => {
+      expect(validate(undefined)).toBe(false)
+      expect(validate({ all: true })).toBe(false)
+      expect(validate({ ids: ['a'], all: true })).toBe(false)
+      expect(validate({ ids: [] })).toBe(false)
+      expect(validate({ ids: [''] })).toBe(false)
+      expect(validate({ ids: [null] })).toBe(false)
+      expect(validate({ ids: ['x'.repeat(601)] })).toBe(false)
+      expect(validate({ ids: Array.from({ length: 501 }, (_, i) => 'id' + i) })).toBe(false)
+      expect(validate(['a'])).toBe(false)
+    })
+  })
+
   describe('activity:get', () => {
     it('takes no payload', () => {
       expect(payloadValidators['activity:get'](undefined)).toBe(true)

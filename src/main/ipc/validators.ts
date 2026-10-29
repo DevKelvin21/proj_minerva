@@ -220,7 +220,14 @@ function isMarkActivityReadPayload(value: unknown): boolean {
   if (Object.hasOwn(value, 'all')) {
     return hasOnlyKeys(value, ['all']) && value.all === true
   }
-  if (!hasOnlyKeys(value, ['ids']) || !Array.isArray(value.ids)) return false
+  return isActivityIdsPayload(value)
+}
+
+/** `activity:dismiss` (and markRead's `{ ids }`): exactly `{ ids }`, 1..500 non-empty ids. */
+function isActivityIdsPayload(value: unknown): boolean {
+  if (!isPlainObject(value) || !hasOnlyKeys(value, ['ids']) || !Array.isArray(value.ids)) {
+    return false
+  }
   const ids: unknown[] = value.ids
   return (
     ids.length > 0 &&
@@ -404,6 +411,7 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:getDashboard': isGetDashboardPayload,
   'activity:get': isVoidPayload,
   'activity:markRead': isMarkActivityReadPayload,
+  'activity:dismiss': isActivityIdsPayload,
   'ai:analyzePullRequest': isRepoAndNumberPayload,
   'ai:getCachedAnalysis': isRepoAndNumberPayload,
   'ai:invalidateAnalysis': isRepoAndNumberPayload,

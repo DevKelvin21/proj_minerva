@@ -323,6 +323,7 @@ export async function registerIpcHandlers(): Promise<{
   notifier.refreshBadge(activity.get())
   handle('activity:get', () => activity.get())
   handle('activity:markRead', (req) => activity.markRead(req))
+  handle('activity:dismiss', (req) => activity.dismiss(req))
   handle('settings:getNotifications', () => settingsStore.getNotifications())
   handle('settings:setNotifications', (req) => {
     settingsStore.setNotifications(req)

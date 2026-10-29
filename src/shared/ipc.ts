@@ -38,7 +38,12 @@ import type {
   ChatSendRequest,
   ChatSendResult,
 } from './chat'
-import type { ActivityState, MarkActivityReadRequest, NotificationSettings } from './activity'
+import type {
+  ActivityState,
+  DismissActivityRequest,
+  MarkActivityReadRequest,
+  NotificationSettings,
+} from './activity'
 import type { AiModelOption, AiProviderId } from './ai-providers'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
@@ -168,6 +173,8 @@ export interface IpcContract {
   'activity:get': { req: void; res: ActivityState }
   /** Marks some items (`ids`) or every one (`all`) as read; answers the new state. */
   'activity:markRead': { req: MarkActivityReadRequest; res: ActivityState }
+  /** "Done": removes items for good (never rebuilt by a listing); answers the new state. */
+  'activity:dismiss': { req: DismissActivityRequest; res: ActivityState }
 
   'ai:analyzePullRequest': { req: { repo: RepoRef; number: number }; res: DidacticAnalysis }
   /**
@@ -385,6 +392,7 @@ export const IPC_CHANNELS = [
   'scm:getDashboard',
   'activity:get',
   'activity:markRead',
+  'activity:dismiss',
   'ai:analyzePullRequest',
   'ai:getCachedAnalysis',
   'ai:invalidateAnalysis',
