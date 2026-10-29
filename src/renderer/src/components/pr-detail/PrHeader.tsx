@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { prKey } from '../../../../shared/scm'
 import type { PrCheck, PrMergeStatus, PullRequestDetail } from '../../../../shared/types'
+import { MergeControl } from './MergeControl'
 import { RetargetNote } from '../stacks/RetargetNote'
 import { RetargetPanel } from '../stacks/RetargetPanel'
 import { StackContext, StackOrphanFlag } from '../stacks/StackContext'
@@ -25,8 +26,11 @@ import { labelStyle } from '../../lib/label-colors'
 
 interface PrHeaderProps {
   pr: PullRequestDetail
-  /** The Conversation / Files / Comments tabs, on the left of the bar. */
-  tabs: ReactNode
+  /**
+   * The Conversation / Files / Comments tabs, on the left of the bar.
+   * `compact`: the bar is narrow, so they should draw icon + count only.
+   */
+  tabs: (compact: boolean) => ReactNode
   /** Opens the guided walkthrough; absent = no button. */
   onWalkthrough?: () => void
 }
@@ -59,7 +63,8 @@ export function PrHeader(props: PrHeaderProps): React.JSX.Element {
 
 /**
  * The PR bar: the tabs on the left, a one-line status on the right (draft,
- * orphan, merge blockers, approvals, checks, branches) and everything else
+ * orphan, merge blockers, approvals, checks, branches), the Merge control
+ * (`MergeControl`) at the very end, and everything else
  * (author, commits, the provider link, each reviewer's vote, every check,
  * work items, labels, "Change target branch…") in a "Details" popover. The
  * title lives in the title bar, so this bar is all the PR costs above the
@@ -174,11 +179,21 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
         </span>
       )}
       {pr.autoComplete && (
-        <span data-auto-complete title={t('prDetail.header.autoCompleteTitle')}>
+        <span
+          data-auto-complete
+          title={
+            pr.repo.provider === 'azure'
+              ? t('prDetail.header.autoCompleteTitle')
+              : t('prDetail.header.autoMergeTitle')
+          }
+        >
           <Badge tone="accent">
-            {t('prDetail.header.autoComplete', {
-              name: pr.autoComplete.setBy.displayName ?? pr.autoComplete.setBy.login,
-            })}
+            {t(
+              pr.repo.provider === 'azure'
+                ? 'prDetail.header.autoComplete'
+                : 'prDetail.header.autoMergeSetBy',
+              { name: pr.autoComplete.setBy.displayName ?? pr.autoComplete.setBy.login },
+            )}
           </Badge>
         </span>
       )}
@@ -285,6 +300,9 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
   const barWidth = measuredBarWidth ?? 0
   const showSummaryText = barWidth >= 860
   const showBranches = barWidth >= 1040
+  const compactWalkthrough = barWidth < 900
+  // Below this the three tab labels plus the actions don't fit: icon + count.
+  const compactTabs = barWidth > 0 && barWidth < 680
 
   const summary = (
     <div className="flex min-w-0 items-center gap-3 overflow-hidden text-xs text-muted">
@@ -348,10 +366,20 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
       <h1 className="sr-only">
         {pr.title} #{pr.number}
       </h1>
+      {/*
+        Three parts that never draw over each other: the tabs (shrink, then
+        scroll sideways), the one-line status (shrinks first, clipped) and the
+        actions (Details, Walkthrough, Merge: never shrink; they go icon-only
+        on narrow bars instead).
+      */}
       <div ref={barRef} className="flex h-12 min-w-0 items-center gap-3 pl-3 pr-3">
-        <div className="flex h-full min-w-0 shrink-0 items-stretch">{tabs}</div>
-        <div className="ml-auto flex min-w-0 items-center justify-end gap-3">
+        <div className="flex h-full min-w-0 shrink items-stretch overflow-x-auto [scrollbar-width:none]">
+          {tabs(compactTabs)}
+        </div>
+        <div className="ml-auto flex min-w-0 shrink-[100] items-center justify-end overflow-hidden">
           {summary}
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
           <details ref={detailsRef} className="relative shrink-0" data-testid="pr-details">
             <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted transition-colors duration-150 hover:bg-border/60 hover:text-text">
               {t('prDetail.header.details')}
@@ -373,13 +401,15 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
             <Button
               onClick={onWalkthrough}
               // Narrow: icon only, so the label moves to the name and the tooltip.
-              aria-label={barWidth < 560 ? t('prDetail.header.walkthrough') : undefined}
-              title={barWidth < 560 ? t('prDetail.header.walkthrough') : undefined}
+              aria-label={compactWalkthrough ? t('prDetail.header.walkthrough') : undefined}
+              title={compactWalkthrough ? t('prDetail.header.walkthrough') : undefined}
               icon={<Layers size={14} aria-hidden />}
             >
-              {barWidth >= 560 && t('prDetail.header.walkthrough')}
+              {!compactWalkthrough && t('prDetail.header.walkthrough')}
             </Button>
           )}
+          {/* Last in the bar: finishing the PR is the last thing a review does. */}
+          <MergeControl pr={pr} compact={barWidth < 640} />
         </div>
       </div>
       {/* Stack map, retarget form and note: navigation and fixes, never hidden. */}

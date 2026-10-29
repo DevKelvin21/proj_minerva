@@ -42,6 +42,9 @@ function makeFakeService(overrides: Partial<ScmDataSource> = {}): ScmDataSource 
     getFileContent: vi.fn().mockResolvedValue({ content: '', isBinary: false, tooLarge: false }),
     branchExists: vi.fn().mockResolvedValue(true),
     updatePullRequestBase: vi.fn().mockResolvedValue({}),
+    getMergeOptions: vi.fn().mockResolvedValue({}),
+    mergePullRequest: vi.fn().mockResolvedValue({ completed: true }),
+    setAutoMerge: vi.fn().mockResolvedValue(undefined),
     listScopePullRequests: vi.fn().mockResolvedValue([]),
     listMergedBySourceBranch: vi.fn().mockResolvedValue([]),
     ...overrides,
@@ -126,6 +129,18 @@ describe('withGhCliTokenRetry', () => {
         w.getFileContent({ repo: validRepo, number: 1, path: 'a.ts', side: 'head' }),
       branchExists: (w) => w.branchExists(validRepo, 'main'),
       updatePullRequestBase: (w) => w.updatePullRequestBase(validRepo, 1, 'main'),
+      getMergeOptions: (w) => w.getMergeOptions(validRepo, 1),
+      mergePullRequest: (w) =>
+        w.mergePullRequest({
+          repo: validRepo,
+          number: 1,
+          headSha: 'a'.repeat(40),
+          sourceBranch: 'feature/x',
+          strategy: 'merge',
+          deleteSourceBranch: false,
+          transitionWorkItems: false,
+        }),
+      setAutoMerge: (w) => w.setAutoMerge({ repo: validRepo, number: 1, enable: false }),
       listScopePullRequests: (w) => w.listScopePullRequests(),
       listMergedBySourceBranch: (w) => w.listMergedBySourceBranch(validRepo, 'feature/x'),
     }

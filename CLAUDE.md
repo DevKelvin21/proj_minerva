@@ -35,7 +35,8 @@ unified patches built in main.
   under an aggregate budget (`diff-files.ts`). `updatedAt` is derived (see the header of
   `azure-provider.ts`).
 - Provider-neutral in `main/scm/`: `snapshot-store`, `seen-store`, `pr-watcher`,
-  `scm-settings` (enabled flags), `retarget` (re-validation before the only PR write),
+  `scm-settings` (enabled flags), `retarget` and `merge` (the PR writes: validate, native
+  confirm, re-check, write; merge pins the head commit the user reviewed),
   `stacks-service` (orphans via exact merged-by-source lookups), `dashboard-service`
   (`scm:getDashboard`: scope open PRs + the user's own, with `labels`/`reviewers`/`viewer`),
   `scope-cache` (ONE single-flight 60 s scope fetch shared by stacks and dashboard; the
@@ -56,6 +57,11 @@ unified patches built in main.
   `mainView === 'review'`. Feature groups = a label/tag shared by open PRs in ≥ 2 repos of
   the same provider + owner/org (key `provider:owner:tag`); custom names and hidden groups
   live in localStorage (prototype-less maps). Sidebar collapses on every tier (Cmd/Ctrl+B).
+- **Merge control** (`pr-detail/MergeControl.tsx`, end of the PR bar): split button + popover
+  fed by `scm:getMergeOptions` (allowed strategies, blocker, auto-merge offer/state). Writes go
+  through `scm:merge` / `scm:setAutoMerge`; refusals are `MERGE_CONFLICT`, `CHECKS_FAILING`,
+  `MERGE_BLOCKED`, `FORBIDDEN`, or `CONFLICT` when the PR moved. GitHub auto-merge needs
+  "Allow auto-merge" AND something pending (GitHub refuses it on a clean PR).
 - `MINERVA_MOCK=1` = mock SCM: GitHub universe "shopwave" + Azure org "contoso" (the real
   `AzureScmProvider` over the in-memory `azure/fixtures/fake-server.ts`; writes stay in
   memory). It does not affect AI. NEVER test write paths against a real org.

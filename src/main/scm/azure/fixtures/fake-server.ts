@@ -5,15 +5,16 @@
  * `AzureScmProvider` + `AzureDevOpsClient` on top of it, so mock mode
  * exercises the same URLs, paging and mappers as production.
  *
- * Writes (new threads, replies, thread status, retarget) mutate this
- * server's own copy of the universe and nothing else: nothing here ever
- * talks to the network.
+ * Writes (new threads, replies, thread status, retarget, completion,
+ * auto-complete) mutate this server's own copy of the universe and nothing
+ * else: nothing here ever talks to the network.
  *
  * Only the routes the provider uses exist; anything else is a 404, which
  * keeps tests honest about new endpoints.
  */
 import type {
   AzComment,
+  AzIdentityRef,
   AzIteration,
   AzPolicyEvaluation,
   AzPullRequest,
@@ -29,6 +30,7 @@ import {
   MOCK_ME,
   MOCK_ORG,
   MOCK_PROJECT,
+  PEOPLE,
   PULL_REQUESTS,
   REPOS,
   THREADS,
@@ -114,6 +116,24 @@ function policy(
   }
 }
 
+/** "Require a merge strategy" (real type id): storefront-web allows merge, squash and semi-linear. */
+const MERGE_STRATEGY_POLICY: AzPolicyEvaluation = {
+  evaluationId: 'eval-9',
+  status: 'approved',
+  configuration: {
+    id: 9,
+    isBlocking: true,
+    isEnabled: true,
+    type: { id: 'fa4e907d-c16b-4a4c-9dfa-4916e5d171ab', displayName: 'Require a merge strategy' },
+    settings: {
+      allowNoFastForward: true,
+      allowSquash: true,
+      allowRebase: false,
+      allowRebaseMerge: true,
+    },
+  },
+}
+
 const POLICY_EVALUATIONS: Record<number, AzPolicyEvaluation[]> = {
   101: [
     policy(1, 'running', 'Minimum number of reviewers', true),
@@ -128,8 +148,15 @@ const POLICY_EVALUATIONS: Record<number, AzPolicyEvaluation[]> = {
   108: [
     policy(1, 'approved', 'Minimum number of reviewers', true),
     policy(5, 'approved', 'Build', true, 'storefront-web CI'),
+    MERGE_STRATEGY_POLICY,
   ],
 }
+
+/** Identities a PATCH may name as `autoCompleteSetBy`. */
+const IDENTITIES: AzIdentityRef[] = Object.values(PEOPLE)
+
+/** Cleared `autoCompleteSetBy` (Azure DevOps' way to cancel auto-complete). */
+const EMPTY_IDENTITY_ID = '00000000-0000-0000-0000-000000000000'
 
 const WORK_ITEMS: Record<number, { id: number; title: string; type: string; state: string }[]> = {
   108: [{ id: 4711, title: 'Cart total is off by a cent', type: 'Bug', state: 'Active' }],
@@ -176,6 +203,10 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
   const iterations = new Map<number, AzIteration[]>(
     Object.entries(ITERATIONS).map(([id, list]) => [Number(id), clone(list)]),
   )
+  const branches = new Map<string, string[]>(
+    Object.entries(BRANCHES).map(([id, list]) => [id, [...list]]),
+  )
+  const branchesOf = (repoId: string): string[] => branches.get(repoId) ?? []
   const log: FakeRequestLogEntry[] = []
   let clock = Date.parse('2026-10-20T09:00:00Z')
   const tick = (): string => {
@@ -287,7 +318,7 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
     if (lower === 'refs' && method === 'GET') {
       const filter = query.get('filter') ?? ''
       const prefix = filter.startsWith('heads/') ? filter.slice('heads/'.length) : filter
-      const value = (BRANCHES[repoId] ?? [])
+      const value = branchesOf(repoId)
         .filter((branch) => branch.startsWith(prefix))
         .map((branch) => ({ name: 'refs/heads/' + branch, objectId: '0'.repeat(40) }))
       return json({ count: value.length, value })
@@ -304,13 +335,66 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
     if (!third) {
       if (method === 'GET') return json(pr)
       if (method === 'PATCH') {
-        const patch = body as { targetRefName?: unknown }
+        const patch = body as {
+          targetRefName?: unknown
+          status?: unknown
+          lastMergeSourceCommit?: { commitId?: unknown }
+          completionOptions?: AzPullRequest['completionOptions']
+          autoCompleteSetBy?: { id?: unknown }
+        }
         if (typeof patch.targetRefName === 'string') {
           const branch = stripRefs(patch.targetRefName)
-          if (!(BRANCHES[repoId] ?? []).includes(branch)) {
+          if (!branchesOf(repoId).includes(branch)) {
             return json({ message: 'TF401398: target branch does not exist' }, 400)
           }
           pr.targetRefName = 'refs/heads/' + branch
+        }
+        if (patch.autoCompleteSetBy !== undefined) {
+          const id = patch.autoCompleteSetBy.id
+          if (id === EMPTY_IDENTITY_ID) {
+            delete pr.autoCompleteSetBy
+          } else {
+            const identity = IDENTITIES.find((person) => person.id === id)
+            if (!identity) return json({ message: 'TF400813: unknown identity' }, 400)
+            pr.autoCompleteSetBy = clone(identity)
+          }
+          if (patch.completionOptions) pr.completionOptions = clone(patch.completionOptions)
+        }
+        if (patch.status === 'completed') {
+          if (pr.status !== 'active') {
+            return json({ message: 'TF401181: the pull request is not active' }, 409)
+          }
+          if (patch.lastMergeSourceCommit?.commitId !== pr.lastMergeSourceCommit?.commitId) {
+            return json({ message: 'TF401192: the source branch was updated' }, 409)
+          }
+          if (pr.mergeStatus === 'conflicts') {
+            return json({ message: 'TF401179: the merge has conflicts' }, 400)
+          }
+          const pending = (POLICY_EVALUATIONS[prId] ?? []).filter(
+            (evaluation) =>
+              evaluation.configuration.isEnabled &&
+              evaluation.configuration.isBlocking &&
+              evaluation.status !== 'approved' &&
+              evaluation.status !== 'notApplicable',
+          )
+          if (pending.length > 0) {
+            return json(
+              { message: 'TF402455: pushes to this branch are not permitted by a policy' },
+              400,
+            )
+          }
+          pr.status = 'completed'
+          pr.closedDate = tick()
+          pr.completionOptions = clone(patch.completionOptions ?? {})
+          delete pr.autoCompleteSetBy
+          pr.lastMergeCommit = { commitId: 'f'.repeat(40) }
+          if (patch.completionOptions?.deleteSourceBranch) {
+            const source = stripRefs(pr.sourceRefName)
+            branches.set(
+              repoId,
+              branchesOf(repoId).filter((branch) => branch !== source),
+            )
+          }
         }
         return json(pr)
       }

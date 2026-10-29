@@ -10,15 +10,18 @@
  * - `writeSnapshot` writes HOSTILE content: no symlinks, no paths outside
  *   `destDir`, size caps. It is only read by jailed AI tools, never executed.
  * - Tokens never leave main and never appear in `ScmAuthStatus`.
- * - Writes (comments, thread status, base branch) only happen on explicit
- *   user actions routed through IPC; retarget validation lives in
- *   `./retarget.ts` so it is the same for every provider.
+ * - Writes (comments, thread status, base branch, merge, auto-merge) only
+ *   happen on explicit user actions routed through IPC; retarget validation
+ *   lives in `./retarget.ts` and merge validation in `./merge.ts`, so they are
+ *   the same for every provider.
  */
 import type { FileContent, RepoRef, ScmAuthStatus, ScmProviderId } from '../../shared/scm'
 import type {
   CommentThread,
   DiffFile,
   FileContentRequest,
+  MergeOptions,
+  MergeStrategy,
   PostCommentRequest,
   PrComment,
   PrStateFilter,
@@ -53,6 +56,39 @@ export interface SnapshotRequest {
   headSha: string
 }
 
+/** A raw merge, already validated and confirmed by `./merge.ts`. */
+export interface MergeWrite {
+  repo: RepoRef
+  number: number
+  /** The head commit that was re-checked; providers pass it on so the server refuses a moved head too. */
+  headSha: string
+  /** Short name of the PR's source branch (deleted after the merge when asked). */
+  sourceBranch: string
+  strategy: MergeStrategy
+  deleteSourceBranch: boolean
+  transitionWorkItems: boolean
+}
+
+export interface MergeWriteResult {
+  /** `false`: accepted but still merging (Azure DevOps completes asynchronously). */
+  completed: boolean
+  /** The merge landed but deleting the source branch failed. */
+  branchDeleteFailed?: boolean
+}
+
+/** A raw auto-complete / auto-merge change, already validated and confirmed by `./merge.ts`. */
+export type AutoMergeWrite =
+  | {
+      repo: RepoRef
+      number: number
+      enable: true
+      headSha: string
+      strategy: MergeStrategy
+      deleteSourceBranch: boolean
+      transitionWorkItems: boolean
+    }
+  | { repo: RepoRef; number: number; enable: false }
+
 export interface ScmProvider {
   readonly id: ScmProviderId
   getAuthStatus(): Promise<ScmAuthStatus>
@@ -80,6 +116,13 @@ export interface ScmProvider {
    * (`./retarget.ts`), which re-validates first.
    */
   updatePullRequestBase(repo: RepoRef, number: number, newBase: string): Promise<PullRequestSummary>
+
+  /** What the Merge control may offer: allowed strategies, blockers, auto-merge state. Read only. */
+  getMergeOptions(repo: RepoRef, number: number): Promise<MergeOptions>
+  /** Raw merge / completion. Call it only through `./merge.ts`, which re-validates first. */
+  mergePullRequest(req: MergeWrite): Promise<MergeWriteResult>
+  /** Raw auto-complete / auto-merge change. Call it only through `./merge.ts`. */
+  setAutoMerge(req: AutoMergeWrite): Promise<void>
 
   /**
    * Every OPEN PR of the configured scope (Azure: configured projects;

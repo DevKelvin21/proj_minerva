@@ -345,6 +345,9 @@ describe('detail', () => {
     expect(pr101.labels).toEqual([{ name: 'checkout-v2' }, { name: 'api' }])
     expect(pr101.autoComplete).toEqual({
       setBy: { login: PEOPLE.ada.uniqueName, displayName: 'Ada Lovelace' },
+      strategy: 'squash',
+      deleteSourceBranch: true,
+      transitionWorkItems: true,
     })
     expect(pr101.mergeStatus).toBe('clean')
     expect(pr101.checks?.map((check) => [check.name, check.status, check.isBlocking])).toEqual([
@@ -816,6 +819,118 @@ describe('writes (fake server only)', () => {
     expect(writes()).toEqual([
       expect.objectContaining({ method: 'PATCH', body: { targetRefName: 'refs/heads/main' } }),
     ])
+  })
+})
+
+describe('merge / auto-complete', () => {
+  it('reads merge options: allowed types from the merge-strategy policy, work items, ready', async () => {
+    const options = await provider().getMergeOptions(webRepo, 108)
+    expect(options.strategies).toEqual([
+      { strategy: 'merge', allowed: true },
+      { strategy: 'squash', allowed: true },
+      { strategy: 'rebase', allowed: false },
+      { strategy: 'rebase_merge', allowed: true },
+    ])
+    expect(options.blocker).toBeNull()
+    expect(options.workItems).toBe(1)
+    expect(options.deleteSourceBranch).toBe('option')
+    expect(options.autoMerge).toEqual({ available: true })
+    expect(options.current).toBeNull()
+    expect(options.headSha).toBe(server.pullRequest(108)?.lastMergeSourceCommit?.commitId)
+  })
+
+  it('reports conflicts, pending policies and the auto-complete already set', async () => {
+    const p = provider()
+    expect((await p.getMergeOptions(apiRepo, 105)).blocker).toBe('conflicts')
+    const pr101 = await p.getMergeOptions(apiRepo, 101)
+    expect(pr101.blocker).toBe('approvals_missing')
+    expect(pr101.current).toMatchObject({ strategy: 'squash', deleteSourceBranch: true })
+  })
+
+  it('completes with lastMergeSourceCommit and completion options, deleting the source branch', async () => {
+    const p = provider()
+    const head = server.pullRequest(108)!.lastMergeSourceCommit!.commitId
+    const result = await p.mergePullRequest({
+      repo: webRepo,
+      number: 108,
+      headSha: head,
+      sourceBranch: 'fix/cart-rounding',
+      strategy: 'rebase_merge',
+      deleteSourceBranch: true,
+      transitionWorkItems: true,
+    })
+    expect(result).toEqual({ completed: true })
+    expect(writes()).toEqual([
+      expect.objectContaining({
+        method: 'PATCH',
+        body: {
+          status: 'completed',
+          lastMergeSourceCommit: { commitId: head },
+          completionOptions: {
+            mergeStrategy: 'rebaseMerge',
+            deleteSourceBranch: true,
+            transitionWorkItems: true,
+            bypassPolicy: false,
+          },
+        },
+      }),
+    ])
+    expect((await p.getPullRequestDetail(webRepo, 108)).state).toBe('merged')
+    expect(await p.branchExists(webRepo, 'fix/cart-rounding')).toBe(false)
+  })
+
+  it('maps refusals: a moved head is CONFLICT, conflicts MERGE_CONFLICT, policies MERGE_BLOCKED', async () => {
+    const p = provider()
+    const write = (number: number, headSha: string) =>
+      p.mergePullRequest({
+        repo: number === 108 ? webRepo : apiRepo,
+        number,
+        headSha,
+        sourceBranch: 'x',
+        strategy: 'merge',
+        deleteSourceBranch: false,
+        transitionWorkItems: false,
+      })
+    await expect(write(108, 'f'.repeat(40))).rejects.toMatchObject({ code: 'CONFLICT' })
+    const head105 = server.pullRequest(105)!.lastMergeSourceCommit!.commitId
+    await expect(write(105, head105)).rejects.toMatchObject({ code: 'MERGE_CONFLICT' })
+    const head101 = server.pullRequest(101)!.lastMergeSourceCommit!.commitId
+    const blocked = write(101, head101)
+    await expect(blocked).rejects.toMatchObject({ code: 'MERGE_BLOCKED' })
+    // Azure DevOps' own reason, without the endpoint path.
+    await expect(blocked).rejects.toThrow(/TF402455/)
+    await expect(blocked).rejects.not.toThrow(/_apis/)
+    expect(server.pullRequest(108)?.status).toBe('active')
+  })
+
+  it('sets auto-complete as the signed-in identity, and clears it with the empty identity', async () => {
+    const p = provider()
+    await p.setAutoMerge({
+      repo: webRepo,
+      number: 108,
+      enable: true,
+      headSha: 'ignored-by-azure',
+      strategy: 'squash',
+      deleteSourceBranch: false,
+      transitionWorkItems: true,
+    })
+    expect(writes()[0]).toMatchObject({
+      method: 'PATCH',
+      body: {
+        autoCompleteSetBy: { id: PEOPLE.ada.id },
+        completionOptions: { mergeStrategy: 'squash', transitionWorkItems: true },
+      },
+    })
+    expect((await p.getPullRequestDetail(webRepo, 108)).autoComplete).toMatchObject({
+      setBy: { displayName: 'Ada Lovelace' },
+      strategy: 'squash',
+      deleteSourceBranch: false,
+    })
+    await p.setAutoMerge({ repo: webRepo, number: 108, enable: false })
+    expect(writes()[1]).toMatchObject({
+      body: { autoCompleteSetBy: { id: '00000000-0000-0000-0000-000000000000' } },
+    })
+    expect((await p.getPullRequestDetail(webRepo, 108)).autoComplete).toBeUndefined()
   })
 })
 

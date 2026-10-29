@@ -16,6 +16,7 @@ import type {
   CommentThread,
   DiffFile,
   FileContentRequest,
+  MergeOptions,
   PostCommentRequest,
   PrComment,
   PrViewerRelation,
@@ -35,7 +36,10 @@ import {
 import { ScmError } from '../errors'
 import { mt } from '../../i18n'
 import type {
+  AutoMergeWrite,
   ListPullRequestsQuery,
+  MergeWrite,
+  MergeWriteResult,
   ScmDataSource,
   ScopePullRequest,
   SnapshotRequest,
@@ -44,7 +48,53 @@ import type { StackInputPr } from '../stacks'
 import { MOCK_GITHUB_LOGIN, prFixtures } from './fixtures'
 import { genericSnapshotFixture, snapshotFixturesByRepo } from './fixtures-snapshot'
 import { asGithubRepo } from './repo'
+import { mapGithubMergeOptions, type GithubMergeNode } from './merge-options'
 import { githubRepo } from '../../../shared/scm-guards'
+
+/**
+ * Repository merge settings of the mock universe (GitHub's "Pull Requests"
+ * settings), so every Merge control state shows up somewhere:
+ * - api: every method, auto-merge allowed (#482 merges now, #479 waits for
+ *   checks and offers auto-merge);
+ * - web: no rebase, auto-merge off (#190 conflicts, #198 is a draft);
+ * - checkout-service: merged branches are deleted by the repository (#77 has
+ *   a failing required check).
+ */
+const MOCK_REPO_MERGE_SETTINGS: Record<string, GithubMergeNode['repository']> = {
+  'shopwave/api': {
+    mergeCommitAllowed: true,
+    squashMergeAllowed: true,
+    rebaseMergeAllowed: true,
+    autoMergeAllowed: true,
+    deleteBranchOnMerge: false,
+    viewerPermission: 'WRITE',
+  },
+  'shopwave/web': {
+    mergeCommitAllowed: true,
+    squashMergeAllowed: true,
+    rebaseMergeAllowed: false,
+    autoMergeAllowed: false,
+    deleteBranchOnMerge: false,
+    viewerPermission: 'WRITE',
+  },
+  'shopwave/checkout-service': {
+    mergeCommitAllowed: true,
+    squashMergeAllowed: true,
+    rebaseMergeAllowed: true,
+    autoMergeAllowed: true,
+    deleteBranchOnMerge: true,
+    viewerPermission: 'WRITE',
+  },
+}
+
+/** PRs whose branch conflicts with its base (`prKey`). */
+const MOCK_CONFLICTING = new Set(['github:shopwave/web#190'])
+
+const MOCK_CHECKS_STATE: Record<string, string> = {
+  success: 'SUCCESS',
+  failure: 'FAILURE',
+  pending: 'PENDING',
+}
 
 interface PrRecord {
   detail: PullRequestDetail
@@ -67,6 +117,7 @@ const LATENCY_MS = {
   getPullRequestFiles: 260,
   getCommentThreads: 200,
   postComment: 320,
+  merge: 400,
 } as const
 
 function delay(ms: number): Promise<void> {
@@ -382,6 +433,79 @@ export class MockGithubService implements ScmDataSource {
     record.detail.baseRef = shortRef(newBase)
     record.detail.updatedAt = new Date().toISOString()
     return { ...record.detail }
+  }
+
+  /** The same GitHub facts the real query reads, built from the fixtures. */
+  private mergeNode(record: PrRecord): GithubMergeNode {
+    const { detail } = record
+    const key = prKey(detail.repo, detail.number)
+    const repository = MOCK_REPO_MERGE_SETTINGS[detail.repo.fullName] ?? {
+      mergeCommitAllowed: true,
+      squashMergeAllowed: true,
+      rebaseMergeAllowed: true,
+      autoMergeAllowed: false,
+      deleteBranchOnMerge: false,
+      viewerPermission: 'WRITE',
+    }
+    const mergeStateStatus = detail.isDraft
+      ? 'DRAFT'
+      : MOCK_CONFLICTING.has(key)
+        ? 'DIRTY'
+        : detail.ciStatus === 'failure' || detail.ciStatus === 'pending'
+          ? 'BLOCKED'
+          : 'CLEAN'
+    return {
+      repository,
+      pullRequest: {
+        state: detail.state === 'open' ? 'OPEN' : detail.state === 'merged' ? 'MERGED' : 'CLOSED',
+        isDraft: detail.isDraft,
+        headRefOid: detail.headSha,
+        isCrossRepository: false,
+        mergeable: MOCK_CONFLICTING.has(key) ? 'CONFLICTING' : 'MERGEABLE',
+        mergeStateStatus,
+        reviewDecision: null,
+        viewerCanEnableAutoMerge: true,
+        autoMergeRequest: detail.autoComplete
+          ? {
+              mergeMethod: (detail.autoComplete.strategy ?? 'merge').toUpperCase(),
+              enabledBy: { login: detail.autoComplete.setBy.login },
+            }
+          : null,
+        checksState: detail.ciStatus ? (MOCK_CHECKS_STATE[detail.ciStatus] ?? null) : null,
+      },
+    }
+  }
+
+  async getMergeOptions(repo: RepoRef, number: number): Promise<MergeOptions> {
+    await delay(LATENCY_MS.getPullRequestDetail)
+    return mapGithubMergeOptions(this.mergeNode(this.getRecord(repo, number)))
+  }
+
+  /** Merges in memory: the PR becomes `merged` (no branch to delete in the mock). */
+  async mergePullRequest(req: MergeWrite): Promise<MergeWriteResult> {
+    await delay(LATENCY_MS.merge)
+    const record = this.getRecord(req.repo, req.number)
+    if (record.detail.headSha !== req.headSha) {
+      throw new ScmError('CONFLICT', mt('github.mergeHeadMoved'))
+    }
+    record.detail.state = 'merged'
+    record.detail.updatedAt = new Date().toISOString()
+    delete record.detail.autoComplete
+    return { completed: true }
+  }
+
+  async setAutoMerge(req: AutoMergeWrite): Promise<void> {
+    await delay(LATENCY_MS.merge)
+    const record = this.getRecord(req.repo, req.number)
+    if (!req.enable) {
+      delete record.detail.autoComplete
+      return
+    }
+    if (record.detail.headSha !== req.headSha) {
+      throw new ScmError('CONFLICT', mt('github.mergeHeadMoved'))
+    }
+    record.detail.autoComplete = { setBy: { login: MOCK_GITHUB_LOGIN }, strategy: req.strategy }
+    record.detail.updatedAt = new Date().toISOString()
   }
 
   /** The mock scope is the whole universe: every open PR. */

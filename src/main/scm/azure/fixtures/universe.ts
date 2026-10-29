@@ -352,6 +352,7 @@ interface PrSpec {
   /** Tag names (Azure DevOps "tags" are labels on the wire). */
   tags?: string[]
   autoCompleteSetBy?: AzIdentityRef
+  completionOptions?: AzPullRequest['completionOptions']
 }
 
 function pullRequest(spec: PrSpec): AzPullRequest {
@@ -377,6 +378,7 @@ function pullRequest(spec: PrSpec): AzPullRequest {
     pr.labels = spec.tags.map((name, index) => ({ id: 'tag-' + spec.id + '-' + index, name }))
   }
   if (spec.autoCompleteSetBy) pr.autoCompleteSetBy = spec.autoCompleteSetBy
+  if (spec.completionOptions) pr.completionOptions = spec.completionOptions
   return pr
 }
 
@@ -413,6 +415,11 @@ export const PULL_REQUESTS: AzPullRequest[] = [
     reviewers: [reviewer(PEOPLE.grace, 10, true), reviewer(PEOPLE.team, 0, true)],
     tags: ['checkout-v2', 'api'],
     autoCompleteSetBy: PEOPLE.ada,
+    completionOptions: {
+      mergeStrategy: 'squash',
+      deleteSourceBranch: true,
+      transitionWorkItems: true,
+    },
   }),
   pullRequest({
     id: 102,

@@ -55,6 +55,7 @@ import type {
   CommentThread,
   DiffFile,
   FileContentRequest,
+  MergeOptions,
   PostCommentRequest,
   PrComment,
   PrWorkItem,
@@ -66,7 +67,10 @@ import { AZURE_GUID_RE, isAzureRepoRef } from '../../../shared/scm-guards'
 import { ScmError, toScmError } from '../errors'
 import { mt } from '../../i18n'
 import type {
+  AutoMergeWrite,
   ListPullRequestsQuery,
+  MergeWrite,
+  MergeWriteResult,
   ScmProvider,
   ScopePullRequest,
   SnapshotRequest,
@@ -84,7 +88,9 @@ import type {
   AzPullRequestStatusEntry,
   AzThread,
 } from './api-types'
+import { azureMergeStrategy, mapAutoComplete, mapAzureMergeOptions } from './merge-options'
 import {
+  AzureApiError,
   AzureTooLargeError,
   gitRepoUrl,
   orgApiUrl,
@@ -105,7 +111,6 @@ import {
   mapRepo,
   mapReviewer,
   mapThread,
-  mapUser,
   threadAnchor,
   threadOrigin,
   threadStatusToAzure,
@@ -326,6 +331,29 @@ function toStackInput(pr: AzPullRequest, organization: string): StackInputPr {
   if (pr.closedDate) input.closedAt = pr.closedDate
   if (summary.state === 'merged') input.mergedInto = summary.baseRef
   return input
+}
+
+/** Clears `autoCompleteSetBy` (Azure DevOps' documented way to cancel auto-complete). */
+const EMPTY_IDENTITY_ID = '00000000-0000-0000-0000-000000000000'
+
+/**
+ * A refused completion: 409 / 412 = the PR moved (head or state) since the
+ * re-check, 400 = a policy or conflict refused it (Azure DevOps' own reason
+ * is kept, it names the policy). 401/403/404/network keep their codes.
+ */
+function mapCompletionError(error: unknown): ScmError {
+  if (error instanceof AzureApiError && error.status === 400) {
+    // Azure DevOps' own message only: drop the "<status> [endpoint]: " prefix
+    // (the path could contain any word), collapse whitespace, cap it.
+    const full = error.message
+    const cut = full.indexOf(']: ')
+    const reason =
+      (cut >= 0 ? full.slice(cut + 3) : full).replace(/\s+/g, ' ').trim().slice(0, 200) ||
+      mt('azure.status.other', { status: 400 })
+    const code = /conflict/i.test(reason) ? 'MERGE_CONFLICT' : 'MERGE_BLOCKED'
+    return new ScmError(code, mt('azure.completeRefused', { reason }), { cause: error })
+  }
+  return toScmError(error)
 }
 
 export class AzureScmProvider implements ScmProvider {
@@ -728,17 +756,7 @@ export class AzureScmProvider implements ScmProvider {
         )
         .then((data) => data.value ?? [])
         .catch(() => [] as AzPullRequestStatusEntry[]),
-      this.client
-        .json<AzListResponse<AzPolicyEvaluation>>(
-          org,
-          orgApiUrl(org, repo.project, '_apis', 'policy', 'evaluations'),
-          {
-            query: { artifactId: 'vstfs:///CodeReview/CodeReviewId/' + projectId + '/' + number },
-            apiVersion: POLICY_API_VERSION,
-          },
-        )
-        .then((data) => data.value ?? [])
-        .catch(() => [] as AzPolicyEvaluation[]),
+      this.policyEvaluations(repo, projectId, number).catch(() => [] as AzPolicyEvaluation[]),
       this.workItems(repo, number).catch(() => [] as PrWorkItem[]),
       this.client
         .listContinuation<unknown>(org, this.repoUrl(repo, 'pullRequests', number, 'commits'), {
@@ -772,9 +790,8 @@ export class AzureScmProvider implements ScmProvider {
     // Only for open PRs: a completed PR's last merge status is history, not a warning.
     const mergeStatus = summary.state === 'open' ? mapMergeStatus(pr.mergeStatus) : undefined
     if (mergeStatus) detail.mergeStatus = mergeStatus
-    if (summary.state === 'open' && pr.autoCompleteSetBy) {
-      detail.autoComplete = { setBy: mapUser(pr.autoCompleteSetBy) }
-    }
+    const autoComplete = mapAutoComplete(pr)
+    if (autoComplete) detail.autoComplete = autoComplete
     if (changes) {
       detail.changedFiles = changes.total
       if (changes.truncated) detail.filesTruncated = true
@@ -787,13 +804,34 @@ export class AzureScmProvider implements ScmProvider {
     return detail
   }
 
-  private async workItems(repo: AzureRepoRef, number: number): Promise<PrWorkItem[]> {
+  private async policyEvaluations(
+    repo: AzureRepoRef,
+    projectId: string,
+    number: number,
+  ): Promise<AzPolicyEvaluation[]> {
     const org = repo.organization
-    const refs = await this.client.json<AzListResponse<{ id: string | number }>>(
+    const data = await this.client.json<AzListResponse<AzPolicyEvaluation>>(
       org,
+      orgApiUrl(org, repo.project, '_apis', 'policy', 'evaluations'),
+      {
+        query: { artifactId: 'vstfs:///CodeReview/CodeReviewId/' + projectId + '/' + number },
+        apiVersion: POLICY_API_VERSION,
+      },
+    )
+    return data.value ?? []
+  }
+
+  private async workItemRefs(repo: AzureRepoRef, number: number): Promise<{ id: string | number }[]> {
+    const refs = await this.client.json<AzListResponse<{ id: string | number }>>(
+      repo.organization,
       this.repoUrl(repo, 'pullRequests', number, 'workitems'),
     )
-    const ids = (refs.value ?? [])
+    return refs.value ?? []
+  }
+
+  private async workItems(repo: AzureRepoRef, number: number): Promise<PrWorkItem[]> {
+    const org = repo.organization
+    const ids = (await this.workItemRefs(repo, number))
       .map((ref) => String(ref.id))
       .filter((id) => /^[0-9]{1,10}$/.test(id))
       .slice(0, MAX_WORK_ITEMS)
@@ -1180,6 +1218,88 @@ export class AzureScmProvider implements ScmProvider {
     )
     const me = await this.identity(repo.organization).catch(() => null)
     return this.summarize(updated, repo.organization, me?.id ?? null)
+  }
+
+  // -------------------------------------------------------------------------
+  // Completion / auto-complete (validated and confirmed in `../merge.ts`)
+  // -------------------------------------------------------------------------
+
+  async getMergeOptions(repoRef: RepoRef, number: number): Promise<MergeOptions> {
+    const repo = this.scoped(repoRef)
+    const pr = await this.rawPullRequest(repo, number)
+    const [evaluations, workItems] = await Promise.all([
+      // Unreadable policies must not look like "nothing blocks it": the
+      // server still enforces them, so this read failing fails the options.
+      this.policyEvaluations(repo, pr.repository.project.id, number),
+      this.workItemRefs(repo, number)
+        .then((refs) => refs.length)
+        .catch(() => 0),
+    ])
+    return mapAzureMergeOptions(pr, evaluations, workItems)
+  }
+
+  /**
+   * `PATCH …/pullrequests/{id}` with `status: completed`. Azure DevOps refuses
+   * it when `lastMergeSourceCommit` is no longer the head, so a push between
+   * the re-check and this call can't merge unseen commits. Completion may
+   * finish asynchronously (`completed: false` while the PR is still active).
+   */
+  async mergePullRequest(req: MergeWrite): Promise<MergeWriteResult> {
+    const repo = this.scoped(req.repo)
+    try {
+      const updated = await this.client.json<AzPullRequest>(
+        repo.organization,
+        this.repoUrl(repo, 'pullrequests', req.number),
+        {
+          method: 'PATCH',
+          body: {
+            status: 'completed',
+            lastMergeSourceCommit: { commitId: req.headSha },
+            completionOptions: {
+              mergeStrategy: azureMergeStrategy(req.strategy),
+              deleteSourceBranch: req.deleteSourceBranch,
+              transitionWorkItems: req.transitionWorkItems,
+              bypassPolicy: false,
+            },
+          },
+        },
+      )
+      return { completed: updated.status === 'completed' }
+    } catch (error) {
+      throw mapCompletionError(error)
+    }
+  }
+
+  /**
+   * Auto-complete on = `autoCompleteSetBy` (the signed-in identity) plus the
+   * completion options; off = the empty identity, which clears it.
+   */
+  async setAutoMerge(req: AutoMergeWrite): Promise<void> {
+    const repo = this.scoped(req.repo)
+    let body: Record<string, unknown>
+    if (req.enable) {
+      const me = await this.identity(repo.organization)
+      body = {
+        autoCompleteSetBy: { id: me.id },
+        completionOptions: {
+          mergeStrategy: azureMergeStrategy(req.strategy),
+          deleteSourceBranch: req.deleteSourceBranch,
+          transitionWorkItems: req.transitionWorkItems,
+          bypassPolicy: false,
+        },
+      }
+    } else {
+      body = { autoCompleteSetBy: { id: EMPTY_IDENTITY_ID } }
+    }
+    try {
+      await this.client.json<AzPullRequest>(
+        repo.organization,
+        this.repoUrl(repo, 'pullrequests', req.number),
+        { method: 'PATCH', body },
+      )
+    } catch (error) {
+      throw mapCompletionError(error)
+    }
   }
 
   // -------------------------------------------------------------------------

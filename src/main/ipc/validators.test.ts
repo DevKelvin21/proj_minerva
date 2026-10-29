@@ -798,6 +798,67 @@ describe('payloadValidators', () => {
     })
   })
 
+  describe('scm:merge', () => {
+    const validate = payloadValidators['scm:merge']
+    const base = {
+      repo: validRepo,
+      number: 7,
+      expectedHeadSha: 'a'.repeat(40),
+      strategy: 'squash',
+      deleteSourceBranch: true,
+      transitionWorkItems: false,
+    }
+
+    it('accepts a full sha, a known strategy and two booleans', () => {
+      expect(validate(base)).toBe(true)
+      expect(validate({ ...base, expectedHeadSha: 'F'.repeat(64) })).toBe(true)
+      expect(
+        validate({ ...base, repo: validAzureRepo, strategy: 'rebase_merge', transitionWorkItems: true }),
+      ).toBe(true)
+    })
+
+    it('rejects short or non-hex shas, unknown strategies, missing or extra keys', () => {
+      expect(validate({ ...base, expectedHeadSha: 'abc1234' })).toBe(false)
+      expect(validate({ ...base, expectedHeadSha: 'g'.repeat(40) })).toBe(false)
+      expect(validate({ ...base, strategy: 'fast-forward' })).toBe(false)
+      expect(validate({ ...base, deleteSourceBranch: 'yes' })).toBe(false)
+      const { strategy: _drop, ...missing } = base
+      void _drop
+      expect(validate(missing)).toBe(false)
+      expect(validate({ ...base, bypassPolicy: true })).toBe(false)
+    })
+
+    it('GitHub: no work items and no semi-linear merge', () => {
+      expect(validate({ ...base, transitionWorkItems: true })).toBe(false)
+      expect(validate({ ...base, strategy: 'rebase_merge' })).toBe(false)
+    })
+  })
+
+  describe('scm:setAutoMerge', () => {
+    const validate = payloadValidators['scm:setAutoMerge']
+    const on = {
+      repo: validAzureRepo,
+      number: 12495,
+      enable: true,
+      expectedHeadSha: 'b'.repeat(40),
+      strategy: 'merge',
+      deleteSourceBranch: false,
+      transitionWorkItems: true,
+    }
+
+    it('accepts on (with the merge fields) and off (repo and number only)', () => {
+      expect(validate(on)).toBe(true)
+      expect(validate({ repo: validRepo, number: 7, enable: false })).toBe(true)
+    })
+
+    it('rejects off with extra fields, on without them, and non-boolean enable', () => {
+      expect(validate({ repo: validRepo, number: 7, enable: false, strategy: 'merge' })).toBe(false)
+      expect(validate({ repo: validRepo, number: 7, enable: true })).toBe(false)
+      expect(validate({ ...on, enable: 'true' })).toBe(false)
+      expect(validate({ ...on, extra: 1 })).toBe(false)
+    })
+  })
+
   describe('scm:retarget', () => {
     const validate = payloadValidators['scm:retarget']
     const base = {
