@@ -48,9 +48,12 @@ export function ConversationTab({
   // re-runs when they land. Opening another PR drops the request.
   useEffect(() => {
     if (!pendingFocus || !threads.some((thread) => thread.id === pendingFocus)) return
-    document
-      .querySelector(`[data-thread-id="${CSS.escape(pendingFocus)}"]`)
-      ?.scrollIntoView({ block: 'center' })
+    const card = document.querySelector<HTMLElement>(
+      `[data-thread-id="${CSS.escape(pendingFocus)}"]`,
+    )
+    card?.scrollIntoView({ block: 'center' })
+    // The highlighted card is focusable (tabIndex -1): keyboard and screen readers land on it.
+    card?.focus({ preventScroll: true })
     clearPendingFocus()
   }, [pendingFocus, threads, clearPendingFocus])
 

@@ -7,8 +7,9 @@ import {
   GitPullRequestArrow,
   MessageSquareWarning,
 } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import type { ActivityItem, ActivityReviewItem } from '../../../../shared/activity'
+import { prKey } from '../../../../shared/scm'
 import { useActivity, useOpenActivityItem } from '../../hooks/use-activity'
 import { useLocale } from '../../i18n/use-locale'
 import {
@@ -25,12 +26,12 @@ import { IconButton } from '../ui/IconButton'
 import { InlineError } from '../ui/InlineError'
 import { Spinner } from '../ui/Spinner'
 
-/** The unread mark: a small dot, nothing louder. */
+/** The unread mark: the PR list's dot for unseen PRs; read rows keep its room so leads line up. */
 function UnreadDot({ unread }: { unread: boolean }): React.JSX.Element {
   return (
     <span
       aria-hidden
-      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${unread ? 'bg-accent' : 'bg-transparent'}`}
+      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${unread ? 'bg-danger' : 'bg-transparent'}`}
     />
   )
 }
@@ -46,38 +47,80 @@ function VoteIcon({ vote }: { vote: ActivityReviewItem['vote'] }): React.JSX.Ele
   return <MessageSquareWarning size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden />
 }
 
-/** One-line rows (orphan, vote, review request): icon, sentence, time. */
-function EventRow({
-  item,
-  icon,
-  children,
-  onOpen,
-}: {
-  item: ActivityItem
-  icon: React.ReactNode
-  children: React.ReactNode
-  onOpen: (item: ActivityItem) => void
-}): React.JSX.Element {
-  const { t } = useTranslation()
+/** Relative time, the absolute one in the tooltip. */
+function When({ at }: { at: string }): React.JSX.Element {
   const { locale } = useLocale()
+  return (
+    <span className="shrink-0" title={formatAbsoluteTime(at, locale)}>
+      {formatRelativeTime(at, locale)}
+    </span>
+  )
+}
+
+interface RowShellProps {
+  item: ActivityItem
+  /** The item's PR is the one open in the review. */
+  current: boolean
+  lead: React.ReactNode
+  title: React.ReactNode
+  /** Before the time on the meta line (a comment's file and line). */
+  meta?: React.ReactNode
+  body?: React.ReactNode
+  onOpen: (item: ActivityItem) => void
+  /** A row that names itself (comments) says "Unread" there instead of in the title. */
+  ariaLabel?: string
+  ariaDescribedBy?: string
+}
+
+/**
+ * The one row shell of every event kind, on the PR list's scale (`PrListItem`):
+ * a `text-sm` title, `font-medium` in full colour while unread and
+ * `text-text/70` once read; `text-xs` meta; the left accent border (and
+ * `aria-current`) when the item's PR is the one open in the review.
+ */
+function RowShell({
+  item,
+  current,
+  lead,
+  title,
+  meta,
+  body,
+  onOpen,
+  ariaLabel,
+  ariaDescribedBy,
+}: RowShellProps): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <button
       type="button"
       onClick={() => onOpen(item)}
       data-activity-item={item.id}
       data-read={item.read || undefined}
-      className={`flex w-full items-start gap-1.5 px-3 py-1.5 text-left transition-colors duration-150 hover:bg-bg/60 ${
-        item.read ? 'opacity-60' : ''
+      aria-current={current || undefined}
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      className={`flex w-full items-start gap-1.5 border-l-2 px-3 py-2 text-left transition-colors duration-150 ${
+        current ? 'border-accent bg-accent/10' : 'border-transparent hover:bg-bg/60'
       }`}
     >
       <UnreadDot unread={!item.read} />
-      {icon}
-      <span className="min-w-0 flex-1 text-xs text-text">
-        {!item.read && <span className="sr-only">{t('layout.inbox.unreadItem')} </span>}
-        {children}
-      </span>
-      <span className="shrink-0 text-[11px] text-muted" title={formatAbsoluteTime(item.at, locale)}>
-        {formatRelativeTime(item.at, locale)}
+      {lead}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span
+          className={`break-words text-sm leading-snug ${
+            item.read ? 'text-text/70' : 'font-medium text-text'
+          }`}
+        >
+          {!item.read && !ariaLabel && (
+            <span className="sr-only">{t('layout.inbox.unreadItem')} </span>
+          )}
+          {title}
+        </span>
+        <span className="flex min-w-0 items-baseline gap-2 text-xs text-muted">
+          {meta}
+          <When at={item.at} />
+        </span>
+        {body}
       </span>
     </button>
   )
@@ -85,54 +128,57 @@ function EventRow({
 
 function ItemRow({
   item,
+  current,
   onOpen,
 }: {
   item: ActivityItem
+  current: boolean
   onOpen: (item: ActivityItem) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const { locale } = useLocale()
   const excerptId = useId()
-  const when = formatRelativeTime(item.at, locale)
-  const tone = item.read ? 'opacity-60' : ''
+  const shell = { item, current, onOpen }
 
   if (item.kind === 'orphan') {
     return (
-      <EventRow
-        item={item}
-        onOpen={onOpen}
-        icon={
+      <RowShell
+        {...shell}
+        lead={
           <GitPullRequestArrow size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden />
         }
-      >
-        {t('layout.inbox.orphan', {
-          parent: item.parent.number,
-          base: item.parent.mergedInto,
-        })}{' '}
-        <span className="text-warning">
-          {t('layout.inbox.retargetTo', { base: item.suggestedBase })}
-        </span>
-      </EventRow>
+        title={
+          // Branch names go in as components (plain text), never as values Trans would parse.
+          <Trans
+            i18nKey="layout.inbox.orphan"
+            values={{ parent: item.parent.number }}
+            components={{
+              base: <span>{item.parent.mergedInto}</span>,
+              target: <span>{item.suggestedBase}</span>,
+              warn: <span className="text-warning" />,
+            }}
+          />
+        }
+      />
     )
   }
   if (item.kind === 'review') {
     return (
-      <EventRow item={item} onOpen={onOpen} icon={<VoteIcon vote={item.vote} />}>
-        {t(`layout.inbox.vote.${item.vote}`, {
+      <RowShell
+        {...shell}
+        lead={<VoteIcon vote={item.vote} />}
+        title={t(`layout.inbox.vote.${item.vote}`, {
           reviewer: item.reviewer.displayName ?? item.reviewer.login,
         })}
-      </EventRow>
+      />
     )
   }
   if (item.kind === 'review_request') {
     return (
-      <EventRow
-        item={item}
-        onOpen={onOpen}
-        icon={<Eye size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />}
-      >
-        {t(item.required ? 'layout.inbox.requested' : 'layout.inbox.requestedOptional')}
-      </EventRow>
+      <RowShell
+        {...shell}
+        lead={<Eye size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />}
+        title={t(item.required ? 'layout.inbox.requested' : 'layout.inbox.requestedOptional')}
+      />
     )
   }
 
@@ -149,66 +195,71 @@ function ItemRow({
   })
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(item)}
-      data-activity-item={item.id}
-      data-read={item.read || undefined}
+    <RowShell
+      {...shell}
       // The name says who and where (and whether it is unread); the excerpt is its description.
-      aria-label={item.read ? label : t('layout.inbox.unreadLabel', { label })}
-      aria-describedby={excerptId}
-      className={`flex w-full items-start gap-1.5 px-3 py-1.5 text-left transition-colors duration-150 hover:bg-bg/60 ${tone}`}
-    >
-      <UnreadDot unread={!item.read} />
-      <Avatar user={item.author} size={16} />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-w-0 items-baseline gap-1 text-[11px] text-muted">
-          <span className="shrink-0 font-medium text-text">{author}</span>
-          <span className="min-w-0 truncate font-mono" title={item.path}>
-            {where}
-          </span>
-          <span className="ml-auto shrink-0" title={formatAbsoluteTime(item.at, locale)}>
-            {when}
-          </span>
+      ariaLabel={item.read ? label : t('layout.inbox.unreadLabel', { label })}
+      ariaDescribedBy={excerptId}
+      lead={<Avatar user={item.author} size={16} />}
+      title={t(item.isReply ? 'layout.inbox.replied' : 'layout.inbox.commented', { author })}
+      meta={
+        <span className="min-w-0 truncate font-mono" title={item.path}>
+          {where}
         </span>
-        {/* Plain text on purpose: main flattened it, and it is never Markdown here. */}
-        <span id={excerptId} className="line-clamp-2 break-words text-xs text-text">
+      }
+      body={
+        // Plain text on purpose: main flattened it, and it is never Markdown here.
+        <span id={excerptId} className="line-clamp-2 break-words text-xs text-muted">
           {item.excerpt}
         </span>
-      </span>
-    </button>
+      }
+    />
   )
 }
 
 function GroupSection({
   group,
+  current,
   pending,
   onOpen,
   onMarkRead,
 }: {
   group: ActivityGroup
+  /** The group's PR is the one open in the review. */
+  current: boolean
   pending: boolean
   onOpen: (item: ActivityItem) => void
   onMarkRead: (group: ActivityGroup) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const headingId = useId()
   return (
     <section
       data-testid="inbox-group"
       data-pr-key={group.prKey}
-      aria-label={t('layout.inbox.groupLabel', { number: group.number, title: group.prTitle })}
+      aria-labelledby={headingId}
       className="border-b border-border/60 py-1"
     >
       <div className="flex min-w-0 items-start gap-1.5 px-3 pt-1.5">
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-medium text-text" title={group.prTitle}>
-            <span className="text-muted">#{group.number}</span> {group.prTitle}
+          <span
+            id={headingId}
+            className="block truncate text-sm font-medium text-text"
+            title={group.prTitle}
+          >
+            {/* The title goes in as a component (plain text), never as a value Trans would parse. */}
+            <Trans
+              i18nKey="layout.inbox.groupLabel"
+              values={{ number: group.number }}
+              components={{
+                num: <span className="text-muted" />,
+                name: <span>{group.prTitle}</span>,
+              }}
+            />
           </span>
-          <span className="block truncate text-[11px] text-muted">{group.repo.fullName}</span>
+          <span className="block truncate text-xs text-muted">{group.repo.fullName}</span>
         </span>
-        {pending && (
-          <Spinner size={13} className="mt-0.5" />
-        )}
+        {pending && <Spinner size={13} className="mt-0.5" />}
         {/* Stays mounted once the group is read (quiet, aria-disabled), so focus is not lost. */}
         <IconButton
           size="xs"
@@ -223,7 +274,7 @@ function GroupSection({
       <ul>
         {group.items.map((item) => (
           <li key={item.id}>
-            <ItemRow item={item} onOpen={onOpen} />
+            <ItemRow item={item} current={current} onOpen={onOpen} />
           </li>
         ))}
       </ul>
@@ -233,8 +284,9 @@ function GroupSection({
 
 /**
  * The sidebar's Inbox: what happened on your PRs (new comments, orphaned
- * stacks), grouped by PR, newest first. Quiet on purpose: unread is a dot,
- * read rows fade. A row opens the PR at its thread and marks it read. The
+ * stacks, votes, review requests), grouped by PR, newest first. Unread reads
+ * like the PR list: the same dot and a stronger title; read rows drop to the
+ * list's seen tone. A row opens the PR at its thread and marks it read. The
  * search field above filters it locally.
  */
 export function InboxView(): React.JSX.Element {
@@ -242,6 +294,10 @@ export function InboxView(): React.JSX.Element {
   const searchQuery = useAppStore((s) => s.searchQuery)
   const { state, loadError, markError, load, markRead, retryMarkRead } = useActivity()
   const { open, pendingKey, error: openError } = useOpenActivityItem()
+  // The PR open in the review (not one only remembered behind the home dashboard).
+  const currentKey = useAppStore((s) =>
+    s.mainView === 'review' && s.selectedPr ? prKey(s.selectedPr.repo, s.selectedPr.number) : null,
+  )
 
   const groups = useMemo(
     () =>
@@ -307,6 +363,7 @@ export function InboxView(): React.JSX.Element {
         <GroupSection
           key={group.prKey}
           group={group}
+          current={group.prKey === currentKey}
           pending={pendingKey === group.prKey}
           onOpen={open}
           onMarkRead={(target) =>

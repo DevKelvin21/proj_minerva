@@ -82,9 +82,11 @@ test('a new line comment lands in the Inbox and opens the review at its line', a
   await expect(thread).toBeInViewport()
   await expect(thread).toContainText('Should this retry on 409')
 
-  // Read: no badge, the row stays (faded) and the header says so.
+  // Read: no badge, the row stays (in the list's seen tone) and the header says so.
   await expect(badge(window)).toHaveCount(0)
   await expect(incoming(window)).toHaveAttribute('data-read', 'true')
+  // Its PR is the one open in the review: the row is marked current, like the PR list's.
+  await expect(incoming(window)).toHaveAttribute('aria-current', 'true')
   await expect(inbox(window)).toContainText('All caught up')
   await attachScreenshot(window, testInfo, 'inbox-opened-at-line')
 })
@@ -123,6 +125,25 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
   await expect(viewSwitch(window).getByRole('button', { name: /^Inbox/ })).toHaveAccessibleName(
     'Inbox: 1 unread',
   )
+
+  // At the narrowest sidebar (220px) the four views still read: no label is cut.
+  const handle = window.getByRole('separator', { name: 'Resize sidebar' })
+  await handle.focus()
+  await window.keyboard.press('Home')
+  await expect(handle).toHaveAttribute('aria-valuenow', '220')
+  await expect(badge(window)).toBeVisible()
+  const clipped = await viewSwitch(window)
+    .getByRole('button')
+    .evaluateAll((buttons) =>
+      buttons
+        .map((button) => button.querySelector('span'))
+        .filter((label) => label !== null && label.scrollWidth > label.clientWidth)
+        .map((label) => label?.textContent),
+    )
+  expect(clipped).toEqual([])
+  // ...and the badges stay whole next to their labels.
+  await expect(badge(window)).toHaveText('1')
+  await attachScreenshot(window, testInfo, 'inbox-sidebar-220')
 
   // Folded to the rail, the Inbox button carries the count.
   await window.getByTestId('sidebar-toggle').click()

@@ -97,6 +97,33 @@ describe('matchesActivityQuery', () => {
     expect(matchesActivityQuery(group, 'carts.ts shopwave/api')).toBe(true)
     expect(matchesActivityQuery(group, 'refund')).toBe(false)
   })
+
+  it('matches people by the display name the rows show, as well as the login', () => {
+    const [named] = groupActivity([
+      comment('a', { author: { login: 'jrivas', displayName: 'Julia Rivas' } }),
+      {
+        ...orphan,
+        prKey: 'github:shopwave/api#1',
+        repo: api,
+        number: 1,
+        id: 'review:x',
+        kind: 'review',
+        reviewer: { login: 'dkumar', displayName: 'Dev Kumar' },
+        vote: 'changes_requested',
+      },
+    ])
+    expect(matchesActivityQuery(named, 'julia')).toBe(true)
+    expect(matchesActivityQuery(named, 'jrivas')).toBe(true)
+    expect(matchesActivityQuery(named, 'dev kumar')).toBe(true)
+    expect(matchesActivityQuery(named, 'dkumar')).toBe(true)
+    expect(matchesActivityQuery(named, 'nobody')).toBe(false)
+  })
+
+  it("matches an orphan's parent and branches", () => {
+    const [child] = groupActivity([{ ...orphan, suggestedBase: 'release/2.0' }])
+    expect(matchesActivityQuery(child, '#8')).toBe(true)
+    expect(matchesActivityQuery(child, 'release/2.0')).toBe(true)
+  })
 })
 
 describe('fileName', () => {

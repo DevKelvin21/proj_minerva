@@ -133,12 +133,14 @@ export const en = {
       allRead: 'All caught up',
       markAllRead: 'Mark all read',
       markPrRead: 'Mark #{{number}} read',
-      groupLabel: '#{{number}} {{title}}',
+      groupLabel: '<num>#{{number}}</num> <name/>',
       conversation: 'conversation',
       commentBy: '{{author}} commented on {{where}}',
       replyBy: '{{author}} replied on {{where}}',
-      orphan: 'Its base PR #{{parent}} was merged into {{base}}.',
-      retargetTo: 'Retarget to {{base}}.',
+      commented: '{{author}} commented',
+      replied: '{{author}} replied',
+      orphan:
+        'Its base PR #{{parent}} was merged into <base/>. <warn>Retarget to <target/>.</warn>',
       vote: {
         approved: '{{reviewer}} approved.',
         approved_with_suggestions: '{{reviewer}} approved with suggestions.',
@@ -153,7 +155,8 @@ export const en = {
       unreadItem: 'Unread.',
       unreadLabel: 'Unread: {{label}}',
       emptyTitle: 'Nothing new on your PRs.',
-      emptyHint: 'New comments on your PRs, and PRs whose base was merged, show up here.',
+      emptyHint:
+        'New comments and votes on your PRs, review requests, and PRs whose base was merged show up here.',
       noMatches: 'No activity matches "{{query}}".',
     },
     queue: {

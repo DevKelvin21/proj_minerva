@@ -114,7 +114,8 @@ function SidebarViewSwitch({
     <div
       role="group"
       aria-label={t('layout.sidebar.viewSwitch')}
-      className="flex w-full rounded-md border border-border bg-bg p-0.5 text-xs"
+      // Wraps instead of clipping a label; at the narrowest widths (220px) as two rows of two.
+      className="@container flex w-full flex-wrap rounded-md border border-border bg-bg p-0.5 text-xs"
     >
       {options.map((option) => (
         <button
@@ -128,7 +129,7 @@ function SidebarViewSwitch({
               : undefined
           }
           onClick={() => onChange(option.value)}
-          className={`flex min-w-0 flex-auto items-center justify-center gap-0.5 rounded px-1 py-1 font-medium transition-colors duration-150 ${
+          className={`flex min-w-0 flex-auto items-center justify-center gap-0.5 rounded px-0.5 py-1 font-medium @max-[13.5rem]:basis-1/2 transition-colors duration-150 ${
             value === option.value ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
           }`}
         >

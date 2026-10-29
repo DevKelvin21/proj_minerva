@@ -159,7 +159,9 @@ export function ThreadCard({
     <div
       data-thread-id={thread.id}
       data-collapsed={collapsed || undefined}
-      className={`min-w-0 rounded-md border bg-panel ${
+      // Focusable (not tabbable) while highlighted: arriving from the Inbox moves focus here.
+      tabIndex={highlighted ? -1 : undefined}
+      className={`min-w-0 rounded-md border bg-panel focus:outline-none ${
         highlighted ? 'border-accent ring-1 ring-accent/60' : 'border-border'
       }`}
     >

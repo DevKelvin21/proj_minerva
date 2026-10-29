@@ -132,12 +132,14 @@ export const es: MessageShape<typeof en> = {
       allRead: 'Estás al día',
       markAllRead: 'Marcar todo como leído',
       markPrRead: 'Marcar #{{number}} como leído',
-      groupLabel: '#{{number}} {{title}}',
+      groupLabel: '<num>#{{number}}</num> <name/>',
       conversation: 'conversación',
       commentBy: '{{author}} comentó en {{where}}',
       replyBy: '{{author}} respondió en {{where}}',
-      orphan: 'Su PR base #{{parent}} se fusionó en {{base}}.',
-      retargetTo: 'Cambia el destino a {{base}}.',
+      commented: '{{author}} comentó',
+      replied: '{{author}} respondió',
+      orphan:
+        'Su PR base #{{parent}} se fusionó en <base/>. <warn>Cambia el destino a <target/>.</warn>',
       vote: {
         approved: '{{reviewer}} aprobó.',
         approved_with_suggestions: '{{reviewer}} aprobó con sugerencias.',
@@ -152,7 +154,8 @@ export const es: MessageShape<typeof en> = {
       unreadItem: 'Sin leer.',
       unreadLabel: 'Sin leer: {{label}}',
       emptyTitle: 'Nada nuevo en tus PRs.',
-      emptyHint: 'Aquí aparecen los comentarios nuevos en tus PRs y los PRs cuya base se fusionó.',
+      emptyHint:
+        'Aquí aparecen los comentarios y votos nuevos en tus PRs, las solicitudes de revisión y los PRs cuya base se fusionó.',
       noMatches: 'Ninguna actividad coincide con "{{query}}".',
     },
     queue: {
