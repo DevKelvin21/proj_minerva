@@ -5,7 +5,8 @@ import { Badge } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { SelectableCard } from '../ui/SelectableCard'
 
-function CountBadge({
+/** A count that decides whether to open the repo; zero hides it. */
+function CountPill({
   value,
   label,
   title,
@@ -14,7 +15,7 @@ function CountBadge({
   value: number
   label: string
   title: string
-  tone: 'accent' | 'warning' | 'neutral'
+  tone: 'warning' | 'neutral'
 }): React.JSX.Element | null {
   if (value === 0) return null
   return (
@@ -74,30 +75,30 @@ export function RepoCard({
             {t('home.repoCard.openCount', { count: summary.open })}
           </span>
         )}
-        <CountBadge
+        <CountPill
           value={summary.needsMyReview}
           label={t('home.repoCard.needsReview', { count: summary.needsMyReview })}
           title={t('home.repoCard.needsReviewTitle')}
           tone="warning"
         />
-        <CountBadge
+        <CountPill
           value={summary.optional}
           label={t('home.repoCard.optional', { count: summary.optional })}
           title={t('home.repoCard.optionalTitle')}
           tone="neutral"
         />
-        <CountBadge
+        <CountPill
           value={summary.mine}
           label={t('home.repoCard.mine', { count: summary.mine })}
           title={t('home.repoCard.mineTitle')}
-          tone="accent"
+          tone="neutral"
         />
       </span>
       {(summary.stacks > 0 || summary.orphans > 0) && (
         <span className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-muted">
           {summary.stacks > 0 && (
             <span className="inline-flex items-center gap-1" title={t('home.repoCard.stacksTitle')}>
-              <Layers size={11} className="text-accent" aria-hidden />
+              <Layers size={11} aria-hidden />
               {t('home.repoCard.stacks', { count: summary.stacks })}
             </span>
           )}

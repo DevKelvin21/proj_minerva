@@ -1,9 +1,19 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 
-export type BadgeTone = 'neutral' | 'accent' | 'success' | 'danger' | 'warning' | 'info' | 'merged'
+export type BadgeTone =
+  | 'neutral'
+  | 'outline'
+  | 'accent'
+  | 'success'
+  | 'danger'
+  | 'warning'
+  | 'info'
+  | 'merged'
 
 const toneClasses: Record<BadgeTone, string> = {
   neutral: 'bg-border/60 text-muted',
+  // Quieter than neutral: a tag, a branch, a draft. An inset ring, so it keeps the same height.
+  outline: 'text-muted ring-1 ring-inset ring-border',
   accent: 'bg-accent/15 text-accent',
   success: 'bg-success/15 text-success',
   danger: 'bg-danger/15 text-danger',

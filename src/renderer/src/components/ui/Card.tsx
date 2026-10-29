@@ -1,12 +1,16 @@
 import type { HTMLAttributes } from 'react'
 import { CARD_BASE, CARD_PADDING, type CardPadding } from './card-classes'
 
-/** `panel` is a card on the canvas; `inset` groups other cards (a stack on the board). */
-export type CardTone = 'panel' | 'inset'
+/**
+ * `panel` is a card on the canvas; `inset` groups other cards (a stack on the
+ * board); `warning` is an inset group that needs attention (an orphaned stack).
+ */
+export type CardTone = 'panel' | 'inset' | 'warning'
 
 const toneClasses: Record<CardTone, string> = {
   panel: 'border-border bg-panel',
   inset: 'border-border bg-bg/40',
+  warning: 'border-warning/50 bg-bg/40',
 }
 
 interface CardProps extends HTMLAttributes<HTMLElement> {

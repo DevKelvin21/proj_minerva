@@ -25,6 +25,9 @@ import {
   normalizeFeatureName,
   parseFeatureNames,
   parseHiddenFeatures,
+  retargetNoteKey,
+  scopeOwnerLabel,
+  uniqueProviderErrors,
   stackOrder,
   tagKey,
   stackPosition,
@@ -451,5 +454,32 @@ describe('stacks on the board', () => {
     expect(stackPosition(chain, prKey(API, 3))).toEqual({ index: 3, total: 4, previous: prKey(API, 2), next: prKey(API, 4) })
     expect(stackPosition(chain, prKey(API, 4))).toEqual({ index: 4, total: 4, previous: prKey(API, 3), next: null })
     expect(stackPosition(chain, prKey(WEB, 1))).toBeNull()
+  })
+})
+
+describe('page header helpers', () => {
+  it('scopeOwnerLabel: the organization (Azure) or the owner (GitHub)', () => {
+    expect(scopeOwnerLabel(API)).toBe('contoso')
+    expect(scopeOwnerLabel(GH)).toBe(GH.owner)
+  })
+
+  it('uniqueProviderErrors: one line per provider, first wins', () => {
+    const errors = uniqueProviderErrors([
+      { provider: 'azure', code: 'NETWORK', message: 'first' },
+      { provider: 'github', code: 'UNAUTHENTICATED', message: 'gh' },
+      { provider: 'azure', code: 'NETWORK', message: 'again' },
+    ])
+    expect(errors.map((error) => error.provider + ':' + error.message)).toEqual([
+      'azure:first',
+      'github:gh',
+    ])
+  })
+
+  it('retargetNoteKey: the PR the note is about', () => {
+    expect(retargetNoteKey(null)).toBeNull()
+    expect(retargetNoteKey({ kind: 'retargeted', pr: { repo: API, number: 105 } })).toBe(
+      prKey(API, 105),
+    )
+    expect(retargetNoteKey({ kind: 'conflict', prKey: 'k' })).toBe('k')
   })
 })

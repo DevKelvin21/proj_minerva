@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Check, Eye, EyeOff, Pencil, RefreshCw, Tag, X } from 'lucide-react'
+import { Check, Eye, EyeOff, Pencil, SearchX, Tag, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
@@ -9,18 +9,19 @@ import {
   FEATURE_NAME_MAX_LENGTH,
   normalizeFeatureName,
   repoOwnerLabel,
+  scopeOwnerLabel,
   type FeatureGroup,
 } from '../../lib/dashboard'
 import { useAppStore } from '../../stores/app-store'
 import { useDashboardStore } from '../../stores/dashboard-store'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
-import { IconButton } from '../ui/IconButton'
+import { Input } from '../ui/Input'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { ApprovalBar } from './FeatureCard'
 import { useEscapeBack } from '../../hooks/use-escape-back'
-import { HomeBreadcrumb } from './HomeBreadcrumb'
-import { ContinueReviewButton, ProviderErrorList } from './HomeShared'
+import { HomePageHeader, PageTitle } from './HomePageHeader'
+import { PageEmpty, PageSkeleton, ProviderErrorList } from './HomeShared'
 import { PrCard } from './PrCard'
 import { InlineError } from '../ui/InlineError'
 
@@ -52,11 +53,10 @@ function FeatureName({ group }: { group: FeatureGroup }): React.JSX.Element {
 
   if (!editing) {
     return (
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <h1 className="min-w-0 truncate text-base font-semibold text-text" title={group.name}>
-          {group.name}
-        </h1>
+      <div className="flex min-w-0 items-center gap-2">
+        <PageTitle text={group.name}>{group.name}</PageTitle>
         <Button
+          variant="ghost"
           size="xs"
           data-testid="feature-rename"
           onClick={startEditing}
@@ -76,8 +76,9 @@ function FeatureName({ group }: { group: FeatureGroup }): React.JSX.Element {
         save()
       }}
     >
-      <input
+      <Input
         type="text"
+        fieldSize="sm"
         autoFocus
         value={draft}
         maxLength={FEATURE_NAME_MAX_LENGTH}
@@ -91,9 +92,9 @@ function FeatureName({ group }: { group: FeatureGroup }): React.JSX.Element {
         }}
         aria-label={t('home.featurePage.nameLabel')}
         placeholder={t('home.featurePage.namePlaceholder')}
-        className="min-w-[12rem] rounded-md border border-border bg-bg px-2 py-1 text-sm text-text placeholder:text-muted focus:border-accent"
+        className="min-w-[12rem]"
       />
-      <Button type="submit" variant="primary" size="xs" icon={<Check size={12} aria-hidden />}>
+      <Button type="submit" size="xs" icon={<Check size={12} aria-hidden />}>
         {t('home.featurePage.save')}
       </Button>
       <Button size="xs" onClick={() => setEditing(false)} icon={<X size={12} aria-hidden />}>
@@ -115,7 +116,7 @@ function FeatureName({ group }: { group: FeatureGroup }): React.JSX.Element {
  */
 export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.Element {
   const { t } = useTranslation()
-  const { pullRequests, providerErrors, loading, error, refresh } = useDashboard()
+  const { pullRequests, providerErrors, loading, error, fetchedAt, refresh } = useDashboard()
   const identity = useViewerIdentity()
   const featureNames = useDashboardStore((s) => s.featureNames)
   const hiddenFeatures = useDashboardStore((s) => s.hiddenFeatures)
@@ -141,18 +142,35 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
   }
 
   if (!group) {
+    const waiting = pullRequests === null
     return (
       <div data-testid="feature-page" className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <HomeBreadcrumb
-          crumbs={[homeCrumb, { key: 'feature', label: featureKey, text: featureKey }]}
+        <HomePageHeader
+          crumbs={[homeCrumb]}
           onBack={goOverview}
+          title={waiting ? null : t('home.featurePage.untitled')}
+          fetchedAt={fetchedAt}
+          busy={loading}
+          onRefresh={refresh}
         />
-        <p className="p-4 text-sm text-muted">
-          {pullRequests === null ? t('home.overview.loading') : t('home.featurePage.notFound')}
-        </p>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
+          {error && waiting ? (
+            <InlineError message={t('home.overview.loadFailed', { error })} onRetry={refresh} />
+          ) : waiting ? (
+            <PageSkeleton />
+          ) : (
+            <>
+              <ProviderErrorList errors={providerErrors} />
+              <PageEmpty icon={SearchX} title={t('home.featurePage.notFound')} />
+            </>
+          )}
+        </div>
       </div>
     )
   }
+
+  const firstRepo = group.repos[0]?.repo
+  const owner = firstRepo ? scopeOwnerLabel(firstRepo) : null
 
   return (
     <div
@@ -161,71 +179,71 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
       aria-label={t('home.featurePage.ariaLabel', { name: group.name })}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      <HomeBreadcrumb
-        crumbs={[homeCrumb, { key: 'feature', label: group.name, text: group.name }]}
+      <HomePageHeader
+        crumbs={owner ? [homeCrumb, { key: 'owner', label: owner, text: owner }] : [homeCrumb]}
         onBack={goOverview}
-        trailing={
-          <>
-            <ContinueReviewButton />
-            <IconButton
-              icon={<RefreshCw size={14} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
-              label={t('home.overview.refresh')}
-              onClick={refresh}
-              disabled={loading}
-            />
-          </>
+        icon={firstRepo ? <ScmProviderIcon provider={firstRepo.provider} size={16} /> : undefined}
+        title={group.name}
+        heading={<FeatureName key={group.name + '\n' + String(group.renamed)} group={group} />}
+        meta={
+          t('home.featureCard.repos', { count: group.repos.length }) +
+          ' · ' +
+          t('home.featureCard.prs', { count: group.prCount })
         }
-      />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3">
-        <header className="flex min-w-0 flex-col gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <FeatureName key={group.name + '\n' + String(group.renamed)} group={group} />
-            <Button
-              size="xs"
-              data-testid="feature-hide"
-              aria-pressed={group.hidden}
-              onClick={() => setFeatureHidden(group.key, !group.hidden)}
-              className="ml-auto"
-              icon={group.hidden ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
-            >
-              {group.hidden ? t('home.featurePage.unhide') : t('home.featurePage.hide')}
-            </Button>
-          </div>
-          {group.hidden && (
-            <p className="text-[11px] text-muted">{t('home.featurePage.hiddenHint')}</p>
-          )}
-          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted">
-            <Badge data-testid="feature-tag" className="max-w-full" icon={<Tag size={11} aria-hidden />}>
-              <span className="truncate">{group.tag}</span>
-            </Badge>
+        actions={
+          <Button
+            size="sm"
+            data-testid="feature-hide"
+            aria-pressed={group.hidden}
+            onClick={() => setFeatureHidden(group.key, !group.hidden)}
+            icon={group.hidden ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
+          >
+            {group.hidden ? t('home.featurePage.unhide') : t('home.featurePage.hide')}
+          </Button>
+        }
+        fetchedAt={fetchedAt}
+        busy={loading}
+        onRefresh={refresh}
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted">
+          <Badge
+            tone="outline"
+            data-testid="feature-tag"
+            className="max-w-full"
+            icon={<Tag size={11} aria-hidden />}
+          >
+            <span className="min-w-0 truncate">{group.tag}</span>
+          </Badge>
+          <span className="min-w-0">
+            {group.renamed
+              ? t('home.featurePage.renamedHint', { tag: group.tag })
+              : t('home.featurePage.tagHint', { tag: group.tag, count: group.repos.length })}
+          </span>
+        </div>
+        {group.hidden && <p className="text-[11px] text-muted">{t('home.featurePage.hiddenHint')}</p>}
+        <div className="flex max-w-md flex-col gap-1">
+          <ApprovalBar
+            approved={group.approved}
+            total={group.prCount}
+            label={t('home.featurePage.progressAriaLabel')}
+          />
+          <span className="flex flex-wrap gap-x-3 text-[11px] text-muted">
             <span>
-              {group.renamed
-                ? t('home.featurePage.renamedHint', { tag: group.tag })
-                : t('home.featurePage.tagHint', { tag: group.tag, count: group.repos.length })}
+              {t('home.featurePage.approvedSummary', {
+                approved: group.approved,
+                total: group.prCount,
+              })}
             </span>
-          </div>
-          <div className="flex max-w-md flex-col gap-1">
-            <ApprovalBar
-              approved={group.approved}
-              total={group.prCount}
-              label={t('home.featurePage.progressAriaLabel')}
-            />
-            <span className="flex flex-wrap gap-x-3 text-[11px] text-muted">
-              <span>
-                {t('home.featurePage.approvedSummary', {
-                  approved: group.approved,
-                  total: group.prCount,
-                })}
+            {group.needsMyReview > 0 && (
+              <span className="text-warning">
+                {t('home.featurePage.needsReview', { count: group.needsMyReview })}
               </span>
-              {group.needsMyReview > 0 && (
-                <span className="text-warning">
-                  {t('home.featurePage.needsReview', { count: group.needsMyReview })}
-                </span>
-              )}
-            </span>
-          </div>
-        </header>
+            )}
+          </span>
+        </div>
+      </HomePageHeader>
 
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
         {error && (
           <InlineError message={t('home.overview.refreshFailed', { error })} onRetry={refresh} />
         )}

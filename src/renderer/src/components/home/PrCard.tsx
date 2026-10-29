@@ -1,4 +1,4 @@
-import { MessageSquare } from 'lucide-react'
+import { GitPullRequest, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary, ReviewDecision } from '../../../../shared/types'
@@ -11,7 +11,7 @@ import { CiStatusIcon } from '../ui/CiStatusIcon'
 import { Spinner } from '../ui/Spinner'
 import { DiffStat } from '../ui/DiffStat'
 import { SelectableCard } from '../ui/SelectableCard'
-import { OrphanBadge, StackStateIcon } from '../stacks/StackTree'
+import { OrphanBadge } from '../stacks/StackTree'
 
 const MAX_LABELS = 3
 
@@ -29,7 +29,26 @@ function reviewDecisionTone(decision: ReviewDecision): string {
   }
 }
 
-/** "Required reviewer" / "Optional reviewer" / "Yours" chips from the viewer relation. */
+/**
+ * The PR glyph before the number. Decorative: a draft says so once, with its
+ * badge, so the icon only turns muted (same shape).
+ */
+export function PrStateIcon({ isDraft }: { isDraft: boolean }): React.JSX.Element {
+  return (
+    <GitPullRequest
+      size={14}
+      aria-hidden
+      className={`shrink-0 ${isDraft ? 'text-muted' : 'text-success'}`}
+    />
+  )
+}
+
+type RoleKey = 'toReview' | 'required' | 'optional' | 'mine'
+
+/**
+ * The viewer's role, in the filter's words: "To review" (a required review
+ * still owed, in warning), "Required" (already voted), "Optional", "Yours".
+ */
 export function RoleBadges({
   pr,
   identity,
@@ -40,20 +59,24 @@ export function RoleBadges({
   const { t } = useTranslation()
   const viewer = pr.viewer
   if (!viewer) return null
-  const chips: { key: 'required' | 'optional' | 'mine'; tone: BadgeTone }[] = []
+  const chips: { key: RoleKey; role: 'required' | 'optional' | 'mine'; tone: BadgeTone }[] = []
   if (viewer.reviewer === 'required') {
-    chips.push({ key: 'required', tone: needsMyReview(pr, identity) ? 'warning' : 'neutral' })
+    chips.push(
+      needsMyReview(pr, identity)
+        ? { key: 'toReview', role: 'required', tone: 'warning' }
+        : { key: 'required', role: 'required', tone: 'neutral' },
+    )
   } else if (viewer.reviewer === 'optional') {
-    chips.push({ key: 'optional', tone: 'neutral' })
+    chips.push({ key: 'optional', role: 'optional', tone: 'neutral' })
   }
   if (viewer.isAuthor) {
-    chips.push({ key: 'mine', tone: 'accent' })
+    chips.push({ key: 'mine', role: 'mine', tone: 'neutral' })
   }
   if (chips.length === 0) return null
   return (
     <>
       {chips.map((chip) => (
-        <Badge key={chip.key} data-role={chip.key} tone={chip.tone} size="sm">
+        <Badge key={chip.key} data-role={chip.role} tone={chip.tone} size="sm">
           {t(`home.prCard.role.${chip.key}`)}
         </Badge>
       ))}
@@ -69,7 +92,7 @@ interface PrCardProps {
   dimmed?: boolean
   /** Being fetched before it can open. */
   pending?: boolean
-  /** Stack root that still targets a completed PR's branch. */
+  /** Stack root that still targets a completed PR's branch: the badge (the stack carries the border). */
   orphan?: boolean
   testId?: string
 }
@@ -104,7 +127,6 @@ export function PrCard({
       onClick={() => onOpen(pr)}
       disabled={pending}
       title={'#' + pr.number + ' ' + pr.title}
-      tone={orphan ? 'warning' : 'default'}
       className={dimmed ? 'opacity-45 hover:opacity-100 focus-visible:opacity-100' : ''}
     >
       <span className="flex min-w-0 items-start gap-1.5">
@@ -112,7 +134,7 @@ export function PrCard({
           <Spinner size={14} className="mt-0.5" />
         ) : (
           <span className="mt-0.5">
-            <StackStateIcon isDraft={pr.isDraft} />
+            <PrStateIcon isDraft={pr.isDraft} />
           </span>
         )}
         <span className="shrink-0 font-mono text-xs text-muted">#{pr.number}</span>
@@ -162,22 +184,32 @@ export function PrCard({
         <span className="flex min-w-0 flex-wrap items-center gap-1">
           <RoleBadges pr={pr} identity={identity} />
           {pr.isDraft && (
-            <Badge size="sm">{t('home.prCard.draft')}</Badge>
+            <Badge tone="outline" size="sm">
+              {t('home.prCard.draft')}
+            </Badge>
           )}
           {orphan && <OrphanBadge />}
           {shownLabels.map((label) => {
-            const style = labelStyle(label.color)
+            const dot = labelStyle(label.color)
             return (
-              <span
+              <Badge
                 key={label.name}
-                className={`inline-flex max-w-[9rem] truncate rounded-full px-1.5 text-[10px] font-medium ${
-                  style ? '' : 'bg-border/60 text-muted'
-                }`}
-                style={style ?? undefined}
+                tone="outline"
+                size="sm"
+                className="max-w-[9rem]"
                 title={label.name}
+                icon={
+                  dot ? (
+                    <span
+                      aria-hidden
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: dot.backgroundColor }}
+                    />
+                  ) : undefined
+                }
               >
-                {label.name}
-              </span>
+                <span className="min-w-0 truncate">{label.name}</span>
+              </Badge>
             )
           })}
           {hiddenLabels > 0 && (

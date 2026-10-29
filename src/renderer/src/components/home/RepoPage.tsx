@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { RefreshCw, Search } from 'lucide-react'
+import { FolderX, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey, type PrStack } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
@@ -13,6 +13,7 @@ import {
   filterPullRequestsByText,
   matchesViewerFilter,
   repoOwnerLabel,
+  retargetNoteKey,
   stackOrder,
   stacksByRepo,
   summarizeRepos,
@@ -21,13 +22,20 @@ import {
   type ViewerFilter,
 } from '../../lib/dashboard'
 import { useAppStore } from '../../stores/app-store'
-import { Chip } from '../ui/Chip'
-import { IconButton } from '../ui/IconButton'
+import { useStacksStore } from '../../stores/stacks-store'
+import { Input } from '../ui/Input'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { RetargetNote } from '../stacks/RetargetNote'
 import { useEscapeBack } from '../../hooks/use-escape-back'
-import { HomeBreadcrumb } from './HomeBreadcrumb'
-import { ContinueReviewButton, ProviderErrorList, SectionHeading } from './HomeShared'
+import { HomePageHeader } from './HomePageHeader'
+import {
+  CardSkeleton,
+  PageEmpty,
+  PageSkeleton,
+  ProviderErrorList,
+  SectionEmpty,
+  SectionHeading,
+} from './HomeShared'
 import { PrCard } from './PrCard'
 import { StackBoard } from './StackBoard'
 import { InlineError } from '../ui/InlineError'
@@ -35,10 +43,11 @@ import { InlineError } from '../ui/InlineError'
 const keyOf = (pr: PullRequestSummary): string => prKey(pr.repo, pr.number)
 
 /**
- * "All · Required reviewer · Optional reviewer · Mine · Not assigned to me",
- * each with the count it would show. Session-only (app store).
+ * "All · To review · Optional · Yours · Others" as one segmented control,
+ * each segment with the count it would show; the long meaning is the
+ * tooltip. Session-only (app store).
  */
-function FilterChips({
+function FilterSegments({
   value,
   counts,
   onChange,
@@ -52,21 +61,25 @@ function FilterChips({
     <div
       role="group"
       aria-label={t('home.filters.ariaLabel')}
-      className="flex min-w-0 flex-wrap items-center gap-1"
+      className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-0.5 overflow-x-auto rounded-md border border-border bg-bg p-0.5"
     >
       {VIEWER_FILTERS.map((filter) => {
         const active = value === filter
         return (
-          <Chip
+          <button
             key={filter}
+            type="button"
             data-testid={'repo-filter-' + filter}
-            selected={active}
+            aria-pressed={active}
+            title={t(`home.filters.titles.${filter}`)}
             onClick={() => onChange(filter)}
-            count={counts[filter]}
-            className="font-medium"
+            className={`inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 text-xs font-medium transition-colors duration-150 ${
+              active ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-border/60 hover:text-text'
+            }`}
           >
             {t(`home.filters.${filter}`)}
-          </Chip>
+            <span className="tabular-nums text-[11px] opacity-80">{counts[filter]}</span>
+          </button>
         )
       })}
     </div>
@@ -92,7 +105,7 @@ function stacksMatchingText(
  */
 export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
   const { t } = useTranslation()
-  const { pullRequests, providerErrors, loading, error, refresh } = useDashboard()
+  const { pullRequests, providerErrors, loading, error, fetchedAt, refresh } = useDashboard()
   const {
     stacks,
     loading: stacksLoading,
@@ -104,6 +117,7 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
   const filter = useAppStore((s) => s.repoFilter)
   const setFilter = useAppStore((s) => s.setRepoFilter)
   const navigateHome = useAppStore((s) => s.navigateHome)
+  const noteKey = useStacksStore((s) => retargetNoteKey(s.lastRetarget))
   const [query, setQuery] = useState('')
   const { open, openNode, reviewStack, pendingKey, error: openError } = useHomeOpenPr()
 
@@ -142,6 +156,16 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
     [textMatched, board.stackedKeys, filter],
   )
   const hasUnknownRelation = repoPrs.some((pr) => !pr.viewer)
+  // The retarget outcome sits under its stack (StackBoard). Once the PR has
+  // left every stack on screen (a fixed orphan is no stack any more), it
+  // sits with the PRs not in a stack, where that PR now is.
+  const noteInBoard = useMemo(
+    () =>
+      noteKey !== null && boardVisible.some((stack) => stackOrder(stack).includes(noteKey)),
+    [noteKey, boardVisible],
+  )
+  const noteWithLoose =
+    noteKey !== null && !noteInBoard && repoPrs.some((pr) => keyOf(pr) === noteKey)
 
   const refreshAll = (): void => {
     refresh()
@@ -154,31 +178,43 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
     text: t('home.breadcrumb.home'),
     onClick: goOverview,
   }
+  const allProviderErrors = [...providerErrors, ...stackErrors]
 
   if (!summary) {
+    const waiting = pullRequests === null && stacks === null
     return (
       <div data-testid="repo-page" className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <HomeBreadcrumb
-          crumbs={[homeCrumb, { key: 'repo', label: repoKey, text: repoKey }]}
+        <HomePageHeader
+          crumbs={[homeCrumb]}
           onBack={goOverview}
+          title={waiting ? null : t('home.repoPage.untitled')}
+          fetchedAt={fetchedAt}
+          busy={busy}
+          onRefresh={refreshAll}
         />
-        <p className="p-4 text-sm text-muted">
-          {pullRequests === null && stacks === null
-            ? t('home.overview.loading')
-            : t('home.repoPage.notFound')}
-        </p>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
+          {error && pullRequests === null ? (
+            <InlineError message={t('home.overview.loadFailed', { error })} onRetry={refreshAll} />
+          ) : waiting ? (
+            <PageSkeleton />
+          ) : (
+            <>
+              <ProviderErrorList errors={allProviderErrors} />
+              <PageEmpty icon={FolderX} title={t('home.repoPage.notFound')} />
+            </>
+          )}
+        </div>
       </div>
     )
   }
 
   const repo = summary.repo
-  const repoLabel = (
-    <span className="inline-flex min-w-0 items-center gap-1.5">
-      <ScmProviderIcon provider={repo.provider} size={12} />
-      <span className="truncate">{repo.fullName}</span>
-    </span>
-  )
+  const owner = repoOwnerLabel(repo)
   const showStacksSection = board.stacks.length > 0 || stacks === null
+  const meta = [
+    t('home.repoCard.openCount', { count: filteredCounts.open }),
+    ...(summary.stacks > 0 ? [t('home.repoCard.stacks', { count: summary.stacks })] : []),
+  ].join(' · ')
 
   return (
     <div
@@ -187,61 +223,41 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
       aria-label={t('home.repoPage.ariaLabel', { repo: repo.fullName })}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      <HomeBreadcrumb
-        crumbs={[homeCrumb, { key: 'repo', label: repoLabel, text: repo.fullName }]}
+      <HomePageHeader
+        crumbs={[homeCrumb, { key: 'owner', label: owner, text: owner }]}
         onBack={goOverview}
-        trailing={
-          <>
-            <ContinueReviewButton />
-            <IconButton
-              icon={<RefreshCw size={14} className={busy ? 'animate-spin motion-reduce:animate-none' : ''} />}
-              label={t('home.overview.refresh')}
-              onClick={refreshAll}
-              disabled={busy}
-            />
-          </>
-        }
-      />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3">
-        <header className="flex min-w-0 flex-col gap-2">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h1 className="min-w-0 truncate text-base font-semibold text-text" title={repo.fullName}>
-              {repo.name}
-            </h1>
-            <span className="text-xs text-muted">{repoOwnerLabel(repo)}</span>
-            <span className="text-xs text-muted">
-              {t('home.overview.totals.open', { count: filteredCounts.open })}
-              {summary.stacks > 0 && ' · ' + t('home.repoCard.stacks', { count: summary.stacks })}
-            </span>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <FilterChips value={filter} counts={counts} onChange={setFilter} />
-            <div className="relative ml-auto min-w-[12rem] max-w-sm flex-1">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
-              />
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t('home.repoPage.searchPlaceholder')}
-                aria-label={t('home.repoPage.searchAriaLabel')}
-                className="w-full rounded-md border border-border bg-bg py-1 pl-8 pr-2 text-xs text-text placeholder:text-muted transition-colors duration-150 focus:border-accent"
-              />
-            </div>
-          </div>
-          {hasUnknownRelation && filter !== 'all' && (
-            <p className="text-[11px] text-muted">{t('home.filters.unknownRelationHint')}</p>
-          )}
-        </header>
+        icon={<ScmProviderIcon provider={repo.provider} size={16} />}
+        title={repo.name}
+        titleText={repo.fullName}
+        meta={meta}
+        fetchedAt={fetchedAt}
+        busy={busy}
+        onRefresh={refreshAll}
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <FilterSegments value={filter} counts={counts} onChange={setFilter} />
+          <Input
+            type="search"
+            fieldSize="sm"
+            icon={<Search size={13} />}
+            containerClassName="min-w-[12rem] flex-1"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('home.repoPage.searchPlaceholder')}
+            aria-label={t('home.repoPage.searchAriaLabel')}
+          />
+        </div>
+        {hasUnknownRelation && filter !== 'all' && (
+          <p className="text-[11px] text-muted">{t('home.filters.unknownRelationHint')}</p>
+        )}
+      </HomePageHeader>
 
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
         {error && (
           <InlineError message={t('home.overview.refreshFailed', { error })} onRetry={refreshAll} />
         )}
         {openError && <InlineError message={openError} />}
-        <ProviderErrorList errors={[...providerErrors, ...stackErrors]} />
-        <RetargetNote className="rounded-md border border-border bg-panel px-3 py-2" />
+        <ProviderErrorList errors={allProviderErrors} />
 
         {showStacksSection && (
           <section aria-label={t('home.repoPage.stacksTitle')} className="flex min-w-0 flex-col gap-2">
@@ -263,7 +279,12 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
                   onRetry={refreshStacks}
                 />
               ) : (
-                <p className="text-xs text-muted">{t('home.repoPage.loadingStacks')}</p>
+                <>
+                  <p role="status" className="sr-only">
+                    {t('home.repoPage.loadingStacks')}
+                  </p>
+                  <CardSkeleton count={3} className="h-20" />
+                </>
               )
             ) : (
               <StackBoard
@@ -272,6 +293,7 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
                 identity={identity}
                 filter={filter}
                 pendingKey={pendingKey}
+                noteKey={noteInBoard ? noteKey : null}
                 onOpenNode={openNode}
                 onReviewStack={reviewStack}
               />
@@ -281,13 +303,22 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
 
         <section aria-label={t('home.repoPage.prsTitle')} className="flex min-w-0 flex-col gap-2">
           <SectionHeading
-            title={t('home.repoPage.prsTitle')}
-            hint={board.stacks.length > 0 ? t('home.repoPage.prsHint') : undefined}
+            title={
+              board.stacks.length > 0
+                ? t('home.repoPage.prsNotInStack')
+                : t('home.repoPage.prsTitle')
+            }
           />
+          {noteWithLoose && noteKey !== null && (
+            <RetargetNote
+              onlyFor={noteKey}
+              className="rounded-md border border-border bg-panel px-3 py-2"
+            />
+          )}
           {loosePrs.length === 0 ? (
-            <p className="text-xs text-muted">
-              {repoPrs.length === 0 ? t('home.repoPage.empty') : t('home.repoPage.noMatch')}
-            </p>
+            <SectionEmpty
+              title={repoPrs.length === 0 ? t('home.repoPage.empty') : t('home.repoPage.noMatch')}
+            />
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
               {loosePrs.map((pr) => (

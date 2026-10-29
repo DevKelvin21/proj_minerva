@@ -16,7 +16,7 @@ import {
   type ReviewerVote,
   type ScmProviderId,
 } from '../../../shared/scm'
-import type { PullRequestSummary } from '../../../shared/types'
+import type { PullRequestSummary, ScmListError } from '../../../shared/types'
 import { flattenStackNodes } from './stacks'
 
 /** Filter of a repo page: who the PR is for, from the signed-in user's point of view. */
@@ -470,6 +470,35 @@ export function findPullRequest(
 /** "org / project" (Azure DevOps) or "owner" (GitHub): where a repo lives, for subtitles. */
 export function repoOwnerLabel(repo: RepoRef): string {
   return repo.provider === 'github' ? repo.owner : repo.organization + ' / ' + repo.project
+}
+
+/** "org" (Azure DevOps) or "owner" (GitHub): the scope a feature group lives in. */
+export function scopeOwnerLabel(repo: RepoRef): string {
+  return repo.provider === 'github' ? repo.owner : repo.organization
+}
+
+/**
+ * One entry per provider, first error wins: the dashboard and the stacks
+ * fetch fail together when a provider is down, and the page says it once.
+ */
+export function uniqueProviderErrors(errors: readonly ScmListError[]): ScmListError[] {
+  const seen = new Set<string>()
+  return errors.filter((error) => {
+    if (seen.has(error.provider)) return false
+    seen.add(error.provider)
+    return true
+  })
+}
+
+/** The retarget outcome the stacks store keeps (`stores/stacks-store`), reduced to what keys it. */
+export type RetargetNoteRef =
+  | { kind: 'retargeted'; pr: Pick<PullRequestSummary, 'repo' | 'number'> }
+  | { kind: 'conflict'; prKey: string }
+
+/** `prKey` of the PR a retarget note is about (`null` = no note). */
+export function retargetNoteKey(note: RetargetNoteRef | null): string | null {
+  if (!note) return null
+  return note.kind === 'retargeted' ? prKey(note.pr.repo, note.pr.number) : note.prKey
 }
 
 /** Stacks that contain at least one PR matching `filter` (PRs not listed match only "all"). */
