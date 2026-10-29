@@ -22,9 +22,21 @@ import type { ChatContextItem } from '../../shared/chat'
 import type { DidacticSection, PullRequestDetail } from '../../shared/types'
 import type { ChatTurnInput } from './service'
 
-/** Where a context item points, for the mock answer (`path:12`, `path:3-5` or `path`). */
-function contextWhere(item: ChatContextItem): string {
+/**
+ * Where a context item points, for the mock answer (`path:12`, `path:3-5`, `path`,
+ * `general comment`, or `path:8 @ abc1234` for a thread sent with its code as commented).
+ */
+function contextWhere(item: ChatContextItem, turn: ChatTurnInput): string {
   if (item.kind === 'line') return item.path + ':' + item.line
+  if (item.path === undefined) return 'general comment'
+  const code =
+    turn.commentedCode && Object.hasOwn(turn.commentedCode, item.id)
+      ? turn.commentedCode[item.id]
+      : undefined
+  if (code) {
+    const lines = code.end > code.start ? code.start + '-' + code.end : String(code.start)
+    return code.path + ':' + lines + ' @ ' + code.commit.slice(0, 7)
+  }
   if (item.startLine === undefined || item.endLine === undefined) return item.path
   return item.startLine === item.endLine
     ? item.path + ':' + item.startLine
@@ -49,7 +61,7 @@ export function chatAnswerSection(turn: ChatTurnInput): DidacticSection {
       'message.\n\n' +
       (count > 0
         ? turn.context
-            .map((item) => '- `' + contextWhere(item) + '` (' + item.kind + ')')
+            .map((item) => '- `' + contextWhere(item, turn) + '` (' + item.kind + ')')
             .join('\n') + '\n\n'
         : '') +
       (followUp > 1

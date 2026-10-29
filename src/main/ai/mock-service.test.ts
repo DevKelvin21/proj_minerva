@@ -131,6 +131,33 @@ describe('MockAiService chat', () => {
     expect(es.sections[0].markdown).toContain('Respuesta mock con 1 elemento de contexto.')
   })
 
+  it('names a general comment, and a thread sent with its code as commented', async () => {
+    const general = {
+      kind: 'thread' as const,
+      id: 'g1',
+      threadId: 'PRRT_2',
+      outdated: false,
+      comments: [{ author: 'ada', body: 'Where?' }],
+    }
+    const commit = 'ab12cd3'.padEnd(40, '0')
+    const turn = {
+      text: 'Why?',
+      context: [general, context[1]],
+      history: [],
+      commentedCode: {
+        t1: { commit, path: 'src/routes/old.ts', firstLine: 1, lines: ['x'], start: 8, end: 9 },
+      },
+    }
+    const en = await new MockAiService().analyzePullRequest({ repo, number: 482 }, { chat: turn })
+    expect(en.sections[0].markdown).toContain('`general comment` (thread)')
+    expect(en.sections[0].markdown).toContain('`src/routes/old.ts:8-9 @ ab12cd3` (thread)')
+    const es = await new MockAiService().analyzePullRequest(
+      { repo, number: 482 },
+      { language: 'es', chat: turn },
+    )
+    expect(es.sections[0].markdown).toContain('`comentario general` (hilo)')
+  })
+
   it('stops as soon as the signal aborts, and fails on the e2e trigger', async () => {
     const controller = new AbortController()
     const run = new MockAiService().analyzePullRequest(

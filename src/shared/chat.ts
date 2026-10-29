@@ -10,7 +10,8 @@
  * renderer never sends history.
  *
  * Context items are what the reviewer gathered before sending: a diff line
- * (with a note typed in the line's input) or a comment thread. They are
+ * (with a note typed in the line's input) or a comment thread (on a line, a
+ * file, or the whole PR: a "general comment"). They are
  * copied into the message when it is sent, so a saved conversation still
  * reads correctly after the PR changes. Everything in them (code, paths,
  * comments) is PR content: untrusted, fenced as data in the prompt.
@@ -64,19 +65,39 @@ export interface ChatLineContext {
   note: string
 }
 
-/** A comment thread the reviewer added with its sparkle. */
+/**
+ * Where an outdated line thread was written (`CommentThread.origin`): main
+ * reads the code there (the provider's file read at `commit`, which refuses a
+ * commit that is not the PR's) so the AI gets the lines as commented.
+ */
+export interface ChatThreadOrigin {
+  /** Full commit SHA (40 hex). */
+  commit: string
+  /** Path at `commit` when it differs from the thread's `path` (renamed since). */
+  path?: string
+  line: number
+  lineEnd?: number
+}
+
+/**
+ * A comment thread the reviewer added with its sparkle. `path` and `side`
+ * are absent together on a PR-level thread (a "general comment"): the AI
+ * gets its comments, with no file or line.
+ */
 export interface ChatThreadContext {
   kind: 'thread'
   id: string
   /** The provider's thread id (to reply to it from an answer). */
   threadId: string
-  path: string
-  side: ChatSide
-  /** Absent together on a file-level thread. */
+  path?: string
+  side?: ChatSide
+  /** Absent together on a file-level or PR-level thread. */
   startLine?: number
   endLine?: number
   /** The thread no longer matches the latest version of the PR. */
   outdated: boolean
+  /** An outdated line thread whose provider said where it was written. */
+  origin?: ChatThreadOrigin
   comments: Array<{ author: string; body: string }>
 }
 
