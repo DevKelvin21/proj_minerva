@@ -1,6 +1,4 @@
 import { Fragment, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Plus, Sparkles } from 'lucide-react'
 import type { CommentThread } from '../../../../shared/types'
 import { buildSplitRows, type SplitCell, type SplitRow } from '../../lib/diff-parser'
 import type { DiffThreadsModel } from '../../lib/diff-threads'
@@ -8,7 +6,8 @@ import type { HighlightToken } from '../../lib/highlighter'
 import { lineThreadKey, resolveNewThreadPosition, type LineSide } from '../../lib/line-threads'
 import { DiffLineContent } from './DiffLineContent'
 import { DiffExpander } from './DiffExpander'
-import { LineThreadIndicator } from './LineThreadIndicator'
+import { DiffGutterActions, type GutterChat } from './DiffGutterActions'
+import { DiffInsertRow } from './DiffInsertRow'
 import { InlineThreadCard } from './InlineThreadCard'
 import { LineCommentComposer } from './LineCommentComposer'
 import { LineChatInput } from './LineChatInput'
@@ -16,6 +15,7 @@ import {
   asHunk,
   KIND_BG,
   LAYER_ROW_CLASS,
+  onRow,
   rangeClasses,
   samePosition,
   type DiffBodyProps,
@@ -41,7 +41,10 @@ interface RowMeta {
   rightPosition?: LinePosition
 }
 
-type Item = { type: 'full'; key: string; node: React.ReactNode } | { type: 'row'; meta: RowMeta }
+/** `insert` = under a row (thread, composer, chat input): drawn in `DiffInsertRow`. */
+type Item =
+  | { type: 'full'; key: string; node: React.ReactNode; insert?: boolean }
+  | { type: 'row'; meta: RowMeta }
 
 interface SideCellsProps {
   cell?: SplitCell
@@ -52,15 +55,13 @@ interface SideCellsProps {
   threadList: CommentThread[]
   model: DiffThreadsModel
   inLayer: boolean
+  /** Where a new comment (or chat note) on this side goes; absent = no actions here. */
+  position?: LinePosition
   onAdd?: () => void
-  /** Opens (or closes) the line's chat note input; absent = no sparkle (feature off or no position). */
-  onChat?: () => void
+  /** "Add to chat" on this side; absent = no sparkle (feature off or no position). */
+  chat?: GutterChat
   /** Reserve the sparkle's slot even without a button here, so gutters line up. */
   chatSlot: boolean
-  /** The line has a chip in the chat draft: its sparkle stays lit. */
-  pending: boolean
-  /** Its note input is open. */
-  noteOpen: boolean
   getTokens: (content: string) => HighlightToken[] | undefined
 }
 
@@ -77,14 +78,12 @@ function SideCells({
   threadList,
   model,
   inLayer,
+  position,
   onAdd,
-  onChat,
+  chat,
   chatSlot,
-  pending,
-  noteOpen,
   getTokens,
 }: SideCellsProps): React.JSX.Element {
-  const { t } = useTranslation()
   const inRange = positionKey ? model.rangeKeys.has(positionKey) : false
   const focused = positionKey ? model.focusedKeys.has(positionKey) : false
   // A thread mark wins over the layer mark on the same gutter (both are inset shadows).
@@ -93,43 +92,21 @@ function SideCells({
   return (
     <>
       <span className={`flex items-center justify-end gap-1 px-2 text-muted/70 ${bg} ${marks}`}>
-        {threadList.length > 0 && positionKey ? (
-          <LineThreadIndicator
-            hidden={model.hiddenKeys.has(positionKey)}
-            count={commentCount}
-            onClick={() => model.toggleHidden(positionKey)}
-          />
-        ) : onAdd ? (
-          <button
-            type="button"
-            onClick={onAdd}
-            aria-label={t('comments.line.addComment')}
-            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 hover:text-accent focus:opacity-100 group-hover/row:opacity-100"
-          >
-            <Plus size={12} />
-          </button>
-        ) : (
-          <span className="inline-block h-4 w-4 shrink-0" />
-        )}
-        {onChat ? (
-          <button
-            type="button"
-            onClick={onChat}
-            aria-label={t('chat.line.button', { line: cell?.number ?? 0 })}
-            title={pending ? t('chat.line.buttonTitlePending') : t('chat.line.buttonTitle')}
-            aria-expanded={noteOpen}
-            data-pending={pending || undefined}
-            className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded hover:text-accent ${
-              pending || noteOpen
-                ? 'text-accent'
-                : 'text-muted opacity-0 focus:opacity-100 group-hover/row:opacity-100'
-            }`}
-          >
-            <Sparkles size={11} />
-          </button>
-        ) : (
-          chatSlot && <span className="inline-block h-4 w-4 shrink-0" />
-        )}
+        <DiffGutterActions
+          line={position?.line}
+          indicator={
+            threadList.length > 0 && positionKey
+              ? {
+                  hidden: model.hiddenKeys.has(positionKey),
+                  count: commentCount,
+                  onClick: () => model.toggleHidden(positionKey),
+                }
+              : undefined
+          }
+          onComment={onAdd}
+          chat={chat}
+          chatSlot={chatSlot}
+        />
         <span className="select-none">{cell?.number ?? ''}</span>
       </span>
       <span
@@ -231,6 +208,7 @@ export function SplitDiff({
       for (const thread of list) {
         items.push({
           type: 'full',
+          insert: true,
           key: `thread-${thread.id}`,
           node: (
             <InlineThreadCard
@@ -246,11 +224,14 @@ export function SplitDiff({
       { position: meta.leftPosition, content: meta.row.left?.content ?? '' },
       { position: meta.rightPosition, content: meta.row.right?.content ?? '' },
     ]
+    // The composer wins the row: the note input never stacks on it.
+    const composerOnRow = onRow(composer.target, [meta.leftPosition, meta.rightPosition])
     for (const { position, content } of sides) {
       if (!position) continue
-      if (chat && samePosition(chat.noteTarget, position)) {
+      if (chat && !composerOnRow && samePosition(chat.noteTarget, position)) {
         items.push({
           type: 'full',
+          insert: true,
           key: `chat-${meta.rowKey}-${position.side}`,
           node: (
             <LineChatInput
@@ -267,6 +248,7 @@ export function SplitDiff({
       if (target && samePosition(target, position)) {
         items.push({
           type: 'full',
+          insert: true,
           key: `composer-${meta.rowKey}-${position.side}`,
           node: (
             <LineCommentComposer
@@ -326,6 +308,8 @@ export function SplitDiff({
 
   function cells(meta: RowMeta, side: 'left' | 'right', contentClass: string): React.JSX.Element {
     const position = side === 'left' ? meta.leftPosition : meta.rightPosition
+    const rowPositions = [meta.leftPosition, meta.rightPosition]
+    const composerOnRow = onRow(composer.target, rowPositions)
     return (
       <SideCells
         cell={side === 'left' ? meta.row.left : meta.row.right}
@@ -340,24 +324,33 @@ export function SplitDiff({
             ? meta.leftKey !== undefined && layerKeys.has(meta.leftKey)
             : meta.rightKey !== undefined && layerKeys.has(meta.rightKey)
         }
+        position={position}
         onAdd={
           position && (side === 'left' ? meta.leftThreads : meta.rightThreads).length === 0
-            ? () => composer.open(position.side, position.line)
+            ? () => {
+                if (chat && onRow(chat.noteTarget, rowPositions)) chat.closeNote()
+                composer.open(position.side, position.line)
+              }
             : undefined
         }
-        onChat={
+        chat={
           chat && position
-            ? () =>
-                samePosition(chat.noteTarget, position)
-                  ? chat.closeNote()
-                  : chat.openNote(position.side, position.line)
+            ? {
+                pending: chat.pendingLines.has(lineThreadKey(position.line, position.side)),
+                open: !composerOnRow && samePosition(chat.noteTarget, position),
+                focusKey: lineThreadKey(position.line, position.side),
+                onToggle: () => {
+                  if (!composerOnRow && samePosition(chat.noteTarget, position)) {
+                    chat.closeNote()
+                    return
+                  }
+                  if (composerOnRow) composer.close()
+                  chat.openNote(position.side, position.line)
+                },
+              }
             : undefined
         }
         chatSlot={chat !== undefined}
-        pending={Boolean(
-          chat && position && chat.pendingLines.has(lineThreadKey(position.line, position.side)),
-        )}
-        noteOpen={Boolean(chat && samePosition(chat.noteTarget, position))}
         getTokens={getTokens}
       />
     )
@@ -384,9 +377,13 @@ export function SplitDiff({
       >
         {items.map((item) =>
           item.type === 'full' ? (
-            <div key={item.key} style={{ gridColumn: '1 / -1' }} className="min-w-0">
-              {item.node}
-            </div>
+            item.insert ? (
+              <DiffInsertRow key={item.key}>{item.node}</DiffInsertRow>
+            ) : (
+              <div key={item.key} style={{ gridColumn: '1 / -1' }} className="min-w-0">
+                {item.node}
+              </div>
+            )
           ) : (
             wrapRow(item.meta)
           ),
@@ -396,10 +393,12 @@ export function SplitDiff({
   }
 
   // Without wrap: runs of rows go in two panels; full-width items cut the run.
-  // Digits + padding + the "+" slot, plus the chat sparkle slot when it is on.
-  const gutterWidth = `calc(${gutterDigits}ch + ${chat ? '3.5rem' : '2.25rem'})`
-  const segments: Array<{ key: string; rows: RowMeta[] } | { key: string; node: React.ReactNode }> =
-    []
+  // Digits + padding + the actions group (its 1px border each side, the "+"
+  // slot, plus the chat sparkle slot when it is on).
+  const gutterWidth = `calc(${gutterDigits}ch + ${chat ? '3.375rem' : '2.25rem'} + 2px)`
+  const segments: Array<
+    { key: string; rows: RowMeta[] } | { key: string; node: React.ReactNode; insert?: boolean }
+  > = []
   let run: RowMeta[] = []
   for (const item of items) {
     if (item.type === 'row') {
@@ -408,7 +407,7 @@ export function SplitDiff({
     }
     if (run.length) segments.push({ key: `run-${run[0].rowKey}`, rows: run })
     run = []
-    segments.push({ key: item.key, node: item.node })
+    segments.push({ key: item.key, node: item.node, insert: item.insert })
   }
   if (run.length) segments.push({ key: `run-${run[0].rowKey}`, rows: run })
 
@@ -416,7 +415,11 @@ export function SplitDiff({
     <div className="font-mono text-xs leading-5">
       {segments.map((segment) =>
         'node' in segment ? (
-          <Fragment key={segment.key}>{segment.node}</Fragment>
+          segment.insert ? (
+            <DiffInsertRow key={segment.key}>{segment.node}</DiffInsertRow>
+          ) : (
+            <Fragment key={segment.key}>{segment.node}</Fragment>
+          )
         ) : (
           <div key={segment.key} className="grid grid-cols-2">
             {SIDES.map((side) => (

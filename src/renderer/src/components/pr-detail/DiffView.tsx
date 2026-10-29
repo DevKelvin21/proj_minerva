@@ -211,11 +211,20 @@ export function DiffView({
       const side = diffSide(item.side)
       if (item.path === pathOf(side)) notes.set(lineThreadKey(item.line, side), item.note)
     }
+    // Closing the note input (Esc, ×, or the line went in the chat) hands
+    // focus back to the sparkle that opened it, so the keyboard stays on the row.
+    const closeNote = (): void => {
+      if (noteTarget) {
+        const key = lineThreadKey(noteTarget.line, noteTarget.side)
+        scrollRef.current?.querySelector<HTMLElement>(`[data-line-chat="${key}"]`)?.focus()
+      }
+      setNoteTarget(null)
+    }
     return {
       pendingLines: new Set(notes.keys()),
       noteTarget,
       openNote: (side, line) => setNoteTarget({ side, line }),
-      closeNote: () => setNoteTarget(null),
+      closeNote,
       noteFor: (side, line) => notes.get(lineThreadKey(line, side)),
       addLine: (side, line, code, note) => {
         const added = addContextItem(
@@ -223,7 +232,7 @@ export function DiffView({
           lineContextItem({ path: pathOf(side), side, line, code, note }),
         )
         if (added) {
-          setNoteTarget(null)
+          closeNote()
           openAskPanel(true)
         }
         return added

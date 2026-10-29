@@ -425,6 +425,7 @@ export const es: MessageShape<typeof en> = {
       wordWrap: 'Ajuste de línea',
     },
     diff: {
+      lineActions: 'Acciones de la línea {{line}}',
       tooLarge: 'Diff no mostrado: el archivo es demasiado grande para compararlo aquí.',
       overBudget:
         'Diff no mostrado: este pull request es demasiado grande para comparar todos sus archivos. Ábrelo en el proveedor para ver este.',

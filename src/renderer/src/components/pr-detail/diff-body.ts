@@ -25,13 +25,20 @@ export interface LineComposerBinding {
   close: () => void
 }
 
-/** "Add to chat" on this file's lines (`DiffView`): the sparkle and its one-line note input. */
+/**
+ * "Add to chat" on this file's lines (`DiffView`): the sparkle and its
+ * one-line note input. A row never shows the note input and the comment
+ * composer at once: opening one closes the other on that row, and while
+ * the composer is on a row (e.g. "Use as comment" from the chat) a note
+ * input there is not drawn.
+ */
 export interface ChatLineBinding {
   /** `lineThreadKey`s of the lines with a chip in the chat draft: their sparkle stays lit. */
   pendingLines: ReadonlySet<string>
   /** The line whose note input is open. */
   noteTarget: LinePosition | null
   openNote: (side: LineSide, line: number) => void
+  /** Closes the note input and gives focus back to its line's gutter sparkle. */
   closeNote: () => void
   /** The note of the line's chip, to edit it. */
   noteFor: (side: LineSide, line: number) => string | undefined
@@ -83,6 +90,14 @@ export function samePosition(
   position: LinePosition | undefined,
 ): boolean {
   return Boolean(target && position && target.side === position.side && target.line === position.line)
+}
+
+/** `target` points at one of a row's positions (inline: one; split: its two sides). */
+export function onRow(
+  target: LinePosition | null | undefined,
+  positions: ReadonlyArray<LinePosition | undefined>,
+): boolean {
+  return positions.some((position) => samePosition(target, position))
 }
 
 /** A section's lines as a pseudo-hunk, for the row builders. */
