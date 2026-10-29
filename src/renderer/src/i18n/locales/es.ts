@@ -612,7 +612,7 @@ export const es: MessageShape<typeof en> = {
     noPr: 'Abre un pull request para preguntar sobre él.',
     empty: {
       title: 'Pregunta sobre este pull request',
-      hint: 'Agrega líneas o hilos de comentarios desde el diff, o simplemente pregunta sobre el PR.',
+      hint: 'Agrega líneas desde el diff o hilos de comentarios desde cualquier pestaña, o simplemente pregunta sobre el PR.',
     },
     list: {
       label: 'Conversaciones sobre este pull request',
@@ -646,6 +646,7 @@ export const es: MessageShape<typeof en> = {
       useAs: 'Usar como…',
       useAsCommentOn: 'Usar como comentario en {{location}}',
       useAsReplyOn: 'Usar como respuesta al hilo en {{location}}',
+      useAsReplyGeneral: 'Usar como respuesta al comentario general de {{author}}',
       copy: 'Copiar la respuesta',
     },
     composer: {
@@ -664,6 +665,7 @@ export const es: MessageShape<typeof en> = {
     chip: {
       lineOld: '{{location}} (eliminada)',
       thread: 'Hilo · {{location}}',
+      general: 'Comentario general · {{author}}',
       outdated: 'Desactualizado',
       jump: 'Mostrar {{location}} en la pestaña Archivos',
       remove: 'Quitar {{location}} del chat',

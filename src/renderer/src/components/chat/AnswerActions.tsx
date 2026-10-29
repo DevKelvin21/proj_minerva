@@ -3,7 +3,8 @@ import { Check, ChevronDown, Copy, MessageSquarePlus, Reply } from 'lucide-react
 import { useTranslation } from 'react-i18next'
 import type { ChatContextItem } from '../../../../shared/chat'
 import { answerDraft } from '../../lib/chat-draft'
-import { contextItemLocation, diffSide } from '../../lib/chat-context'
+import type { TFunction } from 'i18next'
+import { contextItemAuthor, contextItemLocation, diffSide } from '../../lib/chat-context'
 import { widthTier } from '../../lib/layout'
 import { useAppStore } from '../../stores/app-store'
 import { Button } from '../ui/Button'
@@ -20,18 +21,19 @@ interface AnswerActionsProps {
 interface Target {
   key: string
   kind: 'comment' | 'reply'
-  location: string
+  /** Its menu entry and tooltip ("Use as reply to the thread on src/a.ts:12"). */
+  label: string
   run: () => void
 }
 
-function targetsOf(context: readonly ChatContextItem[], text: string): Target[] {
+function targetsOf(context: readonly ChatContextItem[], text: string, t: TFunction): Target[] {
   return context.map((item) => {
     const location = contextItemLocation(item)
     if (item.kind === 'line') {
       return {
         key: item.id,
         kind: 'comment' as const,
-        location,
+        label: t('chat.answer.useAsCommentOn', { location }),
         run: () =>
           useAppStore.getState().openLineComposer(
             { path: item.path, side: diffSide(item.side), line: item.line, draft: answerDraft(text) },
@@ -42,7 +44,11 @@ function targetsOf(context: readonly ChatContextItem[], text: string): Target[] 
     return {
       key: item.id,
       kind: 'reply' as const,
-      location,
+      // A PR-level thread has no location: it is named by who started it.
+      label:
+        location === null
+          ? t('chat.answer.useAsReplyGeneral', { author: contextItemAuthor(item) })
+          : t('chat.answer.useAsReplyOn', { location }),
       run: () =>
         useAppStore.getState().requestThreadReply({
           threadId: item.threadId,
@@ -59,13 +65,13 @@ function targetsOf(context: readonly ChatContextItem[], text: string): Target[] 
  * question pointed. A line of the question offers "Use as comment" (that
  * line's comment composer opens in the Files tab with the answer); a thread
  * offers "Use as reply" (its reply box gets the answer, after anything
- * typed). Several targets = a menu (`ui/Menu`). The text always goes through
+ * typed: in the Files tab, or the Conversation tab for a general comment). Several targets = a menu (`ui/Menu`). The text always goes through
  * `answerDraft` (no image or loading HTML survives) and nothing is posted.
  */
 export function AnswerActions({ text, context }: AnswerActionsProps): React.JSX.Element {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
-  const targets = targetsOf(context, text)
+  const targets = targetsOf(context, text, t)
 
   function run(target: Target): void {
     target.run()
@@ -84,10 +90,7 @@ export function AnswerActions({ text, context }: AnswerActionsProps): React.JSX.
     }
   }
 
-  const targetLabel = (target: Target): string =>
-    target.kind === 'comment'
-      ? t('chat.answer.useAsCommentOn', { location: target.location })
-      : t('chat.answer.useAsReplyOn', { location: target.location })
+  const targetLabel = (target: Target): string => target.label
   const targetIcon = (target: Target): React.JSX.Element =>
     target.kind === 'comment' ? (
       <MessageSquarePlus size={12} aria-hidden />

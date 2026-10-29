@@ -407,15 +407,20 @@ interface AppState {
     navigate?: boolean,
   ) => void
   closeLineComposer: () => void
-  /** Files tab on the thread, its reply box getting `text` (`ReplyRequest`). */
+  /**
+   * The thread's reply box gets `text` (`ReplyRequest`): in the Files tab for
+   * a thread on a file, in the Conversation tab for a PR-level one (no `path`).
+   */
   requestThreadReply: (thread: {
     threadId: string
-    path: string
+    path?: string
     line?: number
     text: string
   }) => void
   /** Drops the reply request once a card applied it (no-op when a newer one replaced it). */
   consumeReplyRequest: (token: number) => void
+  /** Conversation tab, scrolled to the thread (opened and ringed). */
+  openConversationThread: (threadId: string) => void
   clearPendingConversationFocus: () => void
   /**
    * `selectPr` plus a landing spot, in one go (`selectPr` alone clears any
@@ -669,15 +674,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeLineComposer: () => set({ lineComposer: null }),
   requestThreadReply: ({ threadId, path, line, text }) =>
     set({
-      centerTab: 'files',
-      selectedFilePath: path,
+      ...(path === undefined
+        ? {
+            centerTab: 'conversation' as const,
+            pendingConversationFocus: threadId,
+          }
+        : {
+            centerTab: 'files' as const,
+            selectedFilePath: path,
+            pendingThreadFocus: { path, line: line ?? 0, threadId },
+          }),
       expandedThreadId: threadId,
-      pendingThreadFocus: { path, line: line ?? 0, threadId },
       pendingLineFocus: null,
       replyRequest: { threadId, text, token: nextToken() },
     }),
   consumeReplyRequest: (token) =>
     set((state) => (state.replyRequest?.token === token ? { replyRequest: null } : {})),
+  openConversationThread: (threadId) =>
+    set({
+      centerTab: 'conversation',
+      expandedThreadId: threadId,
+      pendingConversationFocus: threadId,
+    }),
   clearPendingConversationFocus: () => set({ pendingConversationFocus: null }),
   openPrAt: (pr, target) => {
     get().selectPr(pr)
@@ -685,11 +703,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (target.kind === 'line') {
       get().openLineThread(target.path, target.line, target.threadId)
     } else if (target.kind === 'conversation') {
-      set({
-        centerTab: 'conversation',
-        expandedThreadId: target.threadId,
-        pendingConversationFocus: target.threadId,
-      })
+      get().openConversationThread(target.threadId)
     }
   },
   setScmAuth: (statuses) => set({ scmAuth: statuses }),

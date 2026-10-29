@@ -1,6 +1,7 @@
 /**
  * Context items of the side-panel chat (`shared/chat.ts`): building them from
- * a diff line or a comment thread, and fitting them to what main takes.
+ * a diff line or a comment thread (line, file or PR-level), and fitting them
+ * to what main takes.
  *
  * Every item of one message must fit `MAX_CHAT_CONTEXT_LEN` characters
  * together (codes, notes, authors, comment bodies; main rejects more), so
@@ -21,6 +22,7 @@ import type {
   ChatLineContext,
   ChatSide,
   ChatThreadContext,
+  ChatThreadOrigin,
 } from '../../../shared/chat'
 import {
   MAX_CHAT_AUTHOR_LEN,
@@ -29,8 +31,9 @@ import {
   MAX_CHAT_NOTE_LEN,
   MAX_CHAT_THREAD_COMMENTS,
 } from '../../../shared/chat'
-import type { CommentThread } from '../../../shared/types'
+import type { CommentThread, ThreadOrigin } from '../../../shared/types'
 import { threadLineRange, threadSide, type LineSide } from './line-threads'
+import { hasCommentedVersion } from './thread-origin'
 
 /** Below this many characters a shortened piece says too little to be worth sending. */
 const MIN_PIECE = 40
@@ -75,11 +78,13 @@ export function lineContextItem(input: {
 /**
  * A comment thread as a context item: author (display name, else login) and
  * body of each visible comment (all of them when every one is hidden), its
- * first one plus the newest replies the channel takes. `null` for a thread
- * with no file or no comments (nothing to point the AI at).
+ * first one plus the newest replies the channel takes. A thread with no file
+ * is a PR-level one (no path, side or lines). An outdated line thread whose
+ * provider said where it was written carries that `origin`, so main sends the
+ * code as commented. `null` for a thread with no comments (nothing to send).
  */
 export function threadContextItem(thread: CommentThread): ChatThreadContext | null {
-  if (!thread.path || thread.comments.length === 0) return null
+  if (thread.comments.length === 0) return null
   const visible = thread.comments.filter((c) => !c.isMinimized)
   const all = (visible.length > 0 ? visible : thread.comments).map((c) => ({
     author: clip(c.author.displayName || c.author.login || '?', MAX_CHAT_AUTHOR_LEN),
@@ -87,22 +92,54 @@ export function threadContextItem(thread: CommentThread): ChatThreadContext | nu
   }))
   const [first, ...rest] = all
   const comments = [first, ...rest.slice(-(MAX_CHAT_THREAD_COMMENTS - 1))]
-  const range = threadLineRange(thread)
-  return {
-    kind: 'thread',
+  const base = {
+    kind: 'thread' as const,
     id: newContextItemId(),
     threadId: thread.id,
-    path: thread.path,
-    side: chatSide(threadSide(thread)),
-    ...(range ? { startLine: range.start, endLine: range.end } : {}),
     outdated: thread.isOutdated === true,
     comments,
   }
+  if (!thread.path) return { ...base, outdated: false }
+  const range = threadLineRange(thread)
+  return {
+    ...base,
+    path: thread.path,
+    side: chatSide(threadSide(thread)),
+    ...(range ? { startLine: range.start, endLine: range.end } : {}),
+    ...(hasCommentedVersion(thread) ? { origin: chatOrigin(thread.origin) } : {}),
+  }
 }
 
-/** `path:12` or `path:12-14` (a file-level thread: just the path). */
-export function contextItemLocation(item: ChatContextItem): string {
+function chatOrigin(origin: ThreadOrigin): ChatThreadOrigin {
+  return {
+    commit: origin.commit,
+    ...(origin.path ? { path: origin.path } : {}),
+    line: origin.line,
+    ...(origin.lineEnd !== undefined && origin.lineEnd >= origin.line
+      ? { lineEnd: origin.lineEnd }
+      : {}),
+  }
+}
+
+/** A thread with no file: a "general comment" on the whole PR. */
+export function isGeneralThreadItem(
+  item: ChatContextItem,
+): item is ChatThreadContext & { path: undefined } {
+  return item.kind === 'thread' && item.path === undefined
+}
+
+/** Who started a thread item (its first comment's author), for a general comment's chip. */
+export function contextItemAuthor(item: ChatThreadContext): string {
+  return item.comments[0]?.author ?? '?'
+}
+
+/**
+ * `path:12` or `path:12-14` (a file-level thread: just the path). `null` for
+ * a PR-level thread, which has no location (its chip names its author).
+ */
+export function contextItemLocation(item: ChatContextItem): string | null {
   if (item.kind === 'line') return `${item.path}:${item.line}`
+  if (item.path === undefined) return null
   if (item.startLine === undefined) return item.path
   return item.endLine !== undefined && item.endLine > item.startLine
     ? `${item.path}:${item.startLine}-${item.endLine}`
