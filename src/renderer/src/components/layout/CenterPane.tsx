@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { CircleAlert, GitPullRequest } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  CircleAlert,
+  FileDiff,
+  GitPullRequest,
+  MessageSquare,
+  MessagesSquare,
+  type LucideIcon,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, type CenterTab } from '../../stores/app-store'
 import { useRovingTabs, type RovingTabProps } from '../../hooks/use-roving-tabs'
@@ -17,24 +24,43 @@ import type { PullRequestDetail } from '../../../../shared/types'
 
 const CENTER_TABS: readonly CenterTab[] = ['conversation', 'files', 'comments']
 
-/** One review tab: `useRovingTabs` gives it its role, selection and keys. */
+/**
+ * One review tab: `useRovingTabs` gives it its role, selection and keys.
+ * Compact (narrow bar): the icon and the count only; the full label stays the
+ * accessible name and the tooltip.
+ */
 function ReviewTab({
   tabProps,
-  children,
+  icon: Icon,
+  label,
+  count,
+  compact,
 }: {
   tabProps: RovingTabProps
-  children: ReactNode
+  icon: LucideIcon
+  label: string
+  count?: number | null
+  compact: boolean
 }): React.JSX.Element {
   const selected = tabProps['aria-selected']
   return (
     <button
       type="button"
       {...tabProps}
-      className={`flex h-full items-center border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
-        selected ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text'
-      }`}
+      aria-label={compact ? label : undefined}
+      title={compact ? label : undefined}
+      className={`flex h-full shrink-0 items-center gap-1.5 border-b-2 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
+        compact ? 'px-2' : 'px-3'
+      } ${selected ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text'}`}
     >
-      {children}
+      {compact ? (
+        <>
+          <Icon size={15} aria-hidden />
+          {count !== undefined && count !== null && <span aria-hidden>{count}</span>}
+        </>
+      ) : (
+        label
+      )}
     </button>
   )
 }
@@ -170,27 +196,42 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
           <PrHeader
             pr={detail}
             onWalkthrough={openWalkthroughFocus}
-            tabs={
+            tabs={(compact) => (
               <div
                 role="tablist"
                 aria-label={t('layout.center.tabsLabel')}
                 className="flex h-full gap-1"
               >
-                <ReviewTab tabProps={tabs.tabProps('conversation')}>
-                  {t('layout.center.tabs.conversation')}
-                </ReviewTab>
-                <ReviewTab tabProps={tabs.tabProps('files')}>
-                  {detail.changedFiles === null
-                    ? t('layout.center.tabs.files')
-                    : t('layout.center.tabs.filesWithCount', { count: detail.changedFiles })}
-                </ReviewTab>
-                <ReviewTab tabProps={tabs.tabProps('comments')}>
-                  {threadsLoading && threads.length === 0
-                    ? t('layout.center.tabs.comments')
-                    : t('layout.center.tabs.commentsOpen', { count: openThreads })}
-                </ReviewTab>
+                <ReviewTab
+                  tabProps={tabs.tabProps('conversation')}
+                  icon={MessageSquare}
+                  label={t('layout.center.tabs.conversation')}
+                  compact={compact}
+                />
+                <ReviewTab
+                  tabProps={tabs.tabProps('files')}
+                  icon={FileDiff}
+                  label={
+                    detail.changedFiles === null
+                      ? t('layout.center.tabs.files')
+                      : t('layout.center.tabs.filesWithCount', { count: detail.changedFiles })
+                  }
+                  count={detail.changedFiles}
+                  compact={compact}
+                />
+                <ReviewTab
+                  tabProps={tabs.tabProps('comments')}
+                  icon={MessagesSquare}
+                  label={
+                    threadsLoading && threads.length === 0
+                      ? t('layout.center.tabs.comments')
+                      : t('layout.center.tabs.commentsOpen', { count: openThreads })
+                  }
+                  count={threadsLoading && threads.length === 0 ? null : openThreads}
+                  compact={compact}
+                />
               </div>
-            }
+            )}
           />
         )}
         <div

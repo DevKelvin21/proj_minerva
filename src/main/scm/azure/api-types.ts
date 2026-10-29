@@ -78,7 +78,20 @@ export interface AzPullRequest {
   labels?: { id: string; name: string; active?: boolean }[]
   /** Set when someone turned on auto-complete. */
   autoCompleteSetBy?: AzIdentityRef
+  /** How the PR completes (set with auto-complete, or on completion). */
+  completionOptions?: AzCompletionOptions
   url?: string
+}
+
+export type AzMergeStrategy = 'noFastForward' | 'squash' | 'rebase' | 'rebaseMerge'
+
+export interface AzCompletionOptions {
+  mergeStrategy?: AzMergeStrategy
+  deleteSourceBranch?: boolean
+  transitionWorkItems?: boolean
+  /** Legacy flag older PRs carry instead of `mergeStrategy: 'squash'`. */
+  squashMerge?: boolean
+  bypassPolicy?: boolean
 }
 
 export interface AzIteration {
@@ -246,8 +259,17 @@ export interface AzPolicyEvaluation {
     isBlocking: boolean
     isEnabled: boolean
     type: { id: string; displayName: string }
-    /** Build / status policies carry their own display name here. */
-    settings?: { displayName?: string | null }
+    /**
+     * Build / status policies carry their own display name here; the
+     * "Require a merge strategy" policy its allowed types (`allow*`).
+     */
+    settings?: {
+      displayName?: string | null
+      allowNoFastForward?: boolean
+      allowSquash?: boolean
+      allowRebase?: boolean
+      allowRebaseMerge?: boolean
+    }
   }
 }
 

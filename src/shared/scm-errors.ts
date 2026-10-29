@@ -15,6 +15,9 @@ export const SCM_ERROR_CODES: readonly ScmErrorCode[] = [
   'NOT_FOUND',
   'FORBIDDEN',
   'CONFLICT',
+  'MERGE_CONFLICT',
+  'CHECKS_FAILING',
+  'MERGE_BLOCKED',
   'NETWORK',
   'UNKNOWN',
 ]

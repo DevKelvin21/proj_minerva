@@ -154,6 +154,85 @@ export interface PrCheck {
   kind: 'policy' | 'status'
 }
 
+/**
+ * How a PR's commits land on its target branch, provider-neutral.
+ * - GitHub: `merge` (merge commit), `squash`, `rebase` (rebase and merge).
+ * - Azure DevOps: `merge` (`noFastForward`), `squash`, `rebase` (rebase and
+ *   fast-forward), `rebase_merge` (semi-linear, `rebaseMerge`).
+ */
+export type MergeStrategy = 'merge' | 'squash' | 'rebase' | 'rebase_merge'
+
+/** Auto-complete (Azure DevOps) / auto-merge (GitHub) currently set on an open PR. */
+export interface AutoMergeState {
+  setBy: UserRef
+  /** `null` when the provider did not say. */
+  strategy: MergeStrategy | null
+  /** Azure DevOps completion options; absent on GitHub (the repository decides). */
+  deleteSourceBranch?: boolean
+  transitionWorkItems?: boolean
+}
+
+/**
+ * What stops "merge now", worst first:
+ * - `not_open`, `draft`: nothing to merge yet;
+ * - `no_permission`: the user can't write to the target branch;
+ * - `conflicts`: the branches conflict;
+ * - `checks_failing` / `checks_pending`: a REQUIRED check or build policy;
+ * - `approvals_missing`: required reviewers or other branch policies;
+ * - `behind`: GitHub's "branch must be up to date";
+ * - `checking`: the provider is still computing mergeability;
+ * - `blocked`: blocked for a reason the provider did not detail.
+ */
+export type MergeBlocker =
+  | 'not_open'
+  | 'draft'
+  | 'no_permission'
+  | 'conflicts'
+  | 'checks_failing'
+  | 'checks_pending'
+  | 'approvals_missing'
+  | 'behind'
+  | 'checking'
+  | 'blocked'
+
+/** Why auto-complete / auto-merge can't be turned on for this PR. */
+export type AutoMergeUnavailableReason =
+  /** GitHub: "Allow auto-merge" is off in the repository settings. */
+  | 'repo_disabled'
+  /** GitHub: nothing is pending, so GitHub refuses it (merge now instead). */
+  | 'nothing_to_wait_for'
+  | 'no_permission'
+  | 'not_open'
+
+/**
+ * Response of `scm:getMergeOptions`: what the Merge control may offer for
+ * one PR, read fresh from the provider.
+ */
+export interface MergeOptions {
+  /** The head commit these options describe; sent back as `expectedHeadSha`. */
+  headSha: string
+  /** Every strategy the provider knows, in its usual order; `allowed: false` = repository settings or a branch policy forbid it. */
+  strategies: { strategy: MergeStrategy; allowed: boolean }[]
+  /** What stops a merge now; `null` = it can merge. */
+  blocker: MergeBlocker | null
+  /** Optional checks still running or failing (they don't block). */
+  checksWarning: 'pending' | 'failing' | null
+  /**
+   * Deleting the source branch after the merge:
+   * - `option`: the user chooses;
+   * - `repo`: the repository deletes merged branches by itself (GitHub setting);
+   * - `none`: not possible here (a fork's branch).
+   */
+  deleteSourceBranch: 'option' | 'repo' | 'none'
+  /** Whether the delete option also applies to auto-complete (Azure: yes; GitHub: no). */
+  deleteBranchWithAutoMerge: boolean
+  /** Linked work items "complete work items" would close; `null` = the provider has no such option (GitHub). */
+  workItems: number | null
+  autoMerge: { available: true } | { available: false; reason: AutoMergeUnavailableReason }
+  /** Auto-complete / auto-merge set right now. */
+  current: AutoMergeState | null
+}
+
 export interface PullRequestDetail extends PullRequestSummary {
   bodyMarkdown: string
   labels: PrLabel[]
@@ -162,8 +241,11 @@ export interface PullRequestDetail extends PullRequestSummary {
   workItems?: PrWorkItem[]
   /** See `PrMergeStatus`. */
   mergeStatus?: PrMergeStatus
-  /** Azure DevOps auto-complete: the PR completes on its own once its policies pass. */
-  autoComplete?: { setBy: UserRef }
+  /**
+   * Auto-complete (Azure DevOps) / auto-merge (GitHub) turned on for this open
+   * PR: it merges on its own once what it waits for passes.
+   */
+  autoComplete?: AutoMergeState
   /** Branch policies / statuses (Azure DevOps). Absent = the provider does not list them. */
   checks?: PrCheck[]
   /**
@@ -277,6 +359,45 @@ export interface RetargetRequest {
   expectedCurrentBase: string
   newBase: string
 }
+
+/**
+ * `scm:merge`: merge (GitHub) / complete (Azure DevOps) a PR. Main re-checks
+ * everything (see `main/scm/merge.ts`) and asks with a native dialog first.
+ */
+export interface MergeRequest {
+  repo: RepoRef
+  number: number
+  /** The head commit the user reviewed: `CONFLICT` if the PR moved since. */
+  expectedHeadSha: string
+  strategy: MergeStrategy
+  deleteSourceBranch: boolean
+  /** Azure DevOps only (completes linked work items); always `false` on GitHub. */
+  transitionWorkItems: boolean
+}
+
+export type MergeResult =
+  /** Merged. `branchDeleteFailed`: the merge landed but the source branch could not be deleted. */
+  | { outcome: 'merged'; pr: PullRequestDetail; branchDeleteFailed?: boolean }
+  /** Azure DevOps accepted the completion and is still merging. */
+  | { outcome: 'completing'; pr: PullRequestDetail }
+  | { outcome: 'cancelled' }
+
+/** `scm:setAutoMerge`: turn auto-complete / auto-merge on (with its options) or off. */
+export type SetAutoMergeRequest =
+  | {
+      repo: RepoRef
+      number: number
+      enable: true
+      expectedHeadSha: string
+      strategy: MergeStrategy
+      deleteSourceBranch: boolean
+      transitionWorkItems: boolean
+    }
+  | { repo: RepoRef; number: number; enable: false }
+
+export type SetAutoMergeResult =
+  | { outcome: 'enabled' | 'disabled'; pr: PullRequestDetail }
+  | { outcome: 'cancelled' }
 
 /** One provider that failed while listing PRs (the others still return items). */
 export interface ScmListError {

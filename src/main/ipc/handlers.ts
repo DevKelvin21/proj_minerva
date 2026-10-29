@@ -22,6 +22,7 @@ import { createAzureOrgAccess } from '../scm/azure-org-access'
 import { nativeConfirm } from '../scm/confirm'
 import { getAuthStatusMap, listAcrossProviders } from '../scm/registry'
 import { retargetPullRequest } from '../scm/retarget'
+import { mergePullRequest, setAutoMerge } from '../scm/merge'
 import { seenStore } from '../scm/seen-store'
 import {
   isDidacticWindow,
@@ -281,6 +282,22 @@ export async function registerIpcHandlers(): Promise<{
       nativeConfirm(event.sender),
     )
     if (result.outcome === 'retargeted') scmRoot.invalidateListCaches()
+    return result
+  })
+  handle('scm:getMergeOptions', (req) =>
+    scm.forRepo(req.repo).getMergeOptions(req.repo, req.number),
+  )
+  // Same pattern as retarget: validated in `merge.ts` (open, head unchanged,
+  // strategy allowed, nothing blocking), confirmed in a native dialog on the
+  // caller's window, re-checked, and only then written.
+  handle('scm:merge', async (req, event) => {
+    const result = await mergePullRequest(scm.forRepo(req.repo), req, nativeConfirm(event.sender))
+    if (result.outcome !== 'cancelled') scmRoot.invalidateListCaches()
+    return result
+  })
+  handle('scm:setAutoMerge', async (req, event) => {
+    const result = await setAutoMerge(scm.forRepo(req.repo), req, nativeConfirm(event.sender))
+    if (result.outcome !== 'cancelled') scmRoot.invalidateListCaches()
     return result
   })
   handle('scm:getStacks', (req) => scmRoot.stacks.get({ refresh: req?.refresh === true }))

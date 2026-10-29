@@ -102,6 +102,12 @@ export type ScmErrorCode =
   | 'NOT_FOUND'
   | 'FORBIDDEN'
   | 'CONFLICT'
+  /** Merge refused: the branches conflict. */
+  | 'MERGE_CONFLICT'
+  /** Merge refused: a required check / build policy failed or is still running. */
+  | 'CHECKS_FAILING'
+  /** Merge refused: required approvals, branch policies or repository rules. */
+  | 'MERGE_BLOCKED'
   | 'NETWORK'
   | 'UNKNOWN'
 

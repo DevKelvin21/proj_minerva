@@ -25,6 +25,7 @@ import {
   OPEN_VSX_SORTS,
 } from '../../shared/theme/open-vsx'
 import { SETTABLE_THREAD_STATUSES, type ThreadStatus } from '../../shared/scm'
+import type { MergeStrategy } from '../../shared/types'
 import { MAX_CHAT_MESSAGE_LEN, MAX_CHAT_PAGE } from '../../shared/chat'
 import { isChatContext, isChatId } from '../chat/chat-guards'
 import {
@@ -198,6 +199,68 @@ function isRetargetPayload(value: unknown): boolean {
     return false
   }
   return value.expectedCurrentBase !== value.newBase
+}
+
+const MERGE_STRATEGIES: readonly MergeStrategy[] = ['merge', 'squash', 'rebase', 'rebase_merge']
+
+/** A full commit id: 40 (SHA-1) or 64 (SHA-256) hex characters. */
+function isCommitSha(value: unknown): boolean {
+  return typeof value === 'string' && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value)
+}
+
+function isMergeStrategy(value: unknown): boolean {
+  return typeof value === 'string' && (MERGE_STRATEGIES as readonly string[]).includes(value)
+}
+
+const MERGE_KEYS = [
+  'repo',
+  'number',
+  'expectedHeadSha',
+  'strategy',
+  'deleteSourceBranch',
+  'transitionWorkItems',
+] as const
+
+/** The fields a merge and an "auto-merge on" share, after the key check. */
+function hasValidMergeFields(value: Record<string, unknown>): boolean {
+  if (!isRepoRef(value.repo)) return false
+  if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
+  if (!isCommitSha(value.expectedHeadSha) || !isMergeStrategy(value.strategy)) return false
+  if (typeof value.deleteSourceBranch !== 'boolean') return false
+  if (typeof value.transitionWorkItems !== 'boolean') return false
+  if (value.repo.provider !== 'azure') {
+    // GitHub: no work items to complete, no semi-linear merge.
+    if (value.transitionWorkItems || value.strategy === 'rebase_merge') return false
+  }
+  return true
+}
+
+/**
+ * `scm:merge`: the PR, the head commit the user reviewed, a known strategy
+ * and two booleans; `transitionWorkItems` and `rebase_merge` only on Azure
+ * DevOps. The rest (open, head unchanged, strategy allowed, nothing
+ * blocking) is re-checked in main.
+ */
+function isMergePayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, MERGE_KEYS) || Object.keys(value).length !== MERGE_KEYS.length) {
+    return false
+  }
+  return hasValidMergeFields(value)
+}
+
+/** `scm:setAutoMerge`: `{ repo, number, enable: false }`, or `enable: true` with a merge payload's fields. */
+function isSetAutoMergePayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (value.enable === false) {
+    if (!hasOnlyKeys(value, ['repo', 'number', 'enable'])) return false
+    if (Object.keys(value).length !== 3) return false
+    return isRepoRef(value.repo) && isIntInRange(value.number, 1, MAX_PR_NUMBER)
+  }
+  if (value.enable !== true) return false
+  const keys = [...MERGE_KEYS, 'enable']
+  if (!hasOnlyKeys(value, keys) || Object.keys(value).length !== keys.length) return false
+  return hasValidMergeFields(value)
 }
 
 /** `scm:getStacks`: nothing, or `{ refresh?: boolean }`. */
@@ -400,6 +463,9 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:setThreadStatus': isSetThreadStatusPayload,
   'scm:getFileContent': isGetFileContentPayload,
   'scm:retarget': isRetargetPayload,
+  'scm:getMergeOptions': isRepoAndNumberPayload,
+  'scm:merge': isMergePayload,
+  'scm:setAutoMerge': isSetAutoMergePayload,
   'scm:getStacks': isGetStacksPayload,
   'scm:getDashboard': isGetDashboardPayload,
   'activity:get': isVoidPayload,

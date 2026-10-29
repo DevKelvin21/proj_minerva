@@ -18,6 +18,9 @@ import type {
   GetStacksResult,
   GhAccount,
   ListPullRequestsResult,
+  MergeOptions,
+  MergeRequest,
+  MergeResult,
   PostCommentRequest,
   PrComment,
   PrStateFilter,
@@ -26,6 +29,8 @@ import type {
   RetargetRequest,
   RetargetResult,
   ScmSettingsInfo,
+  SetAutoMergeRequest,
+  SetAutoMergeResult,
   SetProviderSettingsRequest,
   SetThreadStatusRequest,
   UpdaterStatus,
@@ -149,6 +154,21 @@ export interface IpcContract {
    * updated summary and drops the stacks cache.
    */
   'scm:retarget': { req: RetargetRequest; res: RetargetResult }
+  /**
+   * What the Merge control may offer for one PR (allowed strategies, what
+   * blocks it, auto-merge availability and current state). Read only.
+   */
+  'scm:getMergeOptions': { req: { repo: RepoRef; number: number }; res: MergeOptions }
+  /**
+   * Merges (GitHub) / completes (Azure DevOps) the PR. Main re-validates (open,
+   * head still `expectedHeadSha`, strategy allowed, nothing blocking: see
+   * `main/scm/merge.ts`), asks with a native dialog, re-checks and writes.
+   * Refusals are `[SCM:CONFLICT]` (PR moved), `[SCM:MERGE_CONFLICT]`,
+   * `[SCM:CHECKS_FAILING]`, `[SCM:MERGE_BLOCKED]` or `[SCM:FORBIDDEN]`.
+   */
+  'scm:merge': { req: MergeRequest; res: MergeResult }
+  /** Turns auto-complete (Azure DevOps) / auto-merge (GitHub) on or off; same checks and dialog. */
+  'scm:setAutoMerge': { req: SetAutoMergeRequest; res: SetAutoMergeResult }
   /**
    * Stacked PRs of every enabled provider, with orphan detection (a root that
    * still targets the source branch of an already merged PR). Cached ~60 s in
@@ -381,6 +401,9 @@ export const IPC_CHANNELS = [
   'scm:setThreadStatus',
   'scm:getFileContent',
   'scm:retarget',
+  'scm:getMergeOptions',
+  'scm:merge',
+  'scm:setAutoMerge',
   'scm:getStacks',
   'scm:getDashboard',
   'activity:get',

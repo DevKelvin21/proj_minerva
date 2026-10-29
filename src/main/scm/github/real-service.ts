@@ -16,6 +16,7 @@ import type {
   DiffFile,
   DiffFileStatus,
   FileContentRequest,
+  MergeOptions,
   PostCommentRequest,
   PrComment,
   PrLabel,
@@ -42,13 +43,24 @@ import { looksBinary } from '../azure/patch-builder'
 import { ScmError, isScmError } from '../errors'
 import { mt } from '../../i18n'
 import type {
+  AutoMergeWrite,
   ListPullRequestsQuery,
+  MergeWrite,
+  MergeWriteResult,
   ScmDataSource,
   ScopePullRequest,
   SnapshotRequest,
 } from '../provider'
 import type { StackInputPr } from '../stacks'
 import { asGithubRepo } from './repo'
+import {
+  MERGE_OPTIONS_QUERY,
+  githubMergeMethod,
+  mapAutoMergeRequest,
+  mapGithubMergeOptions,
+  type GithubAutoMergeRequestNode,
+  type GithubMergeNode,
+} from './merge-options'
 
 /** Prefijo sintético para hilos generales (issue comments, sin línea): ver `mapIssueCommentToThread`. */
 const ISSUE_THREAD_PREFIX = 'issue-'
@@ -163,6 +175,8 @@ interface PullRequestDetailNode {
   comments: { totalCount: number }
   commitCount: { totalCount: number }
   lastCommit: { nodes: { commit: { oid?: string; statusCheckRollup: { state: string } | null } }[] }
+  /** Absent in older fixtures. */
+  autoMergeRequest?: GithubAutoMergeRequestNode | null
   labels: GraphqlLabels
   reviewRequests: GraphqlReviewRequests
   latestReviews: GraphqlLatestReviews
@@ -276,6 +290,7 @@ const PULL_REQUEST_DETAIL_QUERY = `
         latestReviews(first: 20) {
           nodes { state author { login avatarUrl } }
         }
+        autoMergeRequest { mergeMethod enabledBy { login avatarUrl } }
       }
     }
   }
@@ -559,6 +574,7 @@ function mapReviewers(pr: GraphqlReviewSources): PrReviewer[] {
 }
 
 function mapDetailNode(pr: PullRequestDetailNode, repo: GithubRepoRef): PullRequestDetail {
+  const autoMerge = pr.state === 'OPEN' ? mapAutoMergeRequest(pr.autoMergeRequest) : null
   return {
     id: pr.id,
     number: pr.number,
@@ -583,6 +599,7 @@ function mapDetailNode(pr: PullRequestDetailNode, repo: GithubRepoRef): PullRequ
     labels: mapLabels(pr.labels),
     reviewers: mapReviewers(pr),
     commits: pr.commitCount?.totalCount ?? 0,
+    ...(autoMerge ? { autoComplete: autoMerge } : {}),
     // `getPullRequestFiles` stops at MAX_PR_FILES; `changedFiles` stays the true total.
     ...((pr.changedFiles ?? 0) > MAX_PR_FILES ? { filesTruncated: true } : {}),
   }
@@ -729,6 +746,69 @@ export function mapGithubError(error: unknown, repoFullName?: string): ScmError 
     error instanceof Error ? error.message : mt('github.unknown'),
     options,
   )
+}
+
+// ---------------------------------------------------------------------------
+// Merge: GraphQL shapes and error mapping.
+// ---------------------------------------------------------------------------
+
+interface MergeOptionsResponse {
+  repository:
+    | (Omit<GithubMergeNode['repository'], never> & {
+        pullRequest:
+          | (Omit<GithubMergeNode['pullRequest'], 'checksState'> & {
+              commits?: { nodes: { commit: { statusCheckRollup: { state: string } | null } }[] }
+            })
+          | null
+      })
+    | null
+}
+
+const ENABLE_AUTO_MERGE_MUTATION = `
+  mutation EnableAutoMerge($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!, $expectedHeadOid: GitObjectID!) {
+    enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod, expectedHeadOid: $expectedHeadOid }) {
+      clientMutationId
+    }
+  }
+`
+
+const DISABLE_AUTO_MERGE_MUTATION = `
+  mutation DisableAutoMerge($pullRequestId: ID!) {
+    disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) {
+      clientMutationId
+    }
+  }
+`
+
+/** GitHub's own one-line reason (REST `message` or the first GraphQL error), capped. */
+function githubReason(error: unknown): string {
+  const err = asGithubErrorLike(error) as GithubErrorLike & {
+    response?: { data?: { message?: unknown } }
+  }
+  const raw = err.response?.data?.message ?? err.errors?.[0]?.message ?? ''
+  const text = typeof raw === 'string' ? raw : ''
+  return text.replace(/\s+/g, ' ').trim().slice(0, 200) || mt('github.unknown')
+}
+
+/**
+ * Merge-specific statuses first: 405 = not mergeable (conflicts, failing or
+ * missing requirements), 409 = the head moved (`sha` mismatch), 422 = a rule
+ * refused it, GraphQL `UNPROCESSABLE` = auto-merge refused. The rest is the
+ * usual mapping (401, 403 permission / rate limit, 404, network).
+ */
+export function mapGithubMergeError(error: unknown, repoFullName: string): ScmError {
+  if (isScmError(error)) return error
+  const err = asGithubErrorLike(error)
+  const options = { cause: error }
+  if (err.status === 409) {
+    return new ScmError('CONFLICT', mt('github.mergeHeadMoved'), options)
+  }
+  if (err.status === 405 || err.status === 422 || err.errors?.[0]?.type === 'UNPROCESSABLE') {
+    const reason = githubReason(error)
+    const code = /conflict/i.test(reason) ? 'MERGE_CONFLICT' : 'MERGE_BLOCKED'
+    return new ScmError(code, mt('github.mergeRefused', { repo: repoFullName, reason }), options)
+  }
+  return mapGithubError(error, repoFullName)
 }
 
 // ---------------------------------------------------------------------------
@@ -1040,6 +1120,117 @@ export class RealGithubService implements ScmDataSource {
       throw mapGithubError(error, repo.fullName)
     }
     return this.getPullRequestDetail(repo, number)
+  }
+
+  // -------------------------------------------------------------------------
+  // Merge / auto-merge (validated and confirmed in `../merge.ts`)
+  // -------------------------------------------------------------------------
+
+  async getMergeOptions(repoRef: RepoRef, number: number): Promise<MergeOptions> {
+    const repo = asGithubRepo(repoRef)
+    const token = this.requireToken()
+    try {
+      const data = await this.client(token).graphql<MergeOptionsResponse>(MERGE_OPTIONS_QUERY, {
+        owner: repo.owner,
+        name: repo.name,
+        number,
+        // `mergeStateStatus` was a preview field; the header is harmless where it is GA.
+        headers: { accept: 'application/vnd.github.merge-info-preview+json' },
+      })
+      const { repository } = data
+      const pr = repository?.pullRequest
+      if (!repository || !pr) {
+        throw new ScmError('NOT_FOUND', mt('scm.prNotFound', { repo: repo.fullName, number }))
+      }
+      return mapGithubMergeOptions({
+        repository: {
+          mergeCommitAllowed: repository.mergeCommitAllowed,
+          squashMergeAllowed: repository.squashMergeAllowed,
+          rebaseMergeAllowed: repository.rebaseMergeAllowed,
+          autoMergeAllowed: repository.autoMergeAllowed,
+          deleteBranchOnMerge: repository.deleteBranchOnMerge,
+          viewerPermission: repository.viewerPermission ?? null,
+        },
+        pullRequest: {
+          ...pr,
+          checksState: pr.commits?.nodes[0]?.commit.statusCheckRollup?.state ?? null,
+        },
+      })
+    } catch (error) {
+      throw mapGithubError(error, repo.fullName)
+    }
+  }
+
+  /**
+   * `PUT /pulls/{n}/merge` with `sha` (GitHub refuses with 409 if the head
+   * moved), then deletes the head branch when asked. A failed delete does not
+   * undo the merge: it is reported as `branchDeleteFailed`.
+   */
+  async mergePullRequest(req: MergeWrite): Promise<MergeWriteResult> {
+    const repo = asGithubRepo(req.repo)
+    const method = githubMergeMethod(req.strategy)
+    if (!method) {
+      throw new ScmError(
+        'MERGE_BLOCKED',
+        mt('scm.merge.strategyNotAllowed', { strategy: mt('scm.merge.strategy.rebase_merge') }),
+      )
+    }
+    const token = this.requireToken()
+    const client = this.client(token)
+    try {
+      await client.rest.pulls.merge({
+        owner: repo.owner,
+        repo: repo.name,
+        pull_number: req.number,
+        sha: req.headSha,
+        merge_method: method === 'MERGE' ? 'merge' : method === 'SQUASH' ? 'squash' : 'rebase',
+      })
+    } catch (error) {
+      throw mapGithubMergeError(error, repo.fullName)
+    }
+    if (!req.deleteSourceBranch) return { completed: true }
+    try {
+      await client.rest.git.deleteRef({
+        owner: repo.owner,
+        repo: repo.name,
+        ref: 'heads/' + shortRef(req.sourceBranch),
+      })
+      return { completed: true }
+    } catch {
+      return { completed: true, branchDeleteFailed: true }
+    }
+  }
+
+  /** GraphQL `enablePullRequestAutoMerge` (with `expectedHeadOid`) / `disablePullRequestAutoMerge`. */
+  async setAutoMerge(req: AutoMergeWrite): Promise<void> {
+    const repo = asGithubRepo(req.repo)
+    const token = this.requireToken()
+    const client = this.client(token)
+    try {
+      const { data: pr } = await client.rest.pulls.get({
+        owner: repo.owner,
+        repo: repo.name,
+        pull_number: req.number,
+      })
+      if (!req.enable) {
+        await client.graphql(DISABLE_AUTO_MERGE_MUTATION, { pullRequestId: pr.node_id })
+        return
+      }
+      const method = githubMergeMethod(req.strategy)
+      if (!method) {
+        throw new ScmError(
+          'MERGE_BLOCKED',
+          mt('scm.merge.strategyNotAllowed', { strategy: mt('scm.merge.strategy.rebase_merge') }),
+        )
+      }
+      await client.graphql(ENABLE_AUTO_MERGE_MUTATION, {
+        pullRequestId: pr.node_id,
+        mergeMethod: method,
+        expectedHeadOid: req.headSha,
+      })
+    } catch (error) {
+      throw mapGithubMergeError(error, repo.fullName)
+    }
   }
 
   /**

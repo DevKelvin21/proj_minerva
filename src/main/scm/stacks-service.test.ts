@@ -49,6 +49,9 @@ function fake(overrides: Partial<ScmProvider> = {}): ScmProvider {
     setThreadStatus: notUsed,
     getFileContent: notUsed,
     updatePullRequestBase: notUsed,
+    getMergeOptions: notUsed,
+    mergePullRequest: notUsed,
+    setAutoMerge: notUsed,
     listScopePullRequests: async () => [
       open(1, 'feature/a', 'main'),
       open(2, 'feature/b', 'feature/a'),
