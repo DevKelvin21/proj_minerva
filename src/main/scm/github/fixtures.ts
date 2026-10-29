@@ -73,6 +73,33 @@ export interface PrFixture {
 const PUSH_470_FIRST = '4700a11c4700a11c4700a11c4700a11c4700a11c'
 const PUSH_470_THIRD = '4700c33c4700c33c4700c33c4700c33c4700c33c'
 
+/**
+ * #482's coupon-service.ts at head: the lines its diff adds, so the active
+ * thread on line 16 (about `coupon.discountRate`, used on line 18) shows its code.
+ */
+const COUPON_SERVICE_482 =
+  "import { Cart } from '../models/cart'\n" +
+  '\n' +
+  'export interface ApplyCouponResult {\n' +
+  '  ok: boolean\n' +
+  '  total: number\n' +
+  '  reason?: string\n' +
+  '}\n' +
+  '\n' +
+  'export const CouponService = {\n' +
+  '  async apply(cart: Cart, code: string): Promise<ApplyCouponResult> {\n' +
+  '    const coupon = await findByCode(code)\n' +
+  '    if (!coupon || coupon.expiresAt < new Date()) {\n' +
+  "      return { ok: false, total: cart.total, reason: 'expired_or_missing' }\n" +
+  '    }\n' +
+  '    if (cart.appliedCouponCode) {\n' +
+  "      return { ok: false, total: cart.total, reason: 'already_applied' }\n" +
+  '    }\n' +
+  '    const total = cart.total * (1 - coupon.discountRate)\n' +
+  '    return { ok: true, total }\n' +
+  '  },\n' +
+  '}\n'
+
 const RATE_LIMIT_HEAD =
   "import { RequestHandler } from 'express'\n" +
   "import { redis } from '../lib/redis'\n" +
@@ -241,6 +268,7 @@ export const prFixtures: PrFixture[] = [
         ],
       },
     ],
+    headFiles: { 'src/services/coupon-service.ts': COUPON_SERVICE_482 },
   },
   {
     detail: {

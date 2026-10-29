@@ -86,6 +86,11 @@ test('a general thread from Conversation and a line thread from Comments: chips,
   await expect(chips(window)).toHaveCount(2)
   await expect(chips(window).nth(1)).toContainText('Thread · coupon-service.ts:16')
   await expect(count(window)).toHaveText('2 of 10 context items')
+  // The active thread's excerpt shows its code at head (line 16, discountRate below it).
+  await expect(lineThread.locator('[data-excerpt-line="16"]')).toContainText('already_applied')
+  await expect(lineThread.getByTestId('code-excerpt')).toContainText('coupon.discountRate')
+  await expect(lineThread).not.toContainText('Loading code')
+  await expect(lineThread).not.toContainText('no longer exists')
   await attachScreenshot(window, testInfo, 'thread-ai-comments')
 
   // On means on everywhere: Conversation and the diff show both as added.
