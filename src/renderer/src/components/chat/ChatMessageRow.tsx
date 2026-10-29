@@ -71,6 +71,7 @@ function AssistantMessage({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const activity = useChatStore((s) => s.activity[message.id])
+  const stage = useChatStore((s) => s.stage[message.id]) ?? 'starting'
   const context = useChatStore((s) =>
     previousId ? (s.messages[previousId]?.context ?? NO_CONTEXT) : NO_CONTEXT,
   )
@@ -100,7 +101,7 @@ function AssistantMessage({
         streaming && (
           <span role="status" className="flex items-center gap-1.5 text-xs text-muted">
             <Spinner size={12} />
-            {t('chat.message.thinking')}
+            {t(`chat.message.stage.${stage}`)}
           </span>
         )
       )}

@@ -175,12 +175,33 @@ export interface ChatSendResult {
 }
 
 /**
+ * What a streaming answer is doing right now, in run order: starting the AI
+ * provider, reading the PR (its details and the snapshot at its commit),
+ * waiting for the model's first event, then the model's own phases.
+ */
+export type ChatRunStage = 'starting' | 'loading' | 'waiting' | 'exploring' | 'writing'
+
+export const CHAT_RUN_STAGES: readonly ChatRunStage[] = [
+  'starting',
+  'loading',
+  'waiting',
+  'exploring',
+  'writing',
+]
+
+/**
  * Push from main to every window. `message` carries the WHOLE message (full
  * text so far, not a delta), coalesced to about one event per 50 ms per
- * message while streaming; `activity` is the run's live tool log (never
- * saved, absent once the message settles).
+ * message while streaming; `activity` is the run's live tool log and `stage`
+ * its current step (neither saved, both absent once the message settles).
  */
 export type ChatEvent =
-  | { type: 'message'; prKey: string; message: ChatMessage; activity?: AnalysisActivityItem[] }
+  | {
+      type: 'message'
+      prKey: string
+      message: ChatMessage
+      activity?: AnalysisActivityItem[]
+      stage?: ChatRunStage
+    }
   | { type: 'conversation'; conversation: ChatConversationSummary }
   | { type: 'deleted'; prKey: string; conversationId: string }

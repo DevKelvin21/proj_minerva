@@ -98,8 +98,15 @@ test('lines and a thread become chips, the answer streams in, and it can become 
   await expect(composer(window)).toContainText('3 of 10 context items')
   await attachScreenshot(window, testInfo, 'chat-chips')
 
-  // Send: the question keeps its chips, the answer streams, the draft empties.
-  await ask(window, 'What could go wrong with these coupons?')
+  // Send: before its first words the answer says which step it is on (the
+  // mock explores for a moment, then writes); the question keeps its chips,
+  // the answer streams, the draft empties.
+  await question(window).fill('What could go wrong with these coupons?')
+  await question(window).press('Enter')
+  const pending = transcript(window).locator('[data-role="assistant"]').last()
+  await expect(pending.getByRole('status')).toHaveText('Reading the code at the PR commit…')
+  await attachScreenshot(window, testInfo, 'chat-stage-exploring')
+  await expect(pending).toHaveAttribute('data-status', 'done', { timeout: 30_000 })
   const userMessage = transcript(window).locator('[data-role="user"]').first()
   await expect(userMessage).toContainText('What could go wrong with these coupons?')
   await expect(userMessage.getByTestId('chat-chip')).toHaveCount(3)

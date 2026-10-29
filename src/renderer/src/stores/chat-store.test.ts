@@ -155,6 +155,37 @@ describe('send', () => {
 })
 
 describe('events', () => {
+  it('keeps a streaming answer\'s stage until it settles', async () => {
+    const store = await loadStore()
+    const s = () => store.getState()
+    send.mockResolvedValue(sendResult())
+    s().setDraftText(KEY, 'Why?')
+    await s().send(repo, 1)
+    expect(s().stage.m2).toBeUndefined()
+
+    s().applyEvent({
+      type: 'message',
+      prKey: KEY,
+      message: message('m2', { status: 'streaming', text: '', updatedAt: '2026-10-01T00:01:00.000Z' }),
+      stage: 'loading',
+    })
+    expect(s().stage.m2).toBe('loading')
+    // An event without a stage (a flush that lost the race) keeps the last one.
+    s().applyEvent({
+      type: 'message',
+      prKey: KEY,
+      message: message('m2', { status: 'streaming', text: '', updatedAt: '2026-10-01T00:01:01.000Z' }),
+    })
+    expect(s().stage.m2).toBe('loading')
+
+    s().applyEvent({
+      type: 'message',
+      prKey: KEY,
+      message: message('m2', { text: 'Done', updatedAt: '2026-10-01T00:02:00.000Z' }),
+    })
+    expect(s().stage.m2).toBeUndefined()
+  })
+
   it('a streaming message only replaces its own entry; settling drops the activity', async () => {
     const store = await loadStore()
     const s = () => store.getState()

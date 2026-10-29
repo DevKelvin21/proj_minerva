@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { app, BrowserWindow, Notification } from 'electron'
 import { handle } from './register'
 import { createAiService } from '../ai'
+import { reportingPrContext } from '../ai/pr-context'
 import { getAiSettingsInfo, getEffectiveAiSelection, providerNeedingCatalogWarmup } from '../ai/env'
 import { getAiProviderStatusMap } from '../ai/providers/provider-status'
 import { getProviderModels, warmProviderModels } from '../ai/providers/provider-models'
@@ -564,11 +565,11 @@ export async function registerIpcHandlers(): Promise<{
   // and seals the selection captured before it, like the analysis.
   const chat: ChatService = createChatService({
     db: openChatDbSafely(join(app.getPath('userData'), CHAT_DB_FILE_NAME)),
-    prepareRun: async () => {
+    prepareRun: async (report) => {
       const providerToWarm = providerNeedingCatalogWarmup()
       if (providerToWarm) await warmProviderModels(providerToWarm)
       const generatedWith = getEffectiveAiSelection()
-      const service = await createAiService(prContext)
+      const service = await createAiService(reportingPrContext(prContext, report))
       return { service, generatedWith }
     },
     // An outdated thread goes with its code as commented, read at its origin

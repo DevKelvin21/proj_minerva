@@ -13,21 +13,24 @@
  *
  * Every change is pushed to every window (`broadcast`): `message` carries the
  * whole message (full text so far), coalesced to about one event per
- * `flushIntervalMs` while streaming, with the run's activity log; the text is
+ * `flushIntervalMs` while streaming, with the run's activity log and its
+ * current stage (`ChatRunStage`, pushed at once when it changes); the text is
  * saved on each of those flushes, so a crash loses at most one interval.
  * The final state (done / failed with its error / cancelled) is saved and
- * pushed once more, without activity, followed by the conversation summary
- * (`running` back to false).
+ * pushed once more, without activity or stage, followed by the conversation
+ * summary (`running` back to false).
  *
  * Never logs message text: it is the reviewer's words and PR content.
  */
 import { randomUUID } from 'node:crypto'
 import {
+  CHAT_RUN_STAGES,
   MAX_CHAT_HISTORY_LEN,
   type ChatConversationSummary,
   type ChatEvent,
   type ChatMessage,
   type ChatPage,
+  type ChatRunStage,
   type ChatSendRequest,
   type ChatSendResult,
 } from '../../shared/chat'
@@ -56,7 +59,11 @@ export interface ChatRunSetup {
 
 export interface ChatServiceDeps {
   db: ChatDb
-  prepareRun: () => Promise<ChatRunSetup>
+  /**
+   * Resolves the provider for a run. `report` says when the run moves on to
+   * reading the PR (`loading`) and to waiting for the model (`waiting`).
+   */
+  prepareRun: (report: (stage: 'loading' | 'waiting') => void) => Promise<ChatRunSetup>
   /**
    * The code as commented of the message's outdated threads, by item id
    * (`./commented-code.ts`). Never rejects; absent = threads go without it.
@@ -232,6 +239,7 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
     const live = (): boolean => !run.removed && !closed
 
     let activity: AnalysisActivityItem[] | undefined
+    let stage: ChatRunStage = 'starting'
     let lastFlushAt = 0
     let timer: ReturnType<typeof setTimeout> | null = null
     let dirty = false
@@ -243,7 +251,21 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
         prKey: key,
         message: { ...answer },
         ...(withActivity && activity ? { activity } : {}),
+        ...(withActivity ? { stage } : {}),
       })
+    }
+    // Stages only move forward (a provider may read the PR again mid-run).
+    const advanceStage = (next: ChatRunStage): boolean => {
+      if (CHAT_RUN_STAGES.indexOf(next) <= CHAT_RUN_STAGES.indexOf(stage)) return false
+      stage = next
+      return true
+    }
+    // A stage reached before any progress is pushed at once: until text
+    // arrives it is all the reviewer sees. The model's phases ride on the
+    // next coalesced flush instead.
+    const enterStage = (next: ChatRunStage): void => {
+      if (settled || !live() || !advanceStage(next)) return
+      push(true)
     }
 
     // Saves and pushes the text so far (at most once per interval).
@@ -293,7 +315,7 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
     }
 
     try {
-      const setup = await deps.prepareRun()
+      const setup = await deps.prepareRun(enterStage)
       if (signal.aborted) {
         settle('cancelled', answer.text)
         return
@@ -301,6 +323,9 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
       if (live()) {
         answer.generatedWith = setup.generatedWith
         db.updateMessage(answer.id, { generatedWith: setup.generatedWith, updatedAt: iso() })
+      }
+      if (deps.readCommentedCode && question.context.some((item) => item.kind === 'thread' && item.origin)) {
+        enterStage('loading')
       }
       const commentedCode = deps.readCommentedCode
         ? await deps
@@ -321,6 +346,7 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
             if (meta.done || settled) return
             answer.text = summaryText(sections)
             if (meta.activity) activity = meta.activity
+            if (meta.phase) advanceStage(meta.phase)
             scheduleFlush()
           },
         },

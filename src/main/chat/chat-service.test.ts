@@ -202,6 +202,38 @@ describe('chat-service send', () => {
     expect(second.options.chat?.commentedCode).toEqual({})
   })
 
+  it('pushes each run stage once, forward only, and drops it when the answer settles', async () => {
+    let report: ((stage: 'loading' | 'waiting') => void) | undefined
+    chat = createChatService({
+      db,
+      prepareRun: async (reporter) => {
+        report = reporter
+        return { service: ai.service, generatedWith: SEAL }
+      },
+      currentLanguage: () => 'es',
+      broadcast: (event) => events.push(event),
+      newId: () => 'id' + ++ids,
+    })
+    chat.send(request())
+    const call = await started()
+    report?.('loading')
+    report?.('waiting')
+    // A provider reading the PR again mid-run does not move the stage back.
+    report?.('loading')
+    call.options.onProgress?.([], { done: false, phase: 'exploring' })
+    call.progress('Because')
+    await vi.advanceTimersByTimeAsync(100)
+    const stages = messageEvents()
+      .map((event) => event.stage)
+      .filter((stage) => stage !== undefined)
+    expect([...new Set(stages)]).toEqual(['loading', 'waiting', 'exploring', 'writing'])
+
+    call.finish('Because it keeps the total positive.')
+    await chat.whenIdle('id1')
+    expect(messageEvents().at(-1)).toMatchObject({ message: { status: 'done' } })
+    expect(messageEvents().at(-1)?.stage).toBeUndefined()
+  })
+
   it('coalesces streaming to one event per interval with the full text, saved on each flush', async () => {
     const { assistantMessage } = chat.send(request())
     const call = await started()
