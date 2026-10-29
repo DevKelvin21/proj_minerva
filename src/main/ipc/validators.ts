@@ -146,12 +146,17 @@ function isRepoFilePath(value: unknown): value is string {
   return value.split('/').every((part) => part.length > 0 && part !== '.' && part !== '..')
 }
 
+/** `commit` (optional, head side only): a full 40-hex SHA; main checks it is the PR's. */
 function isGetFileContentPayload(value: unknown): boolean {
   if (!isPlainObject(value)) return false
-  if (!hasOnlyKeys(value, ['repo', 'number', 'path', 'side'])) return false
+  if (!hasOnlyKeys(value, ['repo', 'number', 'path', 'side', 'commit'])) return false
   if (!isRepoRef(value.repo)) return false
   if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
   if (!isRepoFilePath(value.path)) return false
+  if (value.commit !== undefined) {
+    if (value.side !== 'head') return false
+    if (typeof value.commit !== 'string' || !/^[0-9a-f]{40}$/i.test(value.commit)) return false
+  }
   return value.side === 'base' || value.side === 'head'
 }
 
@@ -283,7 +288,14 @@ function isMarkActivityReadPayload(value: unknown): boolean {
   if (Object.hasOwn(value, 'all')) {
     return hasOnlyKeys(value, ['all']) && value.all === true
   }
-  if (!hasOnlyKeys(value, ['ids']) || !Array.isArray(value.ids)) return false
+  return isActivityIdsPayload(value)
+}
+
+/** `activity:dismiss` (and markRead's `{ ids }`): exactly `{ ids }`, 1..500 non-empty ids. */
+function isActivityIdsPayload(value: unknown): boolean {
+  if (!isPlainObject(value) || !hasOnlyKeys(value, ['ids']) || !Array.isArray(value.ids)) {
+    return false
+  }
   const ids: unknown[] = value.ids
   return (
     ids.length > 0 &&
@@ -470,6 +482,7 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:getDashboard': isGetDashboardPayload,
   'activity:get': isVoidPayload,
   'activity:markRead': isMarkActivityReadPayload,
+  'activity:dismiss': isActivityIdsPayload,
   'ai:analyzePullRequest': isRepoAndNumberPayload,
   'ai:getCachedAnalysis': isRepoAndNumberPayload,
   'ai:invalidateAnalysis': isRepoAndNumberPayload,

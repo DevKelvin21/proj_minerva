@@ -668,6 +668,54 @@ describe('payloadValidators', () => {
       for (const item of bad) expect(validate({ ...base, context: [item] })).toBe(false)
     })
 
+    it('takes a PR-level thread: no path, no side, no lines, no origin', () => {
+      const general = {
+        kind: 'thread',
+        id: 'g1',
+        threadId: 'PRRT_2',
+        outdated: false,
+        comments: thread.comments,
+      }
+      expect(validate({ ...base, context: [general] })).toBe(true)
+      expect(validate({ ...base, context: [general, line] })).toBe(true)
+      const bad = [
+        { ...general, side: 'new' },
+        { ...general, path: 'src/a.ts' },
+        { ...general, startLine: 1, endLine: 1 },
+        { ...general, origin: { commit: 'a'.repeat(40), line: 1 } },
+        { ...general, threadId: undefined },
+        // Only a thread may point at no file.
+        { kind: 'line', id: 'l9', line: 1, code: '', note: '' },
+      ]
+      for (const item of bad) expect(validate({ ...base, context: [item] })).toBe(false)
+    })
+
+    it('checks the origin of an outdated line thread', () => {
+      const commit = 'ab12'.repeat(10)
+      const ok = [
+        { commit, line: 8 },
+        { commit, line: 9, lineEnd: 10 },
+        { commit: commit.toUpperCase(), path: 'src/old-name.ts', line: 1 },
+      ]
+      for (const origin of ok) {
+        expect(validate({ ...base, context: [{ ...thread, outdated: true, origin }] })).toBe(true)
+      }
+      const bad = [
+        { commit: 'ab12', line: 8 },
+        { commit: 'main', line: 8 },
+        { commit: 'g'.repeat(40), line: 8 },
+        { commit, line: 0 },
+        { commit, line: 9, lineEnd: 8 },
+        { commit, path: '../secrets', line: 1 },
+        { commit, line: 1, extra: true },
+        'HEAD',
+        null,
+      ]
+      for (const origin of bad) {
+        expect(validate({ ...base, context: [{ ...thread, outdated: true, origin }] })).toBe(false)
+      }
+    })
+
     it('caps the item count, rejects duplicate ids, and shares one character budget', () => {
       const items = Array.from({ length: 10 }, (_, i) => ({ ...line, id: 'l' + i }))
       expect(validate({ ...base, context: items })).toBe(true)
@@ -737,6 +785,16 @@ describe('payloadValidators', () => {
       }
       expect(validate({ ...base, side: 'LEFT' })).toBe(false)
       expect(validate({ ...base, path: 'x'.repeat(501) })).toBe(false)
+    })
+
+    it('takes a full hex commit on the head side only', () => {
+      const commit = 'a'.repeat(40)
+      expect(validate({ ...base, commit })).toBe(true)
+      expect(validate({ ...base, commit: 'ABCDEF0123'.repeat(4) })).toBe(true)
+      expect(validate({ ...base, side: 'base', commit })).toBe(false)
+      for (const bad of ['a'.repeat(39), 'a'.repeat(41), 'g'.repeat(40), 'HEAD', 'main', '', 7]) {
+        expect(validate({ ...base, commit: bad })).toBe(false)
+      }
     })
   })
 
@@ -884,6 +942,26 @@ describe('payloadValidators', () => {
       expect(validate({ ids: 'a' })).toBe(false)
       expect(validate({ ids: ['x'.repeat(601)] })).toBe(false)
       expect(validate({ ids: Array.from({ length: 501 }, (_, i) => 'id' + i) })).toBe(false)
+    })
+  })
+
+  describe('activity:dismiss', () => {
+    const validate = payloadValidators['activity:dismiss']
+    it('accepts exactly { ids } with 1..500 ids', () => {
+      expect(validate({ ids: ['orphan:github:shopwave/api#2:1'] })).toBe(true)
+      expect(validate({ ids: Array.from({ length: 500 }, (_, i) => 'id' + i) })).toBe(true)
+    })
+
+    it('rejects anything else (there is no "dismiss all")', () => {
+      expect(validate(undefined)).toBe(false)
+      expect(validate({ all: true })).toBe(false)
+      expect(validate({ ids: ['a'], all: true })).toBe(false)
+      expect(validate({ ids: [] })).toBe(false)
+      expect(validate({ ids: [''] })).toBe(false)
+      expect(validate({ ids: [null] })).toBe(false)
+      expect(validate({ ids: ['x'.repeat(601)] })).toBe(false)
+      expect(validate({ ids: Array.from({ length: 501 }, (_, i) => 'id' + i) })).toBe(false)
+      expect(validate(['a'])).toBe(false)
     })
   })
 

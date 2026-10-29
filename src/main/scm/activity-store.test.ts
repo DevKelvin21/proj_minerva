@@ -48,7 +48,12 @@ describe('createActivityStore', () => {
       checkedUpdatedAt: '2026-10-28T11:00:00.000Z',
       checkedAt: '2026-10-28T12:00:00.000Z',
     }
-    store.save({ prs: new Map([[item.prKey, track]]), reviews: new Map(), items: [item] })
+    store.save({
+      prs: new Map([[item.prKey, track]]),
+      reviews: new Map(),
+      items: [item],
+      dismissed: new Map(),
+    })
     const data = createActivityStore(file).load()
     expect(data.prs.get(item.prKey)).toEqual(track)
     expect(data.items).toEqual([item])
@@ -57,7 +62,12 @@ describe('createActivityStore', () => {
 
   it('round-trips review tracks, and drops malformed ones', () => {
     const review = { votes: { dkumar: 'approved' as const }, requested: false, seenAt: 'x' }
-    createActivityStore(file).save({ prs: new Map(), reviews: new Map([['k', review]]), items: [] })
+    createActivityStore(file).save({
+      prs: new Map(),
+      reviews: new Map([['k', review]]),
+      items: [],
+      dismissed: new Map(),
+    })
     expect(createActivityStore(file).load().reviews.get('k')).toEqual(review)
 
     writeFileSync(
@@ -70,6 +80,25 @@ describe('createActivityStore', () => {
       }),
     )
     expect(createActivityStore(file).load().reviews.size).toBe(0)
+  })
+
+  it('round-trips dismissed ids, and reads files written before them', () => {
+    const done = { prKey: item.prKey, at: '2026-10-28T12:00:00.000Z' }
+    createActivityStore(file).save({
+      prs: new Map(),
+      reviews: new Map(),
+      items: [],
+      dismissed: new Map([['orphan:x:1', done]]),
+    })
+    expect([...createActivityStore(file).load().dismissed]).toEqual([['orphan:x:1', done]])
+
+    writeFileSync(
+      file(),
+      JSON.stringify({ version: 1, prs: {}, items: [], dismissed: { a: done, b: { at: 1 } } }),
+    )
+    expect([...createActivityStore(file).load().dismissed.keys()]).toEqual(['a'])
+    writeFileSync(file(), JSON.stringify({ version: 1, prs: {}, items: [] }))
+    expect(createActivityStore(file).load().dismissed.size).toBe(0)
   })
 
   it('falls back to empty on corrupt JSON or another version', () => {

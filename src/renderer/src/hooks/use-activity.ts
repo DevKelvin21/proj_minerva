@@ -21,11 +21,15 @@ export function useActivity() {
   return { state, loadError, markError, load, markRead, retryMarkRead }
 }
 
-/** Unread items, for the tab and rail badges. */
+/** Unread items, for the tab and rail badges (not the ones a pending "Done" hides). */
 export function useUnreadActivityCount(): number {
   const start = useActivityInboxStore((s) => s.start)
   useEffect(() => start(), [start])
-  return useActivityInboxStore((s) => s.state?.unreadCount ?? 0)
+  return useActivityInboxStore((s) => {
+    if (!s.state) return 0
+    if (s.hiddenIds.size === 0) return s.state.unreadCount
+    return s.state.items.filter((item) => !item.read && !s.hiddenIds.has(item.id)).length
+  })
 }
 
 /**

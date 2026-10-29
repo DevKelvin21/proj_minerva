@@ -355,6 +355,7 @@ const minervaApi = {
   activity: {
     get: invoke('activity:get'),
     markRead: invoke('activity:markRead'),
+    dismiss: invoke('activity:dismiss'),
   },
   ai: {
     analyzePullRequest: invoke('ai:analyzePullRequest'),

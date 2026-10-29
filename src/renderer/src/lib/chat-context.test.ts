@@ -4,6 +4,9 @@ import { MAX_CHAT_CONTEXT_LEN, MAX_CHAT_NOTE_LEN, MAX_CHAT_THREAD_COMMENTS } fro
 import type { CommentThread, PrComment } from '../../../shared/types'
 import {
   contextCost,
+  contextItemAuthor,
+  contextItemLocation,
+  isGeneralThreadItem,
   fitComments,
   fitContext,
   lineContextItem,
@@ -112,9 +115,42 @@ describe('threadContextItem', () => {
     expect(item?.comments.at(-1)?.body).toBe('body ' + (MAX_CHAT_THREAD_COMMENTS + 4))
   })
 
-  it('nothing to point at: no file or no comments', () => {
-    expect(threadContextItem({ ...base, path: undefined })).toBeNull()
+  it('nothing to send: no comments', () => {
     expect(threadContextItem({ ...base, comments: [] })).toBeNull()
+  })
+
+  it('a PR-level thread has no path, side or lines, and is named by its author', () => {
+    const item = threadContextItem({
+      ...base,
+      isLineThread: false,
+      path: undefined,
+      line: undefined,
+      lineEnd: undefined,
+      side: undefined,
+      comments: [comment({ author: { login: 'ada' }, bodyMarkdown: 'Where are the groups?' })],
+    })!
+    expect(item).toEqual({
+      kind: 'thread',
+      id: item.id,
+      threadId: 't1',
+      outdated: false,
+      comments: [{ author: 'ada', body: 'Where are the groups?' }],
+    })
+    expect(isGeneralThreadItem(item)).toBe(true)
+    expect(contextItemLocation(item)).toBeNull()
+    expect(contextItemAuthor(item)).toBe('ada')
+    expect(contextItemLocation(threadContextItem(base)!)).toBe('src/a.ts:12-14')
+  })
+
+  it('an outdated line thread with an origin carries it (the code as commented)', () => {
+    const commit = 'ab'.repeat(20)
+    const outdated = { ...base, isOutdated: true, origin: { commit, line: 8, lineEnd: 9 } }
+    expect(threadContextItem(outdated)?.origin).toEqual({ commit, line: 8, lineEnd: 9 })
+    const renamed = { ...outdated, origin: { commit, path: 'src/old.ts', line: 3 } }
+    expect(threadContextItem(renamed)?.origin).toEqual({ commit, path: 'src/old.ts', line: 3 })
+    // Not outdated, or on the base side: the current lines are the right ones.
+    expect(threadContextItem({ ...outdated, isOutdated: false })?.origin).toBeUndefined()
+    expect(threadContextItem({ ...outdated, side: 'LEFT' })?.origin).toBeUndefined()
   })
 })
 

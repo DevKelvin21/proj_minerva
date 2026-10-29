@@ -47,6 +47,7 @@ export function ChatComposer({
   const cancel = useChatStore((s) => s.cancel)
 
   const canSend = draft.text.trim().length > 0 && !sending && !busy
+  const full = draft.items.length >= MAX_CHAT_CONTEXT_ITEMS
 
   function submit(): void {
     if (canSend) void send(repo, number)
@@ -63,12 +64,6 @@ export function ChatComposer({
     >
       {draft.items.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted">
-            {t('chat.composer.contextCount', {
-              count: draft.items.length,
-              max: MAX_CHAT_CONTEXT_ITEMS,
-            })}
-          </span>
           <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
             {draft.items.map((item) => (
               <ContextChip
@@ -119,25 +114,38 @@ export function ChatComposer({
           />
         )}
       </div>
-      {busy ? (
-        <p id={hintId} className="truncate text-xs text-muted">
-          {t('chat.composer.busyHint')}
-        </p>
-      ) : (
-        <p className="flex min-w-0 items-center text-xs text-muted">
-          <span id={hintId} className="sr-only">
-            {t('chat.composer.hint', { mod: MOD_KEY_NAME })}
-          </span>
-          {/* The keys as keycaps; Kbd is aria-hidden, so readers get the line above. */}
-          <span aria-hidden className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
-            <Trans
-              i18nKey="chat.composer.hintKeys"
-              values={{ mod: MOD_KEY_LABEL }}
-              components={{ k: <Kbd>{null}</Kbd> }}
-            />
-          </span>
-        </p>
-      )}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-xs text-muted">
+        {busy ? (
+          <p id={hintId} className="min-w-0 truncate">
+            {t('chat.composer.busyHint')}
+          </p>
+        ) : (
+          <p className="flex min-w-0 items-center">
+            <span id={hintId} className="sr-only">
+              {t('chat.composer.hint', { mod: MOD_KEY_NAME })}
+            </span>
+            {/* The keys as keycaps; Kbd is aria-hidden, so readers get the line above. */}
+            <span aria-hidden className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
+              <Trans
+                i18nKey="chat.composer.hintKeys"
+                values={{ mod: MOD_KEY_LABEL }}
+                components={{ k: <Kbd>{null}</Kbd> }}
+              />
+            </span>
+          </p>
+        )}
+        {/* Always shown, so the limit is known before it is reached. */}
+        <span
+          data-testid="chat-context-count"
+          className={`shrink-0 tabular-nums ${full ? 'text-warning' : ''}`}
+          title={full ? t('chat.composer.full', { max: MAX_CHAT_CONTEXT_ITEMS }) : undefined}
+        >
+          {t('chat.composer.contextCount', {
+            count: draft.items.length,
+            max: MAX_CHAT_CONTEXT_ITEMS,
+          })}
+        </span>
+      </div>
     </form>
   )
 }

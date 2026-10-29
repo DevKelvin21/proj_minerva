@@ -231,6 +231,8 @@ export const en = {
     invalidSettings: 'Invalid source-control settings.',
     prNotFound: 'Pull request not found: {{repo}}#{{number}}',
     threadNotFound: 'Comment thread not found: {{id}}',
+    fileNotAtVersion: '{{path}} does not exist in that version.',
+    commitNotInPr: 'That commit is not part of this pull request.',
     snapshotFinalize: 'Could not finalize the snapshot of {{repo}}@{{sha}} (rename failed).',
     noAgenticAnalysis: 'An agentic analysis cannot be generated for this PR.',
     retarget: {
@@ -274,7 +276,6 @@ export const en = {
       'Repository {{repo}} is too large to copy locally (over {{mb}} MB uncompressed).',
     mockMissingAtBase: '{{path}} does not exist at the base commit.',
     mockMissingAtHead: '{{path}} does not exist at the head commit.',
-    mockFileNotFound: 'File not found: {{path}}',
   },
   azure: {
     completeRefused: 'Azure DevOps refused to complete the pull request: {{reason}}',
@@ -313,9 +314,9 @@ export const en = {
       'with Code (Read & Write) scope.',
     invalidUrlSegment: 'Invalid Azure DevOps URL segment.',
     refusingCredentials: 'Refusing to send credentials to {{host}}',
-    downloadTooLarge: 'Download larger than {{mb}} MB [{{endpoint}}]',
-    timeout: 'Azure DevOps did not answer in time [{{endpoint}}]',
-    unreachable: 'Could not reach Azure DevOps [{{endpoint}}]',
+    downloadTooLarge: 'Download larger than {{mb}} MB.',
+    timeout: 'Azure DevOps did not answer in time.',
+    unreachable: 'Could not reach Azure DevOps.',
     status: {
       rejected: 'Azure DevOps rejected the credential',
       forbidden: 'Not allowed by Azure DevOps (missing permission or PAT scope)',
@@ -323,6 +324,7 @@ export const en = {
       conflict: 'Conflict: the item changed on Azure DevOps',
       rateLimited: 'Azure DevOps rate limit reached',
       other: 'Azure DevOps error (HTTP {{status}})',
+      server: 'Azure DevOps: {{message}}',
     },
     zip: {
       tooManyEntries: 'The repository archive has {{count}} entries (limit {{limit}}).',

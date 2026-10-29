@@ -26,6 +26,12 @@
  * newly asked of me (added as reviewer, or re-requested after voting). Same
  * silent baseline the first time a PR is seen.
  *
+ * Done (`dismiss`): the items leave the inbox and their ids are remembered
+ * (`ActivityData.dismissed`), so nothing a listing rebuilds (an orphan is
+ * found again on every stacks check) brings them back. Comments are also
+ * covered by `knownCommentIds`; the id check is the one rule for every kind.
+ * A dismissal is forgotten with its PR (closed/merged, or unseen for a month).
+ *
  * Comment text is untrusted: `toPlainLine` flattens and caps every string
  * that ends up in an item; the renderer shows it as plain text.
  */
@@ -37,6 +43,7 @@ import {
   type ActivityReviewItem,
   type ActivityReviewRequestItem,
   type ActivityState,
+  type DismissActivityRequest,
   type MarkActivityReadRequest,
 } from '../../shared/activity'
 import {
@@ -47,7 +54,13 @@ import {
   type StackNode,
 } from '../../shared/scm'
 import type { CommentThread, GetStacksResult, PullRequestSummary } from '../../shared/types'
-import type { ActivityData, ActivityStore, PrTrack, ReviewTrack } from './activity-store'
+import type {
+  ActivityData,
+  ActivityStore,
+  DismissedTrack,
+  PrTrack,
+  ReviewTrack,
+} from './activity-store'
 import { toScmError } from './errors'
 import type { WatcherListResult } from './pr-watcher'
 
@@ -67,6 +80,8 @@ const MAX_ITEMS = 200
 const READ_ITEM_MAX_AGE_MS = 14 * 24 * 60 * 60_000
 /** A PR not seen in any listing for this long is forgotten. */
 const TRACK_MAX_AGE_MS = 30 * 24 * 60 * 60_000
+/** Newest dismissals kept (items are capped at 200, so this is generous). */
+const MAX_DISMISSED = 1000
 const MAX_TITLE_LEN = 200
 const MAX_LOGIN_LEN = 100
 const MAX_PATH_LEN = 500
@@ -94,6 +109,8 @@ export interface ActivityService {
   onListing(result: WatcherListResult): Promise<void>
   get(): ActivityState
   markRead(req: MarkActivityReadRequest): ActivityState
+  /** Removes items for good ("Done"); unknown ids are ignored. */
+  dismiss(req: DismissActivityRequest): ActivityState
 }
 
 // Control characters (C0, DEL, C1), soft hyphen, invisible format characters
@@ -342,6 +359,15 @@ export function pruneItems(items: readonly ActivityItem[], now: number): Activit
     .slice(0, MAX_ITEMS)
 }
 
+/** The newest `MAX_DISMISSED` dismissals (exported for tests). */
+export function pruneDismissed(
+  dismissed: ReadonlyMap<string, DismissedTrack>,
+  max = MAX_DISMISSED,
+): Map<string, DismissedTrack> {
+  if (dismissed.size <= max) return new Map(dismissed)
+  return new Map([...dismissed].sort((a, b) => b[1].at.localeCompare(a[1].at)).slice(0, max))
+}
+
 function toState(items: readonly ActivityItem[]): ActivityState {
   return { items: [...items], unreadCount: items.filter((item) => !item.read).length }
 }
@@ -398,7 +424,7 @@ export function createActivityService(deps: ActivityServiceDeps): ActivityServic
           const fresh = newCommentItems(pr, threads, new Set(track.knownCommentIds))
           const existing = new Set(state.items.map((item) => item.id))
           for (const item of fresh) {
-            if (existing.has(item.id)) continue
+            if (existing.has(item.id) || state.dismissed.has(item.id)) continue
             state.items.push(item)
             added.push(item)
           }
@@ -441,6 +467,7 @@ export function createActivityService(deps: ActivityServiceDeps): ActivityServic
       if (!previous || !sameReviewState(previous, next)) changed = true
       if (previous) {
         for (const item of reviewItems(pr, previous, next, nowIso)) {
+          if (state.dismissed.has(item.id)) continue
           state.items.push(item)
           added.push(item)
         }
@@ -480,7 +507,7 @@ export function createActivityService(deps: ActivityServiceDeps): ActivityServic
     let changed = state.items.length !== before
     const existing = new Set(state.items.map((item) => item.id))
     for (const item of found) {
-      if (existing.has(item.id)) continue
+      if (existing.has(item.id) || state.dismissed.has(item.id)) continue
       state.items.push(item)
       added.push(item)
       changed = true
@@ -526,6 +553,12 @@ export function createActivityService(deps: ActivityServiceDeps): ActivityServic
             forgotten++
           }
         }
+        for (const [id, track] of state.dismissed) {
+          if (forget(track.prKey, track.at)) {
+            state.dismissed.delete(id)
+            forgotten++
+          }
+        }
         state.items = pruneItems(state.items, now())
         const itemsChanged =
           added.length > 0 || orphansChanged || state.items.length !== itemsBefore
@@ -553,6 +586,23 @@ export function createActivityService(deps: ActivityServiceDeps): ActivityServic
         persist(state)
         deps.onChange(next, [])
       }
+      return next
+    },
+    dismiss(req) {
+      const state = current()
+      const ids = new Set(req.ids)
+      const at = new Date(now()).toISOString()
+      const kept = state.items.filter((item) => {
+        if (!ids.has(item.id)) return true
+        state.dismissed.set(item.id, { prKey: item.prKey, at })
+        return false
+      })
+      const next = toState(kept)
+      if (kept.length === state.items.length) return next
+      state.items = kept
+      state.dismissed = pruneDismissed(state.dismissed)
+      persist(state)
+      deps.onChange(next, [])
       return next
     },
   }

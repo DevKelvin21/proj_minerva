@@ -22,8 +22,10 @@ import type {
   AzThread,
 } from '../api-types'
 import {
+  addMockBlob,
   BRANCHES,
   CHANGES,
+  FILES_AT_COMMIT,
   ITERATIONS,
   MOCK_ME,
   MOCK_ORG,
@@ -234,6 +236,18 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
   for (const pr of PULL_REQUESTS) {
     for (const commit of [pr.lastMergeSourceCommit?.commitId, pr.lastMergeTargetCommit?.commitId]) {
       if (commit) repoOfCommit.set(commit, pr.repository.id)
+    }
+  }
+  // Older pushes: their files, in the repo of the PR whose iteration names the commit.
+  for (const [commit, files] of Object.entries(FILES_AT_COMMIT)) {
+    for (const [path, content] of Object.entries(files)) {
+      addFile(commit, path, addMockBlob(content))
+    }
+    for (const pr of PULL_REQUESTS) {
+      const list = ITERATIONS[pr.pullRequestId] ?? []
+      if (list.some((it) => it.sourceRefCommit?.commitId === commit)) {
+        repoOfCommit.set(commit, pr.repository.id)
+      }
     }
   }
 

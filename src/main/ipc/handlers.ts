@@ -32,6 +32,7 @@ import {
 import { getMainLocale, mt, setMainLocale } from '../i18n'
 import { CHAT_DB_FILE_NAME, openChatDbSafely } from '../chat/chat-db'
 import { createChatService, type ChatService } from '../chat/chat-service'
+import { readCommentedCode } from '../chat/commented-code'
 import { applyNativeAppearance } from '../theme/appearance-service'
 import { createOpenVsxClient } from '../theme/open-vsx'
 import { createFakeOpenVsxFetch } from '../theme/open-vsx-fake'
@@ -340,6 +341,7 @@ export async function registerIpcHandlers(): Promise<{
   notifier.refreshBadge(activity.get())
   handle('activity:get', () => activity.get())
   handle('activity:markRead', (req) => activity.markRead(req))
+  handle('activity:dismiss', (req) => activity.dismiss(req))
   handle('settings:getNotifications', () => settingsStore.getNotifications())
   handle('settings:setNotifications', (req) => {
     settingsStore.setNotifications(req)
@@ -569,6 +571,10 @@ export async function registerIpcHandlers(): Promise<{
       const service = await createAiService(prContext)
       return { service, generatedWith }
     },
+    // An outdated thread goes with its code as commented, read at its origin
+    // commit through the provider (which refuses a commit that is not the PR's).
+    readCommentedCode: (repo, number, context) =>
+      readCommentedCode(repo, number, context, (req) => scm.forRepo(repo).getFileContent(req)),
     currentLanguage: getMainLocale,
     broadcast: broadcastChat,
   })

@@ -27,6 +27,7 @@ import type {
   PullRequestState,
   PullRequestSummary,
   ReviewDecision,
+  ThreadOrigin,
   UserRef,
 } from '../../../shared/types'
 import type {
@@ -446,6 +447,43 @@ export function isThreadOutdated(
   if (anchor.iteration.second >= latestIteration) return false
   if (latestPaths && thread.path && !latestPaths.has(thread.path)) return true
   return !anchor.tracked
+}
+
+/**
+ * Where a RIGHT-side line thread was written: the source commit of its
+ * iteration (`iterationContext.secondComparingIteration`, mapped through
+ * `iterationCommits`) and its line(s) there. Threads are read with
+ * `$iteration=latest`: when the server re-tracked one, `threadContext` holds
+ * the NEW position and `trackingCriteria.orig*` the original one; untracked
+ * threads keep their original position in `threadContext`. So the original is
+ * `orig*` when present, else `threadContext`. LEFT-side and PR-level threads
+ * get none (their lines refer to a base, not to a push).
+ */
+export function threadOrigin(
+  thread: AzThread,
+  mapped: CommentThread,
+  iterationCommits: ReadonlyMap<number, string>,
+  latestIteration: number | null,
+): ThreadOrigin | undefined {
+  const context = thread.threadContext
+  const iteration = thread.pullRequestThreadContext?.iterationContext?.secondComparingIteration
+  if (mapped.side !== 'RIGHT' || !context?.rightFileStart || !iteration) return undefined
+  const commit = iterationCommits.get(iteration)
+  if (!commit || !/^[0-9a-f]{40}$/i.test(commit)) return undefined
+  const tracking = thread.pullRequestThreadContext?.trackingCriteria
+  const start = tracking?.origRightFileStart?.line ?? context.rightFileStart.line
+  const end = tracking?.origRightFileStart
+    ? (tracking.origRightFileEnd?.line ?? start)
+    : (context.rightFileEnd?.line ?? start)
+  if (!Number.isInteger(start) || start < 1) return undefined
+  const origin: ThreadOrigin = { commit: commit.toLowerCase(), line: start }
+  if (Number.isInteger(end) && end > start) origin.lineEnd = end
+  const originalPath = tracking?.origFilePath ? toRepoPath(tracking.origFilePath) : null
+  if (originalPath && originalPath !== mapped.path) origin.path = originalPath
+  if (latestIteration !== null && latestIteration >= iteration) {
+    origin.push = { index: iteration, total: latestIteration }
+  }
+  return origin
 }
 
 /**

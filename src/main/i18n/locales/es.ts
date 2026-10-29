@@ -227,6 +227,8 @@ export const es: MessageShape<typeof en> = {
     invalidSettings: 'La configuración de control de código no es válida.',
     prNotFound: 'No se encontró el pull request: {{repo}}#{{number}}',
     threadNotFound: 'No se encontró el hilo de comentarios: {{id}}',
+    fileNotAtVersion: '{{path}} no existe en esa versión.',
+    commitNotInPr: 'Ese commit no es parte de este pull request.',
     snapshotFinalize: 'No se pudo finalizar la copia de {{repo}}@{{sha}} (falló el renombrado).',
     noAgenticAnalysis: 'No se puede generar un análisis agéntico para este PR.',
     retarget: {
@@ -274,7 +276,6 @@ export const es: MessageShape<typeof en> = {
       'El repositorio {{repo}} es demasiado grande para copiarlo localmente (más de {{mb}} MB descomprimido).',
     mockMissingAtBase: '{{path}} no existe en el commit base.',
     mockMissingAtHead: '{{path}} no existe en el commit head.',
-    mockFileNotFound: 'No se encontró el archivo: {{path}}',
   },
   azure: {
     completeRefused: 'Azure DevOps rechazó completar el pull request: {{reason}}',
@@ -315,9 +316,9 @@ export const es: MessageShape<typeof en> = {
       'y pega un PAT con el alcance Code (Read & Write).',
     invalidUrlSegment: 'Segmento de URL de Azure DevOps no válido.',
     refusingCredentials: 'Se rechazó enviar credenciales a {{host}}',
-    downloadTooLarge: 'Descarga de más de {{mb}} MB [{{endpoint}}]',
-    timeout: 'Azure DevOps no respondió a tiempo [{{endpoint}}]',
-    unreachable: 'No se pudo conectar con Azure DevOps [{{endpoint}}]',
+    downloadTooLarge: 'Descarga de más de {{mb}} MB.',
+    timeout: 'Azure DevOps no respondió a tiempo.',
+    unreachable: 'No se pudo conectar con Azure DevOps.',
     status: {
       rejected: 'Azure DevOps rechazó la credencial',
       forbidden: 'Azure DevOps no lo permite (falta un permiso o un alcance del PAT)',
@@ -325,6 +326,7 @@ export const es: MessageShape<typeof en> = {
       conflict: 'Conflicto: el elemento cambió en Azure DevOps',
       rateLimited: 'Se alcanzó el límite de uso de Azure DevOps',
       other: 'Error de Azure DevOps (HTTP {{status}})',
+      server: 'Azure DevOps: {{message}}',
     },
     zip: {
       tooManyEntries: 'El archivo del repositorio tiene {{count}} entradas (límite {{limit}}).',

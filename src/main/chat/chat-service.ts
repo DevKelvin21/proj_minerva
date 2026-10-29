@@ -36,7 +36,7 @@ import type { AppLocale } from '../../shared/locale'
 import { prKey } from '../../shared/scm'
 import type { AnalysisGenerationInfo, RepoRef } from '../../shared/types'
 import { chatContextLabel } from '../ai/prompts/ask-chat'
-import type { AiService, ChatHistoryTurn } from '../ai/service'
+import type { AiService, ChatHistoryTurn, CommentedCode } from '../ai/service'
 import { mt } from '../i18n'
 import { conversationTitle, type ChatDb, type StoredConversation } from './chat-db'
 
@@ -57,6 +57,15 @@ export interface ChatRunSetup {
 export interface ChatServiceDeps {
   db: ChatDb
   prepareRun: () => Promise<ChatRunSetup>
+  /**
+   * The code as commented of the message's outdated threads, by item id
+   * (`./commented-code.ts`). Never rejects; absent = threads go without it.
+   */
+  readCommentedCode?: (
+    repo: RepoRef,
+    number: number,
+    context: ChatMessage['context'],
+  ) => Promise<Record<string, CommentedCode>>
   /** The UI language right now; captured when a message is sent and sealed on its answer. */
   currentLanguage: () => AppLocale
   broadcast: (event: ChatEvent) => void
@@ -293,12 +302,21 @@ export function createChatService(deps: ChatServiceDeps): ChatService {
         answer.generatedWith = setup.generatedWith
         db.updateMessage(answer.id, { generatedWith: setup.generatedWith, updatedAt: iso() })
       }
+      const commentedCode = deps.readCommentedCode
+        ? await deps
+            .readCommentedCode(conversation.repo, conversation.number, question.context)
+            .catch(() => ({}))
+        : {}
+      if (signal.aborted) {
+        settle('cancelled', answer.text)
+        return
+      }
       const result = await setup.service.analyzePullRequest(
         { repo: conversation.repo, number: conversation.number },
         {
           language: answer.language,
           signal,
-          chat: { text: question.text, context: question.context, history },
+          chat: { text: question.text, context: question.context, history, commentedCode },
           onProgress: (sections, meta) => {
             if (meta.done || settled) return
             answer.text = summaryText(sections)

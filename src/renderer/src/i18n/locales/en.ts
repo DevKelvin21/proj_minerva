@@ -158,6 +158,26 @@ export const en = {
       emptyHint:
         'New comments and votes on your PRs, review requests, and PRs whose base was merged show up here.',
       noMatches: 'No activity matches "{{query}}".',
+      filter: {
+        label: 'Show',
+        unread: 'Unread',
+        unreadWithCount: 'Unread: {{count}}',
+        all: 'All',
+      },
+      readKept: 'Read items stay 14 days',
+      clearRead: 'Clear read',
+      readUnderAll: 'Read items are under <all>All</all>.',
+      done: 'Done: remove from the inbox',
+      donePr: 'Done with #{{number}}',
+      undo: 'Undo',
+      toast: {
+        item: 'Removed from the inbox.',
+        group_one: '#{{number}} is done ({{count}} item).',
+        group_other: '#{{number}} is done ({{count}} items).',
+        read_one: 'Cleared {{count}} read item.',
+        read_other: 'Cleared {{count}} read items.',
+      },
+      dismissFailed: 'Could not remove from the inbox: {{error}}',
     },
     queue: {
       loadFailed: 'Could not load the queue: {{error}}',
@@ -570,6 +590,9 @@ export const en = {
       notInDiff: 'not in the diff',
       notInDiffTitle:
         "The file is not in this pull request's file list (it may be capped or from an older push)",
+      removed: 'removed in a later push',
+      removedInPush: 'removed in push {{push}}',
+      removedTitle: 'The file no longer exists in the latest version of this pull request',
     },
     thread: {
       fileComment: 'File comment',
@@ -613,7 +636,26 @@ export const en = {
       outdatedNote:
         'This comment was left on an earlier version of the file. The code below is from the latest version around line {{line}}; it may have changed since.',
       loading: 'Loading code…',
-      loadError: 'Could not load the code: {{error}}',
+      loadError: 'Could not load the code.',
+      loadPushError: 'Could not load push {{index}} of this file.',
+      loadCommitError: 'Could not load this file at commit {{commit}}.',
+      missingAtPush: 'This file does not exist in push {{index}}.',
+      missingAtCommit: 'This file does not exist at commit {{commit}}.',
+      missingLatest: 'This file no longer exists in the latest version.',
+      pastEndCommented: 'Line {{line}} is past the end of the file in that version.',
+      versions: 'Which version',
+      asCommented: 'As commented',
+      latest: 'Latest',
+      latestGone: 'The file no longer exists in the latest version.',
+      latestGoneInPush: 'Removed in push {{push}}.',
+      pushOf: 'push {{index}} of {{total}}',
+      commitAt: 'commit <commit/>',
+      commentedAt: 'Code from <at/>, when this was commented.',
+      commentedAtRemoved:
+        'Code from <at/>, when this was commented. The file was removed in a later push.',
+      commentedAtRemovedInPush:
+        'Code from <at/>, when this was commented. The file was removed in push {{push}}.',
+      latestAround: 'Latest version, around line {{line}}. The comment was made on <at/>.',
       pastEndBase: 'Line {{line}} is past the end of the file in its base (before the change).',
       pastEndLatest: 'Line {{line}} is past the end of the file in its latest version.',
       label: 'Code at {{path}}:{{line}}',
@@ -644,7 +686,7 @@ export const en = {
     noPr: 'Open a pull request to ask about it.',
     empty: {
       title: 'Ask about this pull request',
-      hint: 'Add lines or comment threads from the diff, or just ask about the PR.',
+      hint: 'Add lines from the diff or comment threads from any tab, or just ask about the PR.',
     },
     list: {
       label: 'Conversations about this pull request',
@@ -678,6 +720,7 @@ export const en = {
       useAs: 'Use as…',
       useAsCommentOn: 'Use as comment on {{location}}',
       useAsReplyOn: 'Use as reply to the thread on {{location}}',
+      useAsReplyGeneral: 'Use as reply to the general comment by {{author}}',
       copy: 'Copy answer',
     },
     composer: {
@@ -696,6 +739,7 @@ export const en = {
     chip: {
       lineOld: '{{location}} (removed)',
       thread: 'Thread · {{location}}',
+      general: 'General comment · {{author}}',
       outdated: 'Outdated',
       jump: 'Show {{location}} in the Files tab',
       remove: 'Remove {{location}} from the chat',

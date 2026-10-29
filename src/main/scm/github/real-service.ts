@@ -27,6 +27,7 @@ import type {
   PullRequestSummary,
   ReviewDecision,
   SetThreadStatusRequest,
+  ThreadOrigin,
   UserRef,
 } from '../../../shared/types'
 import {
@@ -41,6 +42,7 @@ import {
 } from '../../../shared/scm'
 import { looksBinary } from '../azure/patch-builder'
 import { ScmError, isScmError } from '../errors'
+import { FULL_COMMIT_SHA_RE, ThreadOriginCommits } from '../thread-origins'
 import { mt } from '../../i18n'
 import type {
   AutoMergeWrite,
@@ -193,6 +195,9 @@ interface ReviewThreadNode {
   path: string
   line: number | null
   originalLine: number | null
+  originalStartLine?: number | null
+  /** The PR head commit the thread was written on (absent in old fixtures). */
+  originalCommit?: { oid: string } | null
   diffSide: 'LEFT' | 'RIGHT' | null
   comments: { nodes: GraphqlCommentNode[] }
 }
@@ -308,6 +313,8 @@ const PULL_REQUEST_THREADS_QUERY = `
             path
             line
             originalLine
+            originalStartLine
+            originalCommit { oid }
             diffSide
             comments(first: 100) {
               nodes { id body createdAt isMinimized url viewerDidAuthor author { login avatarUrl } }
@@ -339,7 +346,7 @@ const ADD_REVIEW_THREAD_REPLY_MUTATION = `
 `
 
 const REVIEW_THREAD_FIELDS =
-  ' id isResolved isOutdated path line originalLine diffSide' +
+  ' id isResolved isOutdated path line originalLine originalStartLine originalCommit { oid } diffSide' +
   ' comments(first: 100) {' +
   '   nodes { id body createdAt isMinimized url viewerDidAuthor author { login avatarUrl } }' +
   ' }'
@@ -618,8 +625,30 @@ function mapGraphqlCommentToPrComment(comment: GraphqlCommentNode): PrComment {
   return mapped
 }
 
+/**
+ * Where a RIGHT-side review thread was written: `originalCommit` and its
+ * `originalStartLine..originalLine` there. LEFT-side threads refer to the
+ * base of that diff, which GitHub does not name: none.
+ */
+export function reviewThreadOrigin(node: ReviewThreadNode): ThreadOrigin | undefined {
+  const commit = node.originalCommit?.oid
+  const end = node.originalLine
+  if (node.diffSide === 'LEFT' || !commit || !FULL_COMMIT_SHA_RE.test(commit)) return undefined
+  if (typeof end !== 'number' || !Number.isInteger(end) || end < 1) return undefined
+  const start =
+    typeof node.originalStartLine === 'number' &&
+    Number.isInteger(node.originalStartLine) &&
+    node.originalStartLine >= 1 &&
+    node.originalStartLine < end
+      ? node.originalStartLine
+      : end
+  const origin: ThreadOrigin = { commit: commit.toLowerCase(), line: start }
+  if (end > start) origin.lineEnd = end
+  return origin
+}
+
 function mapReviewThreadNode(node: ReviewThreadNode): CommentThread {
-  return {
+  const thread: CommentThread = {
     id: node.id,
     status: node.isResolved ? 'resolved' : 'active',
     isResolved: node.isResolved,
@@ -630,6 +659,9 @@ function mapReviewThreadNode(node: ReviewThreadNode): CommentThread {
     side: node.diffSide === 'LEFT' ? 'LEFT' : 'RIGHT',
     comments: node.comments.nodes.map(mapGraphqlCommentToPrComment),
   }
+  const origin = reviewThreadOrigin(node)
+  if (origin) thread.origin = origin
+  return thread
 }
 
 function mapIssueCommentToThread(comment: GraphqlCommentNode): CommentThread {
@@ -819,6 +851,9 @@ export function mapGithubMergeError(error: unknown, repoFullName: string): ScmEr
 export type GithubClient = Pick<Octokit, 'graphql' | 'rest' | 'request'>
 
 export class RealGithubService implements ScmDataSource {
+  /** Origin commits this service returned, the first check for `getFileContent({ commit })`. */
+  private readonly originCommits = new ThreadOriginCommits()
+
   constructor(
     private readonly getToken: () => string | null,
     private readonly createClient?: (token: string) => GithubClient,
@@ -953,6 +988,7 @@ export class RealGithubService implements ScmDataSource {
       }
 
       const lineThreads = pr.reviewThreads.nodes.map(mapReviewThreadNode)
+      this.originCommits.record(repo, number, lineThreads)
       const generalThreads = pr.comments.nodes.map(mapIssueCommentToThread)
       return [...lineThreads, ...generalThreads]
     } catch (error) {
@@ -1034,22 +1070,59 @@ export class RealGithubService implements ScmDataSource {
       )
       const thread = resolve ? data.resolveReviewThread?.thread : data.unresolveReviewThread?.thread
       if (!thread) throw new ScmError('NOT_FOUND', mt('scm.threadNotFound', { id: req.threadId }))
-      return mapReviewThreadNode(thread)
+      const mapped = mapReviewThreadNode(thread)
+      this.originCommits.record(repo, req.number, [mapped])
+      return mapped
     } catch (error) {
       throw mapGithubError(error, repo.fullName)
     }
   }
 
   /**
+   * True when `commit` is this PR's: an origin this service returned, or one
+   * of the PR's commits (GitHub lists at most 250). A force-pushed-away
+   * origin is only known through the first.
+   */
+  private async isPullRequestCommit(
+    client: GithubClient,
+    repo: GithubRepoRef,
+    number: number,
+    commit: string,
+  ): Promise<boolean> {
+    if (this.originCommits.has(repo, number, commit)) return true
+    const wanted = commit.toLowerCase()
+    for (let page = 1; page <= 3; page++) {
+      const { data } = await client.rest.pulls.listCommits({
+        owner: repo.owner,
+        repo: repo.name,
+        pull_number: number,
+        per_page: 100,
+        page,
+      })
+      if (data.some((entry) => entry.sha.toLowerCase() === wanted)) return true
+      if (data.length < 100) break
+    }
+    return false
+  }
+
+  /**
    * `base` = the merge base (what LEFT-side line numbers refer to, the same
-   * commit GitHub diffs against), `head` = the PR head. Contents API JSON
-   * form: base64 up to 1 MB, empty `content` above (reported as `tooLarge`).
+   * commit GitHub diffs against), `head` = the PR head, or `commit` (a thread
+   * origin, only when it is this PR's). Contents API JSON form: base64 up to
+   * 1 MB, empty `content` above (reported as `tooLarge`). A file missing at
+   * that version is a one-sentence `NOT_FOUND`.
    */
   async getFileContent(req: FileContentRequest): Promise<FileContent> {
     const repo = asGithubRepo(req.repo)
     const token = this.requireToken()
     try {
       const client = this.client(token)
+      if (req.commit !== undefined) {
+        if (!(await this.isPullRequestCommit(client, repo, req.number, req.commit))) {
+          throw new ScmError('NOT_FOUND', mt('scm.commitNotInPr'))
+        }
+        return await this.readContent(client, repo, req.path, req.commit.toLowerCase())
+      }
       const { data: pr } = await client.rest.pulls.get({
         owner: repo.owner,
         repo: repo.name,
@@ -1065,24 +1138,41 @@ export class RealGithubService implements ScmDataSource {
         })
         ref = compare.merge_base_commit.sha
       }
-      const { data } = await client.rest.repos.getContent({
-        owner: repo.owner,
-        repo: repo.name,
-        path: req.path,
-        ref,
-      })
-      if (Array.isArray(data) || data.type !== 'file') {
-        throw new ScmError('NOT_FOUND', mt('github.notAFile', { path: req.path }))
-      }
-      if (data.size > MAX_FILE_CONTENT_BYTES || !('content' in data) || !data.content) {
-        return { content: null, isBinary: false, tooLarge: data.size > 0 }
-      }
-      const bytes = Buffer.from(data.content, 'base64')
-      if (looksBinary(bytes)) return { content: null, isBinary: true, tooLarge: false }
-      return { content: new TextDecoder('utf-8').decode(bytes), isBinary: false, tooLarge: false }
+      return await this.readContent(client, repo, req.path, ref)
     } catch (error) {
       throw mapGithubError(error, repo.fullName)
     }
+  }
+
+  private async readContent(
+    client: GithubClient,
+    repo: GithubRepoRef,
+    path: string,
+    ref: string,
+  ): Promise<FileContent> {
+    let data: Awaited<ReturnType<GithubClient['rest']['repos']['getContent']>>['data']
+    try {
+      ;({ data } = await client.rest.repos.getContent({
+        owner: repo.owner,
+        repo: repo.name,
+        path,
+        ref,
+      }))
+    } catch (error) {
+      if (asGithubErrorLike(error).status === 404) {
+        throw new ScmError('NOT_FOUND', mt('scm.fileNotAtVersion', { path }), { cause: error })
+      }
+      throw error
+    }
+    if (Array.isArray(data) || data.type !== 'file') {
+      throw new ScmError('NOT_FOUND', mt('github.notAFile', { path }))
+    }
+    if (data.size > MAX_FILE_CONTENT_BYTES || !('content' in data) || !data.content) {
+      return { content: null, isBinary: false, tooLarge: data.size > 0 }
+    }
+    const bytes = Buffer.from(data.content, 'base64')
+    if (looksBinary(bytes)) return { content: null, isBinary: true, tooLarge: false }
+    return { content: new TextDecoder('utf-8').decode(bytes), isBinary: false, tooLarge: false }
   }
 
   async branchExists(repoRef: RepoRef, branch: string): Promise<boolean> {

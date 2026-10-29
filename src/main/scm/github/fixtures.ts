@@ -58,7 +58,111 @@ export interface PrFixture {
   detail: PullRequestDetail
   files: DiffFile[]
   threads: CommentThread[]
+  /**
+   * Files at older commits of the PR (commit -> path -> text), what a thread
+   * origin points at. A path missing under a commit did not exist there.
+   */
+  commitFiles?: Record<string, Record<string, string>>
+  /** Head files the snapshot fixture does not carry (path -> text). */
+  headFiles?: Record<string, string>
+  /** Paths whose first read at a commit fails (NETWORK), to exercise Retry. */
+  failFirstCommitRead?: string[]
 }
+
+/** #470's first and third commits (threads written before later pushes). */
+const PUSH_470_FIRST = '4700a11c4700a11c4700a11c4700a11c4700a11c'
+const PUSH_470_THIRD = '4700c33c4700c33c4700c33c4700c33c4700c33c'
+
+/**
+ * #482's coupon-service.ts at head: the lines its diff adds, so the active
+ * thread on line 16 (about `coupon.discountRate`, used on line 18) shows its code.
+ */
+const COUPON_SERVICE_482 =
+  "import { Cart } from '../models/cart'\n" +
+  '\n' +
+  'export interface ApplyCouponResult {\n' +
+  '  ok: boolean\n' +
+  '  total: number\n' +
+  '  reason?: string\n' +
+  '}\n' +
+  '\n' +
+  'export const CouponService = {\n' +
+  '  async apply(cart: Cart, code: string): Promise<ApplyCouponResult> {\n' +
+  '    const coupon = await findByCode(code)\n' +
+  '    if (!coupon || coupon.expiresAt < new Date()) {\n' +
+  "      return { ok: false, total: cart.total, reason: 'expired_or_missing' }\n" +
+  '    }\n' +
+  '    if (cart.appliedCouponCode) {\n' +
+  "      return { ok: false, total: cart.total, reason: 'already_applied' }\n" +
+  '    }\n' +
+  '    const total = cart.total * (1 - coupon.discountRate)\n' +
+  '    return { ok: true, total }\n' +
+  '  },\n' +
+  '}\n'
+
+const RATE_LIMIT_HEAD =
+  "import { RequestHandler } from 'express'\n" +
+  "import { redis } from '../lib/redis'\n" +
+  '\n' +
+  'const WINDOW_SECONDS = 60\n' +
+  '\n' +
+  'export function rateLimit(limitPerMinute = 60): RequestHandler {\n' +
+  '  return async (req, res, next) => {\n' +
+  "    const key = 'ratelimit:' + req.ip\n" +
+  '    const count = await redis.incr(key)\n' +
+  '    if (count === 1) await redis.expire(key, WINDOW_SECONDS)\n' +
+  '    if (count > limitPerMinute) {\n' +
+  "      res.status(429).json({ error: 'rate_limited' })\n" +
+  '      return\n' +
+  '    }\n' +
+  '    next()\n' +
+  '  }\n' +
+  '}\n'
+
+/** At the third commit: the expiry was set on every request (line 8), before the fix. */
+const RATE_LIMIT_THIRD =
+  "import { RequestHandler } from 'express'\n" +
+  "import { redis } from '../lib/redis'\n" +
+  '\n' +
+  'export function rateLimit(limitPerMinute = 60): RequestHandler {\n' +
+  '  return async (req, res, next) => {\n' +
+  "    const key = 'ratelimit:' + req.ip\n" +
+  '    const count = await redis.incr(key)\n' +
+  '    await redis.expire(key, 60)\n' +
+  '    if (count > limitPerMinute) {\n' +
+  "      res.status(429).json({ error: 'rate_limited' })\n" +
+  '      return\n' +
+  '    }\n' +
+  '    next()\n' +
+  '  }\n' +
+  '}\n'
+
+const APP_470 =
+  "import express from 'express'\n" +
+  "import { registerCartRoutes } from './routes/carts'\n" +
+  "import { rateLimit } from './middleware/rate-limit'\n" +
+  '\n' +
+  'const app = express()\n' +
+  'app.use(rateLimit())\n' +
+  'registerCartRoutes(app)\n'
+
+/** Added by #470's first commit, removed by a later one. */
+const TOKEN_BUCKET_FIRST =
+  'export interface TokenBucket {\n' +
+  '  capacity: number\n' +
+  '  refillPerSecond: number\n' +
+  '  tokens: number\n' +
+  '  updatedAt: number\n' +
+  '}\n' +
+  '\n' +
+  'export function take(bucket: TokenBucket, now: number): boolean {\n' +
+  '  const elapsed = (now - bucket.updatedAt) / 1000\n' +
+  '  bucket.tokens = Math.min(bucket.capacity, bucket.tokens + elapsed * bucket.refillPerSecond)\n' +
+  '  bucket.updatedAt = now\n' +
+  '  if (bucket.tokens < 1) return false\n' +
+  '  bucket.tokens -= 1\n' +
+  '  return true\n' +
+  '}\n'
 
 export const prFixtures: PrFixture[] = [
   {
@@ -164,6 +268,7 @@ export const prFixtures: PrFixture[] = [
         ],
       },
     ],
+    headFiles: { 'src/services/coupon-service.ts': COUPON_SERVICE_482 },
   },
   {
     detail: {
@@ -338,7 +443,85 @@ export const prFixtures: PrFixture[] = [
           "@@ -5,9 +5,18 @@ import express from 'express'\n import { registerCartRoutes } from './routes/carts'\n+import { rateLimit } from './middleware/rate-limit'\n \n const app = express()\n+app.use(rateLimit())\n registerCartRoutes(app)",
       },
     ],
-    threads: [],
+    // Written on earlier commits: one whose lines moved since, one on a file a later push removed.
+    threads: [
+      {
+        id: 'thread-470-1',
+        status: 'active',
+        isResolved: false,
+        isLineThread: true,
+        isOutdated: true,
+        path: 'src/middleware/rate-limit.ts',
+        line: 8,
+        side: 'RIGHT',
+        origin: { commit: PUSH_470_THIRD, line: 8 },
+        comments: [
+          {
+            id: 'c-470-1',
+            author: dkumar,
+            bodyMarkdown:
+              'This resets the window on every request, so a steady client is never let through again.',
+            createdAt: '2026-06-29T15:20:00.000Z',
+            isMinimized: false,
+          },
+        ],
+      },
+      {
+        id: 'thread-470-2',
+        status: 'resolved',
+        isResolved: true,
+        isLineThread: true,
+        isOutdated: true,
+        path: 'src/lib/token-bucket.ts',
+        line: 9,
+        lineEnd: 10,
+        side: 'RIGHT',
+        origin: { commit: PUSH_470_FIRST, line: 9, lineEnd: 10 },
+        comments: [
+          {
+            id: 'c-470-2',
+            author: dkumar,
+            bodyMarkdown: 'Why a hand-rolled bucket? Redis INCR + EXPIRE does this for us.',
+            createdAt: '2026-06-28T10:00:00.000Z',
+            isMinimized: false,
+          },
+          {
+            id: 'c-470-3',
+            author: mgarcia,
+            bodyMarkdown: 'Agreed, it was a first try. Removed in a later push.',
+            createdAt: '2026-06-28T11:30:00.000Z',
+            isMinimized: false,
+          },
+        ],
+      },
+      // Its first read at the commit fails (`failFirstCommitRead`): the excerpt's Retry.
+      {
+        id: 'thread-470-3',
+        status: 'active',
+        isResolved: false,
+        isLineThread: true,
+        isOutdated: true,
+        path: 'src/app.ts',
+        line: 6,
+        side: 'RIGHT',
+        origin: { commit: PUSH_470_THIRD, line: 6 },
+        comments: [
+          {
+            id: 'c-470-4',
+            author: dkumar,
+            bodyMarkdown: 'Should the limiter run before or after auth?',
+            createdAt: '2026-06-29T15:40:00.000Z',
+            isMinimized: false,
+          },
+        ],
+      },
+    ],
+    commitFiles: {
+      [PUSH_470_FIRST]: { 'src/lib/token-bucket.ts': TOKEN_BUCKET_FIRST },
+      [PUSH_470_THIRD]: { 'src/middleware/rate-limit.ts': RATE_LIMIT_THIRD, 'src/app.ts': APP_470 },
+    },
+    headFiles: { 'src/middleware/rate-limit.ts': RATE_LIMIT_HEAD, 'src/app.ts': APP_470 },
+    failFirstCommitRead: ['src/app.ts'],
   },
   {
     detail: {

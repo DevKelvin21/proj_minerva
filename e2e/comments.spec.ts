@@ -132,11 +132,18 @@ test('#102: a comment outside every hunk shows next to its line; outdated badge;
   // Still hidden lines above get an expander.
   await expect(window.getByTestId('diff-expander').first()).toContainText('hidden lines')
 
-  // The outdated thread (left on the first push): badge, note and code excerpt.
+  // The outdated thread (left on the first push): badge, the code as commented
+  // (push 1 of 2), and the latest version one click away.
   const outdated = window.locator('#thread-2')
   await expect(outdated.getByTestId('outdated-badge')).toHaveText('Outdated')
   await expandThread(outdated)
-  await expect(outdated.getByTestId('outdated-note')).toContainText('may have changed')
+  await expect(outdated.getByTestId('outdated-note')).toHaveText(
+    'Code from push 1 of 2, when this was commented.',
+  )
+  await expect(outdated.locator('[data-excerpt-line="17"]')).toContainText(
+    'order.Status = OrderStatus.Submitted;',
+  )
+  await outdated.getByRole('tab', { name: 'Latest' }).click()
   await expect(outdated.getByTestId('code-excerpt')).toContainText('OrderStatus.Draft')
   await attachScreenshot(window, testInfo, 'comments-102-files')
 
@@ -216,7 +223,8 @@ test('Comments view: filters, General group, and jumping to a hidden line', asyn
   await openPr(window, 'Checkout v2: submit validation')
   await tab(window, /^Comments · 2 open$/).click()
   await expect(filterButton(window, 'Open')).toHaveText(/Open\s*2/)
-  await expect(filterButton(window, 'All')).toHaveText(/All\s*2/)
+  // The third thread is resolved (on a file a later push removed).
+  await expect(filterButton(window, 'All')).toHaveText(/All\s*3/)
   await expect(card(window, '2').getByTestId('outdated-badge')).toBeVisible()
   await expect(card(window, '1').getByTestId('code-excerpt')).toContainText(
     '// Line 12: kept as context.',
