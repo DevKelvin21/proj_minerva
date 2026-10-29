@@ -54,6 +54,18 @@ export function choiceDescription(t: TFunction, choice: ModelOptionChoice): stri
 }
 
 /**
+ * Human name of a model ("Big Pickle"), the same in the title bar chip and the
+ * analysis panel; the raw id when the catalog no longer lists it.
+ */
+export function modelDisplayLabel(
+  catalog: Record<AiProviderId, AiProviderCatalogEntry>,
+  provider: AiProviderId,
+  model: string,
+): string {
+  return getModelOption(catalog, provider, model)?.label ?? model
+}
+
+/**
  * Resuelve los labels humanos (proveedor, effort) para un
  * `(provider, model, effortValue)` dado, contra el catálogo ESTÁTICO
  * (`AiSettingsInfo.catalog` — no cambia con la selección del usuario).

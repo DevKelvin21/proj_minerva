@@ -943,11 +943,11 @@ export const es: MessageShape<typeof en> = {
       resizeHint: 'Arrastra para redimensionar; doble clic restaura el ancho por defecto',
     },
     placeholder: {
-      intro: 'Aquí verás el análisis con IA del PR seleccionado:',
-      itemSummary: 'Resumen didáctico del cambio',
-      itemC4: 'Diagrama C4 si toca arquitectura',
-      itemEndpoints: 'Documentación de endpoints nuevos, con ejemplo para probarlos en local',
-      itemEr: 'Diagrama ER si hay cambios de esquema',
+      intro: 'Minerva lee el PR en su commit y te lo explica:',
+      itemSummary: 'Resumen y un recorrido guiado',
+      itemDiagrams: 'Diagramas de arquitectura y de esquema',
+      itemEndpoints: 'Endpoints nuevos, con una forma de probarlos en local',
+      itemSetup: 'Cómo levantar la app y cambios de cloud',
       analyze: 'Analizar PR',
       selectPrFirst: 'Selecciona un PR primero',
     },
@@ -1000,7 +1000,6 @@ export const es: MessageShape<typeof en> = {
       es: 'español',
     },
     modelHint: {
-      via: 'vía',
       title: 'Proveedor y modelo activos: {{summary}}',
     },
     mermaid: {

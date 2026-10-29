@@ -6,11 +6,12 @@ import type { Page } from './fixtures'
 /**
  * Port de scripts/smoke-f9-ui.mjs (F9, issues 1 y 2 post-T59).
  *
- * Banner (`ActiveModelHint.tsx`): formato EXACTO `providerLabel + ' · ' +
- * model` donde `model` es el ID crudo — con opencode + opencode/big-pickle
- * (sin descriptor effort en el catálogo curado, T57) queda literalmente
- * `vía OpenCode · opencode/big-pickle`. Con MINERVA_MOCK_AI=1 responde el
- * mock, pero `generatedWith` se sella con la SELECCIÓN activa.
+ * Banner (`ActiveModelHint.tsx`): the model named like the title bar chip,
+ * `modelLabel + ' · ' + providerLabel` — with opencode + opencode/big-pickle
+ * (no effort descriptor in the curated catalog, T57) it reads exactly
+ * `Big Pickle · OpenCode` (the raw id stays in the tooltip). Con
+ * MINERVA_MOCK_AI=1 responde el mock, pero `generatedWith` se sella con la
+ * SELECCIÓN activa.
  *
  * Staleness: la suite legacy necesitaba que el orquestador escribiera a mano
  * una entrada persistida con headSha viejo ANTES de lanzar. Aquí el propio
@@ -19,7 +20,7 @@ import type { Page } from './fixtures'
  */
 
 const PR_482 = { repo: { provider: 'github', owner: 'shopwave', name: 'api', fullName: 'shopwave/api' }, number: 482 }
-const EXPECTED_BANNER = 'via OpenCode · opencode/big-pickle'
+const EXPECTED_BANNER = 'Big Pickle · OpenCode'
 
 const banner = (page: Page) => page.locator('span[title*="Active provider and model"]')
 

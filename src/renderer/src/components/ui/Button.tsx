@@ -1,6 +1,6 @@
 import type { ComponentPropsWithRef, ReactNode } from 'react'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'warning' | 'link'
 export type ButtonSize = 'xs' | 'sm' | 'md'
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -8,6 +8,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   secondary: 'border border-border bg-panel text-text hover:bg-border/60',
   ghost: 'text-muted hover:bg-border/60 hover:text-text',
   danger: 'bg-danger/15 text-danger hover:bg-danger/25',
+  warning: 'border border-warning/50 bg-warning/15 text-text hover:bg-warning/25',
   link: 'text-accent underline-offset-2 hover:underline',
 }
 
@@ -32,9 +33,10 @@ interface ButtonProps extends ComponentPropsWithRef<'button'> {
 }
 
 /**
- * Text button in one of five roles. Primary is the one action of a surface
+ * Text button in one of six roles. Primary is the one action of a surface
  * (Send, Add to chat); secondary sits beside it; ghost is for quiet actions
- * in a list or toolbar; danger confirms something destructive; link is a
+ * in a list or toolbar; danger confirms something destructive; warning is an
+ * action a notice asks for (Update a stale analysis); link is a
  * small secondary action inside or under a line of text (Reset, Restart now).
  */
 export function Button({

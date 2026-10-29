@@ -8,9 +8,7 @@ import {
   Cloud,
   Database,
   Globe,
-  Languages,
   Layers,
-  RefreshCw,
   Rocket,
   Workflow,
 } from 'lucide-react'
@@ -18,6 +16,8 @@ import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
 import { useProviderStatus } from '../../hooks/use-provider-status'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { isAnalysisLanguageMismatch, isAnalysisStale } from '../../lib/staleness'
+import { pickAnalysisNotice } from '../../lib/analysis-status'
+import { splitEndpointHeading } from '../../lib/endpoint-heading'
 import { useLocale } from '../../i18n/use-locale'
 import { DidacticSectionCard } from './DidacticSectionCard'
 import { Markdown } from '../ui/Markdown'
@@ -29,6 +29,7 @@ import { DidacticPlaceholder } from './DidacticPlaceholder'
 import { HarnessActivityLog } from './HarnessActivityLog'
 import { NoCliProvidersCard } from './NoCliProvidersCard'
 import { ActiveModelHint } from './ActiveModelHint'
+import { AnalysisStatusBar, type StatusBarNotice } from './AnalysisStatusBar'
 import { ExpandableResource } from './ExpandableResource'
 import { ResourceViewer, type ViewerResource } from './ResourceViewer'
 import type { DidacticSection, RepoRef, WalkthroughCohort } from '../../../../shared/types'
@@ -41,7 +42,6 @@ import {
   type InsightTab,
 } from '../../lib/insight-tabs'
 import { Spinner } from '../ui/Spinner'
-import { Skeleton } from '../ui/Skeleton'
 
 const SECTION_ICON: Record<DidacticSection['kind'], React.JSX.Element> = {
   summary: <BookOpen size={16} />,
@@ -98,12 +98,31 @@ function InsightTabStrip({
   )
 }
 
-/** Icon + translated title of a section kind (`didactic.sections.*`). */
+interface SectionMeta {
+  title: string
+  icon: React.JSX.Element
+  /** The title is a route (endpoint cards): mono. */
+  monoTitle: boolean
+  /** The markdown the card shows (an endpoint's route heading moves to the title). */
+  markdown: string
+}
+
+/**
+ * Icon + title of a section (`didactic.sections.*`). An endpoint card is
+ * titled by its route, the first heading of its markdown, which then leaves
+ * the body; without a heading it falls back to "Endpoint".
+ */
 function sectionMeta(
-  kind: DidacticSection['kind'],
+  section: { kind: DidacticSection['kind']; markdown: string },
   t: TFunction,
-): { title: string; icon: React.JSX.Element } {
-  return { title: t(`didactic.sections.${kind}`), icon: SECTION_ICON[kind] }
+): SectionMeta {
+  const fallback = t(`didactic.sections.${section.kind}`)
+  if (section.kind === 'endpoint') {
+    const { title, body } = splitEndpointHeading(section.markdown)
+    if (title)
+      return { title, icon: SECTION_ICON.endpoint, monoTitle: true, markdown: body }
+  }
+  return { title: fallback, icon: SECTION_ICON[section.kind], monoTitle: false, markdown: section.markdown }
 }
 
 /**
@@ -251,7 +270,7 @@ function renderCloudDiagrams(
             })
           }
         >
-          <MermaidDiagram code={mermaid} />
+          <MermaidDiagram code={mermaid} framed={false} />
         </ExpandableResource>
       </div>
     )
@@ -265,13 +284,14 @@ function renderSection(
   t: TFunction,
   onOpenLayer?: OpenLayerHandler,
 ): React.JSX.Element {
-  const meta = sectionMeta(section.kind, t)
+  const meta = sectionMeta(section, t)
 
   return (
     <DidacticSectionCard
       key={key}
       icon={meta.icon}
       title={meta.title}
+      monoTitle={meta.monoTitle}
       onExpandMarkdown={
         section.kind === 'walkthrough'
           ? undefined
@@ -283,7 +303,7 @@ function renderSection(
               })
       }
     >
-      {section.markdown.trim().length > 0 && <Markdown content={section.markdown} images={false} />}
+      {meta.markdown.trim().length > 0 && <Markdown content={meta.markdown} images={false} />}
       {section.kind === 'walkthrough' && (
         <WalkthroughBody cohorts={section.cohorts} onOpenLayer={onOpenLayer} />
       )}
@@ -292,7 +312,7 @@ function renderSection(
           label={t('didactic.resources.expandDiagram')}
           onExpand={() => onExpand({ kind: 'mermaid', title: meta.title, code: section.mermaid })}
         >
-          <MermaidDiagram key={section.mermaid} code={section.mermaid} />
+          <MermaidDiagram key={section.mermaid} code={section.mermaid} framed={false} />
         </ExpandableResource>
       )}
       {section.kind === 'cloud' && renderCloudDiagrams(section.mermaids, meta.title, onExpand, t)}
@@ -329,13 +349,14 @@ function renderDraftSection(
   t: TFunction,
   onOpenLayer?: OpenLayerHandler,
 ): React.JSX.Element {
-  const meta = sectionMeta(section.kind, t)
+  const meta = sectionMeta(section, t)
 
   return (
     <DidacticSectionCard
       key={key}
       icon={meta.icon}
       title={meta.title}
+      monoTitle={meta.monoTitle}
       onExpandMarkdown={
         section.kind === 'walkthrough'
           ? undefined
@@ -347,7 +368,7 @@ function renderDraftSection(
               })
       }
     >
-      {section.markdown.trim().length > 0 && <Markdown content={section.markdown} images={false} />}
+      {meta.markdown.trim().length > 0 && <Markdown content={meta.markdown} images={false} />}
       {section.kind === 'walkthrough' && (
         <WalkthroughBody cohorts={section.cohorts} onOpenLayer={onOpenLayer} />
       )}
@@ -360,7 +381,7 @@ function renderDraftSection(
               onExpand({ kind: 'mermaid', title: meta.title, code: section.mermaid })
           }}
         >
-          <MermaidDiagram key={section.mermaid} code={section.mermaid} />
+          <MermaidDiagram key={section.mermaid} code={section.mermaid} framed={false} />
         </ExpandableResource>
       )}
       {section.kind === 'cloud' &&
@@ -492,20 +513,34 @@ export function DidacticAnalysisArea({
     Object.values(providerStatus.statuses).every((s) => s.status === 'unavailable')
   const showNoCliCard = allProvidersUnavailable && scmSettings !== null && !scmSettings.mockScm
 
+  // At most one notice, new commits first (`pickAnalysisNotice`).
+  const noticeKind = pickAnalysisNotice(isStale, isLanguageMismatch)
+  const notice: StatusBarNotice | null =
+    analysis && noticeKind === 'commits' && currentHeadSha
+      ? { kind: 'commits', from: analysis.headSha.slice(0, 7), to: currentHeadSha.slice(0, 7) }
+      : analysis && noticeKind === 'language'
+        ? {
+            kind: 'language',
+            analysisLanguage: t(`didactic.languageNames.${analysis.language}`),
+            uiLanguage: t(`didactic.languageNames.${locale}`),
+          }
+        : null
+
   let body: React.JSX.Element
   if (error) {
+    // The model stays named on a failure: it is what ran (and what Retry runs).
     body = (
-      <Callout
-        tone="danger"
-        role="alert"
-        action={
-          <Button size="xs" onClick={analyze}>
+      <div className="flex min-w-0 flex-col gap-2">
+        <Callout tone="danger" role="alert">
+          {t('didactic.analysis.failed', { error })}
+        </Callout>
+        <div className="flex min-w-0 items-center gap-2">
+          <ActiveModelHint />
+          <Button size="sm" className="ml-auto" onClick={analyze}>
             {t('common.retry')}
           </Button>
-        }
-      >
-        {t('didactic.analysis.failed', { error })}
-      </Callout>
+        </div>
+      </div>
     )
   } else if (analysis) {
     const tabs = availableInsightTabs(analysis.sections.map((section) => section.kind))
@@ -521,50 +556,39 @@ export function DidacticAnalysisArea({
       </>
     )
   } else if (hasStreamedContent && streamingSections) {
+    const tabs = availableInsightTabs(streamingSections.map((section) => section.kind))
+    const tab = resolveInsightTab(pickedTab, tabs)
     body = (
       <>
-        {/* Mini-log de actividad (F13) DURANTE la escritura: franja delgada
-            encima de las secciones mientras el análisis sigue en vuelo — el
-            hook limpia `activity` con el evento terminal, así que su sola
-            presencia significa "todavía no terminó". Si el agente vuelve a
-            usar herramientas a mitad de la redacción, se ve acá. */}
-        {activity && activity.length > 0 && (
-          <div className="rounded-md border border-border/60 bg-border/10 px-2.5 py-1.5">
-            <HarnessActivityLog items={activity} />
-          </div>
+        {/* Mini-log de actividad (F13) DURANTE la escritura: el hook limpia
+            `activity` con el evento terminal, así que su sola presencia
+            significa "todavía no terminó". */}
+        {activity && activity.length > 0 && <HarnessActivityLog items={activity} />}
+        <InsightTabStrip tabs={tabs} active={tab} onPick={setPickedTab} />
+        {streamingSections.map((section, i) =>
+          insightTabOf(section.kind) === tab
+            ? renderDraftSection(section, i, setViewerResource, t, onOpenLayer)
+            : null,
         )}
-        {(() => {
-          const tabs = availableInsightTabs(streamingSections.map((section) => section.kind))
-          const tab = resolveInsightTab(pickedTab, tabs)
-          return (
-            <>
-              <InsightTabStrip tabs={tabs} active={tab} onPick={setPickedTab} />
-              {streamingSections.map((section, i) =>
-                insightTabOf(section.kind) === tab
-                  ? renderDraftSection(section, i, setViewerResource, t, onOpenLayer)
-                  : null,
-              )}
-            </>
-          )
-        })()}
       </>
     )
   } else if (checkingCache || loading || isExploringEmpty) {
     body = (
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-sm text-muted">
-          <Spinner size={14} />
-          {checkingCache
-            ? t('didactic.analysis.checkingCache')
-            : isExploringEmpty
-              ? t('didactic.analysis.exploring')
-              : t('didactic.analysis.analyzing')}
+      <div className="flex min-w-0 flex-col gap-3" data-testid="analysis-skeleton">
+        <div role="status" className="flex min-w-0 items-center gap-2 text-xs text-muted">
+          <Spinner size={12} />
+          <span className="truncate">
+            {checkingCache
+              ? t('didactic.analysis.checkingCache')
+              : isExploringEmpty
+                ? t('didactic.analysis.exploring')
+                : t('didactic.analysis.analyzing')}
+          </span>
         </div>
         {/* Mini-log de actividad del harness (F13): qué está haciendo el
             agente sobre el snapshot mientras todavía no hay secciones. */}
         {activity && <HarnessActivityLog items={activity} />}
-        <Skeleton className="h-20" />
-        <Skeleton className="h-32" />
+        <ResultSkeleton />
       </div>
     )
   } else if (showNoCliCard) {
@@ -576,67 +600,51 @@ export function DidacticAnalysisArea({
   return (
     <>
       {hasResult && !error && (
-        <div className="flex items-center justify-between gap-2">
-          <ActiveModelHint generatedWith={analysis?.generatedWith} />
-          <Button
-            size="xs"
-            onClick={reanalyze}
-            disabled={loading}
-            title={t('didactic.analysis.reanalyzeHint')}
-            icon={
-              <RefreshCw
-                size={12}
-                aria-hidden
-                className={loading ? 'animate-spin motion-reduce:animate-none' : undefined}
-              />
-            }
-          >
-            {t('didactic.analysis.reanalyze')}
-          </Button>
-        </div>
-      )}
-      {isStale && analysis && currentHeadSha && (
-        <Callout
-          tone="warning"
-          data-testid="analysis-stale-banner"
-          action={
-            <Button size="xs" onClick={reanalyze} disabled={loading}>
-              {t('didactic.analysis.update')}
-            </Button>
-          }
-        >
-          {t('didactic.analysis.staleNotice', {
-            from: analysis.headSha.slice(0, 7),
-            to: currentHeadSha.slice(0, 7),
-          })}
-        </Callout>
-      )}
-      {isLanguageMismatch && analysis && (
-        <Callout
-          tone="warning"
-          icon={Languages}
-          data-testid="analysis-language-banner"
-          action={
-            <Button
-              size="xs"
-              data-testid="analysis-language-regenerate"
-              onClick={reanalyze}
-              disabled={loading}
-            >
-              {t('didactic.analysis.regenerate')}
-            </Button>
-          }
-        >
-          {t('didactic.analysis.languageMismatch', {
-            analysisLanguage: t(`didactic.languageNames.${analysis.language}`),
-            uiLanguage: t(`didactic.languageNames.${locale}`),
-          })}
-        </Callout>
+        <AnalysisStatusBar
+          generatedWith={analysis?.generatedWith}
+          notice={notice}
+          busy={loading}
+          onRegenerate={reanalyze}
+        />
       )}
       {body}
       {viewerResource && (
         <ResourceViewer resource={viewerResource} onClose={() => setViewerResource(null)} />
       )}
+    </>
+  )
+}
+
+/** One placeholder bar of the skeleton. Decorative. */
+function Bone({ className }: { className: string }): React.JSX.Element {
+  return (
+    <span
+      aria-hidden
+      className={`block animate-pulse rounded bg-border/50 motion-reduce:animate-none ${className}`}
+    />
+  )
+}
+
+/** Shaped like the result: a row of tabs, then two flat cards. */
+function ResultSkeleton(): React.JSX.Element {
+  return (
+    <>
+      <div aria-hidden className="flex gap-4 border-b border-border pb-2">
+        <Bone className="h-2.5 w-14" />
+        <Bone className="h-2.5 w-20" />
+        <Bone className="h-2.5 w-16" />
+      </div>
+      <div aria-hidden className="flex flex-col gap-2 rounded-lg border border-border bg-panel p-3">
+        <Bone className="h-2.5 w-2/5" />
+        <Bone className="h-2 w-full" />
+        <Bone className="h-2 w-[86%]" />
+        <Bone className="h-2 w-[70%]" />
+      </div>
+      <div aria-hidden className="flex flex-col gap-2 rounded-lg border border-border bg-panel p-3">
+        <Bone className="h-2.5 w-1/3" />
+        <Bone className="h-2 w-[92%]" />
+        <Bone className="h-16 w-full" />
+      </div>
     </>
   )
 }

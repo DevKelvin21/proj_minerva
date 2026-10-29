@@ -2,11 +2,10 @@ import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
-import { getModelOption } from '../../../../shared/ai-providers'
 import { useAppStore } from '../../stores/app-store'
 import { useSettings } from '../../hooks/use-settings'
 import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
-import { resolveModelHintLabels } from '../../lib/model-labels'
+import { modelDisplayLabel, resolveModelHintLabels } from '../../lib/model-labels'
 import { Spinner } from '../ui/Spinner'
 
 /** What the AI is doing for the PR on screen; `null` = no PR under review. */
@@ -77,7 +76,7 @@ function ChipView({
   const { info } = useSettings()
   if (!info) return null
 
-  const modelLabel = getModelOption(info.catalog, info.provider, info.model)?.label ?? info.model
+  const modelLabel = modelDisplayLabel(info.catalog, info.provider, info.model)
   const { providerLabel, effortLabel } = resolveModelHintLabels(
     info.catalog,
     info.provider,

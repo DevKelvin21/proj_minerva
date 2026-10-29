@@ -931,11 +931,11 @@ export const en = {
       resizeHint: 'Drag to resize; double-click restores the default width',
     },
     placeholder: {
-      intro: 'Here you will see the AI analysis of the selected PR:',
-      itemSummary: 'A didactic summary of the change',
-      itemC4: 'A C4 diagram if it touches the architecture',
-      itemEndpoints: 'Docs for new endpoints, with an example to try them locally',
-      itemEr: 'An ER diagram if the schema changes',
+      intro: 'Minerva reads the PR at its commit and explains it:',
+      itemSummary: 'Summary and a guided walkthrough',
+      itemDiagrams: 'Architecture and schema diagrams',
+      itemEndpoints: 'New endpoints, with a way to try them locally',
+      itemSetup: 'Setup and cloud changes',
       analyze: 'Analyze PR',
       selectPrFirst: 'Select a PR first',
     },
@@ -988,7 +988,6 @@ export const en = {
       es: 'Spanish',
     },
     modelHint: {
-      via: 'via',
       title: 'Active provider and model: {{summary}}',
     },
     mermaid: {
