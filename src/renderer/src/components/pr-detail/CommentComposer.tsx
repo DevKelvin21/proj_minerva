@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { Lightbulb } from 'lucide-react'
 import { buildSuggestionBlock, insertSuggestion } from '../../lib/suggestions'
 import { errorText } from '../../lib/error-text'
+import { MOD_KEY_LABEL } from '../../lib/platform'
 import { Button } from '../ui/Button'
+import { Kbd } from '../ui/Kbd'
 import { TextArea } from '../ui/TextArea'
 
 /** How the composer gets the lines a suggestion starts from, or why it can't. */
@@ -37,8 +39,17 @@ interface CommentComposerProps {
   appendRequest?: AppendRequest
   /** Called once `appendRequest` is in the box (the parent drops it). */
   onAppendApplied?: (token: number) => void
+  /**
+   * Starts as a one-line field (with the Cmd/Ctrl+Enter hint) and grows into
+   * the full composer while focused or holding a draft: a reply box or the
+   * general comment, which sit in a reading column.
+   */
+  collapsible?: boolean
   className?: string
 }
+
+/** Cmd/Ctrl+Enter posts; shown next to the collapsible composers. Decorative (`Kbd`). */
+const SUBMIT_SHORTCUT = MOD_KEY_LABEL + '↵'
 
 function toErrorMessage(error: unknown): string {
   return errorText(error)
@@ -63,12 +74,14 @@ export function CommentComposer({
   initialValue = '',
   appendRequest,
   onAppendApplied,
+  collapsible = false,
 }: CommentComposerProps): React.JSX.Element {
   const { t } = useTranslation()
   const [draft, setDraft] = useState(initialValue)
   const [posting, setPosting] = useState(false)
   const [inserting, setInserting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [focused, setFocused] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   // A prefilled draft (an AI answer) is shown whole, not hidden in two rows.
   const [rows, setRows] = useState(() => draftRows(initialValue))
@@ -132,58 +145,75 @@ export function CommentComposer({
     }
   }
 
+  // A draft, a post in flight or an error keep it open even without focus.
+  const expanded =
+    !collapsible || focused || draft.length > 0 || posting || inserting || error !== null
+
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault()
         void submit()
       }}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false)
+      }}
+      data-expanded={collapsible ? expanded : undefined}
       className={`flex flex-col gap-2 ${className}`}
     >
-      <TextArea
-        ref={textareaRef}
-        autoFocus={autoFocus}
-        aria-label={label}
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault()
-            void submit()
-          }
-        }}
-        disabled={posting}
-        rows={rows}
-        placeholder={placeholder}
-        fieldSize="lg"
-        className="resize-y"
-      />
-      {error && <p className="text-xs text-danger">{error}</p>}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {suggestion && (
-          <Button
-            onClick={() => void handleInsertSuggestion()}
-            disabled={posting || inserting || suggestion.kind === 'disabled'}
-            title={
-              suggestion.kind === 'disabled'
-                ? suggestion.reason
-                : t('comments.composer.insertSuggestionTitle')
+      <div className="flex min-w-0 items-center gap-2">
+        <TextArea
+          ref={textareaRef}
+          autoFocus={autoFocus}
+          aria-label={label}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault()
+              void submit()
             }
-            className="mr-auto"
-            icon={<Lightbulb size={12} aria-hidden />}
-          >
-            {inserting ? t('comments.composer.loadingLines') : t('comments.composer.insertSuggestion')}
-          </Button>
-        )}
-        {onCancel && (
-          <Button variant="ghost" onClick={onCancel} disabled={posting}>
-            {t('common.cancel')}
-          </Button>
-        )}
-        <Button type="submit" variant="primary" disabled={posting || draft.trim().length === 0}>
-          {posting ? t('comments.composer.posting') : submitLabel}
-        </Button>
+          }}
+          disabled={posting}
+          rows={expanded ? rows : 1}
+          placeholder={placeholder}
+          fieldSize="lg"
+          className={`min-w-0 flex-1 ${expanded ? 'resize-y' : 'resize-none'}`}
+        />
+        {!expanded && <Kbd>{SUBMIT_SHORTCUT}</Kbd>}
       </div>
+      {error && <p className="text-xs text-danger">{error}</p>}
+      {expanded && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {suggestion && (
+            <Button
+              onClick={() => void handleInsertSuggestion()}
+              disabled={posting || inserting || suggestion.kind === 'disabled'}
+              title={
+                suggestion.kind === 'disabled'
+                  ? suggestion.reason
+                  : t('comments.composer.insertSuggestionTitle')
+              }
+              className="mr-auto"
+              icon={<Lightbulb size={12} aria-hidden />}
+            >
+              {inserting
+                ? t('comments.composer.loadingLines')
+                : t('comments.composer.insertSuggestion')}
+            </Button>
+          )}
+          {collapsible && <Kbd>{SUBMIT_SHORTCUT}</Kbd>}
+          {onCancel && (
+            <Button variant="ghost" onClick={onCancel} disabled={posting}>
+              {t('common.cancel')}
+            </Button>
+          )}
+          <Button type="submit" variant="primary" disabled={posting || draft.trim().length === 0}>
+            {posting ? t('comments.composer.posting') : submitLabel}
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

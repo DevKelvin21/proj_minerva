@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CircleAlert, GitPullRequest } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useAppStore } from '../../stores/app-store'
+import { useAppStore, type CenterTab } from '../../stores/app-store'
+import { useRovingTabs, type RovingTabProps } from '../../hooks/use-roving-tabs'
 import { usePullRequestDetail } from '../../hooks/use-pull-request-detail'
 import { useCommentThreads } from '../../hooks/use-comment-threads'
 import { usePullRequestFiles } from '../../hooks/use-pull-request-files'
@@ -14,22 +15,23 @@ import { EmptyState } from '../ui/EmptyState'
 import { isThreadOpen, prKey, type RepoRef } from '../../../../shared/scm'
 import type { PullRequestDetail } from '../../../../shared/types'
 
-function TabButton({
-  active,
-  onClick,
+const CENTER_TABS: readonly CenterTab[] = ['conversation', 'files', 'comments']
+
+/** One review tab: `useRovingTabs` gives it its role, selection and keys. */
+function ReviewTab({
+  tabProps,
   children,
 }: {
-  active: boolean
-  onClick: () => void
+  tabProps: RovingTabProps
   children: ReactNode
 }): React.JSX.Element {
+  const selected = tabProps['aria-selected']
   return (
     <button
       type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex h-full items-center border-b-2 px-3 text-sm font-medium transition-colors duration-150 ${
-        active ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text'
+      {...tabProps}
+      className={`flex h-full items-center border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
+        selected ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text'
       }`}
     >
       {children}
@@ -85,7 +87,11 @@ function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): Reac
   if (!detail || !detailIsCurrent) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <EmptyState loading title={t('layout.center.loading')} hint={`${repo.fullName}#${number}`} />
+        <EmptyState
+          loading
+          title={t('layout.center.loading')}
+          hint={`${repo.fullName}#${number}`}
+        />
       </div>
     )
   }
@@ -149,6 +155,12 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
   }, [number, headSha, files, reloadThreads, applyThreadStatus])
 
   const openThreads = threads.filter((thread) => isThreadOpen(thread.status)).length
+  const tabs = useRovingTabs<CenterTab>({
+    keys: CENTER_TABS,
+    value: centerTab,
+    onChange: setCenterTab,
+    tabId: (key) => `review-tab-${key}`,
+  })
 
   return (
     <ThreadActionsContext.Provider value={actions}>
@@ -159,33 +171,33 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
             pr={detail}
             onWalkthrough={openWalkthroughFocus}
             tabs={
-              <nav aria-label={t('layout.center.tabsLabel')} className="flex h-full gap-1">
-                <TabButton
-                  active={centerTab === 'conversation'}
-                  onClick={() => setCenterTab('conversation')}
-                >
+              <div
+                role="tablist"
+                aria-label={t('layout.center.tabsLabel')}
+                className="flex h-full gap-1"
+              >
+                <ReviewTab tabProps={tabs.tabProps('conversation')}>
                   {t('layout.center.tabs.conversation')}
-                </TabButton>
-                <TabButton active={centerTab === 'files'} onClick={() => setCenterTab('files')}>
+                </ReviewTab>
+                <ReviewTab tabProps={tabs.tabProps('files')}>
                   {detail.changedFiles === null
                     ? t('layout.center.tabs.files')
                     : t('layout.center.tabs.filesWithCount', { count: detail.changedFiles })}
-                </TabButton>
-                <TabButton
-                  active={centerTab === 'comments'}
-                  onClick={() => setCenterTab('comments')}
-                >
-                  <span title={t('layout.center.openThreads', { count: openThreads })}>
-                    {threadsLoading && threads.length === 0
-                      ? t('layout.center.tabs.comments')
-                      : t('layout.center.tabs.commentsWithCount', { count: openThreads })}
-                  </span>
-                </TabButton>
-              </nav>
+                </ReviewTab>
+                <ReviewTab tabProps={tabs.tabProps('comments')}>
+                  {threadsLoading && threads.length === 0
+                    ? t('layout.center.tabs.comments')
+                    : t('layout.center.tabs.commentsOpen', { count: openThreads })}
+                </ReviewTab>
+              </div>
             }
           />
         )}
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div
+          // The tab's panel; the full-screen walkthrough hides the tabs, so then it is a plain box.
+          {...(walkthroughFocus ? {} : tabs.panelProps(centerTab))}
+          className="min-h-0 flex-1 overflow-hidden"
+        >
           {centerTab === 'conversation' ? (
             <ConversationTab
               pr={detail}
@@ -193,6 +205,7 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
               loading={threadsLoading}
               error={threadsError}
               reload={reloadThreads}
+              files={filesLoading ? null : files}
             />
           ) : centerTab === 'files' ? (
             <FilesTab
@@ -212,6 +225,7 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
               loading={threadsLoading}
               error={threadsError}
               files={filesLoading ? null : files}
+              reload={reloadThreads}
             />
           )}
         </div>
