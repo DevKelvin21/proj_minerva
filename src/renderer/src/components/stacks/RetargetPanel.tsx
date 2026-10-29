@@ -8,6 +8,7 @@ import { transText } from '../../lib/trans-text'
 import { Spinner } from '../ui/Spinner'
 import { Button } from '../ui/Button'
 import { Callout } from '../ui/Callout'
+import { Input } from '../ui/Input'
 
 /**
  * - `orphan`: one-click fix to the suggested base (the completed parent's own
@@ -199,7 +200,9 @@ export function RetargetPanel({
     >
       <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
         {t('stacks.retarget.newTargetBranch')}
-        <input
+        <Input
+          fieldSize="sm"
+          mono
           autoFocus
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -211,7 +214,7 @@ export function RetargetPanel({
           }}
           spellCheck={false}
           aria-invalid={problem !== null}
-          className="w-full min-w-0 rounded border border-border bg-bg px-2 py-1 font-mono text-xs text-text outline-none focus:border-accent"
+          className="w-full min-w-0"
         />
       </label>
       {problem ? (
