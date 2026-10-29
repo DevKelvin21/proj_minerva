@@ -231,6 +231,8 @@ test('Settings shows the Azure DevOps section with auth and the mock org', async
     .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
     .first()
     .click()
+  await window.getByTestId('settings-nav-azure').click()
+  await expect(window.getByTestId('settings-current-page')).toHaveText('Azure DevOps')
   const section = window.getByTestId('azure-devops-settings')
   await expect(section).toBeVisible()
   await expect(section.locator('[data-azure-auth="signed_in"]')).toContainText(

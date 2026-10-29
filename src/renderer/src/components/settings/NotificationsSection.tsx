@@ -8,11 +8,7 @@ import {
 import { errorText } from '../../lib/error-text'
 import { Radio } from '../ui/Checkbox'
 import { Switch } from '../ui/Switch'
-
-interface NotificationsSectionProps {
-  /** Short window: drop the explanatory text, keep the controls. */
-  compact?: boolean
-}
+import { SettingsGroup, SettingsRow } from './SettingsRow'
 
 /**
  * Settings → Notifications: which new activity raises a system notification
@@ -20,9 +16,7 @@ interface NotificationsSectionProps {
  * dock or taskbar icon. Saved in settings.json through main, which applies the
  * badge at once.
  */
-export function NotificationsSection({
-  compact = false,
-}: NotificationsSectionProps): React.JSX.Element {
+export function NotificationsSection(): React.JSX.Element {
   const { t } = useTranslation()
   const [settings, setSettings] = useState<NotificationSettings | null>(null)
   const [saving, setSaving] = useState(false)
@@ -65,45 +59,53 @@ export function NotificationsSection({
   }
 
   return (
-    <div className="p-4" data-testid="notifications-section">
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-        {t('settings.notifications.title')}
-      </h3>
-      {!compact && (
-        <p className="mb-2 text-xs text-muted">{t('settings.notifications.description')}</p>
-      )}
-      {settings && (
-        <div className="flex flex-col gap-2">
-          <fieldset className="flex flex-col gap-1">
-            <legend className="sr-only">{t('settings.notifications.levelLabel')}</legend>
-            {NOTIFICATION_LEVELS.map((level: NotificationLevel) => (
-              <Radio
-                key={level}
+    <SettingsGroup
+      testId="notifications-section"
+      title={t('settings.notifications.title')}
+      description={t('settings.notifications.description')}
+    >
+      {settings ? (
+        <>
+          <SettingsRow title={t('settings.notifications.levelLabel')}>
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="sr-only">{t('settings.notifications.levelLabel')}</legend>
+              {NOTIFICATION_LEVELS.map((level: NotificationLevel) => (
+                <Radio
+                  key={level}
+                  fieldSize="md"
+                  name="notification-level"
+                  value={level}
+                  checked={settings.level === level}
+                  aria-disabled={saving || undefined}
+                  onChange={() => void save({ ...settings, level })}
+                  label={t(`settings.notifications.level.${level}`)}
+                  hint={t(`settings.notifications.levelHint.${level}`)}
+                />
+              ))}
+            </fieldset>
+          </SettingsRow>
+          <SettingsRow
+            title={t('settings.notifications.badgeTitle')}
+            description={t('settings.notifications.badge')}
+            control={
+              <Switch
                 fieldSize="md"
-                name="notification-level"
-                value={level}
-                checked={settings.level === level}
+                checked={settings.badge}
                 aria-disabled={saving || undefined}
-                onChange={() => void save({ ...settings, level })}
-                label={t(`settings.notifications.level.${level}`)}
-                hint={compact ? undefined : t(`settings.notifications.levelHint.${level}`)}
+                onCheckedChange={(badge) => void save({ ...settings, badge })}
+                label={<span className="sr-only">{t('settings.notifications.badge')}</span>}
               />
-            ))}
-          </fieldset>
-          <Switch
-            fieldSize="md"
-            checked={settings.badge}
-            aria-disabled={saving || undefined}
-            onCheckedChange={(badge) => void save({ ...settings, badge })}
-            label={t('settings.notifications.badge')}
+            }
           />
-        </div>
+        </>
+      ) : error ? null : (
+        <p className="px-4 py-3 text-xs text-muted">{t('common.loading')}</p>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-xs text-danger">
+        <p role="alert" className="px-4 py-3 text-xs text-danger">
           {error}
         </p>
       )}
-    </div>
+    </SettingsGroup>
   )
 }

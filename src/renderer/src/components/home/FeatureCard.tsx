@@ -56,6 +56,7 @@ export function FeatureCard({
             {group.name}
           </span>
           <Badge
+            tone="outline"
             size="sm"
             className="max-w-full self-start"
             icon={<Tag size={10} aria-hidden />}
@@ -65,7 +66,7 @@ export function FeatureCard({
                 : t('home.featureCard.tag')
             }
           >
-            <span className="truncate">{group.tag}</span>
+            <span className="min-w-0 truncate">{group.tag}</span>
           </Badge>
         </span>
         {group.needsMyReview > 0 && (

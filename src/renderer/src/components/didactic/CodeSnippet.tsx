@@ -1,15 +1,15 @@
 import { useState } from 'react'
-import { Check, Copy, Maximize2 } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { DidacticSnippet } from '../../../../shared/types'
 import { Button } from '../ui/Button'
 import { HighlightedCode } from '../ui/HighlightedCode'
-import { IconButton } from '../ui/IconButton'
+import { ExpandButton } from './ExpandButton'
 
 interface CodeSnippetProps {
   snippet: DidacticSnippet
   /**
-   * Al pasarlo, agrega un botón "expandir" en el header, junto a "Copiar"
+   * Al pasarlo, agrega el `ExpandButton` en el header, junto a "Copiar"
    * (abre el `ResourceViewer`). Va DENTRO del header y no como overlay
    * flotante (`ExpandableResource`): el overlay caía justo encima de
    * "Copiar" y dejaba ambos botones incliqueables.
@@ -17,7 +17,10 @@ interface CodeSnippetProps {
   onExpand?: () => void
 }
 
-/** Bloque de código copiable (curl / .http) con feedback visual breve tras copiar. */
+/**
+ * Bloque de código copiable (curl / .http) con feedback visual breve tras
+ * copiar: one `code-bg` surface (label row and code), no box inside the card.
+ */
 export function CodeSnippet({ snippet, onExpand }: CodeSnippetProps): React.JSX.Element {
   const [copied, setCopied] = useState(false)
   const { t } = useTranslation()
@@ -34,10 +37,10 @@ export function CodeSnippet({ snippet, onExpand }: CodeSnippetProps): React.JSX.
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-border">
-      <div className="flex items-center justify-between border-b border-border bg-border/30 px-2.5 py-1.5">
-        <span className="text-xs font-medium text-muted">{snippet.label}</span>
-        <div className="flex shrink-0 items-center gap-1.5">
+    <div className="min-w-0 overflow-hidden rounded-md bg-code-bg">
+      <div className="flex min-w-0 items-center justify-between gap-2 py-1 pr-1 pl-2.5">
+        <span className="min-w-0 truncate text-[11px] font-medium text-muted">{snippet.label}</span>
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             size="xs"
@@ -53,16 +56,11 @@ export function CodeSnippet({ snippet, onExpand }: CodeSnippetProps): React.JSX.
             {copied ? t('common.copied') : t('common.copy')}
           </Button>
           {onExpand && (
-            <IconButton
-              size="xs"
-              onClick={onExpand}
-              label={t('didactic.resources.expandSnippet')}
-              icon={<Maximize2 size={12} />}
-            />
+            <ExpandButton onExpand={onExpand} label={t('didactic.resources.expandSnippet')} />
           )}
         </div>
       </div>
-      <pre className="overflow-x-auto bg-bg p-2.5 text-xs text-text">
+      <pre className="overflow-x-auto px-2.5 pb-2.5 text-xs text-text">
         <HighlightedCode code={snippet.code} language={snippet.language} />
       </pre>
     </div>

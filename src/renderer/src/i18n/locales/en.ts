@@ -133,12 +133,14 @@ export const en = {
       allRead: 'All caught up',
       markAllRead: 'Mark all read',
       markPrRead: 'Mark #{{number}} read',
-      groupLabel: '#{{number}} {{title}}',
+      groupLabel: '<num>#{{number}}</num> <name/>',
       conversation: 'conversation',
       commentBy: '{{author}} commented on {{where}}',
       replyBy: '{{author}} replied on {{where}}',
-      orphan: 'Its base PR #{{parent}} was merged into {{base}}.',
-      retargetTo: 'Retarget to {{base}}.',
+      commented: '{{author}} commented',
+      replied: '{{author}} replied',
+      orphan:
+        'Its base PR #{{parent}} was merged into <base/>. <warn>Retarget to <target/>.</warn>',
       vote: {
         approved: '{{reviewer}} approved.',
         approved_with_suggestions: '{{reviewer}} approved with suggestions.',
@@ -153,7 +155,8 @@ export const en = {
       unreadItem: 'Unread.',
       unreadLabel: 'Unread: {{label}}',
       emptyTitle: 'Nothing new on your PRs.',
-      emptyHint: 'New comments on your PRs, and PRs whose base was merged, show up here.',
+      emptyHint:
+        'New comments and votes on your PRs, review requests, and PRs whose base was merged show up here.',
       noMatches: 'No activity matches "{{query}}".',
     },
     queue: {
@@ -251,10 +254,9 @@ export const en = {
         files: 'Files',
         filesWithCount: 'Files ({{count}})',
         comments: 'Comments',
-        commentsWithCount: 'Comments ({{count}})',
+        commentsOpen_one: 'Comments · {{count}} open',
+        commentsOpen_other: 'Comments · {{count}} open',
       },
-      openThreads_one: '{{count}} open thread',
-      openThreads_other: '{{count}} open threads',
     },
   },
   prList: {
@@ -423,6 +425,7 @@ export const en = {
       wordWrap: 'Word wrap',
     },
     diff: {
+      lineActions: 'Line {{line}} actions',
       tooLarge: 'Diff not shown: the file is too large to diff here.',
       overBudget:
         'Diff not shown: this pull request is too large to diff every file. Open it on the provider to see this one.',
@@ -465,13 +468,12 @@ export const en = {
     },
     conversation: {
       openedThisPr: 'opened this pull request',
+      noDescription: 'No description',
       loadError: 'Could not load the comments: {{error}}',
       loading: 'Loading comments…',
       empty: 'No comments yet.',
       generalCommentLabel: 'General comment',
       placeholder: 'Write a comment on this pull request…',
-      postError: 'Could not post: {{error}}',
-      posting: 'Posting…',
       submit: 'Comment',
     },
     tab: {
@@ -492,6 +494,8 @@ export const en = {
       line: 'Line {{line}}',
       lines: 'Lines {{lines}}',
       generalComment: 'General comment',
+      fold: 'Fold thread',
+      unfold: 'Unfold thread',
       commentCount_one: '{{count}} comment',
       commentCount_other: '{{count}} comments',
       statusError: 'Could not change the status: {{error}}',
@@ -561,6 +565,7 @@ export const en = {
       hint: 'Add lines or comment threads from the diff, or just ask about the PR.',
     },
     list: {
+      label: 'Conversations about this pull request',
       toggle: 'Show the conversations about this pull request',
       newTitle: 'New conversation',
       new: 'New conversation',
@@ -599,7 +604,8 @@ export const en = {
       followUpPlaceholder: 'Ask a follow-up…',
       send: 'Send',
       stop: 'Stop the answer',
-      hint: 'Enter to send · Shift+Enter for a new line',
+      hint: 'Enter or {{mod}}+Enter to send · Shift+Enter for a new line',
+      hintKeys: '<k>↵</k> or <k>{{mod}}↵</k> to send · <k>⇧↵</k> for a new line',
       busyHint: 'Answering… Stop it to ask something else here.',
       contextCount_one: '{{count}} of {{max}} context items',
       contextCount_other: '{{count}} of {{max}} context items',
@@ -755,18 +761,18 @@ export const en = {
       updatedAt: 'Updated {{time}}',
       totals: {
         ariaLabel: 'Totals',
-        needsReview_one: '{{count}} needs your review',
-        needsReview_other: '{{count}} need your review',
-        mine_one: '{{count}} yours',
-        mine_other: '{{count}} yours',
-        open_one: '{{count}} open PR',
-        open_other: '{{count}} open PRs',
+        needsReview_one: '<n>{{count}}</n> to review',
+        needsReview_other: '<n>{{count}}</n> to review',
+        mine_one: '<n>{{count}}</n> yours',
+        mine_other: '<n>{{count}}</n> yours',
+        open_one: '<n>{{count}}</n> open',
+        open_other: '<n>{{count}}</n> open',
         repos_one: '{{count}} repository',
         repos_other: '{{count}} repositories',
-        stacks_one: '{{count}} stack',
-        stacks_other: '{{count}} stacks',
-        orphans_one: '{{count}} orphaned PR',
-        orphans_other: '{{count}} orphaned PRs',
+        stacks_one: '<n>{{count}}</n> stack',
+        stacks_other: '<n>{{count}}</n> stacks',
+        orphans_one: '<n>{{count}}</n> orphaned',
+        orphans_other: '<n>{{count}}</n> orphaned',
       },
       features: {
         title: 'Features',
@@ -775,6 +781,7 @@ export const en = {
         hidden_other: '{{count}} hidden',
         showHidden: 'Show',
         hideAgain: 'Hide again',
+        emptyTitle: 'No shared tags yet',
         empty:
           'No tag is shared across repositories yet. Put the same tag on related PRs in different repos and they will show up here as one feature.',
       },
@@ -833,10 +840,17 @@ export const en = {
     filters: {
       ariaLabel: 'Filter by your role',
       all: 'All',
-      required: 'Required reviewer',
-      optional: 'Optional reviewer',
-      mine: 'Mine',
-      unassigned: 'Not assigned to me',
+      required: 'To review',
+      optional: 'Optional',
+      mine: 'Yours',
+      unassigned: 'Others',
+      titles: {
+        all: 'Every open pull request in this repository',
+        required: 'You are a required reviewer',
+        optional: 'You are an optional reviewer',
+        mine: 'You opened them',
+        unassigned: 'Neither yours nor assigned to you',
+      },
       unknownRelationHint:
         'Some pull requests do not report your role; they only show under "All".',
     },
@@ -848,7 +862,7 @@ export const en = {
       stacksHint:
         'Each PR targets the branch of the one before it. Review from the base outward: a later PR only adds what the earlier one did not have.',
       prsTitle: 'Pull requests',
-      prsHint: 'Not part of a stack.',
+      prsNotInStack: 'Pull requests not in a stack',
       noMatch: 'No pull request matches.',
       empty: 'No open pull requests in this repository.',
       stacksHidden_one: '{{count}} stack hidden by the filter.',
@@ -856,6 +870,7 @@ export const en = {
       loadingStacks: 'Loading stacks…',
       stacksFailed: 'Could not load stacks: {{error}}',
       notFound: 'This repository is no longer in the dashboard.',
+      untitled: 'Repository',
     },
     stackBoard: {
       ariaLabel: 'Stacks board',
@@ -865,12 +880,12 @@ export const en = {
       reviewStackTitle: 'Open the base PR and walk the stack with Previous/Next',
       prCount_one: '{{count}} PR',
       prCount_other: '{{count}} PRs',
-      orphaned: 'Orphaned',
     },
     prCard: {
       role: {
-        required: 'Required reviewer',
-        optional: 'Optional reviewer',
+        toReview: 'To review',
+        required: 'Required',
+        optional: 'Optional',
         mine: 'Yours',
       },
       unread: 'Unread changes',
@@ -882,6 +897,7 @@ export const en = {
     },
     featurePage: {
       ariaLabel: 'Feature {{name}}',
+      untitled: 'Feature',
       notFound:
         'This feature group no longer exists: its tag is not shared across repositories any more.',
       rename: 'Rename',
@@ -920,11 +936,11 @@ export const en = {
       resizeHint: 'Drag to resize; double-click restores the default width',
     },
     placeholder: {
-      intro: 'Here you will see the AI analysis of the selected PR:',
-      itemSummary: 'A didactic summary of the change',
-      itemC4: 'A C4 diagram if it touches the architecture',
-      itemEndpoints: 'Docs for new endpoints, with an example to try them locally',
-      itemEr: 'An ER diagram if the schema changes',
+      intro: 'Minerva reads the PR at its commit and explains it:',
+      itemSummary: 'Summary and a guided walkthrough',
+      itemDiagrams: 'Architecture and schema diagrams',
+      itemEndpoints: 'New endpoints, with a way to try them locally',
+      itemSetup: 'Setup and cloud changes',
       analyze: 'Analyze PR',
       selectPrFirst: 'Select a PR first',
     },
@@ -977,7 +993,6 @@ export const en = {
       es: 'Spanish',
     },
     modelHint: {
-      via: 'via',
       title: 'Active provider and model: {{summary}}',
     },
     mermaid: {
@@ -998,6 +1013,48 @@ export const en = {
     modal: {
       title: 'Settings',
       close: 'Close settings',
+      back: 'All settings',
+      navLabel: 'Settings sections',
+      breadcrumb: 'Breadcrumb',
+    },
+    nav: {
+      groups: {
+        sourceControl: 'Source control',
+        ai: 'AI',
+        app: 'App',
+      },
+      pages: {
+        general: 'General',
+        appearance: 'Appearance',
+        github: 'GitHub',
+        azure: 'Azure DevOps',
+        aiProviders: 'Providers',
+        aiModel: 'Model',
+        notifications: 'Notifications',
+        updates: 'Updates',
+      },
+      dot: {
+        warning: 'Needs your attention',
+        accent: 'Update available',
+      },
+    },
+    scmPage: {
+      access: 'Access',
+      connection: 'Connection',
+      recheck: 'Check again',
+      signIn: 'Sign in',
+    },
+    openAt: {
+      aiProviders: 'Open AI settings',
+    },
+    aiProviders: {
+      title: 'Command-line tools',
+      description:
+        'Minerva analyzes pull requests through your own CLI sessions; there are no Minerva API keys.',
+      recheckTitle: 'Status',
+      recheckHint: 'Sign-in happens in a terminal. Check again after you run the command.',
+      howToSignIn: 'How to sign in',
+      notSignedIn: '{{provider}} is not signed in yet.',
     },
     appearance: {
       title: 'Appearance',
@@ -1139,6 +1196,7 @@ export const en = {
         all: 'Also new comments on PRs I review.',
       },
       badge: 'Show the unread count on the app icon',
+      badgeTitle: 'App icon badge',
       loadError: 'Could not load the notification settings: {{error}}',
       saveError: 'Could not save the notification settings: {{error}}',
     },
@@ -1176,6 +1234,7 @@ export const en = {
       use: 'Use',
       activateError: 'Could not activate the model. Try again.',
       reasoningOnActive: 'Reasoning is set on the active model.',
+      title: 'Model',
     },
     modelOptions: {
       effort: 'Reasoning',
@@ -1221,6 +1280,9 @@ export const en = {
       intro:
         'Minerva uses your <mono>gh</mono> (GitHub CLI) session: there is no separate login to authorize. Enterprise orgs that block third-party OAuth apps usually allow GitHub CLI.',
       enable: 'Enable GitHub',
+      enableTitle: 'List pull requests from GitHub',
+      accountHint:
+        'The gh accounts you are signed in to. Following gh switches along with the CLI; picking one keeps Minerva on it.',
       demoMode:
         'Demo mode (MINERVA_MOCK): data is simulated; this setting applies once you go back to real data.',
       install:
@@ -1247,6 +1309,9 @@ export const en = {
       intro:
         'Minerva uses your Azure CLI credential (<mono>az devops login</mono> with a PAT that has Code Read & Write scope). The credential never leaves the main process.',
       enable: 'Enable Azure DevOps',
+      enableTitle: 'List pull requests from Azure DevOps',
+      enableHint: 'Minerva reads them with your Azure CLI credential. Applies when you save below.',
+      scopeTitle: 'Organization and projects',
       demoMode: 'Demo mode lists the mock organization "contoso" whatever is saved here.',
       organization: 'Organization',
       organizationPlaceholder: 'e.g. Contoso',
@@ -1296,6 +1361,7 @@ export const en = {
       notWritable: 'Minerva cannot write over its own file',
     },
     viewRelease: 'View the release',
+    versionTitle: 'Version',
   },
   errors: {
     boundary: {

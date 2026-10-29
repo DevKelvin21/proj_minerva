@@ -8,10 +8,12 @@ import type { CommentThread } from '../../../../shared/types'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
+import { IconButton } from '../ui/IconButton'
 import { providerOfWebUrl, SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { formatAbsoluteTime, formatRelativeTime } from '../../lib/relative-time'
 import { useLocale } from '../../i18n/use-locale'
 import { hasSuggestion } from '../../lib/suggestions'
+import { commentPreview } from '../../lib/comment-preview'
 import { threadLineRange } from '../../lib/line-threads'
 import { settableStatusesFor } from '../../lib/thread-groups'
 import {
@@ -71,10 +73,12 @@ function positionLabel(thread: CommentThread, showPath: boolean, t: TFunction): 
 }
 
 /**
- * One comment thread: header (where it points, how many comments, status
- * picker, Outdated badge), the comments (author, relative time with the
+ * One comment thread: header (fold button, where it points as its own link,
+ * how many comments, a plain-text preview when folded, status picker only
+ * tinted when the thread is not simply open, Outdated badge), the comments (author, relative time with the
  * absolute one on hover, safe Markdown with suggestions as mini-diffs), the
- * code it points at when useful, and a reply composer.
+ * code it points at when useful, and a reply box that starts as one line and
+ * grows into the full composer when focused.
  *
  * Status changes are optimistic: the picker shows the new status at once and
  * rolls back with a visible error if the provider refuses. Threads that are
@@ -148,64 +152,68 @@ export function ThreadCard({
 
   const first = thread.comments[0]
   const count = thread.comments.length
+  const preview = first ? commentPreview(first.bodyMarkdown) : ''
+  const toggle = (): void => setCollapsed((c) => !c)
 
   return (
     <div
       data-thread-id={thread.id}
       data-collapsed={collapsed || undefined}
-      className={`min-w-0 rounded-md border bg-panel ${
+      // Focusable (not tabbable) while highlighted: arriving from the Inbox moves focus here.
+      tabIndex={highlighted ? -1 : undefined}
+      className={`min-w-0 rounded-md border bg-panel focus:outline-none ${
         highlighted ? 'border-accent ring-1 ring-accent/60' : 'border-border'
       }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-1.5">
-        <button
-          type="button"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-expanded={!collapsed}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs text-muted"
-        >
-          {collapsed ? (
-            <ChevronRight size={13} className="shrink-0" />
-          ) : (
-            <ChevronDown size={13} className="shrink-0" />
-          )}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-3 pl-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted">
+          <IconButton
+            size="xs"
+            onClick={toggle}
+            aria-expanded={!collapsed}
+            label={collapsed ? t('comments.thread.unfold') : t('comments.thread.fold')}
+            icon={collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+          />
           {label ? (
             onNavigateToLine ? (
               <span
                 role="link"
                 tabIndex={0}
                 title={t('comments.thread.showLineInFiles')}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onNavigateToLine()
-                }}
+                onClick={onNavigateToLine}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
-                    event.stopPropagation()
                     onNavigateToLine()
                   }
                 }}
-                className={`${showPath ? 'min-w-[6rem] truncate' : 'shrink-0'} font-mono text-accent underline decoration-dotted hover:text-text`}
+                className={`${showPath ? 'min-w-[6rem] truncate' : 'shrink-0'} cursor-pointer rounded-sm font-mono text-text underline decoration-border decoration-dotted underline-offset-2 hover:decoration-text`}
               >
                 {label}
               </span>
             ) : (
-              <span className={`${showPath ? 'min-w-[6rem] truncate' : 'shrink-0'} font-mono`}>
+              <span
+                className={`${showPath ? 'min-w-[6rem] truncate' : 'shrink-0'} font-mono text-text`}
+              >
                 {label}
               </span>
             )
           ) : (
-            <span>{t('comments.thread.generalComment')}</span>
+            <span className="shrink-0 text-text">{t('comments.thread.generalComment')}</span>
           )}
-          <span className="shrink-0">· {t('comments.thread.commentCount', { count })}</span>
-          {collapsed && first && (
-            <span className="min-w-0 truncate text-muted/80">
-              · {first.author.displayName ?? first.author.login}:{' '}
-              {first.bodyMarkdown.replace(/\s+/g, ' ').slice(0, 120)}
-            </span>
-          )}
-        </button>
+          {/* Mouse shortcut for the fold button (the keyboard path is the button itself). */}
+          <span
+            onClick={toggle}
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 self-stretch"
+          >
+            <span className="shrink-0">· {t('comments.thread.commentCount', { count })}</span>
+            {collapsed && preview && (
+              <span className="min-w-0 truncate text-muted/80">
+                · {first!.author.displayName ?? first!.author.login}: {preview}
+              </span>
+            )}
+          </span>
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           {thread.isOutdated && (
             <Badge tone="warning">
@@ -285,6 +293,7 @@ export function ThreadCard({
           </ul>
 
           <CommentComposer
+            collapsible
             className="border-t border-border p-3"
             label={t('comments.thread.replyLabel')}
             placeholder={t('comments.thread.replyPlaceholder')}

@@ -71,10 +71,8 @@ export function InlineThreadCard({
   }
 
   return (
-    <div
-      id={`thread-${thread.id}`}
-      className={placement === 'line' ? 'bg-bg px-2 py-1 font-sans' : ''}
-    >
+    // Under a row its frame is the diff's `DiffInsertRow`.
+    <div id={`thread-${thread.id}`}>
       <ThreadCard
         thread={thread}
         collapsedByDefault={placement === 'line' ? true : undefined}

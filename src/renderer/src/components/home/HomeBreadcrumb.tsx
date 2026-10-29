@@ -8,37 +8,38 @@ export interface Crumb {
   label: ReactNode
   /** Plain-text version for `title` (the label may carry markup). */
   text: string
-  /** Absent = the current page (not clickable). */
+  /** Absent = context only (where the page lives), not a place to go. */
   onClick?: () => void
 }
 
 /**
- * "Home › repo › …" trail with a back button. Every crumb but the last is a
- * button; the trail truncates from the middle on narrow panes.
+ * "← Home › contoso / Platform": the back button and the trail above a page
+ * title (`HomePageHeader`). Crumbs with `onClick` are buttons, the others
+ * say where the page lives (the page itself is the title below); each one
+ * truncates on narrow panes. No border or band of its own: it is the first
+ * line of the page header.
  */
 export function HomeBreadcrumb({
   crumbs,
   onBack,
-  trailing,
 }: {
   crumbs: Crumb[]
   onBack: () => void
-  /** Right-aligned extras (refresh, counts). */
-  trailing?: ReactNode
 }): React.JSX.Element {
   const { t } = useTranslation()
   return (
     <nav
       aria-label={t('home.breadcrumb.ariaLabel')}
-      className="flex min-w-0 shrink-0 items-center gap-1 border-b border-border px-3 py-1.5"
+      className="-ml-1 flex min-w-0 items-center gap-1 text-xs"
     >
       <IconButton
-        icon={<ArrowLeft size={16} />}
+        size="xs"
+        icon={<ArrowLeft size={13} />}
         label={t('home.breadcrumb.back')}
         onClick={onBack}
         data-testid="home-back"
       />
-      <ol className="flex min-w-0 flex-1 items-center gap-1 text-sm">
+      <ol className="flex min-w-0 flex-1 items-center gap-1">
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1
           return (
@@ -49,15 +50,14 @@ export function HomeBreadcrumb({
                   type="button"
                   onClick={crumb.onClick}
                   title={crumb.text}
-                  className="min-w-0 truncate rounded px-1 text-muted transition-colors duration-150 hover:text-text"
+                  className="min-w-0 truncate rounded px-0.5 text-muted transition-colors duration-150 hover:text-text"
                 >
                   {crumb.label}
                 </button>
               ) : (
                 <span
-                  aria-current={last ? 'page' : undefined}
                   title={crumb.text}
-                  className="min-w-0 truncate px-1 font-medium text-text"
+                  className="min-w-0 truncate px-0.5 text-muted"
                 >
                   {crumb.label}
                 </span>
@@ -66,7 +66,6 @@ export function HomeBreadcrumb({
           )
         })}
       </ol>
-      {trailing && <div className="ml-auto flex shrink-0 items-center gap-1">{trailing}</div>}
     </nav>
   )
 }

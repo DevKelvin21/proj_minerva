@@ -3,33 +3,35 @@ import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { findModelInList, type AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
+import { useElementWidth } from '../../hooks/use-element-width'
 import { useProviderModels } from '../../hooks/use-provider-models'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { ModelOptionPicker } from './ModelOptionPicker'
-import { CliLoginGuide } from './CliLoginGuide'
+
+/** From this card width up the model cards go two per row. */
+const TWO_COLUMN_MIN_WIDTH = 520
 
 interface ProviderModelPanelProps {
   info: AiSettingsInfo
   viewedProvider: AiProviderId
   statuses: Record<AiProviderId, AiProviderStatus> | null
-  statusLoading: boolean
   error: string | null
-  onRefetchStatus: () => void
   saveModel: (provider: AiProviderId, model: string) => Promise<boolean>
   selectProvider: (provider: AiProviderId) => Promise<boolean>
   setModelOption: (provider: AiProviderId, optionId: string, value: string) => Promise<boolean>
-  /** Modal en dos columnas (F16/T81): las cards de modelo se pintan en grid de 2. */
-  wide?: boolean
+  /** Goes to Settings › AI › Providers (the viewed provider is not signed in). */
+  onOpenProviders: () => void
 }
 
 /**
  * Contenido del tab visto (`viewedProvider`, T62/F12): lista de modelos como
  * CARDS clickeables — sin radios ni botón "Guardar" aparte, click = activar
  * ese proveedor+modelo en un solo gesto — más "Otro (avanzado)" para
- * OpenCode, el selector de razonamiento del modelo ACTIVO (`ModelOptionPicker`,
- * intacto) y la guía de login del CLI.
+ * OpenCode y el selector de razonamiento del modelo ACTIVO (`ModelOptionPicker`,
+ * intacto). The CLI sign-in guide lives on Settings › AI › Providers; while
+ * the viewed provider is not signed in, a line here links there.
  *
  * `SettingsModal` lo monta con `key={viewedProvider}`: cambiar de tab
  * remonta este componente desde cero, así `useProviderModels` re-fetchea sin
@@ -51,15 +53,17 @@ export function ProviderModelPanel({
   info,
   viewedProvider,
   statuses,
-  statusLoading,
   error,
-  onRefetchStatus,
   saveModel,
   selectProvider,
   setModelOption,
-  wide = false,
+  onOpenProviders,
 }: ProviderModelPanelProps): React.JSX.Element {
   const { t } = useTranslation()
+  const { ref: widthRef, width } = useElementWidth<HTMLDivElement>()
+  // Unmeasured (first frame) counts as wide, so the cards do not jump.
+  const wide = width === null || width >= TWO_COLUMN_MIN_WIDTH
+  const viewedStatus = statuses?.[viewedProvider]
   const fallbackModels = info.catalog[viewedProvider].models
   const { models, error: modelsError } = useProviderModels(viewedProvider, fallbackModels)
 
@@ -100,6 +104,7 @@ export function ProviderModelPanel({
 
   return (
     <div
+      ref={widthRef}
       role="tabpanel"
       id={'settings-tabpanel-' + viewedProvider}
       aria-labelledby={'settings-tab-' + viewedProvider}
@@ -108,6 +113,15 @@ export function ProviderModelPanel({
       <p className="mb-3 text-xs text-muted">
         {t('settings.models.intro', { provider: info.catalog[viewedProvider].label })}
       </p>
+
+      {viewedStatus && viewedStatus.status !== 'authenticated' && (
+        <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-warning">
+          {t('settings.aiProviders.notSignedIn', { provider: info.catalog[viewedProvider].label })}
+          <Button variant="link" size="xs" onClick={onOpenProviders}>
+            {t('settings.aiProviders.howToSignIn')}
+          </Button>
+        </p>
+      )}
 
       {modelsError && (
         <p className="mb-2 text-xs text-muted">
@@ -214,13 +228,6 @@ export function ProviderModelPanel({
       ) : (
         <p className="mt-3 text-[11px] text-muted">{t('settings.models.reasoningOnActive')}</p>
       )}
-
-      <CliLoginGuide
-        provider={viewedProvider}
-        status={statuses?.[viewedProvider]}
-        loading={statusLoading}
-        onRecheck={onRefetchStatus}
-      />
     </div>
   )
 }

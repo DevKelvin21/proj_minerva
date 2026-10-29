@@ -1,8 +1,6 @@
-import { RefreshCw } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { AiProviderStatus } from '../../../../shared/types'
 import { CLI_META, type CliProvider } from '../../lib/cli-meta'
-import { Button } from '../ui/Button'
 
 /** Enlace externo consistente con el resto del design system (`Markdown.tsx`/`TitleBar.tsx`): `target="_blank"` lo intercepta `external-link-guard` en main y lo abre en el navegador del sistema. */
 function ExternalLink({
@@ -27,8 +25,6 @@ function ExternalLink({
 interface CliLoginGuideProps {
   provider: CliProvider
   status: AiProviderStatus | undefined
-  loading: boolean
-  onRecheck: () => void
 }
 
 /**
@@ -37,8 +33,8 @@ interface CliLoginGuideProps {
  * Minerva (el renderer no puede spawnear procesos ni el main puede leer la
  * sesión sin el handshake real de T28/T29/T56), así que acá solo se muestra
  * el comando a correr + un enlace real de instalación (`installUrl`, T60) y
- * un botón que vuelve a pedir `ai:getProviderStatus` (`use-provider-status.ts`)
- * para reflejar el resultado.
+ * (Settings › AI › Providers pone al lado el botón que vuelve a pedir
+ * `ai:getProviderStatus`, uno para los tres proveedores).
  *
  * Copy de `installed` DISTINTO para `opencode` (T60, decisión de Edilson): a
  * diferencia de Claude Code/Codex (donde `installed` = "CLI ahí pero sin
@@ -48,12 +44,7 @@ interface CliLoginGuideProps {
  * OpenAI, un gateway, etc.), no "inicia sesión del CLI" en el sentido en que
  * lo hacen `claude login`/`codex login`.
  */
-export function CliLoginGuide({
-  provider,
-  status,
-  loading,
-  onRecheck,
-}: CliLoginGuideProps): React.JSX.Element {
+export function CliLoginGuide({ provider, status }: CliLoginGuideProps): React.JSX.Element {
   const { t } = useTranslation()
   const meta = CLI_META[provider]
   const value = status?.status ?? 'unavailable'
@@ -61,7 +52,7 @@ export function CliLoginGuide({
   const docs = <ExternalLink href={meta.installUrl} />
 
   return (
-    <div className="mt-2 rounded-md border border-border bg-bg/40 p-2.5">
+    <div className="min-w-0">
       {value === 'unavailable' && status?.reason === 'probe-failed' && (
         <p className="text-xs text-muted">
           {status.resolvedPath ? (
@@ -116,15 +107,6 @@ export function CliLoginGuide({
           })}
         </p>
       )}
-
-      <Button
-        onClick={onRecheck}
-        disabled={loading}
-        className="mt-2"
-        icon={<RefreshCw size={12} className={loading ? 'animate-spin' : ''} />}
-      >
-        {t('settings.cliGuide.recheck')}
-      </Button>
     </div>
   )
 }

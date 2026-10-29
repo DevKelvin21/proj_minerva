@@ -37,7 +37,7 @@ export function DiffExpander({
     <div
       data-testid="diff-expander"
       data-gap-start={gap.newStart}
-      className="flex min-h-6 flex-wrap items-center gap-2 border-y border-border bg-accent/5 px-3 font-sans text-[11px] text-muted"
+      className="flex min-h-6 flex-wrap items-center gap-2 border-y border-border bg-panel px-3 font-sans text-[11px] text-muted"
     >
       <UnfoldVertical size={12} className="shrink-0" />
       <span>

@@ -75,16 +75,18 @@ test('a new line comment lands in the Inbox and opens the review at its line', a
   await expect(window.locator('header:has(h1)')).toContainText('#482')
   await expect(
     window
-      .getByRole('navigation', { name: 'Pull request views' })
-      .getByRole('button', { name: /^Files/ }),
-  ).toHaveAttribute('aria-pressed', 'true')
+      .getByRole('tablist', { name: 'Pull request views' })
+      .getByRole('tab', { name: /^Files/ }),
+  ).toHaveAttribute('aria-selected', 'true')
   const thread = window.locator('#thread-thread-482-incoming')
   await expect(thread).toBeInViewport()
   await expect(thread).toContainText('Should this retry on 409')
 
-  // Read: no badge, the row stays (faded) and the header says so.
+  // Read: no badge, the row stays (in the list's seen tone) and the header says so.
   await expect(badge(window)).toHaveCount(0)
   await expect(incoming(window)).toHaveAttribute('data-read', 'true')
+  // Its PR is the one open in the review: the row is marked current, like the PR list's.
+  await expect(incoming(window)).toHaveAttribute('aria-current', 'true')
   await expect(inbox(window)).toContainText('All caught up')
   await attachScreenshot(window, testInfo, 'inbox-opened-at-line')
 })
@@ -124,6 +126,25 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
     'Inbox: 1 unread',
   )
 
+  // At the narrowest sidebar (220px) the four views still read: no label is cut.
+  const handle = window.getByRole('separator', { name: 'Resize sidebar' })
+  await handle.focus()
+  await window.keyboard.press('Home')
+  await expect(handle).toHaveAttribute('aria-valuenow', '220')
+  await expect(badge(window)).toBeVisible()
+  const clipped = await viewSwitch(window)
+    .getByRole('button')
+    .evaluateAll((buttons) =>
+      buttons
+        .map((button) => button.querySelector('span'))
+        .filter((label) => label !== null && label.scrollWidth > label.clientWidth)
+        .map((label) => label?.textContent),
+    )
+  expect(clipped).toEqual([])
+  // ...and the badges stay whole next to their labels.
+  await expect(badge(window)).toHaveText('1')
+  await attachScreenshot(window, testInfo, 'inbox-sidebar-220')
+
   // Folded to the rail, the Inbox button carries the count.
   await window.getByTestId('sidebar-toggle').click()
   const railInbox = window.getByTestId('sidebar-rail').getByRole('button', { name: /^Inbox/ })
@@ -161,6 +182,7 @@ test('Settings → Notifications: defaults to "aimed at me", saves the level and
       .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
       .first()
       .click()
+    await window.getByTestId('settings-nav-notifications').click()
   }
   await openSettings()
   const section = window.getByTestId('notifications-section')

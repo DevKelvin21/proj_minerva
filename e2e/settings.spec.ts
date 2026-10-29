@@ -97,6 +97,9 @@ test('modal F12: strip "En uso", tabs de proveedor y activación por card', asyn
   )
 
   await openSettingsModal(window)
+  // Settings opens on General; the provider tabs and model cards are AI › Model.
+  await window.getByTestId('settings-nav-ai-model').click()
+  await expect(window.getByTestId('settings-nav-ai-model')).toHaveAttribute('aria-current', 'page')
 
   // Strip "En uso" (uppercase vía CSS ⇒ case-insensitive) y 3 proveedores.
   await expect(window.getByText(/in use/i).first()).toBeVisible()

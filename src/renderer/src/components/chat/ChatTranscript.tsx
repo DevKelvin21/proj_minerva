@@ -95,7 +95,7 @@ export function ChatTranscript({ conversationId, prKey }: ChatTranscriptProps): 
         )}
         {loading && ids.length === 0 && (
           <p role="status" className="flex items-center gap-1.5 text-xs text-muted">
-            <Spinner size={13} />
+            <Spinner size={12} />
             {t('chat.transcript.loading')}
           </p>
         )}

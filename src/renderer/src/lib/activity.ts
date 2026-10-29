@@ -52,14 +52,23 @@ export function activityTarget(item: ActivityItem): PrFocusTarget {
   return { kind: 'conversation', threadId: item.threadId }
 }
 
-/** `true` when every word of `query` is in the PR (title, repo, #number) or one of its items. */
+/**
+ * `true` when every word of `query` is in the PR (title, repo, #number) or one
+ * of its items, as the rows show them: people by display name as well as
+ * login, an orphan's parent and branches.
+ */
 export function matchesActivityQuery(group: ActivityGroup, query: string): boolean {
   const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
   if (tokens.length === 0) return true
   const parts = [group.prTitle, group.repo.fullName, '#' + group.number]
   for (const item of group.items) {
-    if (item.kind === 'comment') parts.push(item.author.login, item.excerpt, item.path ?? '')
-    if (item.kind === 'review') parts.push(item.reviewer.login)
+    if (item.kind === 'comment') {
+      parts.push(item.author.login, item.author.displayName ?? '', item.excerpt, item.path ?? '')
+    }
+    if (item.kind === 'review') parts.push(item.reviewer.login, item.reviewer.displayName ?? '')
+    if (item.kind === 'orphan') {
+      parts.push('#' + item.parent.number, item.parent.mergedInto, item.suggestedBase)
+    }
   }
   const haystack = parts.join('\n').toLowerCase()
   return tokens.every((token) => haystack.includes(token))

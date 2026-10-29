@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { APP_LOCALES, isAppLocale, type AppLocale } from '../../../../shared/locale'
 import { useLocale } from '../../i18n/use-locale'
 import { Select } from '../ui/Select'
+import { SettingsGroup, SettingsRow } from './SettingsRow'
 
 /**
  * Each language named in itself (never translated): someone who can't read
@@ -13,17 +14,12 @@ const LANGUAGE_NAMES: Record<AppLocale, string> = {
   es: 'Español',
 }
 
-interface LanguageSectionProps {
-  /** Short window (F16): drop the explanatory text, keep the control. */
-  compact?: boolean
-}
-
 /**
- * UI language picker. Saving goes through main (`settings:setLanguage`),
+ * Settings › General: the UI language picker. Saving goes through main (`settings:setLanguage`),
  * which persists it and pushes `languageChanged` to every window, so the
  * detached didactic window switches too.
  */
-export function LanguageSection({ compact = false }: LanguageSectionProps): React.JSX.Element {
+export function LanguageSection(): React.JSX.Element {
   const { t } = useTranslation()
   const { locale, setLocale } = useLocale()
   const [saving, setSaving] = useState(false)
@@ -43,29 +39,35 @@ export function LanguageSection({ compact = false }: LanguageSectionProps): Reac
   }
 
   return (
-    <div className="p-4">
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-        {t('settings.language.title')}
-      </h3>
-      {!compact && <p className="mb-2 text-xs text-muted">{t('settings.language.description')}</p>}
-      <Select
-        data-testid="language-picker"
-        aria-label={t('settings.language.label')}
-        value={locale}
-        disabled={saving}
-        onChange={(event) => void change(event.target.value)}
+    <SettingsGroup title={t('settings.language.title')}>
+      <SettingsRow
+        title={t('settings.language.label')}
+        description={t('settings.language.description')}
+        htmlFor="settings-language"
+        control={
+          <Select
+            id="settings-language"
+            data-testid="language-picker"
+            aria-label={t('settings.language.label')}
+            value={locale}
+            disabled={saving}
+            onChange={(event) => void change(event.target.value)}
+            containerClassName="w-44"
+          >
+            {APP_LOCALES.map((code) => (
+              <option key={code} value={code} lang={code}>
+                {LANGUAGE_NAMES[code]}
+              </option>
+            ))}
+          </Select>
+        }
       >
-        {APP_LOCALES.map((code) => (
-          <option key={code} value={code} lang={code}>
-            {LANGUAGE_NAMES[code]}
-          </option>
-        ))}
-      </Select>
-      {error && (
-        <p role="alert" className="mt-2 text-xs text-danger">
-          {error}
-        </p>
-      )}
-    </div>
+        {error && (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
+        )}
+      </SettingsRow>
+    </SettingsGroup>
   )
 }
