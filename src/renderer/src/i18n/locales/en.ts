@@ -158,6 +158,26 @@ export const en = {
       emptyHint:
         'New comments and votes on your PRs, review requests, and PRs whose base was merged show up here.',
       noMatches: 'No activity matches "{{query}}".',
+      filter: {
+        label: 'Show',
+        unread: 'Unread',
+        unreadWithCount: 'Unread: {{count}}',
+        all: 'All',
+      },
+      readKept: 'Read items stay 14 days',
+      clearRead: 'Clear read',
+      readUnderAll: 'Read items are under <all>All</all>.',
+      done: 'Done: remove from the inbox',
+      donePr: 'Done with #{{number}}',
+      undo: 'Undo',
+      toast: {
+        item: 'Removed from the inbox.',
+        group_one: '#{{number}} is done ({{count}} item).',
+        group_other: '#{{number}} is done ({{count}} items).',
+        read_one: 'Cleared {{count}} read item.',
+        read_other: 'Cleared {{count}} read items.',
+      },
+      dismissFailed: 'Could not remove from the inbox: {{error}}',
     },
     queue: {
       loadFailed: 'Could not load the queue: {{error}}',

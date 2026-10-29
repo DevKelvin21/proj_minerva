@@ -157,6 +157,26 @@ export const es: MessageShape<typeof en> = {
       emptyHint:
         'Aquí aparecen los comentarios y votos nuevos en tus PRs, las solicitudes de revisión y los PRs cuya base se fusionó.',
       noMatches: 'Ninguna actividad coincide con "{{query}}".',
+      filter: {
+        label: 'Mostrar',
+        unread: 'Sin leer',
+        unreadWithCount: 'Sin leer: {{count}}',
+        all: 'Todo',
+      },
+      readKept: 'Lo leído se guarda 14 días',
+      clearRead: 'Quitar lo leído',
+      readUnderAll: 'Lo leído está en <all>Todo</all>.',
+      done: 'Listo: quitar de la bandeja',
+      donePr: 'Listo con #{{number}}',
+      undo: 'Deshacer',
+      toast: {
+        item: 'Se quitó de la bandeja.',
+        group_one: '#{{number}} está listo ({{count}} elemento).',
+        group_other: '#{{number}} está listo ({{count}} elementos).',
+        read_one: 'Se quitó {{count}} elemento leído.',
+        read_other: 'Se quitaron {{count}} elementos leídos.',
+      },
+      dismissFailed: 'No se pudo quitar de la bandeja: {{error}}',
     },
     queue: {
       loadFailed: 'No se pudo cargar la cola: {{error}}',

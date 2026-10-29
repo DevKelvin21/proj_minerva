@@ -5,7 +5,15 @@ import type {
   ActivityOrphanItem,
 } from '../../../shared/activity'
 import { githubRepo } from '../../../shared/scm-guards'
-import { activityTarget, fileName, groupActivity, matchesActivityQuery } from './activity'
+import {
+  activityTarget,
+  fileName,
+  focusAfterRemoval,
+  groupActivity,
+  matchesActivityQuery,
+  parseInboxFilter,
+  visibleInboxItems,
+} from './activity'
 
 const api = githubRepo('shopwave', 'api')
 const web = githubRepo('shopwave', 'web')
@@ -130,5 +138,49 @@ describe('fileName', () => {
   it('keeps the last path segment', () => {
     expect(fileName('src/routes/carts.ts')).toBe('carts.ts')
     expect(fileName('README.md')).toBe('README.md')
+  })
+})
+
+describe('parseInboxFilter', () => {
+  it('defaults to Unread for anything but "all"', () => {
+    expect(parseInboxFilter('all')).toBe('all')
+    expect(parseInboxFilter('unread')).toBe('unread')
+    expect(parseInboxFilter(null)).toBe('unread')
+    expect(parseInboxFilter('ALL')).toBe('unread')
+  })
+})
+
+describe('visibleInboxItems', () => {
+  const items = [comment('a'), comment('b', { read: true }), comment('c', { read: true })]
+  const none = new Set<string>()
+
+  it('Unread lists unread items plus the ones read while the view was open', () => {
+    expect(visibleInboxItems(items, 'unread', none, none).map((i) => i.id)).toEqual(['a'])
+    expect(visibleInboxItems(items, 'unread', new Set(['c']), none).map((i) => i.id)).toEqual([
+      'a',
+      'c',
+    ])
+  })
+
+  it('All lists everything; both views drop the items hidden by a pending Done', () => {
+    expect(visibleInboxItems(items, 'all', none, none)).toHaveLength(3)
+    expect(visibleInboxItems(items, 'all', none, new Set(['a', 'b'])).map((i) => i.id)).toEqual([
+      'c',
+    ])
+    expect(visibleInboxItems(items, 'unread', new Set(['c']), new Set(['a', 'c']))).toEqual([])
+  })
+})
+
+describe('focusAfterRemoval', () => {
+  const order = ['a', 'b', 'c', 'd']
+  it('moves to the next remaining row, else the previous one', () => {
+    expect(focusAfterRemoval(order, new Set(['b']))).toBe('c')
+    expect(focusAfterRemoval(order, new Set(['b', 'c']))).toBe('d')
+    expect(focusAfterRemoval(order, new Set(['c', 'd']))).toBe('b')
+  })
+
+  it('is null when nothing is left or nothing was removed', () => {
+    expect(focusAfterRemoval(order, new Set(order))).toBeNull()
+    expect(focusAfterRemoval(order, new Set(['x']))).toBeNull()
   })
 })
