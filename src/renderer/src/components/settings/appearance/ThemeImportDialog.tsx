@@ -116,7 +116,8 @@ function FileImport({ onDone }: { onDone: () => void }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-2 p-4">
       <p className="text-xs text-muted">{t('settings.appearance.import.fileHint')}</p>
-      <label className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-text hover:bg-border/40">
+      {/* The file input is visually hidden, so the label shows its keyboard focus. */}
+      <label className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-text outline-focus hover:bg-border/40 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
         <FileJson size={12} aria-hidden />
         {t('settings.appearance.import.pickFile')}
         <input

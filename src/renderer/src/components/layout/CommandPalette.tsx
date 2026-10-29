@@ -16,6 +16,7 @@ import {
 import { sidebarIsDrawer, widthTier } from '../../lib/layout'
 import { MOD_KEY_LABEL } from '../../lib/platform'
 import { Dialog } from '../ui/Dialog'
+import { fieldBareClass } from '../ui/field-classes'
 import { Kbd } from '../ui/Kbd'
 
 /** Key names are the same in every language (macOS and Windows label the key so). */
@@ -223,7 +224,9 @@ function PaletteDialog({ fileItems }: { fileItems: PaletteItem[] }): React.JSX.E
       onKeyDown={onKeyDown}
       className="max-h-[min(520px,calc(100vh-6rem))] w-full max-w-xl"
     >
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3">
+      {/* The search row is the field: while the input has focus, its divider turns to the
+          focus color across the panel's full width, icon included. */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[inset_0_-1px_0_var(--color-focus)]">
         <Search size={16} className="shrink-0 text-muted" aria-hidden />
         <input
           ref={inputRef}
@@ -239,7 +242,7 @@ function PaletteDialog({ fileItems }: { fileItems: PaletteItem[] }): React.JSX.E
             setQuery(event.target.value)
             setActive(0)
           }}
-          className="h-12 min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-muted focus-visible:outline-none"
+          className={`h-12 min-w-0 flex-1 text-sm ${fieldBareClass}`}
         />
         <Kbd>{ESC_KEY}</Kbd>
       </div>

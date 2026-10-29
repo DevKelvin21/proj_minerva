@@ -6,6 +6,7 @@ import type { RepoRef } from '../../../../shared/scm'
 import { IS_MAC, MOD_KEY_LABEL } from '../../lib/platform'
 import { isConversationBusy, useChatDraft, useChatStore } from '../../stores/chat-store'
 import { ContextChip } from './ContextChip'
+import { fieldFrameClass } from '../ui/field-classes'
 import { IconButton } from '../ui/IconButton'
 import { Kbd } from '../ui/Kbd'
 import { TextArea } from '../ui/TextArea'
@@ -75,7 +76,7 @@ export function ChatComposer({
           </div>
         </div>
       )}
-      <div className="flex min-w-0 items-end gap-1.5 rounded-md border border-border bg-bg px-2 py-1.5 transition-colors duration-150 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40">
+      <div className={`flex min-w-0 items-end gap-1.5 px-2 py-1.5 ${fieldFrameClass}`}>
         <TextArea
           bare
           autoGrow
