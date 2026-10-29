@@ -52,8 +52,9 @@ export function ConversationTab({
       `[data-thread-id="${CSS.escape(pendingFocus)}"]`,
     )
     card?.scrollIntoView({ block: 'center' })
-    // The highlighted card is focusable (tabIndex -1): keyboard and screen readers land on it.
-    card?.focus({ preventScroll: true })
+    // The highlighted card is focusable (tabIndex -1): keyboard and screen readers land on it,
+    // unless focus is already inside it (an AI answer just went into its reply box).
+    if (card && !card.contains(document.activeElement)) card.focus({ preventScroll: true })
     clearPendingFocus()
   }, [pendingFocus, threads, clearPendingFocus])
 

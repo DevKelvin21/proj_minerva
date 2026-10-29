@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Check, ChevronDown, ChevronRight, Link } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Link, Sparkles } from 'lucide-react'
+import { MAX_CHAT_CONTEXT_ITEMS } from '../../../../shared/chat'
 import { isThreadOpen } from '../../../../shared/scm'
 import type { ThreadStatus } from '../../../../shared/scm'
 import type { CommentThread } from '../../../../shared/types'
@@ -22,8 +23,10 @@ import {
   useThreadActions,
   useThreadFileLines,
 } from '../../hooks/thread-actions'
+import { useThreadChat } from '../../hooks/use-thread-chat'
+import { useAppStore } from '../../stores/app-store'
 import { CommentBody } from './CommentBody'
-import { CommentComposer, type AppendRequest } from './CommentComposer'
+import { CommentComposer } from './CommentComposer'
 import { ThreadCodeExcerpt } from './CodeExcerpt'
 import { ThreadStatusPicker } from './ThreadStatusPicker'
 import { errorText } from '../../lib/error-text'
@@ -43,13 +46,6 @@ interface ThreadCardProps {
   showPath?: boolean
   /** Focused (jumped to from the Comments view). */
   highlighted?: boolean
-  /**
-   * Text to add to the reply box (an AI answer the reviewer turns into a
-   * reply): the thread opens, the text goes after anything already typed,
-   * the box is focused, then `onReplyRequestApplied(token)`.
-   */
-  replyRequest?: AppendRequest
-  onReplyRequestApplied?: (token: number) => void
 }
 
 function toErrorMessage(error: unknown): string {
@@ -115,6 +111,15 @@ function PathLabel({ path, lines }: { path: string; lines: string | null }): Rea
  * Status changes are optimistic: the picker shows the new status at once and
  * rolls back with a visible error if the provider refuses. Threads that are
  * no longer open start collapsed (header only) so open discussions stand out.
+ *
+ * The sparkle adds the thread to the side panel's chat draft as a chip (its
+ * comments are the context; a PR-level thread too), and removes it when
+ * clicked again. It is the same toggle in the diff, the Conversation tab and
+ * the Comments tab: while the thread is in the draft it is pressed and the
+ * card is outlined in every view; with the draft full it can't add, and its
+ * tooltip says why. "Use as reply" in the chat lands here as the app store's
+ * `replyRequest`: the thread opens and the answer goes in its reply box,
+ * after anything already typed. Nothing is posted.
  */
 export function ThreadCard({
   thread,
@@ -124,12 +129,15 @@ export function ThreadCard({
   showExcerpt = false,
   showPath = true,
   highlighted = false,
-  replyRequest,
-  onReplyRequestApplied,
 }: ThreadCardProps): React.JSX.Element {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const actions = useThreadActions()
+  const chat = useThreadChat(thread)
+  const replyRequest = useAppStore((s) =>
+    s.replyRequest?.threadId === thread.id ? s.replyRequest : null,
+  )
+  const consumeReplyRequest = useAppStore((s) => s.consumeReplyRequest)
   const [collapsed, setCollapsed] = useState(
     highlighted ? false : (collapsedByDefault ?? !isThreadOpen(thread.status)),
   )
@@ -200,10 +208,15 @@ export function ThreadCard({
     <div
       data-thread-id={thread.id}
       data-collapsed={collapsed || undefined}
+      data-in-chat={chat.inChat || undefined}
       // Focusable (not tabbable) while highlighted: arriving from the Inbox moves focus here.
       tabIndex={highlighted ? -1 : undefined}
       className={`min-w-0 rounded-md border bg-panel focus:outline-none ${
-        highlighted ? 'border-accent ring-1 ring-accent/60' : 'border-border'
+        highlighted
+          ? 'border-accent ring-1 ring-accent/60'
+          : chat.inChat
+            ? 'border-accent/50'
+            : 'border-border'
       }`}
     >
       {/*
@@ -293,6 +306,25 @@ export function ThreadCard({
             busy={pendingStatus !== null}
             onChange={(next) => void handleStatusChange(next)}
           />
+          {chat.canAdd && (
+            <IconButton
+              size="xs"
+              onClick={chat.toggle}
+              aria-disabled={chat.blocked || undefined}
+              active={chat.inChat}
+              label={chat.inChat ? t('chat.thread.buttonRemove') : t('chat.thread.button')}
+              title={
+                chat.inChat
+                  ? t('chat.thread.buttonTitlePending')
+                  : chat.blocked
+                    ? t('chat.composer.full', { max: MAX_CHAT_CONTEXT_ITEMS })
+                    : t('chat.thread.buttonTitle')
+              }
+              data-pending={chat.inChat || undefined}
+              data-testid="thread-chat-toggle"
+              icon={<Sparkles size={12} />}
+            />
+          )}
           {extraHeaderContent}
         </div>
       </div>
@@ -364,8 +396,8 @@ export function ThreadCard({
             placeholder={t('comments.thread.replyPlaceholder')}
             submitLabel={t('comments.thread.reply')}
             clearOnSubmit
-            appendRequest={replyRequest}
-            onAppendApplied={onReplyRequestApplied}
+            appendRequest={replyRequest ?? undefined}
+            onAppendApplied={consumeReplyRequest}
             suggestion={suggestionSourceFor(actions, thread, t)}
             onSubmit={(bodyMarkdown) => actions.reply(thread.id, bodyMarkdown)}
           />

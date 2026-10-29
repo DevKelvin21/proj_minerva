@@ -22,9 +22,22 @@ import type { ChatContextItem } from '../../shared/chat'
 import type { DidacticSection, PullRequestDetail } from '../../shared/types'
 import type { ChatTurnInput } from './service'
 
-/** Dónde apunta un elemento de contexto, para la respuesta mock (`path:12`, `path:3-5` o `path`). */
-function contextWhere(item: ChatContextItem): string {
+/**
+ * Dónde apunta un elemento de contexto, para la respuesta mock (`path:12`, `path:3-5`,
+ * `path`, `comentario general`, o `path:8 @ abc1234` para un hilo enviado con su código
+ * tal como se comentó).
+ */
+function contextWhere(item: ChatContextItem, turn: ChatTurnInput): string {
   if (item.kind === 'line') return item.path + ':' + item.line
+  if (item.path === undefined) return 'comentario general'
+  const code =
+    turn.commentedCode && Object.hasOwn(turn.commentedCode, item.id)
+      ? turn.commentedCode[item.id]
+      : undefined
+  if (code) {
+    const lines = code.end > code.start ? code.start + '-' + code.end : String(code.start)
+    return code.path + ':' + lines + ' @ ' + code.commit.slice(0, 7)
+  }
   if (item.startLine === undefined || item.endLine === undefined) return item.path
   return item.startLine === item.endLine
     ? item.path + ':' + item.startLine
@@ -52,7 +65,7 @@ export function chatAnswerSection(turn: ChatTurnInput): DidacticSection {
             .map(
               (item) =>
                 '- `' +
-                contextWhere(item) +
+                contextWhere(item, turn) +
                 '` (' +
                 (item.kind === 'line' ? 'línea' : 'hilo') +
                 ')',

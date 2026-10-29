@@ -108,6 +108,26 @@ export interface ChatTurnInput {
   context: ChatContextItem[]
   /** Earlier done exchanges, oldest first, already trimmed to `MAX_CHAT_HISTORY_LEN`. */
   history: ChatHistoryTurn[]
+  /**
+   * The code as commented of outdated thread items with an `origin`, by item
+   * id, read by main at the origin commit (`../chat/commented-code.ts`).
+   * Missing for an item whose file could not be read.
+   */
+  commentedCode?: Record<string, CommentedCode>
+}
+
+/** Lines of a file at a thread's origin commit, around the lines it was written on. */
+export interface CommentedCode {
+  /** Full commit SHA. */
+  commit: string
+  /** Path at that commit. */
+  path: string
+  /** Number of the first line of `lines`. */
+  firstLine: number
+  lines: string[]
+  /** The thread's own lines at that commit (within `lines`). */
+  start: number
+  end: number
 }
 
 /**

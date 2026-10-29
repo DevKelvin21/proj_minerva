@@ -14,7 +14,9 @@ import {
   MAX_CHAT_PATH_LEN,
   MAX_CHAT_THREAD_COMMENTS,
   type ChatContextItem,
+  type ChatThreadOrigin,
 } from '../../shared/chat'
+import { FULL_COMMIT_SHA_RE } from '../scm/thread-origins'
 
 /** Longest id main accepts (conversation/message ids are UUIDs; context item ids are client-made). */
 export const MAX_CHAT_ID_LEN = 100
@@ -63,6 +65,20 @@ function isChatPath(value: unknown): value is string {
   return value.split('/').every((part) => part.length > 0 && part !== '.' && part !== '..')
 }
 
+/** Where an outdated line thread was written: a full commit SHA and its line(s) there. */
+function isThreadOrigin(value: unknown): value is ChatThreadOrigin {
+  if (!isPlainObject(value) || !hasOnlyKeys(value, ['commit', 'path', 'line', 'lineEnd'])) {
+    return false
+  }
+  if (typeof value.commit !== 'string' || !FULL_COMMIT_SHA_RE.test(value.commit)) return false
+  if (value.path !== undefined && !isChatPath(value.path)) return false
+  if (!isLine(value.line)) return false
+  if (value.lineEnd !== undefined && (!isLine(value.lineEnd) || value.lineEnd < value.line)) {
+    return false
+  }
+  return true
+}
+
 /**
  * Characters a valid context item counts toward `MAX_CHAT_CONTEXT_LEN`
  * (code, note, authors, comment bodies), or `null` when it is not valid.
@@ -70,8 +86,13 @@ function isChatPath(value: unknown): value is string {
 function contextItemLength(value: unknown): number | null {
   if (!isPlainObject(value)) return null
   if (!isNonEmptyString(value.id, MAX_CHAT_ID_LEN)) return null
-  if (!isChatPath(value.path)) return null
-  if (value.side !== 'old' && value.side !== 'new') return null
+  // Only a thread may point at no file (a PR-level thread): no path, no side, no lines.
+  const general =
+    value.kind === 'thread' && value.path === undefined && value.side === undefined
+  if (!general) {
+    if (!isChatPath(value.path)) return null
+    if (value.side !== 'old' && value.side !== 'new') return null
+  }
 
   if (value.kind === 'line') {
     if (!hasOnlyKeys(value, ['kind', 'id', 'path', 'side', 'line', 'code', 'note'])) return null
@@ -91,15 +112,18 @@ function contextItemLength(value: unknown): number | null {
       'startLine',
       'endLine',
       'outdated',
+      'origin',
       'comments',
     ]
     if (!hasOnlyKeys(value, keys)) return null
     if (!isNonEmptyString(value.threadId, MAX_CHAT_THREAD_ID_LEN)) return null
     if (value.startLine !== undefined || value.endLine !== undefined) {
+      if (general) return null
       if (!isLine(value.startLine) || !isLine(value.endLine)) return null
       if (value.endLine < value.startLine) return null
     }
     if (typeof value.outdated !== 'boolean') return null
+    if (value.origin !== undefined && (general || !isThreadOrigin(value.origin))) return null
     const comments = value.comments
     if (!Array.isArray(comments) || comments.length > MAX_CHAT_THREAD_COMMENTS) return null
     let total = 0

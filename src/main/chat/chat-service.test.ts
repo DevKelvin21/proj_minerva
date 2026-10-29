@@ -143,6 +143,7 @@ describe('chat-service send', () => {
       text: 'Why clamp the discount?',
       context: [line],
       history: [],
+      commentedCode: {},
     })
     expect(call.options.language).toBe('es')
     call.finish('Because it keeps the total positive.')
@@ -163,6 +164,42 @@ describe('chat-service send', () => {
       expect.objectContaining({ id: 'id1', running: false, messageCount: 2 }),
     ])
     expect(chat.get('id1').messages.map((m) => m.role)).toEqual(['user', 'assistant'])
+  })
+
+  it('sends the code as commented that main read for the message, and goes on when it fails', async () => {
+    const code = {
+      commit: 'ab'.repeat(20),
+      path: 'src/a.ts',
+      firstLine: 1,
+      lines: ['x'],
+      start: 1,
+      end: 1,
+    }
+    const reads: unknown[] = []
+    let fail = false
+    chat = createChatService({
+      db,
+      prepareRun: async () => ({ service: ai.service, generatedWith: SEAL }),
+      readCommentedCode: async (...args) => {
+        reads.push(args)
+        if (fail) throw new Error('boom')
+        return { l1: code }
+      },
+      currentLanguage: () => 'es',
+      broadcast: (event) => events.push(event),
+      newId: () => 'id' + ++ids,
+    })
+    chat.send(request())
+    const call = await started()
+    expect(reads).toEqual([[repo, 482, [line]]])
+    expect(call.options.chat?.commentedCode).toEqual({ l1: code })
+    call.finish('ok')
+    await chat.whenIdle('id1')
+
+    fail = true
+    chat.send(request({ conversationId: 'id1' }))
+    const second = await started(2)
+    expect(second.options.chat?.commentedCode).toEqual({})
   })
 
   it('coalesces streaming to one event per interval with the full text, saved on each flush', async () => {

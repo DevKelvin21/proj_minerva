@@ -118,6 +118,29 @@ describe('MockGithubService incoming review', () => {
   })
 })
 
+describe('MockGithubService head files (api#482)', () => {
+  it('serves coupon-service.ts at head: the lines its diff adds, line 16 the thread’s', async () => {
+    const repo = githubRepo('shopwave', 'api')
+    const mock = new MockGithubService()
+    const [file] = (await mock.getPullRequestFiles(repo, 482)).filter(
+      (f) => f.path === 'src/services/coupon-service.ts',
+    )
+    const added = file
+      .patch!.split('\n')
+      .filter((line) => line.startsWith('+'))
+      .map((line) => line.slice(1))
+    const head = await mock.getFileContent({
+      repo,
+      number: 482,
+      path: 'src/services/coupon-service.ts',
+      side: 'head',
+    })
+    const lines = head.content!.replace(/\n$/, '').split('\n')
+    expect(lines).toEqual(added)
+    expect(lines[17]).toContain('coupon.discountRate')
+  })
+})
+
 describe('MockGithubService threads from earlier pushes (api#470)', () => {
   const repo = githubRepo('shopwave', 'api')
 

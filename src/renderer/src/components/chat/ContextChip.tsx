@@ -1,7 +1,7 @@
 import { Code2, MessageSquare, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ChatContextItem } from '../../../../shared/chat'
-import { contextItemLocation, diffSide } from '../../lib/chat-context'
+import { contextItemAuthor, contextItemLocation, diffSide } from '../../lib/chat-context'
 import { useAppStore } from '../../stores/app-store'
 import { widthTier } from '../../lib/layout'
 import { Badge } from '../ui/Badge'
@@ -21,26 +21,32 @@ function preview(item: ChatContextItem): string {
 
 /**
  * A context item as a chip (composer and sent user messages): what it points
- * at and a one-line preview. Clicking the location jumps to that line or
- * thread in the Files tab; on the narrowest tier the panel (an overlay
- * there) closes so the diff shows.
+ * at and a one-line preview. A PR-level thread reads "General comment ·
+ * author". Clicking the location jumps to that line or thread (Files tab; a
+ * general comment in the Conversation tab); on the narrowest tier the panel
+ * (an overlay there) closes so the review shows.
  */
 export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Element {
   const { t } = useTranslation()
-  const location = contextItemLocation(item)
+  const location =
+    contextItemLocation(item) ??
+    t('chat.chip.general', { author: item.kind === 'thread' ? contextItemAuthor(item) : '' })
   // The file name and lines fit a narrow panel; the full path is in the tooltip.
-  const short = location.slice(item.path.lastIndexOf('/') + 1)
+  const short = item.path === undefined ? location : location.slice(item.path.lastIndexOf('/') + 1)
   const label =
     item.kind === 'line'
       ? item.side === 'old'
         ? t('chat.chip.lineOld', { location: short })
         : short
-      : t('chat.chip.thread', { location: short })
+      : item.path === undefined
+        ? location
+        : t('chat.chip.thread', { location: short })
   const text = preview(item)
 
   function jump(): void {
     const app = useAppStore.getState()
     if (item.kind === 'line') app.jumpToLine(item.path, diffSide(item.side), item.line)
+    else if (item.path === undefined) app.openConversationThread(item.threadId)
     else app.openLineThread(item.path, item.startLine ?? 0, item.threadId)
     if (widthTier(window.innerWidth) === 'sm' && app.didacticPanelOpen) app.toggleDidacticPanel()
   }
@@ -48,7 +54,7 @@ export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Ele
   return (
     <div
       data-testid="chat-chip"
-      data-kind={item.kind}
+      data-kind={item.kind === 'thread' && item.path === undefined ? 'general' : item.kind}
       className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1 text-xs"
     >
       {item.kind === 'line' ? (
@@ -60,7 +66,9 @@ export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Ele
         type="button"
         onClick={jump}
         title={t('chat.chip.jump', { location })}
-        className="min-w-0 max-w-[75%] shrink-0 truncate font-mono text-text hover:underline"
+        className={`min-w-0 max-w-[75%] shrink-0 truncate text-text hover:underline ${
+          item.path === undefined ? '' : 'font-mono'
+        }`}
       >
         {label}
       </button>

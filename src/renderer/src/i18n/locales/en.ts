@@ -604,7 +604,7 @@ export const en = {
     noPr: 'Open a pull request to ask about it.',
     empty: {
       title: 'Ask about this pull request',
-      hint: 'Add lines or comment threads from the diff, or just ask about the PR.',
+      hint: 'Add lines from the diff or comment threads from any tab, or just ask about the PR.',
     },
     list: {
       label: 'Conversations about this pull request',
@@ -638,6 +638,7 @@ export const en = {
       useAs: 'Use as…',
       useAsCommentOn: 'Use as comment on {{location}}',
       useAsReplyOn: 'Use as reply to the thread on {{location}}',
+      useAsReplyGeneral: 'Use as reply to the general comment by {{author}}',
       copy: 'Copy answer',
     },
     composer: {
@@ -656,6 +657,7 @@ export const en = {
     chip: {
       lineOld: '{{location}} (removed)',
       thread: 'Thread · {{location}}',
+      general: 'General comment · {{author}}',
       outdated: 'Outdated',
       jump: 'Show {{location}} in the Files tab',
       remove: 'Remove {{location}} from the chat',
