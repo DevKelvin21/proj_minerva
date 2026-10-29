@@ -48,10 +48,19 @@ describe('transText', () => {
 
 /**
  * Interpolated values inside Trans strings must be local data (numbers, CLI
- * commands, the app version): PR/SCM text goes through `transText`. A new
- * placeholder here means checking where its value comes from first.
+ * commands, the app version, the modifier key): PR/SCM text goes through
+ * `transText`. A new placeholder here means checking where its value comes from first.
  */
-const TRANS_SAFE_VALUES = new Set(['number', 'parent', 'command', 'binary', 'path', 'version'])
+const TRANS_SAFE_VALUES = new Set([
+  'number',
+  'count',
+  'parent',
+  'command',
+  'binary',
+  'path',
+  'version',
+  'mod',
+])
 
 function valueAt(table: object, key: string): string {
   return key
