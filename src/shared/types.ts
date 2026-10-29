@@ -231,7 +231,24 @@ export interface CommentThread {
   side?: 'LEFT' | 'RIGHT'
   /** The thread's anchor no longer matches the latest iteration of the PR. */
   isOutdated?: boolean
+  /** Where a RIGHT-side line thread was written (absent when the provider doesn't say). */
+  origin?: ThreadOrigin
   comments: PrComment[]
+}
+
+/**
+ * The code a line thread was written on: the PR head commit at that time and
+ * the line(s) on it. `line`/`lineEnd` on the thread are where it sits now.
+ */
+export interface ThreadOrigin {
+  /** Full commit SHA (40 hex): readable through `FileContentRequest.commit`. */
+  commit: string
+  /** Path at `commit` when it differs from the thread's `path` (renamed since). */
+  path?: string
+  line: number
+  lineEnd?: number
+  /** Azure DevOps: the iteration (push) it was written on and the latest one. GitHub has none. */
+  push?: { index: number; total: number }
 }
 
 /** Request of `scm:postComment`. */
@@ -263,6 +280,12 @@ export interface FileContentRequest {
   number: number
   path: string
   side: FileContentSide
+  /**
+   * With `side: 'head'`: read at this commit of the PR instead of its head (a
+   * `ThreadOrigin.commit`). Full 40-hex SHA; main refuses one that is not the
+   * PR's (`NOT_FOUND`).
+   */
+  commit?: string
 }
 
 /**

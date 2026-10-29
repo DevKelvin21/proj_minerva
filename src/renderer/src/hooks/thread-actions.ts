@@ -50,13 +50,34 @@ export function threadFileKey(
   }
 }
 
-/** Lines of the file a thread is anchored to (`enabled = false` fetches nothing). */
+/** Cache key of the file as it was when the thread was written (its `origin` commit). */
+export function threadOriginKey(
+  actions: ThreadActions,
+  thread: Pick<CommentThread, 'path' | 'origin'>,
+): FileContentKey | null {
+  if (!thread.path || !thread.origin) return null
+  return {
+    repo: actions.repo,
+    number: actions.number,
+    headSha: actions.headSha,
+    path: thread.origin.path ?? thread.path,
+    side: 'head',
+    commit: thread.origin.commit,
+  }
+}
+
+/**
+ * Lines of the file a thread is anchored to (`enabled = false` fetches
+ * nothing): where it sits now, or as it was written (`at = 'origin'`).
+ */
 export function useThreadFileLines(
-  thread: Pick<CommentThread, 'path' | 'side'>,
+  thread: Pick<CommentThread, 'path' | 'side' | 'origin'>,
   enabled: boolean,
+  at: 'current' | 'origin' = 'current',
 ): FileLinesState {
   const actions = useThreadActions()
-  return useFileLines(enabled ? threadFileKey(actions, thread) : null)
+  const key = at === 'origin' ? threadOriginKey(actions, thread) : threadFileKey(actions, thread)
+  return useFileLines(enabled ? key : null)
 }
 
 /**

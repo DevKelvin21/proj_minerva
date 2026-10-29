@@ -9,6 +9,7 @@ import {
   RealGithubService,
   githubViewerRelation,
   mapSearchNodeToSummary,
+  reviewThreadOrigin,
   type GithubClient,
   type SearchPullRequestNode,
 } from './real-service'
@@ -345,5 +346,88 @@ describe('RealGithubService listings carry the viewer from the same query', () =
     const { client } = searchClient(null)
     const scope = await service(client).listScopePullRequests()
     expect(scope.every((item) => item.summary.viewer === undefined)).toBe(true)
+  })
+})
+
+describe('thread origins and reading a file at one', () => {
+  const origin = 'ab'.repeat(20)
+
+  it('maps originalCommit and originalStartLine..originalLine, RIGHT side only', () => {
+    const node = {
+      ...thread,
+      isOutdated: true,
+      line: null,
+      originalLine: 14,
+      originalStartLine: 12,
+      diffSide: 'RIGHT' as 'LEFT' | 'RIGHT',
+      originalCommit: { oid: origin.toUpperCase() } as { oid: string } | null,
+    }
+    expect(reviewThreadOrigin(node)).toEqual({ commit: origin, line: 12, lineEnd: 14 })
+    expect(reviewThreadOrigin({ ...node, originalStartLine: null })).toEqual({
+      commit: origin,
+      line: 14,
+    })
+    expect(reviewThreadOrigin({ ...node, diffSide: 'LEFT' })).toBeUndefined()
+    expect(reviewThreadOrigin({ ...node, originalCommit: { oid: 'abc1234' } })).toBeUndefined()
+    expect(reviewThreadOrigin({ ...node, originalCommit: null })).toBeUndefined()
+  })
+
+  function contentClient(prCommits: string[], missing = false) {
+    const getContent = vi.fn(async () => {
+      if (missing) throw Object.assign(new Error('Not Found'), { status: 404 })
+      return {
+        data: { type: 'file', size: 4, content: Buffer.from('old\n').toString('base64') },
+      }
+    })
+    const listCommits = vi.fn(async () => ({ data: prCommits.map((sha) => ({ sha })) }))
+    const graphql = vi.fn(async () => ({
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            nodes: [{ ...thread, originalCommit: { oid: origin }, comments: { nodes: [] } }],
+          },
+          comments: { nodes: [] },
+        },
+      },
+    }))
+    const client = {
+      graphql,
+      rest: { repos: { getContent }, pulls: { listCommits } },
+      request: vi.fn(),
+    } as unknown as GithubClient
+    return { client, getContent, listCommits }
+  }
+
+  const read = (s: RealGithubService, commit: string) =>
+    s.getFileContent({ repo, number: 7, path: 'a.ts', side: 'head', commit })
+
+  it('reads an origin it returned without listing commits', async () => {
+    const fake = contentClient([])
+    const s = service(fake.client)
+    const threads = await s.getCommentThreads(repo, 7)
+    expect(threads[0].origin).toEqual({ commit: origin, line: 1 })
+    await expect(read(s, origin)).resolves.toMatchObject({ content: 'old\n' })
+    expect(fake.listCommits).not.toHaveBeenCalled()
+    expect(fake.getContent).toHaveBeenCalledWith(expect.objectContaining({ ref: origin }))
+  })
+
+  it("accepts one of the PR's commits, and refuses any other before reading", async () => {
+    const other = 'cd'.repeat(20)
+    const fake = contentClient([other])
+    const s = service(fake.client)
+    await expect(read(s, other)).resolves.toMatchObject({ content: 'old\n' })
+    await expect(read(s, 'ef'.repeat(20))).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'That commit is not part of this pull request.',
+    })
+    expect(fake.getContent).toHaveBeenCalledTimes(1)
+  })
+
+  it('says in one sentence that the file does not exist at that version', async () => {
+    const fake = contentClient([origin], true)
+    await expect(read(service(fake.client), origin)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'a.ts does not exist in that version.',
+    })
   })
 })

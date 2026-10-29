@@ -4,6 +4,7 @@
  * auth reports (`MINERVA_MOCK_GH_AUTH=signed_in`).
  */
 import { describe, expect, it } from 'vitest'
+import { githubRepo } from '../../../shared/scm-guards'
 import { MOCK_GITHUB_LOGIN } from './fixtures'
 import { MockGithubService } from './mock-service'
 
@@ -114,5 +115,31 @@ describe('MockGithubService incoming review', () => {
     expect(pr?.reviewers).toEqual([expect.objectContaining({ vote: 'changes_requested' })])
     expect(pr?.reviewDecision).toBe('changes_requested')
     expect(pr?.updatedAt).toBe('2026-10-28T12:00:00.000Z')
+  })
+})
+
+describe('MockGithubService threads from earlier pushes (api#470)', () => {
+  const repo = githubRepo('shopwave', 'api')
+
+  it('reads a thread origin, refuses other commits; a removed file is NOT_FOUND at head', async () => {
+    const mock = new MockGithubService()
+    const threads = await mock.getCommentThreads(repo, 470)
+    const moved = threads.find((thread) => thread.id === 'thread-470-1')
+    const removed = threads.find((thread) => thread.id === 'thread-470-2')
+    expect(moved).toMatchObject({ isOutdated: true, origin: { line: 8 } })
+    expect(removed).toMatchObject({ isOutdated: true, status: 'resolved' })
+    const at = (path: string, commit?: string) =>
+      mock.getFileContent({ repo, number: 470, path, side: 'head', commit })
+    const old = await at('src/middleware/rate-limit.ts', moved?.origin?.commit)
+    expect(old.content?.split('\n')[7]).toBe('    await redis.expire(key, 60)')
+    expect((await at('src/middleware/rate-limit.ts')).content).toContain('WINDOW_SECONDS')
+    expect((await at('src/lib/token-bucket.ts', removed?.origin?.commit)).content).toContain(
+      'TokenBucket',
+    )
+    await expect(at('src/lib/token-bucket.ts')).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    await expect(at('src/lib/token-bucket.ts', 'f'.repeat(40))).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'That commit is not part of this pull request.',
+    })
   })
 })

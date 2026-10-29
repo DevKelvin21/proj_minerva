@@ -4,6 +4,7 @@ import type { AzChangeEntry, AzPullRequest, AzThread } from './api-types'
 import {
   azureViewerRelation,
   isThreadOutdated,
+  threadOrigin,
   mapChangeEntry,
   mapChangeStatus,
   mapChecks,
@@ -396,6 +397,66 @@ describe('mapThread', () => {
     const general = mapThread({ ...base, threadContext: null }, azRepo, 1)
     if (!general) throw new Error('expected a thread')
     expect(isThreadOutdated(general, anchor, 9, paths)).toBe(false)
+  })
+
+  describe('threadOrigin', () => {
+    const commits = new Map([
+      [1, 'a'.repeat(40)],
+      [2, 'B'.repeat(40)],
+    ])
+    const origin = (thread: AzThread, latest: number | null = 4) => {
+      const mapped = mapThread(thread, azRepo, 1)
+      if (!mapped) throw new Error('expected a thread')
+      return threadOrigin(thread, mapped, commits, latest)
+    }
+
+    it("is the iteration's source commit, its lines and which push of how many", () => {
+      expect(origin(base)).toEqual({
+        commit: 'b'.repeat(40),
+        line: 10,
+        lineEnd: 12,
+        push: { index: 2, total: 4 },
+      })
+      expect(origin(base, null)).toEqual({ commit: 'b'.repeat(40), line: 10, lineEnd: 12 })
+    })
+
+    it('takes the original position (and path) when the server re-tracked the thread', () => {
+      const tracked: AzThread = {
+        ...base,
+        pullRequestThreadContext: {
+          ...base.pullRequestThreadContext,
+          trackingCriteria: {
+            origRightFileStart: { line: 4, offset: 1 },
+            origRightFileEnd: { line: 4, offset: 9 },
+            origFilePath: '/src/old-name.ts',
+          },
+        },
+      }
+      expect(origin(tracked)).toEqual({
+        commit: 'b'.repeat(40),
+        path: 'src/old-name.ts',
+        line: 4,
+        push: { index: 2, total: 4 },
+      })
+    })
+
+    it('is absent for LEFT-side, PR-level, unknown-iteration and non-SHA commits', () => {
+      const left: AzThread = {
+        ...base,
+        threadContext: { filePath: '/src/a.ts', leftFileStart: { line: 3, offset: 1 } },
+      }
+      expect(origin(left)).toBeUndefined()
+      expect(origin({ ...base, pullRequestThreadContext: null })).toBeUndefined()
+      const third: AzThread = {
+        ...base,
+        pullRequestThreadContext: {
+          iterationContext: { firstComparingIteration: 1, secondComparingIteration: 3 },
+        },
+      }
+      expect(origin(third)).toBeUndefined()
+      const mapped = mapThread(base, azRepo, 1)!
+      expect(threadOrigin(base, mapped, new Map([[2, 'main']]), 4)).toBeUndefined()
+    })
   })
 })
 

@@ -20,6 +20,9 @@
  * - Threads with every status, a system thread, a deleted comment, replies,
  *   a PR-level thread, a LEFT-side comment and a comment on a context line
  *   outside every hunk.
+ * - #102 had two pushes: an outdated thread whose lines moved since push 1,
+ *   and a resolved one on a file push 1 added and push 2 removed (its code
+ *   only exists at push 1, `FILES_AT_COMMIT`).
  * - A rename with edits, a pure rename, a binary file, an add and a delete.
  *
  * Blob ids are real git blob SHA-1s of the contents, so they are stable.
@@ -115,6 +118,11 @@ function blob(content: string | Buffer): string {
   return id
 }
 
+/** Stores `content` as a blob (served by `getMockBlob`) and returns its id. */
+export function addMockBlob(content: string | Buffer): string {
+  return blob(content)
+}
+
 /** Raw blob bytes by object id (what `GET …/blobs/{id}?$format=octetstream` returns). */
 export function getMockBlob(objectId: string): Buffer | null {
   return blobStore.get(objectId) ?? null
@@ -189,6 +197,23 @@ const CHECKOUT_SERVICE_HEAD = CHECKOUT_SERVICE_BASE.replace(
     '        order.Status = OrderStatus.Submitted;',
     '        await orders.SaveAsync(order);',
   ),
+)
+
+/** CheckoutService.cs at #102's first push: the status set without any check. */
+const CHECKOUT_SERVICE_FIRST_PUSH = CHECKOUT_SERVICE_BASE.replace(
+  '        await orders.SaveAsync(order);\n',
+  lines('        order.Status = OrderStatus.Submitted;', '        await orders.SaveAsync(order);'),
+)
+
+/** Added by #102's first push, removed by its second (so it is in no diff vs. the base). */
+const CHECKOUT_RULES_FIRST_PUSH = lines(
+  'namespace Contoso.Orders.Services;',
+  '',
+  'public static class CheckoutRulesForCustomerGroups',
+  '{',
+  '    public const int MaxLinesPerOrder = 50;',
+  '    public const decimal MinimumTotal = 1.00m;',
+  '}',
 )
 
 const ENDPOINTS_HEAD = lines(
@@ -640,6 +665,20 @@ export const CHANGES: Record<number, AzChangeEntry[]> = {
   ],
 }
 
+/** Source commit of #102's first push (iteration 1). */
+const FIRST_PUSH_102 = commitId('first102')
+
+/**
+ * Files at commits that are no PR's head or target (older pushes), by commit
+ * then repo path. The fake server serves `items` from these as well.
+ */
+export const FILES_AT_COMMIT: Record<string, Record<string, string>> = {
+  [FIRST_PUSH_102]: {
+    '/src/Services/CheckoutService.cs': CHECKOUT_SERVICE_FIRST_PUSH,
+    '/src/Services/Checkout/Rules/CheckoutRulesForCustomerGroups.cs': CHECKOUT_RULES_FIRST_PUSH,
+  },
+}
+
 function iterationsFor(pr: AzPullRequest): AzIteration[] {
   const head = pr.lastMergeSourceCommit?.commitId ?? ''
   const target = pr.lastMergeTargetCommit?.commitId ?? ''
@@ -648,7 +687,7 @@ function iterationsFor(pr: AzPullRequest): AzIteration[] {
     author: pr.createdBy,
     createdDate: pr.creationDate,
     reason: 'create',
-    sourceRefCommit: { commitId: pr.pullRequestId === 102 ? commitId('first102') : head },
+    sourceRefCommit: { commitId: pr.pullRequestId === 102 ? FIRST_PUSH_102 : head },
     targetRefCommit: { commitId: target },
   }
   // #102 got a second push after review started: line comments on
@@ -751,6 +790,7 @@ const trackingId = (prId: number, path: string): number =>
 
 const CART = '/src/cart/total.ts'
 const SERVICE = '/src/Services/CheckoutService.cs'
+const RULES = '/src/Services/Checkout/Rules/CheckoutRulesForCustomerGroups.cs'
 
 export const THREADS: Record<number, AzThread[]> = {
   108: [
@@ -846,6 +886,19 @@ export const THREADS: Record<number, AzThread[]> = {
       comments: [
         comment(1, PEOPLE.grace, 'Validate the status before saving.'),
         comment(2, PEOPLE.ada, 'Done in the next push.'),
+      ],
+    }),
+    // On a file push 1 added and push 2 removed: only readable as commented.
+    thread({
+      id: 3,
+      status: 'fixed',
+      filePath: RULES,
+      right: [5, 6],
+      changeTrackingId: 9102,
+      iteration: [1, 1],
+      comments: [
+        comment(1, PEOPLE.linus, 'Why constants here? These limits belong in the order settings.'),
+        comment(2, PEOPLE.ada, 'Good catch, it was for the demo. Removed in the next push.'),
       ],
     }),
   ],

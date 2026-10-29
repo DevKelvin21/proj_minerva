@@ -145,12 +145,17 @@ function isRepoFilePath(value: unknown): value is string {
   return value.split('/').every((part) => part.length > 0 && part !== '.' && part !== '..')
 }
 
+/** `commit` (optional, head side only): a full 40-hex SHA; main checks it is the PR's. */
 function isGetFileContentPayload(value: unknown): boolean {
   if (!isPlainObject(value)) return false
-  if (!hasOnlyKeys(value, ['repo', 'number', 'path', 'side'])) return false
+  if (!hasOnlyKeys(value, ['repo', 'number', 'path', 'side', 'commit'])) return false
   if (!isRepoRef(value.repo)) return false
   if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
   if (!isRepoFilePath(value.path)) return false
+  if (value.commit !== undefined) {
+    if (value.side !== 'head') return false
+    if (typeof value.commit !== 'string' || !/^[0-9a-f]{40}$/i.test(value.commit)) return false
+  }
   return value.side === 'base' || value.side === 'head'
 }
 

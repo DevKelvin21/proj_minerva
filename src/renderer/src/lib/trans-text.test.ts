@@ -60,6 +60,9 @@ const TRANS_SAFE_VALUES = new Set([
   'path',
   'version',
   'mod',
+  // Thread origins: integers main validated (a line, a push number).
+  'line',
+  'push',
 ])
 
 function valueAt(table: object, key: string): string {

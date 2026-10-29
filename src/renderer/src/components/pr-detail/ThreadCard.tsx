@@ -16,6 +16,7 @@ import { hasSuggestion } from '../../lib/suggestions'
 import { commentPreview } from '../../lib/comment-preview'
 import { threadLineRange } from '../../lib/line-threads'
 import { settableStatusesFor } from '../../lib/thread-groups'
+import { hasCommentedVersion, versionLineRange } from '../../lib/thread-origin'
 import {
   suggestionSourceFor,
   useThreadActions,
@@ -55,21 +56,52 @@ function toErrorMessage(error: unknown): string {
   return errorText(error)
 }
 
-function positionLabel(thread: CommentThread, showPath: boolean, t: TFunction): string | null {
+function lineSpan(thread: CommentThread): string | null {
   const range = threadLineRange(thread)
+  if (!range) return null
+  return range.end > range.start ? `${range.start}–${range.end}` : `${range.start}`
+}
+
+function positionLabel(thread: CommentThread, showPath: boolean, t: TFunction): string | null {
   if (!thread.path) return null
-  const lines = range
-    ? range.end > range.start
-      ? `${range.start}–${range.end}`
-      : `${range.start}`
-    : null
+  const lines = lineSpan(thread)
   if (!showPath) {
     if (!lines) return t('comments.thread.fileComment')
-    return range && range.end > range.start
+    return lines.includes('–')
       ? t('comments.thread.lines', { lines })
       : t('comments.thread.line', { line: lines })
   }
   return lines ? `${thread.path}:${lines}` : thread.path
+}
+
+/**
+ * `path:line` that gives way from the LEFT (`…/types/File.ts:14`): the folders
+ * shrink first (ellipsis at their start), then the file name, also from its
+ * start, so the line number always shows. The full text is the tooltip.
+ * Plain text (untrusted).
+ */
+function PathLabel({ path, lines }: { path: string; lines: string | null }): React.JSX.Element {
+  const slash = path.lastIndexOf('/')
+  const folders = path.slice(0, slash + 1)
+  const name = path.slice(slash + 1) + (lines ? ':' + lines : '')
+  return (
+    <span
+      className="flex min-w-0"
+      title={path + (lines ? ':' + lines : '')}
+      data-testid="thread-path"
+    >
+      {folders && (
+        // rtl puts the ellipsis on the left; <bdi> keeps the path itself left-to-right.
+        <span dir="rtl" className="min-w-0 truncate">
+          <bdi>{folders}</bdi>
+        </span>
+      )}
+      {/* Too long even alone: it also gives way from the left, so the line stays. */}
+      <span dir="rtl" className="max-w-full shrink-0 truncate">
+        <bdi>{name}</bdi>
+      </span>
+    </span>
+  )
 }
 
 /**
@@ -112,16 +144,25 @@ export function ThreadCard({
   const allowed = settableStatusesFor(actions.repo.provider, thread)
   const range = threadLineRange(thread)
   const label = positionLabel(thread, showPath, t)
+  // Written on an earlier push and its provider says where: suggestions apply to THAT code.
+  const asCommented = hasCommentedVersion(thread)
+  const suggestionRange = asCommented ? versionLineRange(thread, 'commented') : range
 
   // Original lines for suggestion mini-diffs: only fetched when a comment has one.
   const wantsOriginal = useMemo(
     () => thread.line !== undefined && thread.comments.some((c) => hasSuggestion(c.bodyMarkdown)),
     [thread.line, thread.comments],
   )
-  const fileLines = useThreadFileLines(thread, wantsOriginal && !collapsed)
+  const fileLines = useThreadFileLines(
+    thread,
+    wantsOriginal && !collapsed,
+    asCommented ? 'origin' : 'current',
+  )
   const originalLines =
-    range && fileLines.status === 'ready' && range.start <= fileLines.lines.length
-      ? fileLines.lines.slice(range.start - 1, range.end)
+    suggestionRange &&
+    fileLines.status === 'ready' &&
+    suggestionRange.start <= fileLines.lines.length
+      ? fileLines.lines.slice(suggestionRange.start - 1, suggestionRange.end)
       : null
 
   async function handleStatusChange(next: ThreadStatus): Promise<void> {
@@ -165,20 +206,32 @@ export function ThreadCard({
         highlighted ? 'border-accent ring-1 ring-accent/60' : 'border-border'
       }`}
     >
+      {/*
+        Header: the left group gives way first (preview, then the path from the
+        left), the count never shrinks, and below ~14rem of room the right
+        group wraps under it instead of being drawn over it. The right group
+        (Outdated, status, `extraHeaderContent`) keeps its full width.
+      */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-3 pl-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted">
-          <IconButton
-            size="xs"
-            onClick={toggle}
-            aria-expanded={!collapsed}
-            label={collapsed ? t('comments.thread.unfold') : t('comments.thread.fold')}
-            icon={collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          />
+        <div
+          className="flex min-w-0 flex-1 basis-56 items-center gap-2 text-xs text-muted"
+          data-thread-header-main
+        >
+          <span className="flex shrink-0">
+            <IconButton
+              size="xs"
+              onClick={toggle}
+              aria-expanded={!collapsed}
+              label={collapsed ? t('comments.thread.unfold') : t('comments.thread.fold')}
+              icon={collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+            />
+          </span>
           {label ? (
             onNavigateToLine ? (
               <span
                 role="link"
                 tabIndex={0}
+                aria-label={label}
                 title={t('comments.thread.showLineInFiles')}
                 onClick={onNavigateToLine}
                 onKeyDown={(event) => {
@@ -187,15 +240,21 @@ export function ThreadCard({
                     onNavigateToLine()
                   }
                 }}
-                className={`${showPath ? 'min-w-[6rem] truncate' : 'shrink-0'} cursor-pointer rounded-sm font-mono text-text underline decoration-border decoration-dotted underline-offset-2 hover:decoration-text`}
+                className={`${showPath ? 'flex min-w-0' : 'shrink-0'} cursor-pointer rounded-sm font-mono text-text underline decoration-border decoration-dotted underline-offset-2 hover:decoration-text`}
               >
-                {label}
+                {showPath && thread.path ? (
+                  <PathLabel path={thread.path} lines={lineSpan(thread)} />
+                ) : (
+                  label
+                )}
               </span>
             ) : (
-              <span
-                className={`${showPath ? 'min-w-[6rem] truncate' : 'shrink-0'} font-mono text-text`}
-              >
-                {label}
+              <span className={`${showPath ? 'flex min-w-0' : 'shrink-0'} font-mono text-text`}>
+                {showPath && thread.path ? (
+                  <PathLabel path={thread.path} lines={lineSpan(thread)} />
+                ) : (
+                  label
+                )}
               </span>
             )
           ) : (
@@ -204,9 +263,15 @@ export function ThreadCard({
           {/* Mouse shortcut for the fold button (the keyboard path is the button itself). */}
           <span
             onClick={toggle}
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 self-stretch"
+            className="shrink-0 cursor-pointer whitespace-nowrap"
+            data-testid="thread-comment-count"
           >
-            <span className="shrink-0">· {t('comments.thread.commentCount', { count })}</span>
+            · {t('comments.thread.commentCount', { count })}
+          </span>
+          <span
+            onClick={toggle}
+            className="flex min-w-0 flex-1 cursor-pointer items-center self-stretch"
+          >
             {collapsed && preview && (
               <span className="min-w-0 truncate text-muted/80">
                 · {first!.author.displayName ?? first!.author.login}: {preview}
@@ -214,7 +279,7 @@ export function ThreadCard({
             )}
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2" data-thread-header-actions>
           {thread.isOutdated && (
             <Badge tone="warning">
               <span data-testid="outdated-badge" title={t('comments.thread.outdatedTitle')}>
@@ -285,7 +350,7 @@ export function ThreadCard({
                   <CommentBody
                     body={comment.bodyMarkdown}
                     originalLines={originalLines}
-                    outdated={thread.isOutdated}
+                    outdated={thread.isOutdated && !asCommented}
                   />
                 </li>
               )

@@ -508,6 +508,9 @@ export const en = {
       notInDiff: 'not in the diff',
       notInDiffTitle:
         "The file is not in this pull request's file list (it may be capped or from an older push)",
+      removed: 'removed in a later push',
+      removedInPush: 'removed in push {{push}}',
+      removedTitle: 'The file no longer exists in the latest version of this pull request',
     },
     thread: {
       fileComment: 'File comment',
@@ -551,7 +554,26 @@ export const en = {
       outdatedNote:
         'This comment was left on an earlier version of the file. The code below is from the latest version around line {{line}}; it may have changed since.',
       loading: 'Loading code…',
-      loadError: 'Could not load the code: {{error}}',
+      loadError: 'Could not load the code.',
+      loadPushError: 'Could not load push {{index}} of this file.',
+      loadCommitError: 'Could not load this file at commit {{commit}}.',
+      missingAtPush: 'This file does not exist in push {{index}}.',
+      missingAtCommit: 'This file does not exist at commit {{commit}}.',
+      missingLatest: 'This file no longer exists in the latest version.',
+      pastEndCommented: 'Line {{line}} is past the end of the file in that version.',
+      versions: 'Which version',
+      asCommented: 'As commented',
+      latest: 'Latest',
+      latestGone: 'The file no longer exists in the latest version.',
+      latestGoneInPush: 'Removed in push {{push}}.',
+      pushOf: 'push {{index}} of {{total}}',
+      commitAt: 'commit <commit/>',
+      commentedAt: 'Code from <at/>, when this was commented.',
+      commentedAtRemoved:
+        'Code from <at/>, when this was commented. The file was removed in a later push.',
+      commentedAtRemovedInPush:
+        'Code from <at/>, when this was commented. The file was removed in push {{push}}.',
+      latestAround: 'Latest version, around line {{line}}. The comment was made on <at/>.',
       pastEndBase: 'Line {{line}} is past the end of the file in its base (before the change).',
       pastEndLatest: 'Line {{line}} is past the end of the file in its latest version.',
       label: 'Code at {{path}}:{{line}}',
