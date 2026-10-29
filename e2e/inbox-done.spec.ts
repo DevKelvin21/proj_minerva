@@ -68,6 +68,12 @@ test('Unread by default: read rows stay until you leave, All keeps them, Clear r
   await expect(inbox(window)).toContainText('2 unread')
   await expect(comment(window)).toContainText('Should this retry on 409')
   await expect(vote(window)).toContainText('dkumar requested changes.')
+  // Keyboard focus on a row: the ring is inset and wraps the row with its Done button.
+  await comment(window).focus()
+  await window.keyboard.press('Tab')
+  await window.keyboard.press('Shift+Tab')
+  await expect(comment(window)).toBeFocused()
+  await attachScreenshot(window, testInfo, 'unread-row-focus')
 
   // Opened while Unread is showing: it stays, dimmed, so the list does not jump.
   await comment(window).click()

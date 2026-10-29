@@ -109,7 +109,9 @@ function RowShell({
       aria-current={current || undefined}
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
-      className="flex min-w-0 flex-1 items-start gap-1.5 py-2 pl-3 pr-1 text-left"
+      // The ring is drawn by the row (`ItemListRow`), inset, around the Done button too
+      // (`!`: the global `:focus-visible` outline in styles.css is unlayered).
+      className="flex min-w-0 flex-1 items-start gap-1.5 py-2 pl-3 pr-1 text-left focus-visible:outline-none!"
     >
       <UnreadDot unread={!item.read} />
       {lead}
@@ -243,7 +245,7 @@ function ItemListRow({
   const { t } = useTranslation()
   return (
     <li
-      className={`group/row flex min-w-0 items-start border-l-2 transition-colors duration-150 ${
+      className={`group/row flex min-w-0 items-start border-l-2 transition-colors duration-150 has-[[data-activity-item]:focus-visible]:outline-2 has-[[data-activity-item]:focus-visible]:-outline-offset-2 outline-[color:var(--theme-focus)] ${
         current ? 'border-accent bg-accent/10' : 'border-transparent hover:bg-bg/60'
       }`}
     >
@@ -254,7 +256,7 @@ function ItemListRow({
         label={t('layout.inbox.done')}
         icon={<Archive size={13} aria-hidden />}
         data-inbox-done={item.id}
-        className="mr-2 mt-2 opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100"
+        className="mr-2 mt-2 opacity-0 focus-visible:opacity-100 focus-visible:outline-offset-[-2px]! group-hover/row:opacity-100 group-focus-within/row:opacity-100"
       />
     </li>
   )
