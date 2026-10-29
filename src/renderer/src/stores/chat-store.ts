@@ -7,7 +7,8 @@
  *   first) and whether older ones exist; `messages[id]` holds each message.
  *   A streaming answer only replaces its own entry in `messages`, so its row
  *   (which selects by id) is the only one that re-renders per chunk.
- * - `activity[messageId]`: the live tool log of a streaming answer.
+ * - `activity[messageId]` / `stage[messageId]`: the live tool log and the
+ *   current step (`ChatRunStage`) of a streaming answer.
  * - `active[prKey]`: the open conversation; `null`/absent = a new one.
  * - `drafts[prKey]`: the context items gathered from the diff and the text
  *   typed in the composer. Session memory only.
@@ -23,6 +24,7 @@ import type {
   ChatEvent,
   ChatMessage,
   ChatPage,
+  ChatRunStage,
   ChatSendResult,
 } from '../../../shared/chat'
 import { MAX_CHAT_CONTEXT_ITEMS, MAX_CHAT_MESSAGE_LEN } from '../../../shared/chat'
@@ -59,6 +61,7 @@ interface ChatState {
   transcripts: Record<string, Transcript>
   messages: Record<string, ChatMessage>
   activity: Record<string, AnalysisActivityItem[]>
+  stage: Record<string, ChatRunStage>
   active: Record<string, string | null>
   drafts: Record<string, ChatDraft>
   /** A send of this PR's draft is on its way to main. */
@@ -176,9 +179,11 @@ export const useChatStore = create<ChatState>((set, get) => {
       const dropped = at >= 0 ? transcript.ids.slice(at + 1).filter((id) => !ids.includes(id)) : []
       let messages = withMessages(s.messages, [userMessage, assistantMessage])
       let activity = s.activity
+      let stage = s.stage
       for (const id of dropped) {
         messages = withoutKey(messages, id)
         activity = withoutKey(activity, id)
+        stage = withoutKey(stage, id)
       }
       const lists = s.lists[conversation.prKey]?.items
         ? upsertSummary(s.lists, conversation)
@@ -194,6 +199,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         lists,
         messages,
         activity,
+        stage,
         transcripts: { ...s.transcripts, [conversation.id]: { ...transcript, ids } },
       }
     })
@@ -238,6 +244,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     transcripts: {},
     messages: {},
     activity: {},
+    stage: {},
     active: {},
     drafts: {},
     sending: {},
@@ -428,9 +435,11 @@ export const useChatStore = create<ChatState>((set, get) => {
           const transcript = s.transcripts[event.conversationId]
           let messages = s.messages
           let activity = s.activity
+          let stage = s.stage
           for (const id of transcript?.ids ?? []) {
             messages = withoutKey(messages, id)
             activity = withoutKey(activity, id)
+            stage = withoutKey(stage, id)
           }
           return {
             lists: list?.items
@@ -445,6 +454,7 @@ export const useChatStore = create<ChatState>((set, get) => {
             transcripts: withoutKey(s.transcripts, event.conversationId),
             messages,
             activity,
+            stage,
             active:
               s.active[event.prKey] === event.conversationId
                 ? { ...s.active, [event.prKey]: null }
@@ -453,7 +463,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         })
         return
       }
-      const { message, activity } = event
+      const { message, activity, stage } = event
       set((s) => {
         const merged = fresher(s.messages[message.id], message)
         const transcript = s.transcripts[message.conversationId]
@@ -463,9 +473,18 @@ export const useChatStore = create<ChatState>((set, get) => {
             : merged.status === 'streaming'
               ? s.activity
               : withoutKey(s.activity, message.id)
+        const nextStage =
+          merged.status === 'streaming' && stage
+            ? s.stage[message.id] === stage
+              ? s.stage
+              : { ...s.stage, [message.id]: stage }
+            : merged.status === 'streaming'
+              ? s.stage
+              : withoutKey(s.stage, message.id)
         return {
           messages: merged === s.messages[message.id] ? s.messages : { ...s.messages, [message.id]: merged },
           activity: nextActivity,
+          stage: nextStage,
           // A transcript the panel knows grows; others get it with their first page.
           transcripts:
             transcript

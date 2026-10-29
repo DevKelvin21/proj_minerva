@@ -716,7 +716,13 @@ export const es: MessageShape<typeof en> = {
       loadingOlder: 'Cargando mensajes anteriores…',
     },
     message: {
-      thinking: 'Leyendo el código en el commit del PR…',
+      stage: {
+        starting: 'Iniciando la IA…',
+        loading: 'Obteniendo el código del pull request…',
+        waiting: 'Esperando al modelo…',
+        exploring: 'Leyendo el código en el commit del PR…',
+        writing: 'Escribiendo la respuesta…',
+      },
       failed: 'No se pudo obtener una respuesta: {{error}}',
       cancelled: 'Se detuvo antes de terminar la respuesta.',
       interrupted: 'Minerva se cerró mientras se escribía esta respuesta.',

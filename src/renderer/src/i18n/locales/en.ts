@@ -708,7 +708,13 @@ export const en = {
       loadingOlder: 'Loading older messages…',
     },
     message: {
-      thinking: 'Reading the code at the PR commit…',
+      stage: {
+        starting: 'Starting the AI…',
+        loading: 'Getting the pull request’s code…',
+        waiting: 'Waiting for the model…',
+        exploring: 'Reading the code at the PR commit…',
+        writing: 'Writing the answer…',
+      },
       failed: 'Could not get an answer: {{error}}',
       cancelled: 'Stopped before the answer was finished.',
       interrupted: 'Minerva closed while this answer was being written.',
