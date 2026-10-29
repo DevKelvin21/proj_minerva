@@ -9,7 +9,9 @@
  * - per PR (`prKey`), the comment ids already known and when the PR was last
  *   checked, so a restart neither re-reports old comments nor floods;
  * - per PR, the reviewer votes and "asked to review me" of the last listing;
- * - the inbox items themselves, with their read flag.
+ * - the inbox items themselves, with their read flag;
+ * - the ids of items the user dismissed ("Done"), so a listing never brings
+ *   them back.
  * Pruning (caps, age) is the service's job; the store only loads and saves.
  */
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -41,10 +43,18 @@ export interface ReviewTrack {
   seenAt: string
 }
 
+/** An item the user dismissed: its PR (pruned with the PR's tracks) and when (ISO). */
+export interface DismissedTrack {
+  prKey: string
+  at: string
+}
+
 export interface ActivityData {
   prs: Map<string, PrTrack>
   reviews: Map<string, ReviewTrack>
   items: ActivityItem[]
+  /** Item id -> dismissal. */
+  dismissed: Map<string, DismissedTrack>
 }
 
 export interface ActivityStore {
@@ -58,10 +68,18 @@ interface PersistedActivity {
   /** Absent in files written before review events. */
   reviews?: Record<string, ReviewTrack>
   items: ActivityItem[]
+  /** Absent in files written before "Done". */
+  dismissed?: Record<string, DismissedTrack>
 }
 
 function emptyData(): ActivityData {
-  return { prs: new Map(), reviews: new Map(), items: [] }
+  return { prs: new Map(), reviews: new Map(), items: [], dismissed: new Map() }
+}
+
+function isDismissedTrack(value: unknown): value is DismissedTrack {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return typeof v.prKey === 'string' && typeof v.at === 'string'
 }
 
 const VOTES: readonly ReviewerVote[] = [
@@ -116,6 +134,11 @@ function fromPersisted(value: unknown): ActivityData {
     }
   }
   if (Array.isArray(v.items)) data.items = v.items.filter(isActivityItem)
+  if (typeof v.dismissed === 'object' && v.dismissed !== null && !Array.isArray(v.dismissed)) {
+    for (const [id, track] of Object.entries(v.dismissed)) {
+      if (isDismissedTrack(track)) data.dismissed.set(id, { prKey: track.prKey, at: track.at })
+    }
+  }
   return data
 }
 
@@ -142,6 +165,7 @@ export function createActivityStore(filePath: () => string): ActivityStore {
         prs: Object.fromEntries(data.prs),
         reviews: Object.fromEntries(data.reviews),
         items: data.items,
+        dismissed: Object.fromEntries(data.dismissed),
       }
       const finalPath = filePath()
       const tmpPath = finalPath + '.tmp'

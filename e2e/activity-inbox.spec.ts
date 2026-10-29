@@ -169,6 +169,9 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
   await setViewport(window, 960, 540)
   await window.getByTestId('sidebar-toggle').click()
   await expect(viewSwitch(window).getByRole('button', { name: /^Inbox/ })).toBeVisible()
+  // The drawer is a fresh Inbox: Unread no longer lists the read row; All does.
+  await expect(incoming(window)).toHaveCount(0)
+  await inbox(window).getByRole('tab', { name: 'All' }).click()
   await expect(incoming(window)).toContainText('carts.ts:26')
   await attachScreenshot(window, testInfo, 'inbox-tiled-960')
 })

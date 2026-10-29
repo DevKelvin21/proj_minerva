@@ -21,6 +21,7 @@ import {
   newCommentItems,
   orphanItems,
   pickDue,
+  pruneDismissed,
   pruneItems,
   reviewItems,
   reviewTrackOf,
@@ -104,17 +105,24 @@ function listing(
 }
 
 function memoryStore(initial?: ActivityData): ActivityStore & { saves: number } {
-  let data: ActivityData = initial ?? { prs: new Map(), reviews: new Map(), items: [] }
+  const copy = (from: ActivityData): ActivityData => ({
+    prs: new Map(from.prs),
+    reviews: new Map(from.reviews),
+    items: [...from.items],
+    dismissed: new Map(from.dismissed),
+  })
+  let data: ActivityData = initial ?? {
+    prs: new Map(),
+    reviews: new Map(),
+    items: [],
+    dismissed: new Map(),
+  }
   return {
     saves: 0,
-    load: () => ({
-      prs: new Map(data.prs),
-      reviews: new Map(data.reviews),
-      items: [...data.items],
-    }),
+    load: () => copy(data),
     save(next) {
       this.saves++
-      data = { prs: new Map(next.prs), reviews: new Map(next.reviews), items: [...next.items] }
+      data = copy(next)
     },
   }
 }
@@ -354,6 +362,70 @@ describe('createActivityService', () => {
     expect(changes.map((change) => change.state.unreadCount)).toEqual([2, 1, 0])
   })
 
+  it('dismisses items for good: pushed once, unknown ids ignored', async () => {
+    const threads: Record<number, CommentThread[]> = { 1: [] }
+    const { service, changes, store } = setup(threads)
+    await service.onListing(listing([pr(1)]))
+    threads[1] = [generalThread('t', [comment('a'), comment('b')])]
+    await service.onListing(listing([pr(1, { updatedAt: '2026-10-03T00:00:00.000Z' })]))
+    const ids = service.get().items.map((item) => item.id)
+    expect(ids).toHaveLength(2)
+
+    expect(service.dismiss({ ids: [ids[0], 'comment:nope'] })).toMatchObject({ unreadCount: 1 })
+    expect(service.get().items.map((item) => item.id)).toEqual([ids[1]])
+    expect([...store.load().dismissed.keys()]).toEqual([ids[0]])
+    // Nothing left to remove: no push, no write.
+    const saves = store.saves
+    service.dismiss({ ids: [ids[0]] })
+    expect(store.saves).toBe(saves)
+    expect(changes.map((change) => change.state.items.length)).toEqual([2, 1])
+
+    // The same comments again (updatedAt moved): the dismissed one stays gone,
+    // and a new reply still arrives.
+    threads[1] = [generalThread('t', [comment('a'), comment('b'), comment('c')])]
+    await service.onListing(listing([pr(1, { updatedAt: '2026-10-05T00:00:00.000Z' })]))
+    expect(service.get().items.map((item) => item.id)).toEqual([
+      ids[1],
+      'comment:' + prKey(api, 1) + ':c',
+    ])
+  })
+
+  it('a dismissed comment does not come back even if its id drops out of the known set', async () => {
+    const threads: Record<number, CommentThread[]> = { 1: [] }
+    const { service } = setup(threads)
+    await service.onListing(listing([pr(1)]))
+    threads[1] = [generalThread('t', [comment('a')])]
+    await service.onListing(listing([pr(1, { updatedAt: '2026-10-03T00:00:00.000Z' })]))
+    service.dismiss({ ids: ['comment:' + prKey(api, 1) + ':a'] })
+    // A provider page that misses it once, then lists it again.
+    threads[1] = []
+    await service.onListing(listing([pr(1, { updatedAt: '2026-10-04T00:00:00.000Z' })]))
+    threads[1] = [generalThread('t', [comment('a')])]
+    await service.onListing(listing([pr(1, { updatedAt: '2026-10-05T00:00:00.000Z' })]))
+    expect(service.get().items).toEqual([])
+  })
+
+  it('forgets dismissals with their PR (merged, or unseen for a month)', async () => {
+    const done = { prKey: prKey(api, 1), at: '2026-10-28T11:00:00.000Z' }
+    const old = { prKey: prKey(api, 9), at: '2026-09-01T00:00:00.000Z' }
+    const recent = { prKey: prKey(api, 8), at: '2026-10-20T00:00:00.000Z' }
+    const { service, store } = setup(
+      {},
+      {
+        prs: new Map(),
+        reviews: new Map(),
+        items: [],
+        dismissed: new Map([
+          ['orphan:a', done],
+          ['orphan:b', old],
+          ['orphan:c', recent],
+        ]),
+      },
+    )
+    await service.onListing(listing([pr(1, { state: 'merged' })]))
+    expect([...store.load().dismissed.keys()]).toEqual(['orphan:c'])
+  })
+
   it('keeps a PR due when its threads fail, and checks it again next time', async () => {
     const { service, getThreads } = setup({})
     getThreads.mockRejectedValueOnce(new Error('boom'))
@@ -465,6 +537,56 @@ describe('createActivityService', () => {
     await service.onListing(listing([pr(2)]))
     expect(service.get().items).toEqual([])
     expect(changes).toHaveLength(2)
+  })
+
+  it('a dismissed orphan is not found again while the PR stays orphaned', async () => {
+    const orphanNode: StackNode = {
+      prKey: prKey(api, 2),
+      repo: api,
+      number: 2,
+      title: 'Child',
+      headRef: 'child',
+      baseRef: 'parent',
+      state: 'open',
+      isDraft: false,
+      children: [],
+      orphan: {
+        parent: { number: 1, title: 'Parent', mergedInto: 'main' },
+        targetBranchExists: true,
+        suggestedBase: 'main',
+      },
+    }
+    const stacks: GetStacksResult = { stacks: [{ repo: api, root: orphanNode, size: 1 }], errors: [] }
+    let now = NOW
+    const service = createActivityService({
+      store: memoryStore(),
+      getThreads: async () => [],
+      getStacks: async () => stacks,
+      onChange: () => {},
+      now: () => now,
+      orphanIntervalMs: 1000,
+    })
+    await service.onListing(listing([pr(2)]))
+    const [orphan] = service.get().items
+    expect(orphan.kind).toBe('orphan')
+    expect(service.dismiss({ ids: [orphan.id] }).items).toEqual([])
+    now += 1000
+    await service.onListing(listing([pr(2)]))
+    now += 1000
+    await service.onListing(listing([pr(2)]))
+    expect(service.get().items).toEqual([])
+  })
+})
+
+describe('pruneDismissed', () => {
+  it('keeps the newest dismissals up to the cap', () => {
+    const dismissed = new Map([
+      ['a', { prKey: 'k', at: '2026-10-01T00:00:00.000Z' }],
+      ['b', { prKey: 'k', at: '2026-10-03T00:00:00.000Z' }],
+      ['c', { prKey: 'k', at: '2026-10-02T00:00:00.000Z' }],
+    ])
+    expect([...pruneDismissed(dismissed, 2).keys()]).toEqual(['b', 'c'])
+    expect(pruneDismissed(dismissed).size).toBe(3)
   })
 })
 
