@@ -235,7 +235,7 @@ export const en = {
       loadFailed: 'Could not load the PR list: {{error}}',
       loading: 'Loading PRs…',
       accountNoSession:
-        'The account <mono>{{account}}</mono> has no valid gh session. Pick another one in Settings, or renew it with <mono>{{command}}</mono>.',
+        'The account <account/> has no valid gh session. Pick another one in Settings, or renew it with <mono>{{command}}</mono>.',
       signInWithGhCli: 'Sign in with GitHub CLI: run <mono>{{command}}</mono> in a terminal.',
       signInWithAz:
         'Sign in with Azure CLI: run <cmd>{{command}}</cmd> in a terminal and paste a PAT with Code (Read & Write) scope.',
@@ -678,8 +678,8 @@ export const en = {
       position: '· {{position}} of {{total}}',
       thisPr: 'This PR',
       builtOnTop:
-        'Built on top of #{{number}} (<branch>{{branch}}</branch>): this diff only shows what this PR adds on top of it.',
-      firstInStack: 'First in the stack: it targets <branch>{{base}}</branch> directly.',
+        'Built on top of #{{number}} (<branch/>): this diff only shows what this PR adds on top of it.',
+      firstInStack: 'First in the stack: it targets <base/> directly.',
       descendants_one: '{{numbers}} builds on top of this one; changes here flow up to it.',
       descendants_other: '{{numbers}} build on top of this one; changes here flow up to them.',
       sameFeatureIn: 'Same feature in',
@@ -694,10 +694,10 @@ export const en = {
     retarget: {
       targetBranch: 'Target branch:',
       consequenceOrphan:
-        'The diff will be recomputed against <branch>{{branch}}</branch>, so the changes that already landed through #{{parent}} drop out and only this PR’s own work is left. Minerva asks you to confirm before writing.',
+        'The diff will be recomputed against <branch/>, so the changes that already landed through #{{parent}} drop out and only this PR’s own work is left. Minerva asks you to confirm before writing.',
       consequenceManual:
-        'The diff will be recomputed against <branch>{{branch}}</branch>. Files and line comments may shift. Minerva asks you to confirm before writing.',
-      waiting: 'Waiting for your confirmation… then retargeting to <branch>{{branch}}</branch>',
+        'The diff will be recomputed against <branch/>. Files and line comments may shift. Minerva asks you to confirm before writing.',
+      waiting: 'Waiting for your confirmation… then retargeting to <branch/>',
       couldNotRetarget: 'Could not retarget #{{number}}.',
       dismiss: 'Dismiss',
       retargetTo: 'Retarget to {{branch}}',
@@ -709,7 +709,7 @@ export const en = {
       newTargetBranch: 'New target branch',
       typeBranch: 'Type the branch this PR should merge into.',
       retargeted:
-        '<pr>#{{number}}</pr> now targets <branch>{{base}}</branch> (was <branch>{{oldBase}}</branch>). Its diff is now against <branch>{{base}}</branch>.',
+        '<pr>#{{number}}</pr> now targets <base/> (was <previous/>). Its diff is now against <base/>.',
       branchProblems: {
         empty: 'Enter a branch name.',
         invalidChars: 'Branch names cannot contain spaces or any of ~ ^ : ? * [ \\',

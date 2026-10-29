@@ -235,7 +235,7 @@ export const es: MessageShape<typeof en> = {
       loadFailed: 'No se pudo cargar la lista de PRs: {{error}}',
       loading: 'Cargando PRs…',
       accountNoSession:
-        'La cuenta <mono>{{account}}</mono> no tiene una sesión de gh válida. Elige otra en Configuración o renuévala con <mono>{{command}}</mono>.',
+        'La cuenta <account/> no tiene una sesión de gh válida. Elige otra en Configuración o renuévala con <mono>{{command}}</mono>.',
       signInWithGhCli:
         'Inicia sesión con GitHub CLI: ejecuta <mono>{{command}}</mono> en una terminal.',
       signInWithAz:
@@ -686,8 +686,8 @@ export const es: MessageShape<typeof en> = {
       position: '· {{position}} de {{total}}',
       thisPr: 'Este PR',
       builtOnTop:
-        'Construido sobre #{{number}} (<branch>{{branch}}</branch>): este diff solo muestra lo que este PR agrega encima.',
-      firstInStack: 'Primero del stack: apunta directamente a <branch>{{base}}</branch>.',
+        'Construido sobre #{{number}} (<branch/>): este diff solo muestra lo que este PR agrega encima.',
+      firstInStack: 'Primero del stack: apunta directamente a <base/>.',
       descendants_one:
         '{{numbers}} se construye sobre este; los cambios de aquí se propagan hacia él.',
       descendants_other:
@@ -704,11 +704,11 @@ export const es: MessageShape<typeof en> = {
     retarget: {
       targetBranch: 'Rama destino:',
       consequenceOrphan:
-        'El diff se recalculará contra <branch>{{branch}}</branch>, así que los cambios que ya entraron a través de #{{parent}} desaparecen y solo queda el trabajo propio de este PR. Minerva te pide confirmación antes de escribir.',
+        'El diff se recalculará contra <branch/>, así que los cambios que ya entraron a través de #{{parent}} desaparecen y solo queda el trabajo propio de este PR. Minerva te pide confirmación antes de escribir.',
       consequenceManual:
-        'El diff se recalculará contra <branch>{{branch}}</branch>. Los archivos y los comentarios de línea pueden moverse. Minerva te pide confirmación antes de escribir.',
+        'El diff se recalculará contra <branch/>. Los archivos y los comentarios de línea pueden moverse. Minerva te pide confirmación antes de escribir.',
       waiting:
-        'Esperando tu confirmación… luego se cambia el destino a <branch>{{branch}}</branch>',
+        'Esperando tu confirmación… luego se cambia el destino a <branch/>',
       couldNotRetarget: 'No se pudo cambiar el destino de #{{number}}.',
       dismiss: 'Descartar',
       retargetTo: 'Cambiar destino a {{branch}}',
@@ -720,7 +720,7 @@ export const es: MessageShape<typeof en> = {
       newTargetBranch: 'Nueva rama destino',
       typeBranch: 'Escribe la rama en la que este PR debería fusionarse.',
       retargeted:
-        '<pr>#{{number}}</pr> ahora apunta a <branch>{{base}}</branch> (antes <branch>{{oldBase}}</branch>). Su diff ahora es contra <branch>{{base}}</branch>.',
+        '<pr>#{{number}}</pr> ahora apunta a <base/> (antes <previous/>). Su diff ahora es contra <base/>.',
       branchProblems: {
         empty: 'Escribe un nombre de rama.',
         invalidChars: 'Los nombres de rama no pueden tener espacios ni ninguno de ~ ^ : ? * [ \\',
