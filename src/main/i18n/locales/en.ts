@@ -271,6 +271,7 @@ export const en = {
       conflict: 'Conflict: the item changed on Azure DevOps',
       rateLimited: 'Azure DevOps rate limit reached',
       other: 'Azure DevOps error (HTTP {{status}})',
+      server: 'Azure DevOps: {{message}}',
     },
     zip: {
       tooManyEntries: 'The repository archive has {{count}} entries (limit {{limit}}).',

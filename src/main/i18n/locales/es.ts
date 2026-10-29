@@ -273,6 +273,7 @@ export const es: MessageShape<typeof en> = {
       conflict: 'Conflicto: el elemento cambió en Azure DevOps',
       rateLimited: 'Se alcanzó el límite de uso de Azure DevOps',
       other: 'Error de Azure DevOps (HTTP {{status}})',
+      server: 'Azure DevOps: {{message}}',
     },
     zip: {
       tooManyEntries: 'El archivo del repositorio tiene {{count}} entradas (límite {{limit}}).',

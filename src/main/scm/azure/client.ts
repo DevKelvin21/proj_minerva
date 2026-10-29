@@ -37,7 +37,10 @@ const DEFAULT_DOWNLOAD_TIMEOUT_MS = 5 * 60_000
 const DEFAULT_MAX_RETRY_AFTER_MS = 30_000
 const MAX_THROTTLE_RETRIES = 2
 const MAX_REDIRECTS = 3
-const MAX_ERROR_MESSAGE_CHARS = 300
+/** Server error text kept for the dev log. */
+const MAX_LOGGED_MESSAGE_CHARS = 2000
+/** Server error text shown to the user (`sanitizeAzureServerMessage`). */
+const MAX_SERVER_SENTENCE_CHARS = 200
 const CONTINUATION_HEADER = 'x-ms-continuationtoken'
 
 export interface CredentialProvider {
@@ -186,12 +189,19 @@ function endpointOf(url: URL): string {
   return url.host + url.pathname
 }
 
+/** The server's own `message` (or `value.Message`) from an error body; `''` when there is none. */
 async function serverMessage(response: Response): Promise<string> {
   try {
     const text = await response.text()
     try {
-      const json = JSON.parse(text) as { message?: unknown }
-      if (typeof json.message === 'string') return json.message.slice(0, MAX_ERROR_MESSAGE_CHARS)
+      const json = JSON.parse(text) as { message?: unknown; value?: { Message?: unknown } }
+      const message =
+        typeof json.message === 'string'
+          ? json.message
+          : typeof json.value?.Message === 'string'
+            ? json.value.Message
+            : ''
+      return message.slice(0, MAX_LOGGED_MESSAGE_CHARS)
     } catch {
       // Not JSON.
     }
@@ -202,13 +212,54 @@ async function serverMessage(response: Response): Promise<string> {
 }
 
 /**
- * One translated sentence for an HTTP failure. The endpoint and the server's
- * own text (`TF401174: The item … could not be found … '<Commit: …>'`) go to
- * the dev log only: error messages reach the renderer, and a REST URL or a
- * server dump is not something a reviewer can act on.
+ * The part of Azure's own error text a reviewer can act on (`TF401179: An
+ * active pull request for the source and target branch already exists.`, a
+ * policy or permission message): its first line, then its first sentence,
+ * with every URL, host/endpoint and `_apis` path removed, whitespace
+ * collapsed, at most `MAX_SERVER_SENTENCE_CHARS`. `''` when nothing is left.
  */
-function describeStatus(status: number, endpoint: string, detail: string, method = 'GET'): string {
+export function sanitizeAzureServerMessage(raw: string): string {
+  const firstLine =
+    raw
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .find((line) => line.trim().length > 0) ?? ''
+  const cleaned = firstLine
+    // scheme URLs (https://…, vstfs:///…)
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s)\]'"]*/gi, ' ')
+    // anything with an _apis path segment
+    .replace(/[^\s(['"]*_apis[^\s)\]'"]*/gi, ' ')
+    // bare hosts, with or without a path (dev.azure.com/org, org.visualstudio.com)
+    .replace(/[^\s(['"]*\b(?:[\w-]+\.)+(?:com|net|org|io|ms)\b(?:[/:][^\s)\]'"]*)?/gi, ' ')
+    // brackets / quotes / parentheses left (nearly) empty by the removals
+    .replace(/\[\s*\]|\(\s*(?:see|at|in)?\s*\)|'\s*'|"\s*"/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .trim()
+  const sentence = /^(.*?[.!?])(?=\s|$)/.exec(cleaned)?.[1] ?? cleaned
+  const trimmed = sentence.replace(/[\s:;,-]+$/, '')
+  if (!/[\p{L}\p{N}]/u.test(trimmed)) return ''
+  return trimmed.length > MAX_SERVER_SENTENCE_CHARS
+    ? trimmed.slice(0, MAX_SERVER_SENTENCE_CHARS - 1).trimEnd() + '…'
+    : trimmed
+}
+
+/**
+ * One translated line for an HTTP failure. When Azure said why (`serverText`),
+ * that is the line: "Azure DevOps: <its first sentence>", sanitized. Without
+ * it, a sentence per status. The endpoint we called, headers and the raw body
+ * never reach it; the full detail goes to the dev log.
+ */
+function describeStatus(
+  status: number,
+  endpoint: string,
+  detail: string,
+  method = 'GET',
+  serverText = '',
+): string {
   logFailure(method, endpoint, 'HTTP ' + status + (detail ? ': ' + detail : ''))
+  const said = sanitizeAzureServerMessage(serverText)
+  if (said && status !== 401 && status !== 203) return mt('azure.status.server', { message: said })
   return status === 401 || status === 203
     ? mt('azure.status.rejected')
     : status === 403
@@ -483,7 +534,7 @@ export class AzureDevOpsClient {
         const detail = await serverMessage(response)
         throw new AzureApiError(
           statusToErrorCode(response.status),
-          describeStatus(response.status, endpointOf(target), detail, request.method),
+          describeStatus(response.status, endpointOf(target), detail, request.method, detail),
           { status: response.status, method: request.method, endpoint: endpointOf(target) },
         )
       }

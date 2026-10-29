@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  sanitizeAzureServerMessage,
   AzureDevOpsClient,
   gitRepoUrl,
   isAllowedAzureUrl,
@@ -148,22 +149,51 @@ describe('auth and errors', () => {
     [412, 'CONFLICT'],
     [500, 'UNKNOWN'],
   ])(
-    'maps %i to %s in one sentence; URL and server text only in the dev log',
+    "maps %i to %s with Azure's own first sentence; the URL we called only in the dev log",
     async (status, code) => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const f = fetchSeq(json({ message: 'TF401019: nope', typeKey: 'X' }, { status }))
+      const f = fetchSeq(
+        json(
+          { message: 'TF401019: nope.\n   at Microsoft.TeamFoundation.Stack()', typeKey: 'X' },
+          { status },
+        ),
+      )
       const client = new AzureDevOpsClient({ credentials: creds(), fetch: f })
       const error = (await client
         .json('Contoso', orgApiUrl('Contoso', 'x'))
         .catch((e: Error) => e)) as Error
       expect(error).toMatchObject({ code, status })
-      expect(error.message).not.toContain('TF401019')
-      expect(error.message).not.toContain('dev.azure.com')
-      expect(error.message.split('\n')).toHaveLength(1)
-      expect(warn.mock.calls.flat().join(' ')).toContain('TF401019')
+      expect(error.message).toBe('Azure DevOps: TF401019: nope.')
+      expect(warn.mock.calls.flat().join(' ')).toContain('dev.azure.com/Contoso/x failed: HTTP')
       warn.mockRestore()
     },
   )
+
+  it('falls back to a sentence per status when the body says nothing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const body of ['', '{}', '{"message":"  "}', 'not json']) {
+      const f = fetchSeq(new Response(body, { status: 500 }))
+      const client = new AzureDevOpsClient({ credentials: creds(), fetch: f })
+      const error = (await client
+        .json('Contoso', orgApiUrl('Contoso', 'x'))
+        .catch((e: Error) => e)) as Error
+      expect(error.message).toBe('Azure DevOps error (HTTP 500)')
+    }
+    warn.mockRestore()
+  })
+
+  it("reads value.Message too (some endpoints nest Azure's text)", async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const f = fetchSeq(
+      json({ value: { Message: 'Policy violation: needs 2 reviewers.' } }, { status: 400 }),
+    )
+    const client = new AzureDevOpsClient({ credentials: creds(), fetch: f })
+    const error = (await client
+      .json('Contoso', orgApiUrl('Contoso', 'x'))
+      .catch((e: Error) => e)) as Error
+    expect(error.message).toBe('Azure DevOps: Policy violation: needs 2 reviewers.')
+    warn.mockRestore()
+  })
 
   it('treats an HTML 200 as UNAUTHENTICATED', async () => {
     const f = fetchSeq(
@@ -294,5 +324,43 @@ describe('pagination', () => {
     expect(parseRetryAfter('3')).toBe(3000)
     expect(parseRetryAfter(new Date(10_000).toUTCString(), 4_000)).toBe(6000)
     expect(parseRetryAfter(null)).toBeNull()
+  })
+})
+
+describe('sanitizeAzureServerMessage', () => {
+  it('strips URLs, hosts and _apis paths from the sentence', () => {
+    expect(
+      sanitizeAzureServerMessage(
+        'TF401179: An active pull request already exists (see https://dev.azure.com/contoso/Platform/_git/api/pullrequest/12?x=1). Details follow.',
+      ),
+    ).toBe('TF401179: An active pull request already exists.')
+    const cleaned = sanitizeAzureServerMessage(
+      'You need Contribute on contoso.visualstudio.com/Platform and /contoso/_apis/git/repositories/abc to do this.',
+    )
+    expect(cleaned).toBe('You need Contribute on and to do this.')
+    expect(cleaned).not.toMatch(/visualstudio|_apis|https?:/)
+  })
+
+  it('keeps only the first line and first sentence of a multi-line dump', () => {
+    const dump =
+      '\n  TF401174: The item could not be found at that version. Try another one.\n' +
+      'Microsoft.TeamFoundation.Git.Server.GitItemNotFoundException\n   at Foo.Bar() in C:\\src\\x.cs:line 4'
+    expect(sanitizeAzureServerMessage(dump)).toBe(
+      'TF401174: The item could not be found at that version.',
+    )
+  })
+
+  it('collapses whitespace and caps an over-long message at 200 characters', () => {
+    const long = 'Policy   violation:\t' + 'very '.repeat(80) + 'long'
+    const out = sanitizeAzureServerMessage(long)
+    expect(out.length).toBeLessThanOrEqual(200)
+    expect(out.endsWith('…')).toBe(true)
+    expect(out.startsWith('Policy violation: very very')).toBe(true)
+  })
+
+  it('is empty when nothing readable is left', () => {
+    expect(sanitizeAzureServerMessage('')).toBe('')
+    expect(sanitizeAzureServerMessage('   \n  ')).toBe('')
+    expect(sanitizeAzureServerMessage('https://dev.azure.com/contoso/_apis/x')).toBe('')
   })
 })
