@@ -100,7 +100,7 @@ function ChipView({
   return (
     <button
       type="button"
-      onClick={openSettings}
+      onClick={() => openSettings('ai-model')}
       title={label}
       aria-label={label}
       data-testid="ai-status-chip"

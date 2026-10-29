@@ -113,35 +113,19 @@ test('con la ventana angosta la lista de PRs pasa a drawer y se abre desde el Ti
 test('Settings: todo el contenido es alcanzable con la ventana tileada', async ({
   window,
 }, testInfo) => {
-  for (const viewport of [
-    { name: 'un cuarto', w: 960, h: 540 },
-    { name: 'mitad horizontal', w: 1920, h: 540 },
-  ]) {
-    await setViewport(window, viewport.w, viewport.h)
-    await window
-      .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
-      .first()
-      .click()
+  const settingsButton = window
+    .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
+    .first()
+  const nav = window.getByRole('navigation', { name: 'Settings sections' })
+  const dialog = window.locator('[role="dialog"]')
 
-    const dialog = window.locator('[role="dialog"]')
-    await expect(dialog).toBeVisible()
-
-    // El diálogo entra en la ventana (nada del modal cae fuera del viewport).
-    const box = await dialog.boundingBox()
-    expect(box).not.toBeNull()
-    expect(box!.y, `modal dentro del viewport en ${viewport.name}`).toBeGreaterThanOrEqual(0)
-    expect(Math.round(box!.y + box!.height)).toBeLessThanOrEqual(viewport.h)
-
-    // Sección de GitHub: visible apenas se abre, sin desplegar nada.
-    await expect(window.getByText('GitHub access').first()).toBeVisible()
-
-    // Y el otro extremo del modal (tabs + lista de modelos + campo "Otro") se
-    // alcanza scrolleando. Antes de F16 esto era IMPOSIBLE a 540px de alto.
+  // Model page: the far end of the AI settings (tabs + model cards) is
+  // reachable by scrolling. Before F16 this was impossible at 540px high.
+  const reachModelCards = async (): Promise<void> => {
     const tab = window.locator('[role="tab"]', { hasText: 'Codex' })
     await tab.scrollIntoViewIfNeeded()
     await expect(tab).toBeVisible()
     await tab.click()
-
     // With a real CLI session on the machine (Codex/Claude installed and logged in) the
     // dynamic model catalog arrives mid-test and swaps the list, detaching the first
     // card while Playwright waits for it to be stable; retry until the list settles.
@@ -150,9 +134,55 @@ test('Settings: todo el contenido es alcanzable con la ventana tileada', async (
       await firstModelCard.scrollIntoViewIfNeeded({ timeout: 2_000 })
     }).toPass({ timeout: 15_000 })
     await expect(firstModelCard).toBeVisible()
-
-    await attachScreenshot(window, testInfo, `settings-${viewport.w}x${viewport.h}`)
-    await window.keyboard.press('Escape')
-    await expect(dialog).toHaveCount(0)
   }
+
+  const fitsViewport = async (h: number, name: string): Promise<void> => {
+    const box = await dialog.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.y, `modal dentro del viewport en ${name}`).toBeGreaterThanOrEqual(0)
+    expect(Math.round(box!.y + box!.height)).toBeLessThanOrEqual(h)
+  }
+
+  // Un cuarto (960x540): the page list and one page take turns.
+  await setViewport(window, 960, 540)
+  await settingsButton.click()
+  await expect(dialog).toBeVisible()
+  await fitsViewport(540, 'un cuarto')
+  await expect(nav).toBeVisible()
+  await expect(window.getByTestId('settings-back')).toHaveCount(0)
+  await expect(window.getByTestId('settings-nav-general')).toBeFocused()
+  // Arrows move through the list; Enter opens the focused page.
+  await window.keyboard.press('ArrowDown')
+  await window.keyboard.press('ArrowDown')
+  await expect(window.getByTestId('settings-nav-github')).toBeFocused()
+  await attachScreenshot(window, testInfo, 'settings-960x540-list')
+  await window.keyboard.press('Enter')
+  await expect(nav).toHaveCount(0)
+  await expect(window.getByTestId('settings-current-page')).toHaveText('GitHub')
+  await expect(window.getByText('List pull requests from GitHub').first()).toBeVisible()
+  await attachScreenshot(window, testInfo, 'settings-960x540-page')
+  // Back to the list, on the page it came from.
+  await window.getByTestId('settings-back').click()
+  await expect(window.getByTestId('settings-nav-github')).toHaveAttribute('aria-current', 'page')
+  await window.getByTestId('settings-nav-ai-model').click()
+  await reachModelCards()
+  await attachScreenshot(window, testInfo, 'settings-960x540-model')
+  await window.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+
+  // Mitad horizontal (1920x540): list and page side by side; it reopens on the last page.
+  await setViewport(window, 1920, 540)
+  await settingsButton.click()
+  await fitsViewport(540, 'mitad horizontal')
+  await expect(nav).toBeVisible()
+  await expect(window.getByTestId('settings-nav-ai-model')).toHaveAttribute('aria-current', 'page')
+  await reachModelCards()
+  // Beside the page, arrows switch the page as they move.
+  await window.getByTestId('settings-nav-ai-model').focus()
+  await window.keyboard.press('ArrowUp')
+  await expect(window.getByTestId('settings-current-page')).toHaveText('Providers')
+  await expect(window.getByTestId('settings-ai-provider-codex')).toBeVisible()
+  await attachScreenshot(window, testInfo, 'settings-1920x540')
+  await window.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
 })

@@ -10,6 +10,7 @@
  * Los componentes deben consumir slices vía selector (`useAppStore((s) => s.x)`)
  * en vez de desestructurar el store completo, para no re-renderizar de más.
  */
+import type { SyntheticEvent } from 'react'
 import { create } from 'zustand'
 import {
   clampDidacticWidth,
@@ -28,6 +29,11 @@ import type {
 } from '../../../shared/types'
 import { prKey, type ScmAuthStatus, type ScmProviderId } from '../../../shared/scm'
 import type { LayerRef } from '../lib/walkthrough'
+import {
+  DEFAULT_SETTINGS_PAGE,
+  isSettingsPageId,
+  type SettingsPageId,
+} from '../lib/settings-pages'
 import type { LineSide } from '../lib/line-threads'
 import type { ViewerFilter } from '../lib/dashboard'
 
@@ -280,6 +286,17 @@ interface AppState {
    * innecesariamente.
    */
   settingsOpen: boolean
+  /**
+   * Page of the Settings dialog: the one a caller asked for, else the last
+   * one visited this session (`general` at first). Session only.
+   */
+  settingsPage: SettingsPageId
+  /**
+   * How Settings opened, for the tiled layout where the page list and the
+   * page take turns: `page` = straight to `settingsPage` (a caller named it),
+   * `list` = the page list first.
+   */
+  settingsEntry: 'list' | 'page'
   /** The Cmd/Ctrl+K command palette (title bar "Jump to…" button). Session only. */
   commandPaletteOpen: boolean
   /**
@@ -407,7 +424,14 @@ interface AppState {
   openPrAt: (pr: PullRequestSummary, target: PrFocusTarget) => void
   setScmAuth: (statuses: Record<ScmProviderId, ScmAuthStatus>) => void
   setScmSettings: (info: ScmSettingsInfo) => void
-  openSettings: () => void
+  /**
+   * Opens Settings on `page`, or on the last page of the session. Anything
+   * that is not a page id is ignored, so it can be passed straight as an
+   * `onClick` (the click event then opens the last page).
+   */
+  openSettings: (page?: SettingsPageId | SyntheticEvent) => void
+  /** The page the Settings dialog shows (its page list). */
+  setSettingsPage: (page: SettingsPageId) => void
   closeSettings: () => void
   openCommandPalette: () => void
   closeCommandPalette: () => void
@@ -449,6 +473,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   scmSettings: null,
 
   settingsOpen: false,
+  settingsPage: DEFAULT_SETTINGS_PAGE,
+  settingsEntry: 'list',
   commandPaletteOpen: false,
   walkthroughFocus: false,
   recentPrs: [],
@@ -668,7 +694,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setScmAuth: (statuses) => set({ scmAuth: statuses }),
   setScmSettings: (info) => set({ scmSettings: info }),
-  openSettings: () => set({ settingsOpen: true, commandPaletteOpen: false }),
+  openSettings: (page) =>
+    set(
+      isSettingsPageId(page)
+        ? { settingsOpen: true, commandPaletteOpen: false, settingsPage: page, settingsEntry: 'page' }
+        : { settingsOpen: true, commandPaletteOpen: false, settingsEntry: 'list' },
+    ),
+  setSettingsPage: (page) => set({ settingsPage: page }),
   openCommandPalette: () => set({ commandPaletteOpen: true }),
   closeCommandPalette: () => set({ commandPaletteOpen: false }),
   openWalkthroughFocus: () =>

@@ -9,9 +9,11 @@ import { useScmAuth } from '../../hooks/use-scm-auth'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { CREDENTIAL_SOURCE_KEY } from '../../lib/scm-labels'
 import { Button } from '../ui/Button'
+import { Callout } from '../ui/Callout'
 import { Checkbox } from '../ui/Checkbox'
 import { Input } from '../ui/Input'
-import { ScmProviderIcon } from '../ui/ScmProviderIcon'
+import { ScmRecheckButton } from './ScmRecheckButton'
+import { SettingsCardBody, SettingsGroup, SettingsRow } from './SettingsRow'
 
 /** Auth feedback for Azure DevOps (`AzureScmProvider.getAuthStatus`). */
 function AzureStatusFeedback({
@@ -20,7 +22,7 @@ function AzureStatusFeedback({
   status: ScmAuthStatus | undefined
 }): React.JSX.Element | null {
   const { t } = useTranslation()
-  if (status === undefined) return null
+  if (status === undefined) return <p className="text-xs text-muted">{t('common.loading')}</p>
   if (status.state === 'signed_in') {
     const name = status.user?.displayName ?? status.user?.login ?? t('settings.azure.unknownUser')
     const who =
@@ -58,15 +60,18 @@ function AzureStatusFeedback({
 }
 
 /**
- * The editable part. Mounted with a `key` of the saved settings, so a save
- * (or a change from elsewhere) resets the draft without a setState-in-effect.
+ * The page's form: Access (the enable checkbox, which waits for Save like
+ * the rest of the form; the sign-in help only while signed out; the auth
+ * answer with "Check again"), then the organization and projects. Mounted
+ * with a `key` of the saved settings, so a save (or a change from elsewhere)
+ * resets the draft without a setState-in-effect.
  */
 function AzureSettingsForm({
   info,
-  compact,
+  status,
 }: {
   info: ScmSettingsInfo
-  compact: boolean
+  status: ScmAuthStatus | undefined
 }): React.JSX.Element {
   const { t } = useTranslation()
   const { saveProviderSettings, error: saveError } = useScmSettings()
@@ -87,6 +92,8 @@ function AzureSettingsForm({
     organization.trim() !== (first?.organization ?? '') ||
     selected.join('\n') !== (first?.projects ?? []).join('\n') ||
     info.azureSettingsSource === 'az-cli-defaults'
+  const signedOut = status?.state === 'cli_unavailable' || status?.state === 'cli_unauthenticated'
+  const mono = <span className="font-mono text-text" />
 
   function toggleProject(name: string): void {
     setSelected((current) =>
@@ -108,140 +115,137 @@ function AzureSettingsForm({
   }
 
   return (
-    <div className="mt-3 space-y-3">
-      {/* A checkbox, not a Switch: it is part of the form below and waits for Save. */}
-      <Checkbox
-        checked={enabled}
-        onChange={(event) => setEnabled(event.target.checked)}
-        label={t('settings.azure.enable')}
-      />
+    <>
+      {info.mockScm && <Callout tone="warning">{t('settings.azure.demoMode')}</Callout>}
 
-      {info.mockScm ? (
-        <p className="text-[11px] text-muted">{t('settings.azure.demoMode')}</p>
-      ) : null}
-
-      <div>
-        <label
-          className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted"
-          htmlFor="azure-org"
-        >
-          {t('settings.azure.organization')}
-        </label>
-        <div className="flex min-w-0 items-center gap-2">
-          <Input
-            id="azure-org"
-            value={organization}
-            onChange={(event) => setOrganization(event.target.value)}
-            placeholder={t('settings.azure.organizationPlaceholder')}
-            spellCheck={false}
-            className="min-w-0 flex-1"
+      <SettingsGroup title={t('settings.scmPage.access')}>
+        <SettingsRow
+          title={t('settings.azure.enableTitle')}
+          description={t('settings.azure.enableHint')}
+          control={
+            // A checkbox, not a Switch: it is part of the form and waits for Save.
+            <Checkbox
+              fieldSize="md"
+              checked={enabled}
+              onChange={(event) => setEnabled(event.target.checked)}
+              label={<span className="sr-only">{t('settings.azure.enable')}</span>}
+            />
+          }
+        />
+        {saved.enabled && signedOut && (
+          <SettingsRow
+            title={t('settings.scmPage.signIn')}
+            description={<Trans i18nKey="settings.azure.intro" components={{ mono }} />}
           />
-          <Button
-            disabled={!orgValid || loading}
-            onClick={() => void load(organization.trim())}
-            icon={
-              loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />
-            }
-          >
-            {t('settings.azure.loadProjects')}
-          </Button>
-        </div>
-        {!compact && (
-          <p className="mt-1 text-[11px] text-muted">
+        )}
+        <SettingsRow
+          title={t('settings.scmPage.connection')}
+          description={<AzureStatusFeedback status={status} />}
+          control={<ScmRecheckButton />}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title={t('settings.azure.scopeTitle')}>
+        <SettingsRow
+          title={t('settings.azure.organization')}
+          htmlFor="azure-org"
+          description={
             <Trans
               i18nKey="settings.azure.organizationHint"
               components={{ mono: <span className="font-mono" /> }}
             />
-          </p>
-        )}
-        {projectsError && (
-          <p role="alert" className="mt-1 text-xs text-danger">
-            {projectsError}
-          </p>
-        )}
-      </div>
-
-      <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-          {t('settings.azure.projects')}
-        </h4>
-        {options.length === 0 ? (
-          <p className="text-[11px] text-muted">
-            {projects === null
-              ? t('settings.azure.loadProjectsFirst')
-              : t('settings.azure.noProjects')}
-          </p>
-        ) : (
-          <ul
-            className="max-h-48 space-y-1 overflow-auto rounded-md border border-border p-2"
-            aria-label={t('settings.azure.projectsAriaLabel')}
-          >
-            {options.map((name) => (
-              <li key={name}>
-                <Checkbox
-                  checked={selected.includes(name)}
-                  onChange={() => toggleProject(name)}
-                  label={<span className="block truncate">{name}</span>}
-                  className="min-w-0"
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-        {enabled && orgValid && selected.length === 0 && (
-          <p className="mt-1 text-[11px] text-warning">{t('settings.azure.pickProject')}</p>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Button
-          variant="primary"
-          onClick={() => void save()}
-          disabled={saving || !dirty || (organization.trim() !== '' && !orgValid)}
+          }
         >
-          {saving ? t('settings.azure.saving') : t('settings.azure.save')}
-        </Button>
-        {info.azureSettingsSource === 'az-cli-defaults' && (
-          <span className="text-[11px] text-muted">{t('settings.azure.usingAzDefaults')}</span>
-        )}
-      </div>
-      {saveError && (
-        <p role="alert" className="text-xs text-danger">
-          {saveError}
-        </p>
-      )}
-    </div>
+          <div className="flex min-w-0 items-center gap-2">
+            <Input
+              id="azure-org"
+              value={organization}
+              onChange={(event) => setOrganization(event.target.value)}
+              placeholder={t('settings.azure.organizationPlaceholder')}
+              spellCheck={false}
+              className="min-w-0 flex-1"
+            />
+            <Button
+              disabled={!orgValid || loading}
+              onClick={() => void load(organization.trim())}
+              icon={
+                loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />
+              }
+            >
+              {t('settings.azure.loadProjects')}
+            </Button>
+          </div>
+          {projectsError && (
+            <p role="alert" className="text-xs text-danger">
+              {projectsError}
+            </p>
+          )}
+        </SettingsRow>
+
+        <SettingsRow title={t('settings.azure.projects')}>
+          {options.length === 0 ? (
+            <p className="text-[11px] text-muted">
+              {projects === null
+                ? t('settings.azure.loadProjectsFirst')
+                : t('settings.azure.noProjects')}
+            </p>
+          ) : (
+            <ul
+              className="max-h-48 space-y-1 overflow-auto rounded-md border border-border bg-bg/40 p-2"
+              aria-label={t('settings.azure.projectsAriaLabel')}
+            >
+              {options.map((name) => (
+                <li key={name}>
+                  <Checkbox
+                    checked={selected.includes(name)}
+                    onChange={() => toggleProject(name)}
+                    label={<span className="block truncate">{name}</span>}
+                    className="min-w-0"
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+          {enabled && orgValid && selected.length === 0 && (
+            <p className="text-[11px] text-warning">{t('settings.azure.pickProject')}</p>
+          )}
+        </SettingsRow>
+
+        <SettingsCardBody className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="primary"
+            onClick={() => void save()}
+            disabled={saving || !dirty || (organization.trim() !== '' && !orgValid)}
+          >
+            {saving ? t('settings.azure.saving') : t('settings.azure.save')}
+          </Button>
+          {info.azureSettingsSource === 'az-cli-defaults' && (
+            <span className="text-[11px] text-muted">{t('settings.azure.usingAzDefaults')}</span>
+          )}
+          {saveError && (
+            <p role="alert" className="w-full text-xs text-danger">
+              {saveError}
+            </p>
+          )}
+        </SettingsCardBody>
+      </SettingsGroup>
+    </>
   )
 }
 
 /**
- * "Azure DevOps": auth status (from the Azure CLI's own credential, never
- * shown), an enable toggle, and the organization + projects Minerva lists
- * pull requests from.
+ * Settings › Source control › Azure DevOps: same structure as the GitHub
+ * page. Auth comes from the Azure CLI's own credential (never shown); the
+ * organization + projects say where Minerva lists pull requests from.
  */
-export function AzureDevopsSection({ compact }: { compact: boolean }): React.JSX.Element | null {
+export function AzureDevopsSection(): React.JSX.Element | null {
   const { statuses } = useScmAuth()
   const { info } = useScmSettings()
   if (info === null) return null
   const formKey = JSON.stringify(info.providers.azure) + ':' + info.azureSettingsSource
   return (
-    <div className="mt-4 border-t border-border pt-3" data-testid="azure-devops-settings">
-      <h3 className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-        <ScmProviderIcon provider="azure" size={12} />
-        Azure DevOps
-      </h3>
-      {!compact && (
-        <p className="mb-2 text-xs text-muted">
-          <Trans
-            i18nKey="settings.azure.intro"
-            components={{ mono: <span className="font-mono text-text" /> }}
-          />
-        </p>
-      )}
-      <div className="rounded-md border border-border bg-bg/40 px-2.5 py-2">
-        <AzureStatusFeedback status={statuses?.azure} />
-      </div>
-      <AzureSettingsForm key={formKey} info={info} compact={compact} />
+    <div className="flex min-w-0 flex-col gap-6" data-testid="azure-devops-settings">
+      <AzureSettingsForm key={formKey} info={info} status={statuses?.azure} />
     </div>
   )
 }

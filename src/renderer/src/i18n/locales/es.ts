@@ -1025,6 +1025,49 @@ export const es: MessageShape<typeof en> = {
     modal: {
       title: 'Configuración',
       close: 'Cerrar configuración',
+      back: 'Toda la configuración',
+      navLabel: 'Secciones de la configuración',
+      breadcrumb: 'Ruta de navegación',
+    },
+    nav: {
+      groups: {
+        sourceControl: 'Control de código',
+        ai: 'IA',
+        app: 'App',
+      },
+      pages: {
+        general: 'General',
+        appearance: 'Apariencia',
+        github: 'GitHub',
+        azure: 'Azure DevOps',
+        aiProviders: 'Proveedores',
+        aiModel: 'Modelo',
+        notifications: 'Notificaciones',
+        updates: 'Actualizaciones',
+      },
+      dot: {
+        warning: 'Requiere tu atención',
+        accent: 'Hay una actualización',
+      },
+    },
+    scmPage: {
+      access: 'Acceso',
+      connection: 'Conexión',
+      recheck: 'Volver a comprobar',
+      signIn: 'Iniciar sesión',
+    },
+    openAt: {
+      aiProviders: 'Abrir configuración de IA',
+    },
+    aiProviders: {
+      title: 'Herramientas de línea de comandos',
+      description:
+        'Minerva analiza los pull requests con tus propias sesiones de CLI; no hay claves de API de Minerva.',
+      recheckTitle: 'Estado',
+      recheckHint:
+        'El inicio de sesión ocurre en una terminal. Vuelve a comprobar después de correr el comando.',
+      howToSignIn: 'Cómo iniciar sesión',
+      notSignedIn: '{{provider}} todavía no tiene una sesión iniciada.',
     },
     appearance: {
       title: 'Apariencia',
@@ -1167,6 +1210,7 @@ export const es: MessageShape<typeof en> = {
         all: 'También comentarios nuevos en PRs que reviso.',
       },
       badge: 'Mostrar el número sin leer en el ícono de la app',
+      badgeTitle: 'Contador en el ícono de la app',
       loadError: 'No se pudo cargar la configuración de notificaciones: {{error}}',
       saveError: 'No se pudo guardar la configuración de notificaciones: {{error}}',
     },
@@ -1205,6 +1249,7 @@ export const es: MessageShape<typeof en> = {
       use: 'Usar',
       activateError: 'No se pudo activar el modelo. Inténtalo de nuevo.',
       reasoningOnActive: 'El razonamiento se configura sobre el modelo activo.',
+      title: 'Modelo',
     },
     modelOptions: {
       effort: 'Razonamiento',
@@ -1250,6 +1295,9 @@ export const es: MessageShape<typeof en> = {
       intro:
         'Minerva usa tu sesión de <mono>gh</mono> (GitHub CLI): no hay un login aparte que autorizar. Las organizaciones enterprise que bloquean apps OAuth de terceros suelen permitir GitHub CLI.',
       enable: 'Activar GitHub',
+      enableTitle: 'Listar pull requests de GitHub',
+      accountHint:
+        'Las cuentas de gh en las que iniciaste sesión. Seguir a gh cambia junto con la CLI; elegir una deja a Minerva en esa cuenta.',
       demoMode:
         'Modo demo (MINERVA_MOCK): los datos son simulados; esta configuración se aplica cuando vuelvas a los datos reales.',
       install:
@@ -1277,6 +1325,10 @@ export const es: MessageShape<typeof en> = {
       intro:
         'Minerva usa tu credencial de Azure CLI (<mono>az devops login</mono> con un PAT que tenga el alcance Code Read & Write). La credencial nunca sale del proceso principal.',
       enable: 'Activar Azure DevOps',
+      enableTitle: 'Listar pull requests de Azure DevOps',
+      enableHint:
+        'Minerva los lee con tu credencial de Azure CLI. Se aplica cuando guardas más abajo.',
+      scopeTitle: 'Organización y proyectos',
       demoMode:
         'El modo demo lista la organización simulada "contoso", sin importar lo que se guarde aquí.',
       organization: 'Organización',
@@ -1328,6 +1380,7 @@ export const es: MessageShape<typeof en> = {
       notWritable: 'Minerva no puede escribir sobre su propio archivo',
     },
     viewRelease: 'Ver la release',
+    versionTitle: 'Versión',
   },
   errors: {
     boundary: {

@@ -2,6 +2,7 @@ import { RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AI_PROVIDER_IDS, AI_PROVIDER_CATALOG } from '../../../../shared/ai-providers'
 import { CLI_META } from '../../lib/cli-meta'
+import { useAppStore } from '../../stores/app-store'
 import { Button } from '../ui/Button'
 import { Callout } from '../ui/Callout'
 
@@ -25,6 +26,7 @@ interface NoCliProvidersCardProps {
  */
 export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardProps): React.JSX.Element {
   const { t } = useTranslation()
+  const openSettings = useAppStore((s) => s.openSettings)
   return (
     <Callout tone="warning">
       <p className="mb-1 text-sm font-medium text-text">{t('didactic.noCli.title')}</p>
@@ -60,6 +62,9 @@ export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardPro
         icon={<RefreshCw size={12} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
       >
         {t('didactic.noCli.recheck')}
+      </Button>
+      <Button size="xs" variant="ghost" className="ml-1.5" onClick={() => openSettings('ai-providers')}>
+        {t('settings.openAt.aiProviders')}
       </Button>
     </Callout>
   )

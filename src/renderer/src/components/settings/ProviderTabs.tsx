@@ -48,7 +48,7 @@ export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsP
     <div
       role="tablist"
       aria-label={t('settings.providerTabs.ariaLabel')}
-      className="flex overflow-x-auto border-b border-border bg-panel px-2"
+      className="flex overflow-x-auto rounded-t-lg px-2"
     >
       {AI_PROVIDER_IDS.map((provider) => {
         const entry = info.catalog[provider]
@@ -61,7 +61,6 @@ export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsP
             key={provider}
             type="button"
             {...tabs.tabProps(provider)}
-            autoFocus={isViewed}
             className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-sm transition-colors duration-150 ${
               isViewed ? '-mb-px border-b-2 border-accent text-text' : 'text-muted hover:text-text'
             }`}

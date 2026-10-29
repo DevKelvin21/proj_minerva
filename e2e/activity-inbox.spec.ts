@@ -182,6 +182,7 @@ test('Settings → Notifications: defaults to "aimed at me", saves the level and
       .locator('button:has(svg.lucide-settings), button:has([class*="lucide-settings"])')
       .first()
       .click()
+    await window.getByTestId('settings-nav-notifications').click()
   }
   await openSettings()
   const section = window.getByTestId('notifications-section')
