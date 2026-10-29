@@ -1,11 +1,17 @@
+import { useId } from 'react'
 import { ArrowUp, Square } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { MAX_CHAT_CONTEXT_ITEMS, MAX_CHAT_MESSAGE_LEN } from '../../../../shared/chat'
 import type { RepoRef } from '../../../../shared/scm'
+import { IS_MAC, MOD_KEY_LABEL } from '../../lib/platform'
 import { isConversationBusy, useChatDraft, useChatStore } from '../../stores/chat-store'
 import { ContextChip } from './ContextChip'
 import { IconButton } from '../ui/IconButton'
+import { Kbd } from '../ui/Kbd'
 import { TextArea } from '../ui/TextArea'
+
+/** The modifier as a screen reader should say it (the visible hint shows "⌘"). */
+const MOD_KEY_NAME = IS_MAC ? 'Cmd' : 'Ctrl'
 
 interface ChatComposerProps {
   repo: RepoRef
@@ -29,6 +35,7 @@ export function ChatComposer({
   conversationId,
 }: ChatComposerProps): React.JSX.Element {
   const { t } = useTranslation()
+  const hintId = useId()
   const draft = useChatDraft(prKey)
   const sending = useChatStore((s) => s.sending[prKey] ?? false)
   const busy = useChatStore((s) =>
@@ -56,7 +63,7 @@ export function ChatComposer({
     >
       {draft.items.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] text-muted">
+          <span className="text-xs text-muted">
             {t('chat.composer.contextCount', {
               count: draft.items.length,
               max: MAX_CHAT_CONTEXT_ITEMS,
@@ -88,6 +95,7 @@ export function ChatComposer({
             submit()
           }}
           aria-label={t('chat.composer.label')}
+          aria-describedby={hintId}
           placeholder={
             conversationId ? t('chat.composer.followUpPlaceholder') : t('chat.composer.placeholder')
           }
@@ -107,13 +115,29 @@ export function ChatComposer({
             tone="primary"
             disabled={!canSend}
             label={t('chat.composer.send')}
-            icon={<ArrowUp size={15} />}
+            icon={<ArrowUp size={14} />}
           />
         )}
       </div>
-      <p className="truncate text-[11px] text-muted">
-        {busy ? t('chat.composer.busyHint') : t('chat.composer.hint')}
-      </p>
+      {busy ? (
+        <p id={hintId} className="truncate text-xs text-muted">
+          {t('chat.composer.busyHint')}
+        </p>
+      ) : (
+        <p className="flex min-w-0 items-center text-xs text-muted">
+          <span id={hintId} className="sr-only">
+            {t('chat.composer.hint', { mod: MOD_KEY_NAME })}
+          </span>
+          {/* The keys as keycaps; Kbd is aria-hidden, so readers get the line above. */}
+          <span aria-hidden className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
+            <Trans
+              i18nKey="chat.composer.hintKeys"
+              values={{ mod: MOD_KEY_LABEL }}
+              components={{ k: <Kbd>{null}</Kbd> }}
+            />
+          </span>
+        </p>
+      )}
     </form>
   )
 }

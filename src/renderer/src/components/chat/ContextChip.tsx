@@ -60,7 +60,7 @@ export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Ele
         type="button"
         onClick={jump}
         title={t('chat.chip.jump', { location })}
-        className="min-w-0 max-w-[75%] shrink-0 truncate font-mono text-text hover:text-accent hover:underline"
+        className="min-w-0 max-w-[75%] shrink-0 truncate font-mono text-text hover:underline"
       >
         {label}
       </button>
