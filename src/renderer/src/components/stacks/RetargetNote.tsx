@@ -3,6 +3,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
 import { useStacksStore } from '../../stores/stacks-store'
+import { transText } from '../../lib/trans-text'
 import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 
@@ -71,14 +72,15 @@ export function RetargetNote({
       <p className="min-w-0 flex-1">
         <Trans
           i18nKey="stacks.retarget.retargeted"
-          values={{ number: pr.number, base: pr.baseRef, oldBase }}
+          values={{ number: pr.number }}
           components={{
             pr: onOpenPr ? (
               <Button variant="link" size="xs" onClick={() => onOpenPr(pr)} />
             ) : (
               <span className="font-medium" />
             ),
-            branch: <span className="font-mono" />,
+            base: transText(pr.baseRef, 'font-mono'),
+            previous: transText(oldBase, 'font-mono'),
           }}
         />
       </p>

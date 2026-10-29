@@ -3,6 +3,7 @@ import type { ScmListError } from '../../../../shared/types'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { azDevopsLoginCommand, GH_LOGIN_COMMAND } from '../../lib/scm-connection'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
+import { transText } from '../../lib/trans-text'
 
 const MONO = <span className="font-mono text-text" />
 /** A long command (Azure's names the org URL) on its own line, wrapping anywhere. */
@@ -32,8 +33,8 @@ export function SignInHint({
       githubAccount !== null ? (
         <Trans
           i18nKey="layout.sidebar.accountNoSession"
-          values={{ account: githubAccount, command: GH_LOGIN_COMMAND }}
-          components={{ mono: MONO }}
+          values={{ command: GH_LOGIN_COMMAND }}
+          components={{ mono: MONO, account: transText(githubAccount, 'font-mono text-text') }}
         />
       ) : (
         <Trans

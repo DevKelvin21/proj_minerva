@@ -4,6 +4,7 @@ import { Trans, useTranslation } from 'react-i18next'
 import type { RepoRef } from '../../../../shared/scm'
 import { useRetarget } from '../../hooks/use-retarget'
 import { validateBranchName } from '../../lib/retarget'
+import { transText } from '../../lib/trans-text'
 import { Spinner } from '../ui/Spinner'
 import { Button } from '../ui/Button'
 import { Callout } from '../ui/Callout'
@@ -53,7 +54,7 @@ function Consequence({
   parentNumber?: number
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const branch = <span className="font-mono text-text" />
+  const branch = transText(to, 'font-mono text-text')
   return (
     <div className="flex min-w-0 flex-col gap-1 text-xs text-muted">
       <p className="flex min-w-0 flex-wrap items-center gap-1">
@@ -64,15 +65,11 @@ function Consequence({
         {parentNumber !== undefined ? (
           <Trans
             i18nKey="stacks.retarget.consequenceOrphan"
-            values={{ branch: to, parent: parentNumber }}
+            values={{ parent: parentNumber }}
             components={{ branch }}
           />
         ) : (
-          <Trans
-            i18nKey="stacks.retarget.consequenceManual"
-            values={{ branch: to }}
-            components={{ branch }}
-          />
+          <Trans i18nKey="stacks.retarget.consequenceManual" components={{ branch }} />
         )}
       </p>
     </div>
@@ -131,8 +128,7 @@ export function RetargetPanel({
         <span>
           <Trans
             i18nKey="stacks.retarget.waiting"
-            values={{ branch: state.newBase }}
-            components={{ branch: <span className="font-mono text-text" /> }}
+            components={{ branch: transText(state.newBase, 'font-mono text-text') }}
           />
         </span>
       </p>

@@ -15,6 +15,7 @@ import { Chip } from '../ui/Chip'
 import { IconButton } from '../ui/IconButton'
 import { OrphanBadge, OrphanNotice, StackStateIcon } from './StackTree'
 import { InlineError } from '../ui/InlineError'
+import { transText } from '../../lib/trans-text'
 
 function NodeChip({
   node,
@@ -191,14 +192,13 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
         {parent ? (
           <Trans
             i18nKey="stacks.context.builtOnTop"
-            values={{ number: parent.number, branch: parent.headRef }}
-            components={{ branch: <span className="font-mono" /> }}
+            values={{ number: parent.number }}
+            components={{ branch: transText(parent.headRef, 'font-mono') }}
           />
         ) : orphanIsCurrent ? null : (
           <Trans
             i18nKey="stacks.context.firstInStack"
-            values={{ base: node.baseRef }}
-            components={{ branch: <span className="font-mono" /> }}
+            components={{ base: transText(node.baseRef, 'font-mono') }}
           />
         )}
         {descendants.length > 0 && (
