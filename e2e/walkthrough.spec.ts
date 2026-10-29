@@ -123,7 +123,8 @@ test('layers view works in the narrow tier where the file column is a drawer', a
   // At this width the PR list is a drawer too (`responsive.spec.ts`).
   await window.getByRole('button', { name: 'PR list' }).click()
   await window.getByText('Fix race condition in payment webhook').first().click()
-  await window.getByText('Files').first().click()
+  // Narrow bar: the tabs show icon + count, so find Files by its accessible name.
+  await window.getByRole('tab', { name: /^Files/ }).click()
   // The column is a drawer: open it from the "N files" toolbar button. Esc
   // closes it and gives focus back to the button.
   const filesToggle = window.getByRole('button', { name: /2 files/ })
