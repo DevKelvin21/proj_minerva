@@ -1,7 +1,8 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { PullRequestSummary } from '../../../shared/types'
 import { tagKey } from '../lib/dashboard'
-import { personKey, personLabel } from '../lib/home-filter'
+import { ME_KEY, personKey, personLabel } from '../lib/home-filter'
 import { useAppStore } from '../stores/app-store'
 import { useHomeFilterStore } from '../stores/home-filter-store'
 
@@ -18,15 +19,22 @@ interface CardFilter {
  * overview, where the results are.
  */
 export function useCardFilter(): CardFilter {
+  const { t } = useTranslation()
   const navigateHome = useAppStore((s) => s.navigateHome)
   const addValue = useHomeFilterStore((s) => s.addValue)
 
   const byAuthor = useCallback(
     (pr: PullRequestSummary) => {
-      addValue('author', { key: personKey(pr.repo.provider, pr.author), label: personLabel(pr.author) })
+      // The user's own PR (main matched the identity): "Author: You", as the picker lists it.
+      addValue(
+        'author',
+        pr.viewer?.isAuthor
+          ? { key: ME_KEY, label: t('home.filterBar.me') }
+          : { key: personKey(pr.repo.provider, pr.author), label: personLabel(pr.author) },
+      )
       navigateHome({ kind: 'overview' })
     },
-    [addValue, navigateHome],
+    [addValue, navigateHome, t],
   )
 
   const byTag = useCallback(

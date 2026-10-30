@@ -78,6 +78,10 @@ test('author then tag: results, rows grouped by repo and the header sentence; a 
     await expect(authorItems.first()).toContainText('You')
     await expect(picker(page).locator(`[data-option-key="${LINUS}"]`)).toHaveText(/Linus Pauling\s*4$/)
     await expect(picker(page)).toContainText('People with open PRs')
+    // The user (Ada on contoso, mgarcia on shopwave, matched by main) is only "You".
+    await expect(authorItems.first()).toHaveText(/You\s*6$/)
+    await expect(picker(page)).not.toContainText('Ada Lovelace')
+    await expect(picker(page)).not.toContainText('mgarcia')
     await attachScreenshot(page, testInfo, 'author-picker')
     await page.keyboard.press('Escape')
     await expect(page.getByTestId('home-filter-facet-author')).toBeFocused()

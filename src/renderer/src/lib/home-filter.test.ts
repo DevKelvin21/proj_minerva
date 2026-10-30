@@ -10,6 +10,7 @@ import {
   facetOptions,
   filterChips,
   filterValueCount,
+  isSelf,
   isFilterActive,
   ME_KEY,
   newViewId,
@@ -27,6 +28,7 @@ import {
   type HomeFilter,
   type OptionLabels,
   type OptionsByFacet,
+  viewerSelf,
 } from './home-filter'
 
 const azure = (name: string): AzureRepoRef => ({
@@ -142,11 +144,11 @@ const allOptions = (): OptionsByFacet => {
 }
 
 describe('facetOptions', () => {
-  it('lists authors with counts, "You" first, then by count and name', () => {
+  it('lists authors with counts, "You" first, then by count and name, without the user again', () => {
     const options = facetOptions(PRS, 'author', ME, LABELS)
+    // Ada is the user (main set `viewer.isAuthor` on her PRs): only "You" stands for her.
     expect(options.map((o) => [o.key, o.label, o.count])).toEqual([
       [ME_KEY, 'You', 2],
-      ['azure:ada@contoso.example', 'Ada Lovelace', 2],
       ['github:dkumar', 'dkumar', 1],
       ['azure:grace@contoso.example', 'Grace Hopper', 1],
       ['azure:linus@contoso.example', 'Linus Pauling', 1],
@@ -164,13 +166,49 @@ describe('facetOptions', () => {
     ])
   })
 
-  it('lists reviewers, "You" when main says you are one', () => {
+  it('lists reviewers, "You" when main says you are one, and leaves the user out of the people', () => {
     const options = facetOptions(PRS, 'reviewer', ME, LABELS)
     expect(options.map((o) => [o.key, o.count])).toEqual([
       [ME_KEY, 2],
-      ['azure:ada@contoso.example', 2],
       ['azure:grace@contoso.example', 1],
     ])
+  })
+
+  it('learns the user only per identity scope, and only from PRs they authored', () => {
+    const otherOrg: AzureRepoRef = { ...API, organization: 'fabrikam', fullName: 'fabrikam/Platform/x' }
+    const prs = [
+      ...PRS,
+      // Same email in another organization, where the user authored nothing: another identity.
+      pr(otherOrg, 7, { author: ada, viewer: { isAuthor: false, reviewer: null } }),
+      // GitHub: the user authored nothing there, so a GitHub "ada" stays listed.
+      pr(GH, 9, {
+        author: { login: 'ada@contoso.example' },
+        reviewers: [{ user: ada, vote: 'none', isRequired: false }],
+      }),
+    ]
+    const self = viewerSelf(prs)
+    expect(isSelf(self, API, ada)).toBe(true)
+    expect(isSelf(self, otherOrg, ada)).toBe(false)
+    expect(isSelf(self, GH, ada)).toBe(false)
+    const authors = facetOptions(prs, 'author', ME, LABELS).map((o) => [o.key, o.count])
+    expect(authors).toContainEqual([ME_KEY, 2])
+    // The other org's Ada and the GitHub one are counted under their own keys (same provider key for Azure).
+    expect(authors).toContainEqual(['azure:ada@contoso.example', 1])
+    expect(authors).toContainEqual(['github:ada@contoso.example', 1])
+    const reviewers = facetOptions(prs, 'reviewer', ME, LABELS).map((o) => o.key)
+    expect(reviewers).toContain('github:ada@contoso.example')
+  })
+
+  it('keeps everyone when the user authored no open PR (nothing to infer)', () => {
+    const notMine = PRS.map((item) =>
+      item.viewer ? { ...item, viewer: { ...item.viewer, isAuthor: false } } : item,
+    )
+    expect(viewerSelf(notMine).keys.size).toBe(0)
+    const authors = facetOptions(notMine, 'author', ME, LABELS).map((o) => o.key)
+    expect(authors).toContain('azure:ada@contoso.example')
+    expect(authors).not.toContain(ME_KEY)
+    const reviewers = facetOptions(notMine, 'reviewer', ME, LABELS).map((o) => o.key)
+    expect(reviewers).toContain('azure:ada@contoso.example')
   })
 
   it('lists repositories and only the statuses somebody has, in their fixed order', () => {
@@ -191,7 +229,9 @@ describe('facetOptions', () => {
 
   it('searches by label prefix, by a word of the label, or by an alias', () => {
     const authors = facetOptions(PRS, 'author', ME, LABELS)
-    expect(searchOptions(authors, 'lov').map((o) => o.label)).toEqual(['Ada Lovelace'])
+    expect(searchOptions(authors, 'hop').map((o) => o.label)).toEqual(['Grace Hopper'])
+    // The user's own name finds "You".
+    expect(searchOptions(authors, 'lov').map((o) => o.key)).toEqual([ME_KEY])
     expect(searchOptions(authors, 'linus@').map((o) => o.label)).toEqual(['Linus Pauling'])
     expect(searchOptions(authors, 'me').map((o) => o.key)).toEqual([ME_KEY])
     expect(searchOptions(authors, '  ')).toHaveLength(authors.length)
@@ -312,9 +352,9 @@ describe('bestWithoutHint', () => {
 
 describe('parseTypedTokens', () => {
   it('turns facet:prefix into the existing value with the most PRs', () => {
-    const parsed = parseTypedTokens('author:ada tag:checkout submit', allOptions())
+    const parsed = parseTypedTokens('author:grace tag:checkout submit', allOptions())
     expect(parsed.added).toEqual([
-      { facet: 'author', value: { key: 'azure:ada@contoso.example', label: 'Ada Lovelace' } },
+      { facet: 'author', value: { key: 'azure:grace@contoso.example', label: 'Grace Hopper' } },
       { facet: 'tag', value: { key: 'checkout-v2', label: 'checkout-v2' } },
     ])
     expect(parsed.rest).toBe('submit')
@@ -332,6 +372,12 @@ describe('parseTypedTokens', () => {
       'reviewer=' + ME_KEY,
     ])
     expect(parsed.rest).toBe('')
+  })
+
+  it('resolves the user\'s own login or name to "You"', () => {
+    for (const typed of ['author:ada@contoso', 'author:ada', 'author:"ada lov"', 'reviewer:ada']) {
+      expect(parseTypedTokens(typed, allOptions()).added.map((item) => item.value.key)).toEqual([ME_KEY])
+    }
   })
 
   it('leaves unknown facets and values that match nothing as text', () => {

@@ -225,14 +225,55 @@ export interface OptionLabels {
   status: Record<StatusId, string>
 }
 
+/**
+ * Where one login names one person: the GitHub host (Minerva talks to one),
+ * or an Azure DevOps organization (the same email in another org is
+ * another identity there).
+ */
+function identityScope(repo: RepoRef): string {
+  return repo.provider === 'github' ? 'github' : 'azure:' + repo.organization.toLowerCase()
+}
+
+/**
+ * The signed-in user's own identities, learned from main's identity match:
+ * the author of every PR whose `viewer.isAuthor` is set, per identity scope.
+ * Nothing is guessed from a display name; a scope where the user authored
+ * no open PR stays unknown.
+ */
+export interface ViewerSelf {
+  /** `identityScope|login` (lowercased). */
+  keys: Set<string>
+  /** The user's logins and display names, lowercased: what `author:<you>` may type. */
+  aliases: string[]
+}
+
+export function viewerSelf(pullRequests: readonly PullRequestSummary[]): ViewerSelf {
+  const keys = new Set<string>()
+  const aliases = new Set<string>()
+  for (const pr of pullRequests) {
+    if (!pr.viewer?.isAuthor) continue
+    keys.add(identityScope(pr.repo) + '|' + pr.author.login.trim().toLowerCase())
+    aliases.add(pr.author.login.trim().toLowerCase())
+    const name = pr.author.displayName?.trim().toLowerCase()
+    if (name) aliases.add(name)
+  }
+  return { keys, aliases: [...aliases] }
+}
+
+/** `user` (on `repo`'s provider) is the signed-in user, as far as `self` knows. */
+export function isSelf(self: ViewerSelf, repo: RepoRef, user: Pick<UserRef, 'login'>): boolean {
+  return self.keys.has(identityScope(repo) + '|' + user.login.trim().toLowerCase())
+}
+
 function byCountThenLabel(a: FacetOption, b: FacetOption): number {
   return b.count - a.count || a.label.localeCompare(b.label)
 }
 
 /**
  * The values a picker lists: only what exists among the open PRs, each with
- * how many PRs have it. "You" first for Author and Reviewer; statuses in
- * their fixed order. A status nobody has is left out.
+ * how many PRs have it. "You" first for Author and Reviewer, and the
+ * user's own identities (`viewerSelf`) are not listed again among the
+ * people; statuses in their fixed order. A status nobody has is left out.
  */
 export function facetOptions(
   pullRequests: readonly PullRequestSummary[],
@@ -249,6 +290,7 @@ export function facetOptions(
       aliases: [status.toLowerCase()],
     })).filter((option) => option.count > 0)
   }
+  const self = viewerSelf(pullRequests)
   const byKey = new Map<string, FacetOption>()
   const bump = (key: string, make: () => Omit<FacetOption, 'count'>): void => {
     const existing = byKey.get(key)
@@ -262,7 +304,7 @@ export function facetOptions(
       const seen = new Set<string>()
       for (const user of users) {
         const key = personKey(provider, user)
-        if (seen.has(key)) continue
+        if (seen.has(key) || isSelf(self, pr.repo, user)) continue
         seen.add(key)
         bump(key, () => ({
           key,
@@ -273,7 +315,12 @@ export function facetOptions(
         }))
       }
       if (peopleKeys(pr, facet).has(ME_KEY)) {
-        bump(ME_KEY, () => ({ key: ME_KEY, label: labels.me, section: 'me', aliases: ['me'] }))
+        bump(ME_KEY, () => ({
+          key: ME_KEY,
+          label: labels.me,
+          section: 'me',
+          aliases: ['me', ...self.aliases],
+        }))
       }
     } else if (facet === 'tag') {
       const seen = new Set<string>()
@@ -310,8 +357,11 @@ export function searchOptions(options: readonly FacetOption[], query: string): F
 function optionStartsWith(option: FacetOption, prefix: string): boolean {
   const label = option.label.toLowerCase()
   if (label.startsWith(prefix)) return true
-  if (label.split(/[\s/_.-]+/).some((word) => word.startsWith(prefix))) return true
-  return option.aliases.some((alias) => alias.startsWith(prefix))
+  const words = (text: string): string[] => text.split(/[\s/_.@-]+/)
+  if (words(label).some((word) => word.startsWith(prefix))) return true
+  return option.aliases.some(
+    (alias) => alias.startsWith(prefix) || words(alias).some((word) => word.startsWith(prefix)),
+  )
 }
 
 // ---------------------------------------------------------------------------
