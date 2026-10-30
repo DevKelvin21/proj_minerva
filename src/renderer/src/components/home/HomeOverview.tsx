@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react'
 import { Eye, EyeOff, LogIn, PlugZap } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
 import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
+import { useHomeFilter } from '../../hooks/use-home-filter'
+import { useHomeOpenPr } from '../../hooks/use-home-open-pr'
+import { useLayoutTier } from '../../hooks/use-layout-tier'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { useStacks } from '../../hooks/use-stacks'
 import { buildFeatureGroups, summarizeRepos } from '../../lib/dashboard'
@@ -12,6 +15,9 @@ import { useDashboardStore } from '../../stores/dashboard-store'
 import { Button } from '../ui/Button'
 import { SignInHint } from '../layout/SignInHint'
 import { FeatureCard } from './FeatureCard'
+import { HomeFilterBar } from './HomeFilterBar'
+import { HomeFilterResults } from './HomeFilterResults'
+import { HomeSavedViews } from './HomeSavedViews'
 import { HomePageHeader } from './HomePageHeader'
 import { PageEmpty, PageSkeleton, ProviderErrorList, SectionEmpty, SectionHeading } from './HomeShared'
 import { RepoCard } from './RepoCard'
@@ -42,9 +48,11 @@ function Total({
 }
 
 /**
- * First screen: totals, the cross-repo features (tags shared by PRs in
- * several repos) and one card per repository. Reads the shared dashboard
- * and stacks caches; nothing here fetches twice.
+ * First screen: totals, the saved views and the filter bar, then the
+ * cross-repo features (tags shared by PRs in several repos) and one card
+ * per repository. While a filter is active the matching PRs replace both
+ * sections. Reads the shared dashboard and stacks caches; nothing here
+ * fetches twice.
  */
 export function HomeOverview(): React.JSX.Element {
   const { t } = useTranslation()
@@ -63,6 +71,9 @@ export function HomeOverview(): React.JSX.Element {
   const noProviders = enabled !== null && enabled.length === 0
   const githubAccount = scmSettings?.githubAccount ?? null
   const azureOrganization = scmSettings?.providers.azure.organizations[0]?.organization
+  const homeFilter = useHomeFilter(pullRequests ?? [], identity)
+  const { open: openPr, error: openError } = useHomeOpenPr()
+  const folded = useLayoutTier().w === 'sm'
 
   const repos = useMemo(
     () => summarizeRepos(pullRequests ?? [], stacks, identity),
@@ -138,6 +149,23 @@ export function HomeOverview(): React.JSX.Element {
     body = <InlineError message={t('home.overview.loadFailed', { error })} onRetry={refreshAll} />
   } else if (pullRequests === null) {
     body = <PageSkeleton hint={t('home.overview.loadingHint')} />
+  } else if (homeFilter.active) {
+    body = (
+      <>
+        {error && (
+          <InlineError message={t('home.overview.refreshFailed', { error })} onRetry={refreshAll} />
+        )}
+        {openError && <InlineError message={openError} />}
+        <ProviderErrorList errors={otherErrors} />
+        <HomeFilterResults
+          pullRequests={pullRequests}
+          matched={homeFilter.matched}
+          identity={identity}
+          statusLabel={homeFilter.statusLabel}
+          onOpen={(pr) => openPr(pr)}
+        />
+      </>
+    )
   } else {
     body = (
       <>
@@ -263,6 +291,14 @@ export function HomeOverview(): React.JSX.Element {
             <Total value={totals.stacks} i18nKey="stacks" />
             <Total value={totals.orphans} i18nKey="orphans" tone="text-warning" />
           </ul>
+        )}
+        {showTotals && <HomeSavedViews pullRequests={pullRequests ?? []} identity={identity} />}
+        {showTotals && (
+          <HomeFilterBar
+            options={homeFilter.options}
+            statusLabel={homeFilter.statusLabel}
+            folded={folded}
+          />
         )}
       </HomePageHeader>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">{body}</div>

@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import type { FeatureGroup } from '../../lib/dashboard'
 import { Badge } from '../ui/Badge'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
-import { SelectableCard } from '../ui/SelectableCard'
+import { useCardFilter } from '../../hooks/use-card-filter'
+import { ActionCard, CardOpenButton } from '../ui/SelectableCard'
 
 /** "x of n approved" as a thin bar (theme tokens only). */
 export function ApprovalBar({
@@ -32,8 +33,10 @@ export function ApprovalBar({
 
 /**
  * One cross-repo feature (a tag shared by PRs in several repos): its name
- * (custom or the tag), the tag chip when renamed, the repos involved, the
- * PR count and the approval progress. The whole card is a button.
+ * (custom or the tag), its tag chip, the repos involved, the PR count and
+ * the approval progress. The name opens the feature page (so does a click
+ * anywhere else on the card); the tag chip is its own button, which adds
+ * "Tag: <tag>" to the Home filter bar.
  */
 export function FeatureCard({
   group,
@@ -43,31 +46,35 @@ export function FeatureCard({
   onOpen: (featureKey: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const { byTag } = useCardFilter()
   return (
-    <SelectableCard
+    <ActionCard
       data-testid="feature-card"
       data-feature-key={group.key}
-      onClick={() => onOpen(group.key)}
+      onOpen={() => onOpen(group.key)}
       padding="md"
     >
       <span className="flex min-w-0 items-start gap-2">
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-sm font-semibold text-text" title={group.name}>
+          <CardOpenButton className="truncate text-sm font-semibold text-text" title={group.name}>
             {group.name}
-          </span>
-          <Badge
-            tone="outline"
-            size="sm"
-            className="max-w-full self-start"
-            icon={<Tag size={10} aria-hidden />}
-            title={
-              group.renamed
-                ? t('home.featureCard.renamedTitle', { tag: group.tag })
-                : t('home.featureCard.tag')
-            }
+          </CardOpenButton>
+          <button
+            type="button"
+            data-filter-tag={group.tag}
+            onClick={() => byTag(group.tag)}
+            title={t('home.cardFilter.tagged', { tag: group.tag })}
+            className="group inline-flex min-w-0 max-w-full self-start rounded-full"
           >
-            <span className="min-w-0 truncate">{group.tag}</span>
-          </Badge>
+            <Badge
+              tone="outline"
+              size="sm"
+              className="min-w-0 max-w-full group-hover:text-text group-hover:ring-accent/60"
+              icon={<Tag size={10} aria-hidden />}
+            >
+              <span className="min-w-0 truncate">{group.tag}</span>
+            </Badge>
+          </button>
         </span>
         {group.needsMyReview > 0 && (
           <Badge tone="warning" size="sm">
@@ -103,6 +110,6 @@ export function FeatureCard({
           {t('home.featureCard.approved', { approved: group.approved, total: group.prCount })}
         </span>
       </span>
-    </SelectableCard>
+    </ActionCard>
   )
 }

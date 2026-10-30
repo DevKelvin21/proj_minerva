@@ -1,8 +1,10 @@
 import { GitPullRequest, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
-import type { PullRequestSummary, ReviewDecision } from '../../../../shared/types'
+import type { PrLabel, PullRequestSummary, ReviewDecision } from '../../../../shared/types'
+import { useCardFilter } from '../../hooks/use-card-filter'
 import { isUnread, needsMyReview, type ViewerIdentity } from '../../lib/dashboard'
+import { personLabel } from '../../lib/home-filter'
 import { labelStyle } from '../../lib/label-colors'
 import { reviewDecisionLabelKey } from '../../lib/scm-labels'
 import { Avatar } from '../ui/Avatar'
@@ -10,7 +12,7 @@ import { Badge, type BadgeTone } from '../ui/Badge'
 import { CiStatusIcon } from '../ui/CiStatusIcon'
 import { Spinner } from '../ui/Spinner'
 import { DiffStat } from '../ui/DiffStat'
-import { SelectableCard } from '../ui/SelectableCard'
+import { ActionCard, CardOpenButton } from '../ui/SelectableCard'
 import { OrphanBadge } from '../stacks/StackTree'
 
 const MAX_LABELS = 3
@@ -84,6 +86,49 @@ export function RoleBadges({
   )
 }
 
+/**
+ * A tag on a Home card as a button: one click adds "Tag: <name>" to the Home
+ * filter. Same pill as a static tag, with a hover ring.
+ */
+export function TagFilterButton({
+  label,
+  onFilter,
+  className = '',
+}: {
+  label: PrLabel
+  onFilter: (tag: string) => void
+  className?: string
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const dot = labelStyle(label.color)
+  return (
+    <button
+      type="button"
+      data-filter-tag={label.name}
+      onClick={() => onFilter(label.name)}
+      title={t('home.cardFilter.tagged', { tag: label.name })}
+      className={`group inline-flex min-w-0 max-w-[9rem] rounded-full ${className}`}
+    >
+      <Badge
+        tone="outline"
+        size="sm"
+        className="min-w-0 max-w-full group-hover:text-text group-hover:ring-accent/60"
+        icon={
+          dot ? (
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: dot.backgroundColor }}
+            />
+          ) : undefined
+        }
+      >
+        <span className="min-w-0 truncate">{label.name}</span>
+      </Badge>
+    </button>
+  )
+}
+
 interface PrCardProps {
   pr: PullRequestSummary
   identity: ViewerIdentity
@@ -100,8 +145,10 @@ interface PrCardProps {
 /**
  * One pull request as a card (stack board, repo page list, feature page).
  * Dense: number + title, author + CI + review state + size, then the
- * viewer's role, the orphan flag and the first tags. The whole card is one
- * button (keyboard reachable); the full title lives in `title`.
+ * viewer's role, the orphan flag and the first tags. The title is the
+ * card's button (a click anywhere else on the card opens it too); the
+ * author and the tags are their own buttons, which add that filter to the
+ * Home filter bar. The full title lives in `title`.
  */
 export function PrCard({
   pr,
@@ -113,23 +160,24 @@ export function PrCard({
   testId = 'pr-card',
 }: PrCardProps): React.JSX.Element {
   const { t } = useTranslation()
+  const { byAuthor, byTag } = useCardFilter()
   const unread = isUnread(pr)
   const labels = pr.labels ?? []
   const shownLabels = labels.slice(0, MAX_LABELS)
   const hiddenLabels = labels.length - shownLabels.length
-  const authorName = pr.author.displayName ?? pr.author.login
+  const authorName = personLabel(pr.author)
 
   return (
-    <SelectableCard
+    <ActionCard
       data-testid={testId}
       data-pr-key={prKey(pr.repo, pr.number)}
       data-dimmed={dimmed || undefined}
-      onClick={() => onOpen(pr)}
-      disabled={pending}
+      onOpen={() => onOpen(pr)}
+      busy={pending}
       title={'#' + pr.number + ' ' + pr.title}
-      className={dimmed ? 'opacity-45 hover:opacity-100 focus-visible:opacity-100' : ''}
+      className={dimmed ? 'opacity-45 hover:opacity-100 focus-within:opacity-100' : ''}
     >
-      <span className="flex min-w-0 items-start gap-1.5">
+      <CardOpenButton disabled={pending} className="flex items-start gap-1.5">
         {pending ? (
           <Spinner size={14} className="mt-0.5" />
         ) : (
@@ -153,12 +201,18 @@ export function PrCard({
             title={t('home.prCard.unread')}
           />
         )}
-      </span>
+      </CardOpenButton>
       <span className="flex min-w-0 items-center gap-2 text-[11px] text-muted">
-        <Avatar user={pr.author} size={14} />
-        <span className="min-w-0 truncate" title={authorName}>
-          {authorName}
-        </span>
+        <button
+          type="button"
+          data-filter-author
+          onClick={() => byAuthor(pr)}
+          title={t('home.cardFilter.byAuthor', { name: authorName })}
+          className="inline-flex min-w-0 items-center gap-1.5 rounded decoration-border underline-offset-2 hover:text-text hover:underline hover:decoration-dotted"
+        >
+          <Avatar user={pr.author} size={14} />
+          <span className="min-w-0 truncate">{authorName}</span>
+        </button>
         <CiStatusIcon status={pr.ciStatus} size={12} />
         {pr.reviewDecision && (
           <span
@@ -189,29 +243,9 @@ export function PrCard({
             </Badge>
           )}
           {orphan && <OrphanBadge />}
-          {shownLabels.map((label) => {
-            const dot = labelStyle(label.color)
-            return (
-              <Badge
-                key={label.name}
-                tone="outline"
-                size="sm"
-                className="max-w-[9rem]"
-                title={label.name}
-                icon={
-                  dot ? (
-                    <span
-                      aria-hidden
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: dot.backgroundColor }}
-                    />
-                  ) : undefined
-                }
-              >
-                <span className="min-w-0 truncate">{label.name}</span>
-              </Badge>
-            )
-          })}
+          {shownLabels.map((label) => (
+            <TagFilterButton key={label.name} label={label} onFilter={byTag} />
+          ))}
           {hiddenLabels > 0 && (
             <span
               className="text-[10px] text-muted"
@@ -222,6 +256,6 @@ export function PrCard({
           )}
         </span>
       )}
-    </SelectableCard>
+    </ActionCard>
   )
 }
