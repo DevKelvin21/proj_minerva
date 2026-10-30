@@ -197,6 +197,20 @@ body {
 }
 
 /*
+ * A card with a main button and other controls inside (`ActionCard` in
+ * `ui/SelectableCard.tsx`): the ring of its main button goes around the
+ * whole card.
+ */
+.card-open:focus-visible {
+  outline: none;
+}
+
+.card-host:has(.card-open:focus-visible) {
+  outline: 2px solid var(--theme-focus);
+  outline-offset: 2px;
+}
+
+/*
  * Frameless window (`main/windows/title-bar.ts`): the title bar drags the
  * window and every control in it opts out, as does any popover opened from
  * it (`data-no-drag`), so clicks reach them instead of moving the window.
