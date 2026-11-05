@@ -211,13 +211,30 @@ async function main() {
     entries.filter((e) => m.mapChangeStatus(e.changeType) === 'removed' && e.item.objectId).length,
   )
 
+  // Same read as AzureScmProvider.getCommentThreads: threads as of the latest
+  // iteration, then mapThread + outdated + origin.
   const rawThreads = (
     await client.json(
       org,
       m.gitRepoUrl(org, project, repo.repositoryId, 'pullRequests', prId, 'threads'),
+      { query: { $iteration: latest.id, $baseIteration: 0 } },
     )
   ).value
-  const threads = m.mapThreads(rawThreads)
+  const commits = new Map()
+  for (const it of iterations) {
+    const sha = it.sourceRefCommit?.commitId
+    if (sha && /^[0-9a-f]{40}$/i.test(sha)) commits.set(it.id, sha.toLowerCase())
+  }
+  const latestPaths = new Set(changes.map((c) => c.path))
+  const threads = []
+  for (const raw of rawThreads) {
+    const th = m.mapThread(raw, repo, summary.number)
+    if (!th) continue
+    if (m.isThreadOutdated(th, m.threadAnchor(raw), latest.id, latestPaths)) th.isOutdated = true
+    const origin = m.threadOrigin(raw, th, commits, latest.id)
+    if (origin) th.origin = origin
+    threads.push(th)
+  }
   ok('threads raw / mapped', rawThreads.length + ' / ' + threads.length)
   ok(
     'thread status',
@@ -234,7 +251,8 @@ async function main() {
         ),
       ),
   )
-  ok('threads w/ iteration ctx', threads.filter((th) => th.iteration).length)
+  ok('outdated threads', threads.filter((th) => th.isOutdated).length)
+  ok('threads w/ origin', threads.filter((th) => th.origin).length)
   ok('replies (comments>1)', threads.filter((th) => th.comments.length > 1).length)
 
   console.log('== patches (up to 3 files)')
