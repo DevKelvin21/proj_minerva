@@ -360,7 +360,9 @@ describe('thread origins and reading a file at one', () => {
       originalLine: 14,
       originalStartLine: 12,
       diffSide: 'RIGHT' as 'LEFT' | 'RIGHT',
-      originalCommit: { oid: origin.toUpperCase() } as { oid: string } | null,
+      rootComment: { nodes: [{ originalCommit: { oid: origin.toUpperCase() } }] } as {
+        nodes: Array<{ originalCommit: { oid: string } | null }>
+      } | null,
     }
     expect(reviewThreadOrigin(node)).toEqual({ commit: origin, line: 12, lineEnd: 14 })
     expect(reviewThreadOrigin({ ...node, originalStartLine: null })).toEqual({
@@ -368,8 +370,12 @@ describe('thread origins and reading a file at one', () => {
       line: 14,
     })
     expect(reviewThreadOrigin({ ...node, diffSide: 'LEFT' })).toBeUndefined()
-    expect(reviewThreadOrigin({ ...node, originalCommit: { oid: 'abc1234' } })).toBeUndefined()
-    expect(reviewThreadOrigin({ ...node, originalCommit: null })).toBeUndefined()
+    expect(reviewThreadOrigin({ ...node, rootComment: { nodes: [{ originalCommit: { oid: 'abc1234' } }] } })).toBeUndefined()
+    expect(
+      reviewThreadOrigin({ ...node, rootComment: { nodes: [{ originalCommit: null }] } }),
+    ).toBeUndefined()
+    expect(reviewThreadOrigin({ ...node, rootComment: { nodes: [] } })).toBeUndefined()
+    expect(reviewThreadOrigin({ ...node, rootComment: null })).toBeUndefined()
   })
 
   function contentClient(prCommits: string[], missing = false) {
@@ -384,7 +390,13 @@ describe('thread origins and reading a file at one', () => {
       repository: {
         pullRequest: {
           reviewThreads: {
-            nodes: [{ ...thread, originalCommit: { oid: origin }, comments: { nodes: [] } }],
+            nodes: [
+              {
+                ...thread,
+                rootComment: { nodes: [{ originalCommit: { oid: origin } }] },
+                comments: { nodes: [] },
+              },
+            ],
           },
           comments: { nodes: [] },
         },
