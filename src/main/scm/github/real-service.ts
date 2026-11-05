@@ -196,8 +196,12 @@ interface ReviewThreadNode {
   line: number | null
   originalLine: number | null
   originalStartLine?: number | null
-  /** The PR head commit the thread was written on (absent in old fixtures). */
-  originalCommit?: { oid: string } | null
+  /**
+   * The thread's first comment, aliased: only it carries `originalCommit` (the
+   * PR head the thread was written on). `PullRequestReviewThread` has no such
+   * field; asking for one fails the whole query. Absent in old fixtures.
+   */
+  rootComment?: { nodes: Array<{ originalCommit: { oid: string } | null }> } | null
   diffSide: 'LEFT' | 'RIGHT' | null
   comments: { nodes: GraphqlCommentNode[] }
 }
@@ -314,7 +318,7 @@ const PULL_REQUEST_THREADS_QUERY = `
             line
             originalLine
             originalStartLine
-            originalCommit { oid }
+            rootComment: comments(first: 1) { nodes { originalCommit { oid } } }
             diffSide
             comments(first: 100) {
               nodes { id body createdAt isMinimized url viewerDidAuthor author { login avatarUrl } }
@@ -346,7 +350,8 @@ const ADD_REVIEW_THREAD_REPLY_MUTATION = `
 `
 
 const REVIEW_THREAD_FIELDS =
-  ' id isResolved isOutdated path line originalLine originalStartLine originalCommit { oid } diffSide' +
+  ' id isResolved isOutdated path line originalLine originalStartLine diffSide' +
+  ' rootComment: comments(first: 1) { nodes { originalCommit { oid } } }' +
   ' comments(first: 100) {' +
   '   nodes { id body createdAt isMinimized url viewerDidAuthor author { login avatarUrl } }' +
   ' }'
@@ -626,12 +631,12 @@ function mapGraphqlCommentToPrComment(comment: GraphqlCommentNode): PrComment {
 }
 
 /**
- * Where a RIGHT-side review thread was written: `originalCommit` and its
- * `originalStartLine..originalLine` there. LEFT-side threads refer to the
- * base of that diff, which GitHub does not name: none.
+ * Where a RIGHT-side review thread was written: its first comment's
+ * `originalCommit` and the thread's `originalStartLine..originalLine` there.
+ * LEFT-side threads refer to the base of that diff, which GitHub does not name: none.
  */
 export function reviewThreadOrigin(node: ReviewThreadNode): ThreadOrigin | undefined {
-  const commit = node.originalCommit?.oid
+  const commit = node.rootComment?.nodes[0]?.originalCommit?.oid
   const end = node.originalLine
   if (node.diffSide === 'LEFT' || !commit || !FULL_COMMIT_SHA_RE.test(commit)) return undefined
   if (typeof end !== 'number' || !Number.isInteger(end) || end < 1) return undefined
@@ -811,6 +816,23 @@ const DISABLE_AUTO_MERGE_MUTATION = `
     }
   }
 `
+
+/**
+ * Every GraphQL document this service sends, for the schema test
+ * (`github-graphql-schema.test.ts`): fixtures cannot catch a field GitHub does
+ * not have, and GitHub then rejects the whole request.
+ */
+export const GITHUB_GRAPHQL_DOCUMENTS: Readonly<Record<string, string>> = {
+  SEARCH_PULL_REQUESTS_QUERY,
+  PULL_REQUEST_DETAIL_QUERY,
+  PULL_REQUEST_THREADS_QUERY,
+  ADD_REVIEW_THREAD_REPLY_MUTATION,
+  RESOLVE_REVIEW_THREAD_MUTATION,
+  UNRESOLVE_REVIEW_THREAD_MUTATION,
+  REVIEW_THREAD_OWNER_QUERY,
+  ENABLE_AUTO_MERGE_MUTATION,
+  DISABLE_AUTO_MERGE_MUTATION,
+}
 
 /** GitHub's own one-line reason (REST `message` or the first GraphQL error), capped. */
 function githubReason(error: unknown): string {
