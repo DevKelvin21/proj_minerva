@@ -1,4 +1,5 @@
-import { AlignJustify, Columns2, Files, WrapText } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { DiffFile } from '../../../../shared/types'
 import type { DiffViewMode } from '../../stores/app-store'
@@ -53,7 +54,7 @@ export function DiffToolbar({
               : 'border-border text-muted hover:border-accent/40 hover:text-text'
           }`}
         >
-          <Files size={13} />
+          <Icon icon={icons.changedFiles} size="sm" />
           {fileTreeToggle.count}
         </button>
       )}
@@ -76,7 +77,7 @@ export function DiffToolbar({
 
       <div className="flex shrink-0 gap-0.5 border-l border-border pl-2">
         <IconButton
-          icon={<Columns2 size={15} />}
+          icon={<Icon icon={icons.splitView} size="md" />}
           label={
             splitTooNarrow
               ? t('prDetail.toolbar.splitTooNarrow', { width: SPLIT_DIFF_MIN_WIDTH })
@@ -87,13 +88,13 @@ export function DiffToolbar({
           onClick={() => onModeChange('split')}
         />
         <IconButton
-          icon={<AlignJustify size={15} />}
+          icon={<Icon icon={icons.unifiedView} size="md" />}
           label={t('prDetail.toolbar.inline')}
           active={mode === 'inline'}
           onClick={() => onModeChange('inline')}
         />
         <IconButton
-          icon={<WrapText size={15} />}
+          icon={<Icon icon={icons.wrapLines} size="md" />}
           label={t('prDetail.toolbar.wordWrap')}
           active={wordWrap}
           onClick={onToggleWordWrap}

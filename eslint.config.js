@@ -45,6 +45,41 @@ export default tseslint.config(
     },
   },
   {
+    // One way into the icon set: a meaning from `components/ui/icons.ts`,
+    // rendered by `<Icon icon={icons.retry} size="sm" />` (`ui/Icon.tsx`,
+    // whose `IconSize` type also rules out pixel sizes and stroke widths).
+    // The logos set is banned statically too: it adds ~7 MB (CLAUDE.md
+    // gotcha 7); MermaidDiagram loads it with a dynamic `import()`, which
+    // this rule does not see, and provider logos are copied into `ui/provider-marks.ts`.
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    ignores: ['src/renderer/src/components/ui/icons.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'lucide-react',
+              message:
+                "Use the icon registry: import { icons } from 'components/ui/icons' and render <Icon icon={icons.<meaning>} size=\"xs|sm|md|lg\" /> from 'components/ui/Icon'. If no meaning fits, add one key to icons.ts.",
+            },
+            {
+              name: '@iconify-json/logos',
+              message:
+                'Never import the logos set statically (~7 MB, CLAUDE.md gotcha 7). Provider logos live in components/ui/provider-marks.ts.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['lucide-react/*', '@iconify-json/logos/*'],
+              message: 'Use components/ui/icons.ts (UI icons) or components/ui/provider-marks.ts (provider logos).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // UI text goes through `t()` (src/renderer/src/i18n): no literal text in
     // JSX, nor in the attributes users read (tooltips, labels, placeholders).
     files: ['src/renderer/src/**/*.tsx'],

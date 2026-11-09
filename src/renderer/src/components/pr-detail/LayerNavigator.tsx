@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { MessageSquare, Sparkles, Workflow } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { CommentThread, DiffFile, WalkthroughCohort } from '../../../../shared/types'
 import type { WalkthroughStatus } from '../../hooks/use-walkthrough'
 import type { LayerVerdict } from '../../stores/app-store'
@@ -78,7 +79,7 @@ export function LayerNavigator({
     return (
       <div className="flex flex-col gap-3 p-3" data-testid="layers-loading">
         <p className="flex items-center gap-2 text-xs text-muted">
-          <Spinner size={13} />
+          <Spinner size="sm" />
           {status === 'checking' ? t('prDetail.layers.checking') : t('prDetail.layers.analyzing')}
         </p>
         <Skeleton className="h-10" />
@@ -92,7 +93,7 @@ export function LayerNavigator({
     return (
       <div className="flex flex-col gap-2 p-3" data-testid="layers-placeholder">
         <p className="flex items-center gap-1.5 text-sm font-medium text-text">
-          <Sparkles size={14} className="text-muted" aria-hidden />
+          <Icon icon={icons.ai} size="sm" className="text-muted" />
           {missing ? t('prDetail.layers.missingTitle') : t('prDetail.layers.placeholderTitle')}
         </p>
         <p className="text-xs text-muted">
@@ -112,7 +113,7 @@ export function LayerNavigator({
     <nav aria-label={t('prDetail.layers.title')} className="flex flex-col py-1" data-testid="layer-navigator">
       {status === 'streaming' && (
         <p className="flex items-center gap-1.5 px-3 py-1 text-[11px] text-muted">
-          <Spinner size={11} />
+          <Spinner size="xs" />
           {t('prDetail.layers.streaming')}
         </p>
       )}
@@ -159,11 +160,11 @@ export function LayerNavigator({
                         <span>{t('prDetail.layers.fileCount', { count: known })}</span>
                         {comments > 0 && (
                           <span className="flex items-center gap-0.5">
-                            <MessageSquare size={10} />
+                            <Icon icon={icons.comment} size="xs" />
                             {t('prDetail.layers.commentCount', { count: comments })}
                           </span>
                         )}
-                        {layer.mermaid && <Workflow size={10} aria-hidden />}
+                        {layer.mermaid && <Icon icon={icons.diagram} size="xs" />}
                       </span>
                     </span>
                   </button>

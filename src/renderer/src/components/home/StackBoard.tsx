@@ -1,4 +1,5 @@
-import { GitBranch, Play } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { PrStack, StackNode } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
@@ -203,7 +204,7 @@ function StackRow({
           disabled={ctx.pendingKey === stack.root.prKey}
           title={t('home.stackBoard.reviewStackTitle')}
           className="ml-auto"
-          icon={<Play size={12} aria-hidden />}
+          icon={<Icon icon={icons.start} size="xs" />}
         >
           {t('home.stackBoard.reviewStack')}
         </Button>
@@ -214,7 +215,7 @@ function StackRow({
             tone="outline"
             data-testid="stack-base"
             title={t('home.stackBoard.base', { branch: stack.root.baseRef })}
-            icon={<GitBranch size={11} aria-hidden />}
+            icon={<Icon icon={icons.branch} size="xs" />}
             className={`font-mono ${horizontal ? 'mt-3.5' : 'ml-3 self-start'}`}
           >
             {stack.root.baseRef}

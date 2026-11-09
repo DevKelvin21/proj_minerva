@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderTree, Layers, List } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { DiffFile } from '../../../../shared/types'
 import type { FileTreeMode } from '../../stores/app-store'
 import { buildFileTree } from '../../lib/file-tree'
@@ -67,19 +68,19 @@ export function FileTree({
         </span>
         <div className="flex gap-0.5">
           <IconButton
-            icon={<FolderTree size={15} />}
+            icon={<Icon icon={icons.treeView} size="md" />}
             label={t('prDetail.fileTree.treeView')}
             active={mode === 'tree'}
             onClick={() => onModeChange('tree')}
           />
           <IconButton
-            icon={<List size={15} />}
+            icon={<Icon icon={icons.listView} size="md" />}
             label={t('prDetail.fileTree.listView')}
             active={mode === 'list'}
             onClick={() => onModeChange('list')}
           />
           <IconButton
-            icon={<Layers size={15} />}
+            icon={<Icon icon={icons.walkthrough} size="md" />}
             label={t('prDetail.fileTree.layersView')}
             active={mode === 'layers'}
             onClick={() => onModeChange('layers')}

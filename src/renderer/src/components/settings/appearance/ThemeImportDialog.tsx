@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Download, FileJson, Search } from 'lucide-react'
+import { Icon } from '../../ui/Icon'
+import { icons } from '../../ui/icons'
 import {
   importCustomThemes,
   pickTheme,
@@ -118,7 +119,7 @@ function FileImport({ onDone }: { onDone: () => void }): React.JSX.Element {
       <p className="text-xs text-muted">{t('settings.appearance.import.fileHint')}</p>
       {/* The file input is visually hidden, so the label shows its keyboard focus. */}
       <label className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-text outline-focus hover:bg-border/40 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
-        <FileJson size={12} aria-hidden />
+        <Icon icon={icons.jsonFile} size="xs" />
         {t('settings.appearance.import.pickFile')}
         <input
           type="file"
@@ -267,7 +268,7 @@ function OpenVsxImport(): React.JSX.Element {
           variant="primary"
           data-testid="open-vsx-search"
           disabled={searching || query.trim().length === 0}
-          icon={<Search size={12} aria-hidden />}
+          icon={<Icon icon={icons.search} size="xs" />}
         >
           {searching
             ? t('settings.appearance.import.openVsx.searching')
@@ -312,7 +313,7 @@ function OpenVsxImport(): React.JSX.Element {
               data-testid="open-vsx-install"
               disabled={installing !== null}
               onClick={() => void install(extension)}
-              icon={<Download size={12} aria-hidden />}
+              icon={<Icon icon={icons.download} size="xs" />}
             >
               {installing === extension.id
                 ? t('settings.appearance.import.openVsx.installing')

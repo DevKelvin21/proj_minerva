@@ -1,16 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  Check,
-  CircleX,
-  Eye,
-  GitPullRequestDraft,
-  Search,
-  Tag,
-  ThumbsUp,
-  TriangleAlert,
-  User,
-} from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { searchOptions, type FacetId, type FacetOption, type StatusId } from '../../lib/home-filter'
 import { placeMenu, rovingTarget, type MenuPlacement } from '../../lib/roving-focus'
@@ -19,23 +10,23 @@ import { Input } from '../ui/Input'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 
 const STATUS_ICON: Record<StatusId, React.JSX.Element> = {
-  waitingOnMe: <Eye size={12} aria-hidden className="text-muted" />,
-  draft: <GitPullRequestDraft size={12} aria-hidden className="text-muted" />,
-  changesRequested: <TriangleAlert size={12} aria-hidden className="text-warning" />,
-  approved: <ThumbsUp size={12} aria-hidden className="text-success" />,
-  ciFailing: <CircleX size={12} aria-hidden className="text-danger" />,
+  waitingOnMe: <Icon icon={icons.reviewRequested} size="xs" className="text-muted" />,
+  draft: <Icon icon={icons.pullRequestDraft} size="xs" className="text-muted" />,
+  changesRequested: <Icon icon={icons.changesRequested} size="xs" className="text-warning" />,
+  approved: <Icon icon={icons.approved} size="xs" className="text-success" />,
+  ciFailing: <Icon icon={icons.error} size="xs" className="text-danger" />,
   unread: <span aria-hidden className="mx-[3px] h-1.5 w-1.5 rounded-full bg-danger" />,
 }
 
 /** The small picture before an option: avatar, tag, provider or status glyph. */
 export function OptionLead({ facet, option }: { facet: FacetId; option: FacetOption }): React.JSX.Element {
   if (facet === 'status') return STATUS_ICON[option.key as StatusId] ?? <span aria-hidden />
-  if (facet === 'tag') return <Tag size={12} aria-hidden className="text-muted" />
-  if (facet === 'repo' && option.repo) return <ScmProviderIcon provider={option.repo.provider} size={12} />
+  if (facet === 'tag') return <Icon icon={icons.tag} size="xs" className="text-muted" />
+  if (facet === 'repo' && option.repo) return <ScmProviderIcon provider={option.repo.provider} size="xs" />
   if (option.user) return <Avatar user={option.user} size={16} />
   return (
     <span aria-hidden className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-accent/15 text-accent">
-      <User size={10} />
+      <Icon icon={icons.user} size="xs" />
     </span>
   )
 }
@@ -48,7 +39,7 @@ function CheckMark({ on }: { on: boolean }): React.JSX.Element {
         on ? 'border-accent bg-accent text-accent-fg' : 'border-border bg-panel'
       }`}
     >
-      {on && <Check size={10} strokeWidth={3} />}
+      {on && <Icon icon={icons.check} size="xs" />}
     </span>
   )
 }
@@ -219,7 +210,7 @@ export function FilterPicker({
           ref={searchRef}
           type="search"
           fieldSize="sm"
-          icon={<Search size={12} />}
+          icon={<Icon icon={icons.search} size="xs" />}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={onSearchKeyDown}

@@ -1,5 +1,6 @@
 import type { KeyboardEvent, ReactNode } from 'react'
-import { Bell, Cpu, Download, Palette, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { rovingTarget } from '../../lib/roving-focus'
 import {
@@ -11,14 +12,14 @@ import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 import { useSettingsPageLabel } from './use-settings-page-label'
 
 const PAGE_ICON: Record<SettingsPageId, ReactNode> = {
-  general: <SlidersHorizontal size={14} aria-hidden />,
-  appearance: <Palette size={14} aria-hidden />,
-  github: <ScmProviderIcon provider="github" size={14} />,
-  azure: <ScmProviderIcon provider="azure" size={14} />,
-  'ai-providers': <Cpu size={14} aria-hidden />,
-  'ai-model': <Sparkles size={14} aria-hidden />,
-  notifications: <Bell size={14} aria-hidden />,
-  updates: <Download size={14} aria-hidden />,
+  general: <Icon icon={icons.preferences} size="sm" />,
+  appearance: <Icon icon={icons.appearance} size="sm" />,
+  github: <ScmProviderIcon provider="github" size="sm" />,
+  azure: <ScmProviderIcon provider="azure" size="sm" />,
+  'ai-providers': <Icon icon={icons.aiProvider} size="sm" />,
+  'ai-model': <Icon icon={icons.ai} size="sm" />,
+  notifications: <Icon icon={icons.inbox} size="sm" />,
+  updates: <Icon icon={icons.download} size="sm" />,
 }
 
 const DOT_CLASS: Record<SettingsDot, string> = {

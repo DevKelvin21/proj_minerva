@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Layers, RefreshCw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey, type PrStack, type StackNode } from '../../../../shared/scm'
 import type { PullRequestSummary, ScmListError } from '../../../../shared/types'
@@ -69,7 +70,7 @@ function StackCard({
       className="min-w-0"
     >
       <header className="flex min-w-0 items-center gap-1.5 px-3 pb-0.5 pt-2 text-[11px] text-muted">
-        <ScmProviderIcon provider={stack.repo.provider} size={11} />
+        <ScmProviderIcon provider={stack.repo.provider} size="xs" />
         <span className="min-w-0 truncate" title={stack.repo.fullName}>
           {stack.repo.fullName}
         </span>
@@ -107,7 +108,7 @@ function GroupBlock({
       {group.label !== null && (
         <div className="flex min-w-0 flex-col px-3 pt-2">
           <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-text">
-            <Layers size={12} className="shrink-0 text-accent" aria-hidden />
+            <Icon icon={icons.stack} size="xs" className="shrink-0 text-muted" />
             <span className="min-w-0 truncate" title={group.label}>
               {group.label}
             </span>
@@ -210,7 +211,7 @@ export function StacksView({ pullRequests, onSelectPr }: StacksViewProps): React
           </span>
         )}
         <IconButton
-          icon={<RefreshCw size={14} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
+          icon={<Icon icon={icons.reload} size="sm" className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
           label={t('stacks.view.refresh')}
           onClick={refresh}
           disabled={loading}

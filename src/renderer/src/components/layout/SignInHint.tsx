@@ -61,7 +61,7 @@ export function SignInHint({
       className="flex w-full flex-col items-center gap-1 text-sm text-muted"
     >
       <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-        <ScmProviderIcon provider={error.provider} size={12} />
+        <ScmProviderIcon provider={error.provider} size="xs" />
         {SCM_PROVIDER_LABEL[error.provider]}
       </span>
       <p className="break-words">{body}</p>

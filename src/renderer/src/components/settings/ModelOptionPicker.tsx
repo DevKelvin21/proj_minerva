@@ -84,7 +84,7 @@ export function ModelOptionPicker({
                     selected={checked}
                     disabled={savingValue !== null}
                     onClick={() => void handleSelect(descriptor.id, choice.value)}
-                    icon={isSaving ? <Spinner size={11} /> : undefined}
+                    icon={isSaving ? <Spinner size="xs" /> : undefined}
                   >
                     {choiceLabel(t, choice)}
                   </Chip>

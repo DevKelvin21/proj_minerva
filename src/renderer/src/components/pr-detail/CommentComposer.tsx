@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Lightbulb } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { buildSuggestionBlock, insertSuggestion } from '../../lib/suggestions'
 import { errorText } from '../../lib/error-text'
 import { MOD_KEY_LABEL } from '../../lib/platform'
@@ -196,7 +197,7 @@ export function CommentComposer({
                   : t('comments.composer.insertSuggestionTitle')
               }
               className="mr-auto"
-              icon={<Lightbulb size={12} aria-hidden />}
+              icon={<Icon icon={icons.suggestion} size="xs" />}
             >
               {inserting
                 ? t('comments.composer.loadingLines')

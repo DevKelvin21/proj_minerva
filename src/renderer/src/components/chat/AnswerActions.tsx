@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Check, ChevronDown, Copy, MessageSquarePlus, Reply } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { ChatContextItem } from '../../../../shared/chat'
 import { answerDraft } from '../../lib/chat-draft'
@@ -93,9 +94,9 @@ export function AnswerActions({ text, context }: AnswerActionsProps): React.JSX.
   const targetLabel = (target: Target): string => target.label
   const targetIcon = (target: Target): React.JSX.Element =>
     target.kind === 'comment' ? (
-      <MessageSquarePlus size={12} aria-hidden />
+      <Icon icon={icons.addComment} size="xs" />
     ) : (
-      <Reply size={12} aria-hidden />
+      <Icon icon={icons.reply} size="xs" />
     )
 
   return (
@@ -120,9 +121,9 @@ export function AnswerActions({ text, context }: AnswerActionsProps): React.JSX.
             onSelect: () => run(target),
           }))}
           trigger={(props) => (
-            <Button size="xs" icon={<MessageSquarePlus size={12} aria-hidden />} {...props}>
+            <Button size="xs" icon={<Icon icon={icons.addComment} size="xs" />} {...props}>
               {t('chat.answer.useAs')}
-              <ChevronDown size={12} aria-hidden />
+              <Icon icon={icons.dropdown} size="xs" />
             </Button>
           )}
         />
@@ -131,7 +132,7 @@ export function AnswerActions({ text, context }: AnswerActionsProps): React.JSX.
         size="xs"
         onClick={() => void copy()}
         label={t('chat.answer.copy')}
-        icon={copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+        icon={copied ? <Icon icon={icons.check} size="xs" className="text-success" /> : <Icon icon={icons.copy} size="xs" />}
       />
     </div>
   )

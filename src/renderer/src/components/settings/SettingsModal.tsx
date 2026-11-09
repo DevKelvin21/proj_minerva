@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ChevronLeft, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useSettings } from '../../hooks/use-settings'
@@ -164,7 +165,7 @@ function SettingsHeader({
           variant="ghost"
           size="sm"
           onClick={onBack}
-          icon={<ChevronLeft size={14} aria-hidden />}
+          icon={<Icon icon={icons.back} size="sm" />}
           data-testid="settings-back"
           className="-ml-1.5"
         >
@@ -200,7 +201,7 @@ function SettingsHeader({
           )}
         </ol>
       </nav>
-      <IconButton icon={<X size={16} />} label={t('settings.modal.close')} onClick={onClose} />
+      <IconButton icon={<Icon icon={icons.close} size="md" />} label={t('settings.modal.close')} onClick={onClose} />
     </header>
   )
 }

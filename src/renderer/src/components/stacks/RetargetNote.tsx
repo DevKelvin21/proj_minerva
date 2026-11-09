@@ -1,4 +1,5 @@
-import { CircleCheck, TriangleAlert, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
@@ -37,7 +38,7 @@ export function RetargetNote({
   if (except && key === except) return null
 
   const dismissButton = (
-    <IconButton size="xs" onClick={dismiss} label={t('stacks.retarget.dismiss')} icon={<X size={12} />} />
+    <IconButton size="xs" onClick={dismiss} label={t('stacks.retarget.dismiss')} icon={<Icon icon={icons.close} size="xs" />} />
   )
 
   if (note.kind === 'conflict') {
@@ -47,7 +48,7 @@ export function RetargetNote({
         data-error-code="CONFLICT"
         className={'flex min-w-0 items-start gap-1.5 text-xs ' + className}
       >
-        <TriangleAlert size={13} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+        <Icon icon={icons.warning} size="sm" className="mt-0.5 shrink-0 text-warning" />
         <div className="min-w-0 flex-1">
           <p className="font-medium text-warning">
             {t('stacks.retarget.couldNotRetarget', { number: note.number })}
@@ -68,7 +69,7 @@ export function RetargetNote({
       role="status"
       className={'flex min-w-0 items-start gap-1.5 text-xs text-text/90 ' + className}
     >
-      <CircleCheck size={13} className="mt-0.5 shrink-0 text-success" aria-hidden />
+      <Icon icon={icons.success} size="sm" className="mt-0.5 shrink-0 text-success" />
       <p className="min-w-0 flex-1">
         <Trans
           i18nKey="stacks.retarget.retargeted"

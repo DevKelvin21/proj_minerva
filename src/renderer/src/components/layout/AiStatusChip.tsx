@@ -1,4 +1,3 @@
-import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
@@ -6,6 +5,7 @@ import { useAppStore } from '../../stores/app-store'
 import { useSettings } from '../../hooks/use-settings'
 import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
 import { modelDisplayLabel, resolveModelHintLabels } from '../../lib/model-labels'
+import { AiProviderIcon } from '../ui/AiProviderIcon'
 import { Spinner } from '../ui/Spinner'
 
 /** What the AI is doing for the PR on screen; `null` = no PR under review. */
@@ -107,11 +107,11 @@ function ChipView({
       data-ai-status={status ?? 'none'}
       className="flex h-8 shrink-0 items-center gap-2 rounded-full border border-border px-2.5 text-xs text-text transition-colors duration-150 hover:border-accent"
     >
-      <Sparkles size={14} className="shrink-0 text-accent" aria-hidden />
+      <AiProviderIcon provider={info.provider} size="sm" className="text-muted" />
       {!compact && <span className="max-w-[160px] truncate font-semibold">{modelLabel}</span>}
       {status &&
         (busy ? (
-          <Spinner size={12} />
+          <Spinner size="xs" />
         ) : (
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[status]}`} aria-hidden />
         ))}

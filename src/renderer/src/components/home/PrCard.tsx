@@ -1,4 +1,5 @@
-import { GitPullRequest, MessageSquare } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PrLabel, PullRequestSummary, ReviewDecision } from '../../../../shared/types'
@@ -37,9 +38,9 @@ function reviewDecisionTone(decision: ReviewDecision): string {
  */
 export function PrStateIcon({ isDraft }: { isDraft: boolean }): React.JSX.Element {
   return (
-    <GitPullRequest
-      size={14}
-      aria-hidden
+    <Icon
+      icon={icons.pullRequest}
+      size="sm"
       className={`shrink-0 ${isDraft ? 'text-muted' : 'text-success'}`}
     />
   )
@@ -179,7 +180,7 @@ export function PrCard({
     >
       <CardOpenButton disabled={pending} className="flex items-start gap-1.5">
         {pending ? (
-          <Spinner size={14} className="mt-0.5" />
+          <Spinner size="sm" className="mt-0.5" />
         ) : (
           <span className="mt-0.5">
             <PrStateIcon isDraft={pr.isDraft} />
@@ -213,7 +214,7 @@ export function PrCard({
           <Avatar user={pr.author} size={14} />
           <span className="min-w-0 truncate">{authorName}</span>
         </button>
-        <CiStatusIcon status={pr.ciStatus} size={12} />
+        <CiStatusIcon status={pr.ciStatus} size="xs" />
         {pr.reviewDecision && (
           <span
             data-review={pr.reviewDecision}
@@ -226,7 +227,7 @@ export function PrCard({
             className="flex shrink-0 items-center gap-0.5"
             title={t('prList.comments', { count: pr.commentCount })}
           >
-            <MessageSquare size={11} aria-hidden />
+            <Icon icon={icons.comment} size="xs" />
             {pr.commentCount}
           </span>
         )}

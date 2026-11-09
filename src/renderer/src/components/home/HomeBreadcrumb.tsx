@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { IconButton } from '../ui/IconButton'
 
@@ -34,7 +35,7 @@ export function HomeBreadcrumb({
     >
       <IconButton
         size="xs"
-        icon={<ArrowLeft size={13} />}
+        icon={<Icon icon={icons.back} size="sm" />}
         label={t('home.breadcrumb.back')}
         onClick={onBack}
         data-testid="home-back"
@@ -44,7 +45,7 @@ export function HomeBreadcrumb({
           const last = index === crumbs.length - 1
           return (
             <li key={crumb.key} className="flex min-w-0 items-center gap-1">
-              {index > 0 && <ChevronRight size={12} className="shrink-0 text-muted/60" aria-hidden />}
+              {index > 0 && <Icon icon={icons.breadcrumb} size="xs" className="shrink-0 text-muted/60" />}
               {crumb.onClick && !last ? (
                 <button
                   type="button"

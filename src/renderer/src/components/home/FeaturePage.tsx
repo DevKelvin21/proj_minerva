@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Check, Eye, EyeOff, Pencil, SearchX, Tag, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
@@ -60,7 +61,7 @@ function FeatureName({ group }: { group: FeatureGroup }): React.JSX.Element {
           size="xs"
           data-testid="feature-rename"
           onClick={startEditing}
-          icon={<Pencil size={12} aria-hidden />}
+          icon={<Icon icon={icons.edit} size="xs" />}
         >
           {t('home.featurePage.rename')}
         </Button>
@@ -94,10 +95,10 @@ function FeatureName({ group }: { group: FeatureGroup }): React.JSX.Element {
         placeholder={t('home.featurePage.namePlaceholder')}
         className="min-w-[12rem]"
       />
-      <Button type="submit" size="xs" icon={<Check size={12} aria-hidden />}>
+      <Button type="submit" size="xs" icon={<Icon icon={icons.check} size="xs" />}>
         {t('home.featurePage.save')}
       </Button>
-      <Button size="xs" onClick={() => setEditing(false)} icon={<X size={12} aria-hidden />}>
+      <Button size="xs" onClick={() => setEditing(false)} icon={<Icon icon={icons.close} size="xs" />}>
         {t('home.featurePage.cancel')}
       </Button>
       {group.renamed && (
@@ -161,7 +162,7 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
           ) : (
             <>
               <ProviderErrorList errors={providerErrors} />
-              <PageEmpty icon={SearchX} title={t('home.featurePage.notFound')} />
+              <PageEmpty icon={icons.notFound} title={t('home.featurePage.notFound')} />
             </>
           )}
         </div>
@@ -182,7 +183,7 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
       <HomePageHeader
         crumbs={owner ? [homeCrumb, { key: 'owner', label: owner, text: owner }] : [homeCrumb]}
         onBack={goOverview}
-        icon={firstRepo ? <ScmProviderIcon provider={firstRepo.provider} size={16} /> : undefined}
+        icon={firstRepo ? <ScmProviderIcon provider={firstRepo.provider} size="md" /> : undefined}
         title={group.name}
         heading={<FeatureName key={group.name + '\n' + String(group.renamed)} group={group} />}
         meta={
@@ -196,7 +197,7 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
             data-testid="feature-hide"
             aria-pressed={group.hidden}
             onClick={() => setFeatureHidden(group.key, !group.hidden)}
-            icon={group.hidden ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
+            icon={group.hidden ? <Icon icon={icons.show} size="xs" /> : <Icon icon={icons.hide} size="xs" />}
           >
             {group.hidden ? t('home.featurePage.unhide') : t('home.featurePage.hide')}
           </Button>
@@ -210,7 +211,7 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
             tone="outline"
             data-testid="feature-tag"
             className="max-w-full"
-            icon={<Tag size={11} aria-hidden />}
+            icon={<Icon icon={icons.tag} size="xs" />}
           >
             <span className="min-w-0 truncate">{group.tag}</span>
           </Badge>
@@ -264,7 +265,7 @@ export function FeaturePage({ featureKey }: { featureKey: string }): React.JSX.E
                 title={t('home.featurePage.openRepo', { repo: featureRepo.repo.fullName })}
                 className="flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors duration-150 hover:bg-panel"
               >
-                <ScmProviderIcon provider={featureRepo.repo.provider} size={12} />
+                <ScmProviderIcon provider={featureRepo.repo.provider} size="xs" />
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">
                   {featureRepo.repo.name}
                 </span>

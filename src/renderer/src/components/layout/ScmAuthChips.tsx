@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Settings, UserRound } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import type { ScmProviderId } from '../../../../shared/scm'
@@ -84,7 +85,7 @@ function ProviderAuthChip({
   const { provider, readiness } = view
   if (readiness === 'checking') return null
 
-  const icon = <ScmProviderIcon provider={provider} size={12} className="text-muted" />
+  const icon = <ScmProviderIcon provider={provider} size="xs" className="text-muted" />
   const common = {
     'data-auth-provider': provider,
     'data-auth-state': readiness,
@@ -123,7 +124,7 @@ function ProviderAuthChip({
         <span className="max-w-[140px] truncate text-text">{identityLabel(view.status)}</span>
         {density === 'full' && via && <Badge tone="neutral">{via}</Badge>}
         <IconButton
-          icon={<Settings size={13} />}
+          icon={<Icon icon={icons.settings} size="sm" />}
           label={
             provider === 'github' ? t('layout.auth.managedByGhCli') : t('layout.auth.managedByAz')
           }
@@ -170,7 +171,7 @@ function ProviderAuthChip({
       title={view.status?.detail}
     >
       {icon}
-      <Spinner size={12} />
+      <Spinner size="xs" />
       <Button
         variant="primary"
         size="xs"
@@ -292,7 +293,7 @@ export function AccountsMenu(): React.JSX.Element {
             ))}
           </span>
         ) : (
-          <UserRound size={18} className="m-0.5 text-muted" aria-hidden />
+          <Icon icon={icons.user} size="lg" className="m-0.5 text-muted" />
         )}
         <span
           data-testid="scm-connection"
@@ -326,7 +327,7 @@ export function AccountsMenu(): React.JSX.Element {
                   <ProviderAuthChip view={view} density="full" />
                 ) : (
                   <>
-                    <ScmProviderIcon provider={view.provider} size={12} className="text-muted" />
+                    <ScmProviderIcon provider={view.provider} size="xs" className="text-muted" />
                     <span className="truncate text-muted">{providerStateText(view, t)}</span>
                   </>
                 )}

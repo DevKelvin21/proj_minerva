@@ -1,5 +1,6 @@
 import { useId, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import { X } from 'lucide-react'
+import { Icon } from './Icon'
+import { icons } from './icons'
 import { useTranslation } from 'react-i18next'
 import { useModalLayer } from '../../hooks/use-modal-layer'
 import { IconButton } from './IconButton'
@@ -87,7 +88,7 @@ export function Dialog({
               {title}
             </h2>
             <IconButton
-              icon={<X size={16} />}
+              icon={<Icon icon={icons.close} size="md" />}
               label={closeLabel ?? t('common.close')}
               onClick={onClose}
             />

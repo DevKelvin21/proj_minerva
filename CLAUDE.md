@@ -131,6 +131,13 @@ author's Spanish logs, not maintained)
 - **Responsive**: the app is used tiled. Rules in `renderer/src/lib/layout.ts`;
   `useLayoutTier()` (window) for structure, `useElementWidth()` for intra-panel layout.
   New panels: `min-w-0` on flex containers, no fixed `shrink-0` widths without a clamp.
+- **Icons**: one meaning → one Lucide glyph in `renderer/src/components/ui/icons.ts`, rendered
+  by `<Icon icon={icons.retry} size="xs|sm|md|lg" />` (12/14/16/20 px, `sm` default; one
+  1.25 px absolute stroke; `currentColor`). Importing `lucide-react` elsewhere is a lint
+  error; loading always goes through `Spinner`. Provider logos: `ScmProviderIcon` /
+  `AiProviderIcon` over path data copied into `ui/provider-marks.ts` (never import
+  `@iconify-json/logos` statically, gotcha 7). Color: muted next to text, accent only for
+  on/selected, status colors only for status.
 - Network/AI errors: visible loading and error state, never a silent throw. Show IPC errors
   with `errorText()` (`renderer/src/lib/error-text.ts`: drops Electron's wrapper and `[SCM:CODE]`).
 
@@ -149,7 +156,7 @@ author's Spanish logs, not maintained)
   `:root[data-appearance]`. Shiki tokens carry both colors (`tokenClass`/`tokenStyle`).
   Mermaid re-renders with `theme/mermaid-theme.ts`; C4's hard-coded `#444444` is recolored.
 - **Brand mark** (the merge owl): one definition in `src/shared/brand-mark.ts` feeds
-  `ui/BrandMark.tsx` (title bar, `currentColor`) and the app icons. After changing it run
+  `ui/ProviderMark.tsx` (title bar, `currentColor`) and the app icons. After changing it run
   `node scripts/build-app-icons.mjs` (macOS: writes `build/icon.svg|icns|ico|png`, wired in
   `electron-builder.yml`); `main/brand-mark.test.ts` fails while `build/icon.svg` is stale.
 - Every theme color is untrusted: it must pass `toCanonicalThemeColor` (renderer) /

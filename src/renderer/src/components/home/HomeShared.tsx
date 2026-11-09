@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { ScmListError } from '../../../../shared/types'
 import { uniqueProviderErrors } from '../../lib/dashboard'
@@ -36,7 +37,7 @@ export function ContinueReviewButton(): React.JSX.Element | null {
       <span className="min-w-0 truncate">
         {t('home.overview.continueReview', { number: selectedPr.number })}
       </span>
-      <ArrowRight size={12} aria-hidden className="shrink-0" />
+      <Icon icon={icons.forward} size="xs" className="shrink-0" />
     </Button>
   )
 }

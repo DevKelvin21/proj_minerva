@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, MessagesSquare, Plus, Trash2 } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { ChatConversationSummary } from '../../../../shared/chat'
 import type { RepoRef } from '../../../../shared/scm'
@@ -229,16 +230,16 @@ export function ConversationSwitcher({
           title={t('chat.list.toggle')}
           className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-sm hover:bg-border/60"
         >
-          <MessagesSquare size={14} className="shrink-0 text-muted" aria-hidden />
+          <Icon icon={icons.threads} size="sm" className="shrink-0 text-muted" />
           <span className="min-w-0 truncate font-medium text-text">
             {active ? active.title : t('chat.list.newTitle')}
           </span>
-          {active?.running && <Spinner size={12} label={t('chat.list.running')} />}
+          {active?.running && <Spinner size="xs" label={t('chat.list.running')} />}
           {count > 0 && <CountBadge count={count} tone="neutral" />}
-          <ChevronDown
-            size={12}
+          <Icon
+            icon={icons.dropdown}
+            size="xs"
             className={`ml-auto shrink-0 text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
-            aria-hidden
           />
         </button>
         <IconButton
@@ -248,7 +249,7 @@ export function ConversationSwitcher({
             close(false)
           }}
           label={t('chat.list.new')}
-          icon={<Plus size={14} />}
+          icon={<Icon icon={icons.add} size="sm" />}
         />
       </div>
 
@@ -355,7 +356,7 @@ function ConversationRow({
           <span id={titleId} className="min-w-0 truncate text-sm font-medium text-text">
             {conversation.title}
           </span>
-          {conversation.running && <Spinner size={12} label={t('chat.list.running')} />}
+          {conversation.running && <Spinner size="xs" label={t('chat.list.running')} />}
         </span>
         <span id={metaId} className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
           <time
@@ -416,7 +417,7 @@ function ConversationRow({
           onClick={() => setConfirming(true)}
           label={t('chat.list.delete', { title: conversation.title })}
           title={t('chat.list.deleteTitle')}
-          icon={<Trash2 size={12} />}
+          icon={<Icon icon={icons.delete} size="xs" />}
           className="opacity-0 focus:opacity-100 group-hover/conv:opacity-100 group-focus-within/conv:opacity-100"
         />
       )}

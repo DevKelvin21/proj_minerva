@@ -1,4 +1,5 @@
-import { Sparkles } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { AnalysisGenerationInfo } from '../../../../shared/types'
 import { useSettings } from '../../hooks/use-settings'
@@ -52,7 +53,7 @@ export function ActiveModelHint({ generatedWith }: ActiveModelHintProps = {}): R
       title={t('didactic.modelHint.title', { summary })}
       data-testid="analysis-model"
     >
-      <Sparkles size={11} className="shrink-0 text-accent" aria-hidden />
+      <Icon icon={icons.ai} size="xs" className="shrink-0 text-muted" />
       <span className="truncate">{name}</span>
     </span>
   )

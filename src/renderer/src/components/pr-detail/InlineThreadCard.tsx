@@ -1,4 +1,5 @@
-import { EyeOff } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { CommentThread } from '../../../../shared/types'
 import { ThreadCard } from './ThreadCard'
@@ -52,7 +53,7 @@ export function InlineThreadCard({
               onClick={onHide}
               label={t('comments.line.hideComments')}
               title={t('comments.line.hideCommentsTitle')}
-              icon={<EyeOff size={12} />}
+              icon={<Icon icon={icons.hide} size="xs" />}
             />
           )
         }

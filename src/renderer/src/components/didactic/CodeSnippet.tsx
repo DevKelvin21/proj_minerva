@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Check, Copy } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { DidacticSnippet } from '../../../../shared/types'
 import { Button } from '../ui/Button'
@@ -47,9 +48,9 @@ export function CodeSnippet({ snippet, onExpand }: CodeSnippetProps): React.JSX.
             onClick={() => void handleCopy()}
             icon={
               copied ? (
-                <Check size={12} className="text-success" aria-hidden />
+                <Icon icon={icons.check} size="xs" className="text-success" />
               ) : (
-                <Copy size={12} aria-hidden />
+                <Icon icon={icons.copy} size="xs" />
               )
             }
           >

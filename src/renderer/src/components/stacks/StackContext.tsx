@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, Layers } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import { prKey, shortRef, type StackNode } from '../../../../shared/scm'
 import type { PullRequestDetail } from '../../../../shared/types'
@@ -31,7 +32,7 @@ function NodeChip({
   const { t } = useTranslation()
   const label = (
     <>
-      <StackStateIcon isDraft={node.isDraft} size={12} />
+      <StackStateIcon isDraft={node.isDraft} size="xs" />
       <span className="shrink-0 font-mono">#{node.number}</span>
       <span className="min-w-0 truncate">{current ? t('stacks.context.thisPr') : node.title}</span>
     </>
@@ -63,7 +64,7 @@ function NodeChip({
 function Separator(): React.JSX.Element {
   return (
     <li aria-hidden className="flex items-center text-muted/60">
-      <ChevronRight size={12} />
+      <Icon icon={icons.next} size="xs" />
     </li>
   )
 }
@@ -127,7 +128,7 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
     >
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
-          <Layers size={12} aria-hidden />
+          <Icon icon={icons.stack} size="xs" />
           {t('stacks.context.title')}
           <span className="font-normal normal-case">
             {t('stacks.context.position', {
@@ -146,7 +147,7 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
             className="ml-auto inline-flex items-center gap-0.5 rounded-md border border-border bg-panel px-1 text-[11px] text-muted"
           >
             <IconButton
-              icon={<ChevronLeft size={14} />}
+              icon={<Icon icon={icons.previous} size="sm" />}
               label={t('stacks.context.previous')}
               onClick={() => openKey(nav.previous)}
               disabled={nav.previous === null || pendingKey !== null}
@@ -157,7 +158,7 @@ export function StackContext({ pr }: { pr: PullRequestDetail }): React.JSX.Eleme
               {t('stacks.context.navPosition', { index: nav.index, total: nav.total })}
             </span>
             <IconButton
-              icon={<ChevronRight size={14} />}
+              icon={<Icon icon={icons.next} size="sm" />}
               label={t('stacks.context.next')}
               onClick={() => openKey(nav.next)}
               disabled={nav.next === null || pendingKey !== null}

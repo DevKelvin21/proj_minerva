@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Check, ChevronDown, ChevronRight, Link, Sparkles } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { MAX_CHAT_CONTEXT_ITEMS } from '../../../../shared/chat'
 import { isThreadOpen } from '../../../../shared/scm'
 import type { ThreadStatus } from '../../../../shared/scm'
@@ -236,7 +237,7 @@ export function ThreadCard({
               onClick={toggle}
               aria-expanded={!collapsed}
               label={collapsed ? t('comments.thread.unfold') : t('comments.thread.fold')}
-              icon={collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+              icon={collapsed ? <Icon icon={icons.collapsed} size="sm" /> : <Icon icon={icons.expanded} size="sm" />}
             />
           </span>
           {label ? (
@@ -322,7 +323,7 @@ export function ThreadCard({
               }
               data-pending={chat.inChat || undefined}
               data-testid="thread-chat-toggle"
-              icon={<Sparkles size={12} />}
+              icon={<Icon icon={icons.ai} size="xs" />}
             />
           )}
           {extraHeaderContent}
@@ -369,9 +370,9 @@ export function ThreadCard({
                         className="ml-auto"
                         icon={
                           copiedCommentId === comment.id ? (
-                            <Check size={12} className="text-success" aria-hidden />
+                            <Icon icon={icons.check} size="xs" className="text-success" />
                           ) : (
-                            <Link size={12} aria-hidden />
+                            <Icon icon={icons.link} size="xs" />
                           )
                         }
                       >

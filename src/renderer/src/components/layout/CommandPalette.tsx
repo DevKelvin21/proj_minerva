@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FileCode2, GitPullRequest, Search, Terminal } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
@@ -23,9 +24,9 @@ import { Kbd } from '../ui/Kbd'
 const ESC_KEY = 'Esc'
 
 const GROUP_ICON: Record<PaletteGroup, React.JSX.Element> = {
-  commands: <Terminal size={14} aria-hidden />,
-  pullRequests: <GitPullRequest size={14} aria-hidden />,
-  files: <FileCode2 size={14} aria-hidden />,
+  commands: <Icon icon={icons.commands} size="sm" />,
+  pullRequests: <Icon icon={icons.pullRequest} size="sm" />,
+  files: <Icon icon={icons.file} size="sm" />,
 }
 
 /** Commands that always make sense, plus the review ones when a PR is on screen. */
@@ -227,7 +228,7 @@ function PaletteDialog({ fileItems }: { fileItems: PaletteItem[] }): React.JSX.E
       {/* The search row is the field: while the input has focus, its divider turns to the
           focus color across the panel's full width, icon included. */}
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 transition-[border-color,box-shadow] duration-150 focus-within:border-focus focus-within:shadow-[inset_0_-1px_0_var(--color-focus)]">
-        <Search size={16} className="shrink-0 text-muted" aria-hidden />
+        <Icon icon={icons.search} size="md" className="shrink-0 text-muted" />
         <input
           ref={inputRef}
           type="text"

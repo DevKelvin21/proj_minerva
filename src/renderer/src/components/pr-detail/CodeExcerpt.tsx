@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
-import { History } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { CommentThread, ThreadOrigin } from '../../../../shared/types'
 import { useThreadFileLines } from '../../hooks/thread-actions'
 import type { FileLinesState } from '../../hooks/use-file-content'
@@ -288,7 +289,7 @@ function VersionedExcerpt({
       aria-label={t('comments.excerpt.label', { path: thread.path, line: range.start })}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5">
-        <History size={14} className="shrink-0 text-muted" aria-hidden />
+        <Icon icon={icons.history} size="sm" className="shrink-0 text-muted" />
         <p className="min-w-0 flex-1 basis-56 text-xs text-muted" data-testid="outdated-note">
           {sentence}
         </p>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
@@ -129,9 +130,9 @@ export function QueueView(): React.JSX.Element {
               className="flex w-full items-center gap-1.5 px-3 pb-1 pt-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted transition-colors duration-150 hover:text-text"
             >
               {isFolded ? (
-                <ChevronRight size={13} aria-hidden />
+                <Icon icon={icons.collapsed} size="sm" />
               ) : (
-                <ChevronDown size={13} aria-hidden />
+                <Icon icon={icons.expanded} size="sm" />
               )}
               <span className="min-w-0 flex-1 truncate">{t(`layout.queue.section.${section}`)}</span>
               <CountBadge

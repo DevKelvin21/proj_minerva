@@ -1,21 +1,24 @@
-import { Cloud, GitPullRequest } from 'lucide-react'
 import type { ScmProviderId } from '../../../../shared/scm'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
+import { ProviderMark } from './ProviderMark'
+import type { IconSize } from './Icon'
 
 /**
- * Small provider marker. lucide ships no brand logos, so each provider gets a
- * neutral glyph plus an accessible label; `data-provider` lets tests target it.
+ * Small provider marker: the GitHub or Azure DevOps mark plus an accessible
+ * label; `data-provider` lets tests target it. Monochrome (`currentColor`)
+ * unless `color` asks for the brand's own (Settings).
  */
 export function ScmProviderIcon({
   provider,
-  size = 12,
+  size = 'xs',
+  color = false,
   className = '',
 }: {
   provider: ScmProviderId
-  size?: number
+  size?: IconSize
+  color?: boolean
   className?: string
 }): React.JSX.Element {
-  const Icon = provider === 'azure' ? Cloud : GitPullRequest
   return (
     <span
       role="img"
@@ -24,7 +27,7 @@ export function ScmProviderIcon({
       data-provider={provider}
       className={'inline-flex shrink-0 ' + className}
     >
-      <Icon size={size} aria-hidden />
+      <ProviderMark mark={provider === 'azure' ? 'azureDevops' : 'github'} size={size} color={color} />
     </span>
   )
 }

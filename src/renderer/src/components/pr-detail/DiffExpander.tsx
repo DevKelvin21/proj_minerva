@@ -1,4 +1,5 @@
-import { ArrowDownToLine, ArrowUpToLine, UnfoldVertical } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { EXPAND_STEP, gapLength, type HiddenGap } from '../../lib/expand-context'
 import { Button } from '../ui/Button'
@@ -39,7 +40,7 @@ export function DiffExpander({
       data-gap-start={gap.newStart}
       className="flex min-h-6 flex-wrap items-center gap-2 border-y border-border bg-panel px-3 font-sans text-[11px] text-muted"
     >
-      <UnfoldVertical size={12} className="shrink-0" />
+      <Icon icon={icons.expandContext} size="xs" className="shrink-0" />
       <span>
         {length === null
           ? t('prDetail.expander.moreBelow')
@@ -70,7 +71,7 @@ export function DiffExpander({
               title={t('prDetail.expander.downTitle', { count: EXPAND_STEP })}
               aria-label={t('prDetail.expander.downLabel', { count: EXPAND_STEP })}
               onClick={() => onExpand('down')}
-              icon={<ArrowDownToLine size={11} aria-hidden />}
+              icon={<Icon icon={icons.expandDown} size="xs" />}
             >
               {EXPAND_STEP}
             </Button>
@@ -83,7 +84,7 @@ export function DiffExpander({
               title={t('prDetail.expander.upTitle', { count: EXPAND_STEP })}
               aria-label={t('prDetail.expander.upLabel', { count: EXPAND_STEP })}
               onClick={() => onExpand('up')}
-              icon={<ArrowUpToLine size={11} aria-hidden />}
+              icon={<Icon icon={icons.expandUp} size="xs" />}
             >
               {EXPAND_STEP}
             </Button>

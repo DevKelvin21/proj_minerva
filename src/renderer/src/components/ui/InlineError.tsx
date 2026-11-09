@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { Icon } from './Icon'
+import { icons } from './icons'
 import { useTranslation } from 'react-i18next'
 import { Button } from './Button'
 import { IconButton } from './IconButton'
@@ -42,7 +43,7 @@ export function InlineError({
           size="xs"
           onClick={onDismiss}
           label={t('common.dismiss')}
-          icon={<X size={12} />}
+          icon={<Icon icon={icons.close} size="xs" />}
         />
       )}
     </div>

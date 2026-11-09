@@ -1,4 +1,5 @@
-import { Code2, MessageSquare, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { ChatContextItem } from '../../../../shared/chat'
 import { contextItemAuthor, contextItemLocation, diffSide } from '../../lib/chat-context'
@@ -58,9 +59,9 @@ export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Ele
       className="flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-bg px-2 py-1 text-xs"
     >
       {item.kind === 'line' ? (
-        <Code2 size={12} className="shrink-0 text-muted" aria-hidden />
+        <Icon icon={icons.code} size="xs" className="shrink-0 text-muted" />
       ) : (
-        <MessageSquare size={12} className="shrink-0 text-muted" aria-hidden />
+        <Icon icon={icons.comment} size="xs" className="shrink-0 text-muted" />
       )}
       <button
         type="button"
@@ -87,7 +88,7 @@ export function ContextChip({ item, onRemove }: ContextChipProps): React.JSX.Ele
           size="xs"
           onClick={onRemove}
           label={t('chat.chip.remove', { location })}
-          icon={<X size={12} />}
+          icon={<Icon icon={icons.close} size="xs" />}
           className="ml-auto"
         />
       )}

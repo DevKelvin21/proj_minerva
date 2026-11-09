@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Moon, Sun, Wand2 } from 'lucide-react'
+import { Icon } from '../../ui/Icon'
+import { icons } from '../../ui/icons'
 import { findThemeById, resolveAppearance } from '../../../../../shared/theme/appearance'
 import { themeColorToHex } from '../../../../../shared/theme/color'
 import {
@@ -305,9 +306,9 @@ export function ThemeEditorDialog({
                   }
                 >
                   {appearance === 'light' ? (
-                    <Sun size={12} aria-hidden />
+                    <Icon icon={icons.lightMode} size="xs" />
                   ) : (
-                    <Moon size={12} aria-hidden />
+                    <Icon icon={icons.darkMode} size="xs" />
                   )}
                   {modeName(appearance)}
                 </button>
@@ -333,7 +334,7 @@ export function ThemeEditorDialog({
             <>
               <section className="mb-3 rounded-md border border-border p-2">
                 <h3 className="mb-1 flex items-center gap-1 text-xs font-semibold text-text">
-                  <Wand2 size={12} aria-hidden />
+                  <Icon icon={icons.generate} size="xs" />
                   {t('settings.appearance.editor.generateTitle')}
                 </h3>
                 <p className="mb-1 text-xs text-muted">

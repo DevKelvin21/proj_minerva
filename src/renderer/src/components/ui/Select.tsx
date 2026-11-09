@@ -1,5 +1,6 @@
 import type { ComponentPropsWithRef } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { Icon } from './Icon'
+import { icons } from './icons'
 import {
   fieldBoxClass,
   fieldPaddingClasses,
@@ -34,9 +35,9 @@ export function Select({
       >
         {children}
       </select>
-      <ChevronDown
-        size={fieldSize === 'xs' || fieldSize === 'sm' ? 12 : 14}
-        aria-hidden
+      <Icon
+        icon={icons.dropdown}
+        size={fieldSize === 'xs' || fieldSize === 'sm' ? 'xs' : 'sm'}
         className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted"
       />
     </div>

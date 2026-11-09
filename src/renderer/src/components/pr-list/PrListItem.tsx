@@ -1,10 +1,5 @@
-import {
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  MessageSquare,
-} from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PullRequestState, PullRequestSummary, ReviewDecision } from '../../../../shared/types'
@@ -52,8 +47,9 @@ function StateIcon({
   const { t } = useTranslation()
   if (isDraft) {
     return (
-      <GitPullRequestDraft
-        size={14}
+      <Icon
+        icon={icons.pullRequestDraft}
+        size="sm"
         className="mt-0.5 shrink-0 text-muted"
         aria-label={t('prList.state.draft')}
       />
@@ -61,8 +57,9 @@ function StateIcon({
   }
   if (state === 'merged') {
     return (
-      <GitMerge
-        size={14}
+      <Icon
+        icon={icons.merge}
+        size="sm"
         className="mt-0.5 shrink-0 text-merged"
         aria-label={t('prList.state.merged')}
       />
@@ -70,17 +67,19 @@ function StateIcon({
   }
   if (state === 'closed') {
     return (
-      <GitPullRequestClosed
-        size={14}
+      <Icon
+        icon={icons.pullRequestClosed}
+        size="sm"
         className="mt-0.5 shrink-0 text-muted"
         aria-label={t('prList.state.closed')}
       />
     )
   }
   return (
-    <GitPullRequest
-      size={14}
-      className="mt-0.5 shrink-0 text-accent"
+    <Icon
+      icon={icons.pullRequest}
+      size="sm"
+      className="mt-0.5 shrink-0 text-success"
       aria-label={t('prList.state.open')}
     />
   )
@@ -153,7 +152,7 @@ export function PrListItem({
         <Avatar user={pr.author} size={16} />
         {showRepo && (
           <span className="flex min-w-0 items-center gap-1" title={pr.repo.fullName}>
-            <ScmProviderIcon provider={pr.repo.provider} size={11} />
+            <ScmProviderIcon provider={pr.repo.provider} size="xs" />
             <span className="max-w-[110px] truncate">
               {pr.repo.fullName.slice(pr.repo.fullName.lastIndexOf('/') + 1)}
             </span>
@@ -161,7 +160,7 @@ export function PrListItem({
         )}
         <span>#{pr.number}</span>
         <StateBadge state={pr.state} />
-        <CiStatusIcon status={pr.ciStatus} size={12} />
+        <CiStatusIcon status={pr.ciStatus} size="xs" />
         {pr.reviewDecision && (
           <span
             data-review={pr.reviewDecision}
@@ -174,7 +173,7 @@ export function PrListItem({
             className="relative flex items-center gap-0.5"
             title={t('prList.comments', { count: pr.commentCount })}
           >
-            <MessageSquare size={12} aria-hidden />
+            <Icon icon={icons.comment} size="xs" />
             <span>{pr.commentCount}</span>
             {hasNewComments && (
               <span

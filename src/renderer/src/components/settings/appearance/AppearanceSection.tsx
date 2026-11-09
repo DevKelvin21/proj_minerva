@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Download, Moon, Paintbrush, Pencil, Plus, Sun, Trash2 } from 'lucide-react'
+import { Icon } from '../../ui/Icon'
+import { icons } from '../../ui/icons'
 import {
   APPEARANCE_MODES,
   DEFAULT_APPEARANCE_CONTRAST,
@@ -222,7 +223,7 @@ export function AppearanceSection(): React.JSX.Element {
             <Button
               size="xs"
               data-testid="theme-create"
-              icon={<Paintbrush size={12} aria-hidden />}
+              icon={<Icon icon={icons.customTheme} size="xs" />}
               onClick={() => {
                 const { systemDark } = useAppearanceStore.getState()
                 setEditor({ kind: 'new', seedId: resolveAppearance(settings, systemDark).theme.id })
@@ -233,7 +234,7 @@ export function AppearanceSection(): React.JSX.Element {
             <Button
               size="xs"
               data-testid="theme-import"
-              icon={<Plus size={12} aria-hidden />}
+              icon={<Icon icon={icons.add} size="xs" />}
               onClick={() => setImportOpen(true)}
             >
               {t('settings.appearance.themes.import')}
@@ -285,9 +286,9 @@ export function AppearanceSection(): React.JSX.Element {
                           {picked && (
                             <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-border bg-panel text-text">
                               {mode === 'light' ? (
-                                <Sun size={9} aria-hidden />
+                                <Icon icon={icons.lightMode} size="xs" />
                               ) : (
-                                <Moon size={9} aria-hidden />
+                                <Icon icon={icons.darkMode} size="xs" />
                               )}
                             </span>
                           )}
@@ -307,7 +308,7 @@ export function AppearanceSection(): React.JSX.Element {
                       {theme.label}
                     </button>
                     <IconButton
-                      icon={<Copy size={12} />}
+                      icon={<Icon icon={icons.copy} size="xs" />}
                       label={t('settings.appearance.themes.duplicate', { name: theme.label })}
                       size="xs"
                       onClick={() => setEditor({ kind: 'new', seedId: theme.id })}
@@ -315,19 +316,19 @@ export function AppearanceSection(): React.JSX.Element {
                     {custom && (
                       <>
                         <IconButton
-                          icon={<Pencil size={12} />}
+                          icon={<Icon icon={icons.edit} size="xs" />}
                           label={t('settings.appearance.themes.edit', { name: theme.label })}
                           size="xs"
                           onClick={() => setEditor({ kind: 'edit', id: theme.id })}
                         />
                         <IconButton
-                          icon={<Download size={12} />}
+                          icon={<Icon icon={icons.download} size="xs" />}
                           label={t('settings.appearance.themes.export', { name: theme.label })}
                           size="xs"
                           onClick={() => downloadThemeFile(theme)}
                         />
                         <IconButton
-                          icon={<Trash2 size={12} />}
+                          icon={<Icon icon={icons.delete} size="xs" />}
                           label={t('settings.appearance.themes.delete', { name: theme.label })}
                           size="xs"
                           onClick={() => setPendingDelete(theme)}

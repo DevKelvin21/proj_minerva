@@ -1,13 +1,5 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  Home,
-  PanelLeft,
-  PanelLeftClose,
-  Search,
-  Settings,
-} from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
@@ -38,7 +30,7 @@ function SettingsButton(): React.JSX.Element {
   return (
     <span className="relative inline-flex">
       <IconButton
-        icon={<Settings size={16} />}
+        icon={<Icon icon={icons.settings} size="md" />}
         label={
           showUpdateDot
             ? t('layout.settingsChip.settingsWithUpdate')
@@ -63,7 +55,7 @@ function CommandBarButton({ size }: { size: 'wide' | 'short' | 'icon' }): React.
   const openPalette = useAppStore((s) => s.openCommandPalette)
   const label = t('layout.titleBar.jumpTo', { shortcut: MOD_KEY_LABEL + 'K' })
   if (size === 'icon') {
-    return <IconButton icon={<Search size={16} />} label={label} onClick={openPalette} />
+    return <IconButton icon={<Icon icon={icons.search} size="md" />} label={label} onClick={openPalette} />
   }
   return (
     <button
@@ -76,7 +68,7 @@ function CommandBarButton({ size }: { size: 'wide' | 'short' | 'icon' }): React.
         size === 'wide' ? 'w-[min(340px,100%)]' : ''
       }`}
     >
-      <Search size={14} className="shrink-0" aria-hidden />
+      <Icon icon={icons.search} size="sm" className="shrink-0" />
       <span className="min-w-0 flex-1 truncate text-left">
         {size === 'wide' ? t('layout.titleBar.jumpPlaceholder') : t('layout.titleBar.jumpShort')}
       </span>
@@ -143,7 +135,7 @@ export function TitleBar(): React.JSX.Element {
           // Narrow: the label is hidden, so it moves to the name and the tooltip.
           aria-label={tier.w === 'sm' ? t('prDetail.focus.exit') : undefined}
           title={tier.w === 'sm' ? t('prDetail.focus.exit') : undefined}
-          icon={<ChevronLeft size={16} aria-hidden />}
+          icon={<Icon icon={icons.back} size="md" />}
         >
           {tier.w !== 'sm' && t('prDetail.focus.exit')}
           <Kbd>{ESC_KEY}</Kbd>
@@ -152,7 +144,7 @@ export function TitleBar(): React.JSX.Element {
           e2e suite looks for), the hideable docked column on wide ones. */
       showDrawerToggle ? (
         <IconButton
-          icon={<PanelLeft size={16} />}
+          icon={<Icon icon={icons.sidebar} size="md" />}
           label={t('layout.titleBar.prListToggle')}
           active={sidebarOpen}
           onClick={toggleSidebar}
@@ -161,7 +153,7 @@ export function TitleBar(): React.JSX.Element {
         />
       ) : (
         <IconButton
-          icon={sidebarCollapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
+          icon={sidebarCollapsed ? <Icon icon={icons.sidebar} size="md" /> : <Icon icon={icons.sidebarCollapse} size="md" />}
           label={
             sidebarCollapsed ? t('layout.titleBar.sidebarShow') : t('layout.titleBar.sidebarHide')
           }
@@ -174,7 +166,7 @@ export function TitleBar(): React.JSX.Element {
 
       {!focusPr && (
         <IconButton
-          icon={<Home size={16} />}
+          icon={<Icon icon={icons.home} size="md" />}
           label={t('layout.titleBar.home')}
           active={mainView === 'home'}
           onClick={goHome}
@@ -188,7 +180,7 @@ export function TitleBar(): React.JSX.Element {
         <TitleBarLocation compact={compact || focusPr !== null} />
         {focusPr && (
           <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-text">
-            <ChevronRight size={14} className="text-muted/60" aria-hidden />
+            <Icon icon={icons.breadcrumb} size="sm" className="text-muted/60" />
             {t('prDetail.focus.title')}
           </span>
         )}
@@ -206,7 +198,7 @@ export function TitleBar(): React.JSX.Element {
         {/* The didactic panel only exists in the review view. */}
         {mainView === 'review' && !focusPr && selectedPr && (
           <IconButton
-            icon={<Sparkles size={16} />}
+            icon={<Icon icon={icons.ai} size="md" />}
             label={t('layout.titleBar.didacticPanel')}
             active={didacticPanelOpen}
             onClick={toggleDidacticPanel}

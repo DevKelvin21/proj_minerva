@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
+import { Icon } from './Icon'
+import type { IconGlyph } from './icons'
 import { Spinner } from './Spinner'
 
 interface EmptyStateProps {
   title: string
   hint?: string
-  /** A muted icon above the title. */
-  icon?: LucideIcon
+  /** A muted icon above the title (from `icons`). */
+  icon?: IconGlyph
   /** Shows a spinner in place of the icon: what goes here is on its way. */
   loading?: boolean
   /** One follow-up action (a Button), below the hint. */
@@ -19,12 +20,11 @@ interface EmptyStateProps {
 export function EmptyState({
   title,
   hint,
-  icon: Icon,
+  icon,
   loading = false,
   action,
   compact = false,
 }: EmptyStateProps): React.JSX.Element {
-  const iconSize = compact ? 22 : 32
   return (
     <div
       className={`flex flex-col items-center justify-center gap-2 px-6 text-center ${
@@ -32,9 +32,9 @@ export function EmptyState({
       }`}
     >
       {loading ? (
-        <Spinner size={iconSize} />
+        <Spinner size="lg" />
       ) : (
-        Icon && <Icon size={iconSize} className="text-muted" aria-hidden />
+        icon && <Icon icon={icon} size="lg" className="text-muted" />
       )}
       <p className={`font-medium text-text ${compact ? 'text-sm' : 'text-base'}`}>{title}</p>
       {hint && <p className={`max-w-xs text-muted ${compact ? 'text-xs' : 'text-sm'}`}>{hint}</p>}

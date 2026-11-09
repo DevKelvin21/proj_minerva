@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Sparkles, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { MAX_CHAT_CONTEXT_ITEMS, MAX_CHAT_NOTE_LEN } from '../../../../shared/chat'
 import type { LineSide } from '../../lib/line-threads'
 import { Button } from '../ui/Button'
@@ -51,7 +52,7 @@ export function LineChatInput({
           add()
         }}
       >
-        <Sparkles size={13} className="shrink-0 text-muted" aria-hidden />
+        <Icon icon={icons.ai} size="sm" className="shrink-0 text-muted" />
         <Input
           autoFocus
           value={note}
@@ -74,7 +75,7 @@ export function LineChatInput({
         <Button type="submit" variant="primary" size="xs">
           {initialNote !== undefined ? t('chat.line.update') : t('chat.line.add')}
         </Button>
-        <IconButton size="xs" onClick={onClose} label={t('common.close')} icon={<X size={13} />} />
+        <IconButton size="xs" onClick={onClose} label={t('common.close')} icon={<Icon icon={icons.close} size="sm" />} />
       </form>
       {full && (
         <p role="alert" className="mt-1 text-xs text-danger">

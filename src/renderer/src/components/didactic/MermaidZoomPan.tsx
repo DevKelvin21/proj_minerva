@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
-import { Maximize, Minus, Plus, RotateCcw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { MermaidDiagram } from './MermaidDiagram'
 import { IconButton } from '../ui/IconButton'
@@ -171,7 +172,7 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
       </div>
       <div className="flex items-center justify-center gap-2 border-t border-border bg-panel px-3 py-2">
         <IconButton
-          icon={<Minus size={14} />}
+          icon={<Icon icon={icons.zoomOut} size="sm" />}
           label={t('didactic.mermaid.zoomOut')}
           onClick={() => zoomBy(1 / (1 + ZOOM_STEP))}
         />
@@ -179,16 +180,16 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
           {Math.round(zoom * 100)}%
         </span>
         <IconButton
-          icon={<Plus size={14} />}
+          icon={<Icon icon={icons.zoomIn} size="sm" />}
           label={t('didactic.mermaid.zoomIn')}
           onClick={() => zoomBy(1 + ZOOM_STEP)}
         />
         <IconButton
-          icon={<Maximize size={14} />}
+          icon={<Icon icon={icons.fit} size="sm" />}
           label={t('didactic.mermaid.fit')}
           onClick={fitToContainer}
         />
-        <IconButton icon={<RotateCcw size={14} />} label={t('didactic.mermaid.reset')} onClick={resetView} />
+        <IconButton icon={<Icon icon={icons.resetView} size="sm" />} label={t('didactic.mermaid.reset')} onClick={resetView} />
       </div>
     </div>
   )

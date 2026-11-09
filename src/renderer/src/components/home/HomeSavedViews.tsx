@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Bookmark } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { PullRequestSummary } from '../../../../shared/types'
 import type { ViewerIdentity } from '../../lib/dashboard'
@@ -42,7 +43,7 @@ export function HomeSavedViews({
       className="flex min-w-0 flex-wrap items-center gap-1.5"
     >
       <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-muted">
-        <Bookmark size={12} aria-hidden />
+        <Icon icon={icons.savedView} size="xs" />
         {t('home.savedViews.label')}
       </span>
       {entries.map((entry) => {

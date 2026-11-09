@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { FileTreeNode as FileTreeNodeModel } from '../../lib/file-tree'
 import { FileRow } from '../ui/FileRow'
 import { FileStatusIcon } from './FileStatusIcon'
@@ -35,9 +36,9 @@ export function FileTreeNode({
           className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm text-muted hover:text-text"
         >
           {collapsed ? (
-            <ChevronRight size={13} className="shrink-0" />
+            <Icon icon={icons.collapsed} size="sm" className="shrink-0" />
           ) : (
-            <ChevronDown size={13} className="shrink-0" />
+            <Icon icon={icons.expanded} size="sm" className="shrink-0" />
           )}
           <span className="truncate">{node.name}</span>
         </button>

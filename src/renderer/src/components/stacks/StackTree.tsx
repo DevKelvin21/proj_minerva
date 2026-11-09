@@ -1,4 +1,5 @@
-import { GitPullRequest, GitPullRequestDraft, TriangleAlert } from 'lucide-react'
+import { Icon, type IconSize } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { StackNode } from '../../../../shared/scm'
 import { orphanExplanation } from '../../lib/stacks'
@@ -15,20 +16,21 @@ const TREE_BRANCH_GLYPH = '└'
 
 export function StackStateIcon({
   isDraft,
-  size = 14,
+  size = 'sm',
 }: {
   isDraft: boolean
-  size?: number
+  size?: IconSize
 }): React.JSX.Element {
   const { t } = useTranslation()
   return isDraft ? (
-    <GitPullRequestDraft
+    <Icon
+      icon={icons.pullRequestDraft}
       size={size}
       className="shrink-0 text-muted"
       aria-label={t('stacks.tree.draft')}
     />
   ) : (
-    <GitPullRequest size={size} className="shrink-0 text-accent" aria-label={t('stacks.tree.open')} />
+    <Icon icon={icons.pullRequest} size={size} className="shrink-0 text-success" aria-label={t('stacks.tree.open')} />
   )
 }
 
@@ -36,7 +38,7 @@ export function StackStateIcon({
 export function OrphanBadge(): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <Badge tone="warning" size="sm" data-orphan-badge icon={<TriangleAlert size={10} aria-hidden />}>
+    <Badge tone="warning" size="sm" data-orphan-badge icon={<Icon icon={icons.warning} size="xs" />}>
       {t('stacks.tree.orphaned')}
     </Badge>
   )
@@ -116,7 +118,7 @@ export function StackTree({
             </span>
           )}
           {pendingKey === node.prKey ? (
-            <Spinner size={14} />
+            <Spinner size="sm" />
           ) : (
             <StackStateIcon isDraft={node.isDraft} />
           )}

@@ -1,4 +1,5 @@
-import { MessageSquare } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 
 interface LineThreadIndicatorProps {
@@ -38,7 +39,7 @@ export function LineThreadIndicator({
         hidden ? 'text-muted hover:text-text' : 'text-text'
       }`}
     >
-      <MessageSquare size={12} fill={hidden ? 'none' : 'currentColor'} aria-hidden />
+      <Icon icon={icons.comment} size="xs" filled={!hidden} />
     </button>
   )
 }

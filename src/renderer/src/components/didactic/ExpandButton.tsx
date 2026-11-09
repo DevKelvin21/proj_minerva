@@ -1,4 +1,5 @@
-import { Maximize2 } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { IconButton } from '../ui/IconButton'
 
 interface ExpandButtonProps {
@@ -26,7 +27,7 @@ export function ExpandButton({
       onClick={onExpand}
       label={label}
       title={title ?? label}
-      icon={<Maximize2 size={13} />}
+      icon={<Icon icon={icons.expand} size="sm" />}
       className={className}
     />
   )
