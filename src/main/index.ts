@@ -26,7 +26,8 @@ if (process.env.MINERVA_USER_DATA_DIR) {
   app.setPath('userData', process.env.MINERVA_USER_DATA_DIR)
 }
 
-function createWindow(): void {
+/** Creates the main window (it shows itself once ready); also used by notification and menu bar clicks. */
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -60,6 +61,7 @@ function createWindow(): void {
   } else {
     void mainWindow.loadFile(join(import.meta.dirname, '../renderer/index.html'))
   }
+  return mainWindow
 }
 
 void app.whenReady().then(async () => {
@@ -82,13 +84,17 @@ void app.whenReady().then(async () => {
   // appearance before any window exists.
   initNativeAppearance()
 
-  const { stopPrWatcher, stopChat } = await registerIpcHandlers()
+  const { stopPrWatcher, stopChat, stopTray } = await registerIpcHandlers({
+    createMainWindow: createWindow,
+  })
 
   // Watcher de PRs en background (T51, F10): para el timer antes de que la
   // app termine de cerrarse — sin esto seguiría re-armándose (`setTimeout`)
   // tras destruir todas las ventanas, hasta que el proceso muriera solo.
   app.on('before-quit', () => {
     stopPrWatcher()
+    // The menu bar item goes with the app (macOS removes it anyway; this is explicit).
+    stopTray()
   })
   // Stops running chat answers (saved as `interrupted`) and closes
   // `chat.sqlite`. On `will-quit`, the last step before quitting: a quit

@@ -12,7 +12,7 @@
  * renderer se suscriba a un canal arbitrario si en algún momento tuviera
  * acceso a `ipcRenderer` por una vía no prevista.
  */
-import type { ActivityState } from './activity'
+import type { ActivityState, NotificationSettings } from './activity'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
 import type { ChatEvent } from './chat'
@@ -220,6 +220,15 @@ export interface OpenActivityEvent {
   itemId: string | null
 }
 
+/**
+ * Payload of `minerva:event:notificationsChanged`: the notification settings
+ * just saved (Settings, or the menu bar's "Play notification sounds"), pushed
+ * to every window so an open Settings page never shows a stale switch.
+ */
+export interface NotificationsChangedEvent {
+  settings: NotificationSettings
+}
+
 export interface EventContract {
   'minerva:event:analysisProgress': AnalysisProgressEvent
   'minerva:event:prListChanged': PrListChangedEvent
@@ -230,6 +239,7 @@ export interface EventContract {
   'minerva:event:chat': ChatEvent
   'minerva:event:activityChanged': ActivityChangedEvent
   'minerva:event:openActivity': OpenActivityEvent
+  'minerva:event:notificationsChanged': NotificationsChangedEvent
 }
 
 export type EventChannel = keyof EventContract
@@ -249,4 +259,5 @@ export const MINERVA_EVENTS = {
   chat: 'minerva:event:chat',
   activityChanged: 'minerva:event:activityChanged',
   openActivity: 'minerva:event:openActivity',
+  notificationsChanged: 'minerva:event:notificationsChanged',
 } satisfies Record<string, EventChannel>

@@ -17,8 +17,12 @@ import { createActivityService } from '../scm/activity-service'
 import { createActivityStore } from '../scm/activity-store'
 import {
   createActivityNotifier,
+  notificationSound,
   type NotificationContent,
 } from '../notifications/activity-notifier'
+import { createTrayService } from '../tray/tray-service'
+import type { TrayAction } from '../tray/tray-menu'
+import { createMainWindowOpener, type MainWindowOpener } from '../windows/main-window-opener'
 import { createAzureOrgAccess } from '../scm/azure-org-access'
 import { nativeConfirm } from '../scm/confirm'
 import { getAuthStatusMap, listAcrossProviders } from '../scm/registry'
@@ -46,8 +50,10 @@ import {
   type AppearanceChangedEvent,
   type DraftDidacticSection,
   type LanguageChangedEvent,
+  type NotificationsChangedEvent,
   type PrListChangedEvent,
 } from '../../shared/events'
+import { normalizeNotificationSettings, type NotificationSettings } from '../../shared/activity'
 import type { ChatEvent } from '../../shared/chat'
 import type { IpcResponse } from '../../shared/ipc'
 import { prKey } from '../../shared/scm'
@@ -97,12 +103,21 @@ function notificationText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-/** Shows one activity notification; a click brings the main window up and opens the item. */
-function showActivityNotification(content: NotificationContent): void {
+/**
+ * Shows one activity notification; a click brings the main window up (or
+ * creates it) and opens the item. The sound rides the notification
+ * (`notificationSound`: muted, or macOS's Glass), so Focus silences it too.
+ */
+function showActivityNotification(
+  content: NotificationContent,
+  playSound: boolean,
+  openMainWindow: MainWindowOpener,
+): void {
   if (!Notification.isSupported()) return
   const notification = new Notification({
     title: notificationText(content.title),
     body: notificationText(content.body),
+    ...notificationSound(playSound, process.platform),
   })
   liveNotifications.add(notification)
   if (liveNotifications.size > MAX_LIVE_NOTIFICATIONS) {
@@ -114,12 +129,7 @@ function showActivityNotification(content: NotificationContent): void {
   }
   notification.on('click', () => {
     release()
-    const win = findMainWindow()
-    if (!win) return
-    if (win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
-    win.webContents.send(MINERVA_EVENTS.openActivity, { itemId: content.itemId })
+    openMainWindow({ itemId: content.itemId })
   })
   notification.on('close', release)
   notification.show()
@@ -139,6 +149,15 @@ function broadcastLanguageChanged(payload: LanguageChangedEvent): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
       win.webContents.send(MINERVA_EVENTS.languageChanged, payload)
+    }
+  }
+}
+
+/** Pushes the saved notification settings to every open window (Settings stays in sync). */
+function broadcastNotificationsChanged(payload: NotificationsChangedEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(MINERVA_EVENTS.notificationsChanged, payload)
     }
   }
 }
@@ -189,12 +208,17 @@ function getScmSettings(root: DefaultScm): ScmSettingsInfo {
  * whatever the SCM layer serves (mock or real) without knowing which.
  *
  * Async because `createAiService` may probe a CLI before picking a service.
- * Returns `stopPrWatcher` and `stopChat` so `../index.ts` can stop the
- * watcher and close the chat database on quit.
+ * Returns `stopPrWatcher`, `stopChat` and `stopTray` so `../index.ts` can
+ * stop the watcher, close the chat database and remove the menu bar item on
+ * quit. `createMainWindow` lets a notification or menu bar click bring the
+ * main window back when every window was closed (macOS keeps the app running).
  */
-export async function registerIpcHandlers(): Promise<{
+export async function registerIpcHandlers(options: {
+  createMainWindow: () => BrowserWindow
+}): Promise<{
   stopPrWatcher: () => void
   stopChat: () => void
+  stopTray: () => void
 }> {
   // Main's own text (dialogs, error messages, window titles, the AI prompt)
   // follows the saved UI language from the first call on.
@@ -316,6 +340,15 @@ export async function registerIpcHandlers(): Promise<{
     }
   })
 
+  // Every way back into the app from outside it (a notification click, the
+  // menu bar item): bring the main window up, creating it when none is open.
+  const openMainWindow = createMainWindowOpener({
+    find: findMainWindow,
+    create: options.createMainWindow,
+    activateApp: () => {
+      if (process.platform === 'darwin') app.focus({ steal: true })
+    },
+  })
   // Dock badge + one system notification per batch (`notifications/activity-notifier.ts`).
   const notifier = createActivityNotifier({
     getSettings: () => settingsStore.getNotifications(),
@@ -323,7 +356,7 @@ export async function registerIpcHandlers(): Promise<{
       app.setBadgeCount(count)
     },
     isAppFocused: () => BrowserWindow.getFocusedWindow() !== null,
-    show: showActivityNotification,
+    show: (content, { playSound }) => showActivityNotification(content, playSound, openMainWindow),
     text: (key, vars) => mt(key, vars),
   })
   // Activity inbox (`docs/plan-notifications.md`): fed by every watcher
@@ -336,19 +369,64 @@ export async function registerIpcHandlers(): Promise<{
     onChange: (state, added) => {
       broadcastActivityChanged({ state })
       notifier.onActivity(state, added)
+      tray.refresh()
     },
+  })
+  /**
+   * Saves the notification settings and applies them everywhere: the dock
+   * badge, the menu bar item (created or removed live) and every window's
+   * Settings (`notificationsChanged`, the tray can flip `sound`).
+   */
+  const applyNotificationSettings = (next: NotificationSettings): NotificationSettings => {
+    settingsStore.setNotifications(next)
+    const saved = settingsStore.getNotifications()
+    notifier.refreshBadge(activity.get())
+    tray.refresh()
+    broadcastNotificationsChanged({ settings: saved })
+    return saved
+  }
+  // macOS menu bar item (`../tray/`): the unread count and the newest items.
+  // Clicks carry ids only and run main's own code.
+  const runTrayAction = (action: TrayAction): void => {
+    switch (action.kind) {
+      case 'openApp':
+        openMainWindow()
+        return
+      case 'openItem':
+        openMainWindow({ itemId: action.itemId })
+        return
+      case 'showInbox':
+        openMainWindow({ itemId: null })
+        return
+      case 'markAllRead':
+        activity.markRead({ all: true })
+        return
+      case 'setSound':
+        applyNotificationSettings({ ...settingsStore.getNotifications(), sound: action.sound })
+        return
+      case 'quit':
+        app.quit()
+        return
+    }
+  }
+  const tray = createTrayService({
+    getState: () => activity.get(),
+    getSettings: () => settingsStore.getNotifications(),
+    text: (key, vars) => mt(key, vars),
+    dispatch: runTrayAction,
   })
   // The unread count saved last session shows on the icon from startup.
   notifier.refreshBadge(activity.get())
+  tray.refresh()
   handle('activity:get', () => activity.get())
   handle('activity:markRead', (req) => activity.markRead(req))
   handle('activity:dismiss', (req) => activity.dismiss(req))
   handle('settings:getNotifications', () => settingsStore.getNotifications())
-  handle('settings:setNotifications', (req) => {
-    settingsStore.setNotifications(req)
-    notifier.refreshBadge(activity.get())
-    return settingsStore.getNotifications()
-  })
+  // The validator lets a payload without `sound`/`menuBar` through (the
+  // settings guard), so it is completed with the defaults before saving.
+  handle('settings:setNotifications', (req) =>
+    applyNotificationSettings(normalizeNotificationSettings(req)),
+  )
 
   // Background PR watcher: lists `{ state: 'all' }` across providers on an
   // interval and pushes `prListChanged` when something changed. Not decorated
@@ -632,6 +710,7 @@ export async function registerIpcHandlers(): Promise<{
     settingsStore.setLanguage(req.language)
     setMainLocale(req.language)
     refreshDidacticWindowTitle()
+    tray.refresh()
     broadcastLanguageChanged({ language: req.language })
     return req.language
   })
@@ -674,5 +753,9 @@ export async function registerIpcHandlers(): Promise<{
     return { ok: true as const }
   })
 
-  return { stopPrWatcher: () => prWatcher.stop(), stopChat: () => chat.shutdown() }
+  return {
+    stopPrWatcher: () => prWatcher.stop(),
+    stopChat: () => chat.shutdown(),
+    stopTray: () => tray.destroy(),
+  }
 }

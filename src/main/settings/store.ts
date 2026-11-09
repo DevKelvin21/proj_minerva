@@ -70,7 +70,9 @@ import { app } from 'electron'
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   isNotificationSettings,
+  normalizeNotificationSettings,
   type NotificationSettings,
+  type StoredNotificationSettings,
 } from '../../shared/activity'
 import { DEFAULT_AI_PROVIDER, isAiProviderId, type AiProviderId } from '../../shared/ai-providers'
 import { DEFAULT_LOCALE, isAppLocale, type AppLocale } from '../../shared/locale'
@@ -149,10 +151,13 @@ export interface PersistedSettings {
   appearance?: AppearanceSettings
   /**
    * Activity notifications (`../../shared/activity.ts`): system notification
-   * level and the dock badge. Absent = defaults (direct only, badge on); an
-   * invalid block is dropped on load without touching the rest.
+   * level, the dock badge, the notification sound and the macOS menu bar
+   * item. Absent = defaults (direct only, badge, sound and menu bar on); a
+   * file from before `sound`/`menuBar` keeps its level and badge (the missing
+   * ones read as on). An invalid block is dropped on load without touching
+   * the rest.
    */
-  notifications?: NotificationSettings
+  notifications?: StoredNotificationSettings
 }
 
 export interface PersistedScmSettings {
@@ -522,7 +527,8 @@ export class SettingsStore {
 
   /** Notification settings; the defaults when nothing (valid) is saved. */
   getNotifications(): NotificationSettings {
-    return this.load()?.notifications ?? DEFAULT_NOTIFICATION_SETTINGS
+    const saved = this.load()?.notifications
+    return saved ? normalizeNotificationSettings(saved) : DEFAULT_NOTIFICATION_SETTINGS
   }
 
   /** Replaces the saved notification settings (caller validated them). */

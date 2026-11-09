@@ -176,9 +176,13 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
   await attachScreenshot(window, testInfo, 'inbox-tiled-960')
 })
 
-test('Settings → Notifications: defaults to "aimed at me", saves the level and the badge', async ({
+test('Settings → Notifications: defaults to "aimed at me", saves the level, badge, sound and menu bar', async ({
   window,
 }, testInfo) => {
+  // The sound and the menu bar item themselves are native (OS notification,
+  // `Tray`, and `MINERVA_TRAY=off` here): CDP cannot see them, so this checks
+  // the settings that drive them. The menu bar row exists on macOS only.
+  const isMac = process.platform === 'darwin'
   await setViewport(window, 1600, 1000)
   const openSettings = async (): Promise<void> => {
     await window
@@ -192,13 +196,32 @@ test('Settings → Notifications: defaults to "aimed at me", saves the level and
   await expect(section).toContainText('Notifications')
   await expect(section.getByRole('radio', { name: /Only what is aimed at me/ })).toBeChecked()
   await expect(section.getByRole('switch', { name: /unread count/ })).toBeChecked()
+  const sound = section.getByRole('switch', { name: 'Play a sound' })
+  const menuBar = section.getByRole('switch', { name: 'Show Minerva in the menu bar' })
+  await expect(sound).toBeChecked()
+  await expect(sound).toBeEnabled()
+  await expect(section).toContainText('Focus and Do Not Disturb silence it.')
+  if (isMac) {
+    await expect(menuBar).toBeChecked()
+    await expect(section).toContainText('The owl with your unread count')
+  } else {
+    await expect(menuBar).toHaveCount(0)
+  }
   await section.scrollIntoViewIfNeeded()
   await attachScreenshot(window, testInfo, 'settings-notifications')
 
+  await sound.click()
+  await expect(sound).not.toBeChecked()
+  if (isMac) {
+    await menuBar.click()
+    await expect(menuBar).not.toBeChecked()
+  }
   await section.getByRole('radio', { name: /^Off/ }).check()
   await section.getByRole('switch', { name: /unread count/ }).uncheck()
   await expect(section.getByRole('radio', { name: /^Off/ })).toBeChecked()
   await expect(section.getByRole('switch', { name: /unread count/ })).not.toBeChecked()
+  // No notifications, no sound to choose.
+  await expect(sound).toBeDisabled()
 
   // Saved in main: a fresh Settings shows the same choice.
   await window.getByRole('button', { name: 'Close settings' }).click()
@@ -209,6 +232,19 @@ test('Settings → Notifications: defaults to "aimed at me", saves the level and
   await expect(
     window.getByTestId('notifications-section').getByRole('switch', { name: /unread count/ }),
   ).not.toBeChecked()
+  const reopened = window.getByTestId('notifications-section')
+  await expect(reopened.getByRole('switch', { name: 'Play a sound' })).not.toBeChecked()
+  await expect(reopened.getByRole('switch', { name: 'Play a sound' })).toBeDisabled()
+  if (isMac) {
+    await expect(
+      reopened.getByRole('switch', { name: 'Show Minerva in the menu bar' }),
+    ).not.toBeChecked()
+  }
+
+  // Back on: the sound switch is usable again and keeps its saved value.
+  await reopened.getByRole('radio', { name: /Everything in the Inbox/ }).check()
+  await expect(reopened.getByRole('switch', { name: 'Play a sound' })).toBeEnabled()
+  await expect(reopened.getByRole('switch', { name: 'Play a sound' })).not.toBeChecked()
 })
 
 base(

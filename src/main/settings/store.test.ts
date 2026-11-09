@@ -628,8 +628,41 @@ describe('SettingsStore', () => {
     })
   })
   describe('notifications', () => {
-    it('defaults to direct-only with the badge on', () => {
-      expect(new SettingsStore().getNotifications()).toEqual({ level: 'direct', badge: true })
+    it('defaults to direct-only with the badge, sound and menu bar on', () => {
+      expect(new SettingsStore().getNotifications()).toEqual({
+        level: 'direct',
+        badge: true,
+        sound: true,
+        menuBar: true,
+      })
+    })
+
+    it('keeps the level and badge of a file saved before sound and menuBar existed', () => {
+      const old = {
+        aiProvider: 'codex',
+        models: { codex: 'gpt-5' },
+        notifications: { level: 'all', badge: false },
+      }
+      writeFileSync(settingsFilePath(), JSON.stringify(old), 'utf-8')
+      const store = new SettingsStore()
+      expect(store.getNotifications()).toEqual({
+        level: 'all',
+        badge: false,
+        sound: true,
+        menuBar: true,
+      })
+      // Reading does not rewrite the file: the old block stays as it was.
+      expect(JSON.parse(readFileSync(settingsFilePath(), 'utf-8'))).toEqual(old)
+      // Another setter keeps it too, and the next notifications write is complete.
+      store.setLanguage('es')
+      expect(new SettingsStore().getNotifications()).toMatchObject({ level: 'all', badge: false })
+      store.setNotifications({ level: 'all', badge: false, sound: false, menuBar: true })
+      expect(JSON.parse(readFileSync(settingsFilePath(), 'utf-8')).notifications).toEqual({
+        level: 'all',
+        badge: false,
+        sound: false,
+        menuBar: true,
+      })
     })
 
     it('persists them without touching other fields, and other setters keep them', () => {
@@ -638,12 +671,13 @@ describe('SettingsStore', () => {
         JSON.stringify({ aiProvider: 'codex', models: { codex: 'gpt-5' }, language: 'es' }),
         'utf-8',
       )
-      new SettingsStore().setNotifications({ level: 'off', badge: false })
+      const saved = { level: 'off', badge: false, sound: false, menuBar: false } as const
+      new SettingsStore().setNotifications(saved)
       const reloaded = new SettingsStore()
-      expect(reloaded.getNotifications()).toEqual({ level: 'off', badge: false })
+      expect(reloaded.getNotifications()).toEqual(saved)
       expect(reloaded.getLanguage()).toBe('es')
       reloaded.setLanguage('en')
-      expect(new SettingsStore().getNotifications()).toEqual({ level: 'off', badge: false })
+      expect(new SettingsStore().getNotifications()).toEqual(saved)
     })
 
     it('drops an invalid block (defaults) without discarding the rest', () => {
@@ -657,7 +691,12 @@ describe('SettingsStore', () => {
         'utf-8',
       )
       const store = new SettingsStore()
-      expect(store.getNotifications()).toEqual({ level: 'direct', badge: true })
+      expect(store.getNotifications()).toEqual({
+        level: 'direct',
+        badge: true,
+        sound: true,
+        menuBar: true,
+      })
       expect(store.getPersistedModel('codex')).toBe('gpt-5')
     })
   })

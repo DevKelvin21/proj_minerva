@@ -112,19 +112,59 @@ export interface NotificationSettings {
   level: NotificationLevel
   /** Unread count on the dock / taskbar icon. */
   badge: boolean
+  /** The system notification plays a sound (one per batch, like the notification itself). */
+  sound: boolean
+  /** macOS: the owl in the menu bar with the unread count and a menu of the newest items. */
+  menuBar: boolean
 }
 
-export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = { level: 'direct', badge: true }
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  level: 'direct',
+  badge: true,
+  sound: true,
+  menuBar: true,
+}
 
-/** Exactly `{ level, badge }` with valid values (settings.json on load, IPC payloads). */
-export function isNotificationSettings(value: unknown): value is NotificationSettings {
+/**
+ * What settings.json (and an IPC payload) may hold: `sound` and `menuBar`
+ * came later, so a file saved before them carries only `{ level, badge }`.
+ * Missing = the default (`normalizeNotificationSettings`); the saved level
+ * and badge are kept, never reset.
+ */
+export type StoredNotificationSettings = Pick<NotificationSettings, 'level' | 'badge'> &
+  Partial<Pick<NotificationSettings, 'sound' | 'menuBar'>>
+
+const NOTIFICATION_SETTING_KEYS: readonly string[] = ['level', 'badge', 'sound', 'menuBar']
+
+const isOptionalBoolean = (value: unknown): boolean =>
+  value === undefined || typeof value === 'boolean'
+
+/**
+ * Only the known keys, with valid values; `sound` and `menuBar` may be
+ * missing (settings.json on load, IPC payloads).
+ */
+export function isNotificationSettings(value: unknown): value is StoredNotificationSettings {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const v = value as Record<string, unknown>
   return (
-    Object.keys(v).every((key) => key === 'level' || key === 'badge') &&
+    Object.keys(v).every((key) => NOTIFICATION_SETTING_KEYS.includes(key)) &&
     NOTIFICATION_LEVELS.includes(v.level as NotificationLevel) &&
-    typeof v.badge === 'boolean'
+    typeof v.badge === 'boolean' &&
+    isOptionalBoolean(v.sound) &&
+    isOptionalBoolean(v.menuBar)
   )
+}
+
+/** The full settings: a missing `sound` / `menuBar` takes its default. */
+export function normalizeNotificationSettings(
+  value: StoredNotificationSettings,
+): NotificationSettings {
+  return {
+    level: value.level,
+    badge: value.badge,
+    sound: value.sound ?? DEFAULT_NOTIFICATION_SETTINGS.sound,
+    menuBar: value.menuBar ?? DEFAULT_NOTIFICATION_SETTINGS.menuBar,
+  }
 }
 
 // ---------------------------------------------------------------------------

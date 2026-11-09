@@ -12,6 +12,7 @@ import {
   createActivityNotifier,
   notifiable,
   notificationFor,
+  notificationSound,
   type NotificationContent,
 } from './activity-notifier'
 
@@ -126,17 +127,25 @@ describe('notificationFor', () => {
 })
 
 describe('createActivityNotifier', () => {
-  function setup(settings: NotificationSettings, focused: boolean) {
+  function setup(
+    partial: Pick<NotificationSettings, 'level' | 'badge'> & Partial<NotificationSettings>,
+    focused: boolean,
+  ) {
+    const settings: NotificationSettings = { sound: true, menuBar: true, ...partial }
     const setBadge = vi.fn()
     const shown: NotificationContent[] = []
+    const sounds: boolean[] = []
     const notifier = createActivityNotifier({
       getSettings: () => settings,
       setBadge,
       isAppFocused: () => focused,
-      show: (content) => shown.push(content),
+      show: (content, { playSound }) => {
+        shown.push(content)
+        sounds.push(playSound)
+      },
       text,
     })
-    return { notifier, setBadge, shown }
+    return { notifier, setBadge, shown, sounds }
   }
   const state = (unreadCount: number): ActivityState => ({ items: [], unreadCount })
 
@@ -167,5 +176,33 @@ describe('createActivityNotifier', () => {
     notifier.onActivity(state(0), [])
     expect(setBadge).toHaveBeenLastCalledWith(0)
     expect(shown).toEqual([])
+  })
+
+  it('plays the sound with the one notification of a batch, unless it is turned off', () => {
+    const loud = setup({ level: 'all', badge: true, sound: true }, false)
+    loud.notifier.onActivity(state(2), [comment('a'), comment('b')])
+    expect(loud.sounds).toEqual([true])
+    const quiet = setup({ level: 'all', badge: true, sound: false }, false)
+    quiet.notifier.onActivity(state(1), [comment('a')])
+    expect(quiet.sounds).toEqual([false])
+  })
+
+  it('plays nothing while the app is focused', () => {
+    const { notifier, sounds } = setup({ level: 'all', badge: true, sound: true }, true)
+    notifier.onActivity(state(1), [comment('a')])
+    expect(sounds).toEqual([])
+  })
+})
+
+describe('notificationSound', () => {
+  it('a muted notification is silent everywhere', () => {
+    expect(notificationSound(false, 'darwin')).toEqual({ silent: true })
+    expect(notificationSound(false, 'win32')).toEqual({ silent: true })
+  })
+
+  it('macOS plays the Glass system sound; elsewhere the default sound', () => {
+    expect(notificationSound(true, 'darwin')).toEqual({ silent: false, sound: 'Glass' })
+    expect(notificationSound(true, 'linux')).toEqual({ silent: false })
+    expect(notificationSound(true, 'win32')).toEqual({ silent: false })
   })
 })

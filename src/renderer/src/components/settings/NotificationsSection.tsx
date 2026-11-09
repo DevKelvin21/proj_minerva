@@ -6,15 +6,18 @@ import {
   type NotificationSettings,
 } from '../../../../shared/activity'
 import { errorText } from '../../lib/error-text'
+import { IS_MAC } from '../../lib/platform'
 import { Radio } from '../ui/Checkbox'
 import { Switch } from '../ui/Switch'
 import { SettingsGroup, SettingsRow } from './SettingsRow'
 
 /**
  * Settings → Notifications: which new activity raises a system notification
- * (off / only what is aimed at you / everything) and the unread count on the
- * dock or taskbar icon. Saved in settings.json through main, which applies the
- * badge at once.
+ * (off / only what is aimed at you / everything), whether it plays a sound,
+ * the unread count on the dock or taskbar icon and (macOS) the menu bar item.
+ * Saved in settings.json through main, which applies the badge and the menu
+ * bar item at once. `notificationsChanged` keeps it current when the menu
+ * bar flips the sound.
  */
 export function NotificationsSection(): React.JSX.Element {
   const { t } = useTranslation()
@@ -36,6 +39,11 @@ export function NotificationsSection(): React.JSX.Element {
       alive = false
     }
   }, [t])
+
+  useEffect(
+    () => window.minerva.events.onNotificationsChanged(({ settings: next }) => setSettings(next)),
+    [],
+  )
 
   /**
    * Optimistic: the control moves at once, and goes back if main refuses.
@@ -97,6 +105,40 @@ export function NotificationsSection(): React.JSX.Element {
               />
             }
           />
+          <SettingsRow
+            title={t('settings.notifications.soundTitle')}
+            description={t('settings.notifications.sound')}
+            control={
+              <Switch
+                fieldSize="md"
+                data-testid="notifications-sound"
+                checked={settings.sound}
+                // No notifications, no sound to play.
+                disabled={settings.level === 'off'}
+                aria-disabled={saving || undefined}
+                onCheckedChange={(sound) => void save({ ...settings, sound })}
+                label={<span className="sr-only">{t('settings.notifications.soundTitle')}</span>}
+              />
+            }
+          />
+          {IS_MAC && (
+            <SettingsRow
+              title={t('settings.notifications.menuBarTitle')}
+              description={t('settings.notifications.menuBar')}
+              control={
+                <Switch
+                  fieldSize="md"
+                  data-testid="notifications-menu-bar"
+                  checked={settings.menuBar}
+                  aria-disabled={saving || undefined}
+                  onCheckedChange={(menuBar) => void save({ ...settings, menuBar })}
+                  label={
+                    <span className="sr-only">{t('settings.notifications.menuBarTitle')}</span>
+                  }
+                />
+              }
+            />
+          )}
         </>
       ) : error ? null : (
         <p className="px-4 py-3 text-xs text-muted">{t('common.loading')}</p>

@@ -908,10 +908,12 @@ describe('payloadValidators', () => {
 
   describe('settings:setNotifications', () => {
     const validate = payloadValidators['settings:setNotifications']
-    it('accepts a level and the badge flag', () => {
+    it('accepts a level and the badge flag, with or without sound and menuBar', () => {
       expect(validate({ level: 'off', badge: false })).toBe(true)
       expect(validate({ level: 'direct', badge: true })).toBe(true)
       expect(validate({ level: 'all', badge: true })).toBe(true)
+      expect(validate({ level: 'all', badge: true, sound: false })).toBe(true)
+      expect(validate({ level: 'all', badge: true, sound: true, menuBar: false })).toBe(true)
     })
 
     it('rejects unknown levels, missing or extra keys, wrong types', () => {
@@ -919,7 +921,9 @@ describe('payloadValidators', () => {
       expect(validate({ level: 'loud', badge: true })).toBe(false)
       expect(validate({ level: 'all' })).toBe(false)
       expect(validate({ level: 'all', badge: 'yes' })).toBe(false)
-      expect(validate({ level: 'all', badge: true, sound: true })).toBe(false)
+      expect(validate({ level: 'all', badge: true, sound: 'Glass' })).toBe(false)
+      expect(validate({ level: 'all', badge: true, menuBar: 1 })).toBe(false)
+      expect(validate({ level: 'all', badge: true, sound: true, volume: 3 })).toBe(false)
       expect(validate([])).toBe(false)
     })
   })
