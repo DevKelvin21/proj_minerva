@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey, repoKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
@@ -76,7 +77,7 @@ function ReviewLocation({
     pageCrumb = {
       label: (
         <span className="inline-flex min-w-0 items-center gap-1.5">
-          <ScmProviderIcon provider={pr.repo.provider} size={12} />
+          <ScmProviderIcon provider={pr.repo.provider} size="xs" />
           <span className="truncate">{shortRepoName(pr.repo.fullName)}</span>
         </span>
       ),
@@ -103,7 +104,7 @@ function ReviewLocation({
           >
             {pageCrumb.label}
           </button>
-          <ChevronRight size={14} className="shrink-0 text-muted/60" aria-hidden />
+          <Icon icon={icons.breadcrumb} size="sm" className="shrink-0 text-muted/60" />
         </>
       )}
       <button
@@ -120,7 +121,7 @@ function ReviewLocation({
             {t(`prList.state.${state}`)}
           </Badge>
         )}
-        <ChevronDown size={14} className="shrink-0 text-muted" aria-hidden />
+        <Icon icon={icons.dropdown} size="sm" className="shrink-0 text-muted" />
       </button>
     </nav>
   )

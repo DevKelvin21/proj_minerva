@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, TriangleAlert, Workflow } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { DiffFile, WalkthroughFileRef } from '../../../../shared/types'
 import { rangeLabel, rangeLineCount, type FlatLayer } from '../../lib/walkthrough'
 import { Markdown } from '../ui/Markdown'
@@ -64,14 +65,14 @@ export function LayerContextBar({
           {t('prDetail.layers.keyboardHint')}
         </span>
         <IconButton
-          icon={<ChevronLeft size={15} />}
+          icon={<Icon icon={icons.previous} size="md" />}
           label={t('prDetail.layers.previous')}
           disabled={onPrevious === null}
           onClick={onPrevious ?? undefined}
           className="h-7 w-7"
         />
         <IconButton
-          icon={<ChevronRight size={15} />}
+          icon={<Icon icon={icons.next} size="md" />}
           label={t('prDetail.layers.next')}
           disabled={onNext === null}
           onClick={onNext ?? undefined}
@@ -116,7 +117,7 @@ export function LayerContextBar({
           <Chip
             onClick={() => setDiagramOpen((open) => !open)}
             aria-expanded={diagramOpen}
-            icon={<Workflow size={12} aria-hidden />}
+            icon={<Icon icon={icons.diagram} size="xs" />}
             className="ml-auto"
           >
             {diagramOpen ? t('prDetail.layers.hideDiagram') : t('prDetail.layers.showDiagram')}
@@ -126,7 +127,7 @@ export function LayerContextBar({
 
       {unknownPaths.length > 0 && (
         <p className="flex items-start gap-1.5 text-[11px] text-warning">
-          <TriangleAlert size={12} className="mt-0.5 shrink-0" />
+          <Icon icon={icons.warning} size="xs" className="mt-0.5 shrink-0" />
           {t('prDetail.layers.unknownFiles', { files: unknownPaths.join(', ') })}
         </p>
       )}

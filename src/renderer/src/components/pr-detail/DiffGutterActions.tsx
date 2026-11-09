@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Sparkles } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { rovingTarget } from '../../lib/roving-focus'
 import { LineThreadIndicator } from './LineThreadIndicator'
 
@@ -73,7 +74,7 @@ export function DiffGutterActions({
         title={t('comments.line.addComment')}
         className={`${SLOT} ${REVEAL} text-muted hover:bg-border/60 hover:text-text`}
       >
-        <Plus size={12} aria-hidden />
+        <Icon icon={icons.addComment} size="xs" />
       </button>
     ))
   }
@@ -100,7 +101,7 @@ export function DiffGutterActions({
               : `${REVEAL} text-muted hover:text-text`
         }`}
       >
-        <Sparkles size={11} aria-hidden />
+        <Icon icon={icons.ai} size="xs" />
       </button>
     ))
   }

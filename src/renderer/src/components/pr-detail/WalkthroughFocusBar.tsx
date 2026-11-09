@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, CircleAlert, CircleCheck, CircleHelp } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { LayerVerdict } from '../../stores/app-store'
 import { Button } from '../ui/Button'
@@ -13,19 +14,19 @@ const VERDICTS: ReadonlyArray<{
   {
     verdict: 'good',
     key: '1',
-    icon: <CircleCheck size={15} className="text-success" aria-hidden />,
+    icon: <Icon icon={icons.success} size="md" className="text-success" />,
     on: 'border-success bg-success/15 text-success',
   },
   {
     verdict: 'changes',
     key: '2',
-    icon: <CircleAlert size={15} className="text-danger" aria-hidden />,
+    icon: <Icon icon={icons.error} size="md" className="text-danger" />,
     on: 'border-danger bg-danger/15 text-danger',
   },
   {
     verdict: 'question',
     key: '3',
-    icon: <CircleHelp size={15} className="text-warning" aria-hidden />,
+    icon: <Icon icon={icons.unsure} size="md" className="text-warning" />,
     on: 'border-warning bg-warning/15 text-warning',
   },
 ]
@@ -67,7 +68,7 @@ export function WalkthroughFocusBar({
         size="md"
         onClick={onPrevious ?? undefined}
         disabled={!onPrevious}
-        icon={<ChevronLeft size={15} aria-hidden />}
+        icon={<Icon icon={icons.previous} size="md" />}
       >
         {t('prDetail.focus.previous')}
         <Kbd>K</Kbd>
@@ -75,7 +76,7 @@ export function WalkthroughFocusBar({
       <Button size="md" onClick={onNext ?? undefined} disabled={!onNext}>
         {t('prDetail.focus.next')}
         <Kbd>J</Kbd>
-        <ChevronRight size={15} aria-hidden />
+        <Icon icon={icons.next} size="md" />
       </Button>
 
       <div

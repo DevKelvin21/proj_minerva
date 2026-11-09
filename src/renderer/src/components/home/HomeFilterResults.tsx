@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Bookmark, BookmarkPlus, Funnel, GitPullRequest, Trash2 } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import { prKey, repoKey } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
@@ -76,9 +77,9 @@ function ResultRow({
       )}
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className={`flex min-w-0 items-center gap-1.5 text-sm ${unread ? 'font-semibold text-text' : 'font-medium text-text/85'}`}>
-          <GitPullRequest
-            size={13}
-            aria-hidden
+          <Icon
+            icon={icons.pullRequest}
+            size="sm"
             className={`shrink-0 ${pr.isDraft ? 'text-muted' : 'text-success'}`}
           />
           <span className="shrink-0 font-mono text-xs text-muted">#{pr.number}</span>
@@ -109,7 +110,7 @@ function ResultRow({
             {t(reviewDecisionLabelKey(pr.reviewDecision, pr.repo.provider))}
           </Badge>
         )}
-        <CiStatusIcon status={pr.ciStatus} size={13} />
+        <CiStatusIcon status={pr.ciStatus} size="sm" />
       </span>
     </button>
   )
@@ -191,7 +192,7 @@ function ViewActions({ statusLabel }: { statusLabel: (status: StatusId) => strin
         <Button
           size="sm"
           data-testid="home-view-update"
-          icon={<Bookmark size={12} aria-hidden />}
+          icon={<Icon icon={icons.savedView} size="xs" />}
           title={t('home.savedViews.updateTitle', { name: activeView.name })}
           onClick={() => updateView(activeViewId)}
         >
@@ -203,7 +204,7 @@ function ViewActions({ statusLabel }: { statusLabel: (status: StatusId) => strin
           size="sm"
           variant={activeView ? 'ghost' : 'secondary'}
           data-testid="home-view-save"
-          icon={<BookmarkPlus size={12} aria-hidden />}
+          icon={<Icon icon={icons.saveView} size="xs" />}
           title={t('home.savedViews.saveTitle')}
           onClick={() => setName(suggestViewName(filter, statusLabel))}
         >
@@ -215,7 +216,7 @@ function ViewActions({ statusLabel }: { statusLabel: (status: StatusId) => strin
           size="sm"
           variant="ghost"
           data-testid="home-view-delete"
-          icon={<Trash2 size={12} aria-hidden />}
+          icon={<Icon icon={icons.delete} size="xs" />}
           title={t('home.savedViews.deleteTitle', { name: activeView.name })}
           onClick={() => deleteView(activeViewId)}
         >
@@ -259,7 +260,7 @@ function NoMatch({
       data-testid="home-filter-empty"
       className="flex flex-col items-center gap-2 rounded-lg border border-border bg-panel px-4 py-6 text-center"
     >
-      <Funnel size={20} aria-hidden className="text-muted" />
+      <Icon icon={icons.filter} size="lg" className="text-muted" />
       <p className="text-sm font-medium text-text">{t('home.filterResults.emptyTitle')}</p>
       <p className="text-xs text-muted" data-testid="home-filter-without">
         {hint && described ? (
@@ -348,7 +349,7 @@ export function HomeFilterResults({
               className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-panel"
             >
               <div className="flex min-w-0 items-center gap-2 bg-border/30 px-3 py-1.5">
-                <ScmProviderIcon provider={group.repo.provider} size={12} />
+                <ScmProviderIcon provider={group.repo.provider} size="xs" />
                 <span className="min-w-0 truncate text-xs font-semibold text-text">{group.repo.name}</span>
                 <span className="min-w-0 truncate text-[11px] text-muted">{repoOwnerLabel(group.repo)}</span>
                 <span className="ml-auto shrink-0 tabular-nums text-[11px] text-muted">

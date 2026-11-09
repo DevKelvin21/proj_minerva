@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
+import { Spinner } from '../ui/Spinner'
 import { Trans, useTranslation } from 'react-i18next'
 import type { ScmAuthStatus } from '../../../../shared/scm'
 import { isAzureOrganizationName } from '../../../../shared/scm-guards'
@@ -169,7 +171,7 @@ function AzureSettingsForm({
               disabled={!orgValid || loading}
               onClick={() => void load(organization.trim())}
               icon={
-                loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />
+                loading ? <Spinner size="xs" /> : <Icon icon={icons.reload} size="xs" />
               }
             >
               {t('settings.azure.loadProjects')}

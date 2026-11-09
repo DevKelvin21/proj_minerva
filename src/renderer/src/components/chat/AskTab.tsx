@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { Sparkles, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey as toPrKey, type RepoRef } from '../../../../shared/scm'
 import { useChatStore } from '../../stores/chat-store'
@@ -50,7 +51,7 @@ export function AskTab({ repo, number }: AskTabProps): React.JSX.Element {
 function ChatEmptyState(): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <EmptyState compact icon={Sparkles} title={t('chat.empty.title')} hint={t('chat.empty.hint')} />
+    <EmptyState compact icon={icons.ai} title={t('chat.empty.title')} hint={t('chat.empty.hint')} />
   )
 }
 
@@ -70,7 +71,7 @@ function ChatError({ prKey }: { prKey: string }): React.JSX.Element | null {
           size="xs"
           onClick={() => dismissError(prKey)}
           label={t('common.dismiss')}
-          icon={<X size={12} />}
+          icon={<Icon icon={icons.close} size="xs" />}
         />
       }
     >

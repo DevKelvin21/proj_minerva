@@ -1,6 +1,7 @@
-import { Cloud, GitPullRequest } from 'lucide-react'
 import type { ScmProviderId } from '../../../../shared/scm'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
+import { Icon, type IconSize } from './Icon'
+import { icons } from './icons'
 
 /**
  * Small provider marker. lucide ships no brand logos, so each provider gets a
@@ -8,14 +9,13 @@ import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
  */
 export function ScmProviderIcon({
   provider,
-  size = 12,
+  size = 'xs',
   className = '',
 }: {
   provider: ScmProviderId
-  size?: number
+  size?: IconSize
   className?: string
 }): React.JSX.Element {
-  const Icon = provider === 'azure' ? Cloud : GitPullRequest
   return (
     <span
       role="img"
@@ -24,7 +24,7 @@ export function ScmProviderIcon({
       data-provider={provider}
       className={'inline-flex shrink-0 ' + className}
     >
-      <Icon size={size} aria-hidden />
+      <Icon icon={provider === 'azure' ? icons.cloud : icons.pullRequest} size={size} />
     </span>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { PullRequestSummary } from '../../../../shared/types'
 import type { RepoGroupData } from '../../lib/pr-filters'
 import { prKey } from '../../../../shared/scm'
@@ -25,7 +26,7 @@ export function RepoGroup({ group, onSelectPr }: RepoGroupProps): React.JSX.Elem
         aria-expanded={!collapsed}
         className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted transition-colors duration-150 hover:text-text"
       >
-        {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        {collapsed ? <Icon icon={icons.collapsed} size="sm" /> : <Icon icon={icons.expanded} size="sm" />}
         <ScmProviderIcon provider={group.repo.provider} />
         <span className="truncate">{group.repo.fullName}</span>
         <Badge size="sm" className="ml-auto normal-case">

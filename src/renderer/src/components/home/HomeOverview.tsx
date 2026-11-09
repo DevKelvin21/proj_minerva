@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Eye, EyeOff, LogIn, PlugZap } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
 import { useHomeFilter } from '../../hooks/use-home-filter'
@@ -111,7 +112,7 @@ export function HomeOverview(): React.JSX.Element {
     body = (
       <PageEmpty
         data-testid="home-no-providers"
-        icon={PlugZap}
+        icon={icons.disconnected}
         title={t('home.overview.noProvidersTitle')}
         hint={t('home.overview.noProvidersHint')}
         action={
@@ -125,7 +126,7 @@ export function HomeOverview(): React.JSX.Element {
     body = (
       <PageEmpty
         data-testid="home-sign-in-needed"
-        icon={LogIn}
+        icon={icons.signIn}
         title={t('home.overview.signInTitle')}
         action={
           <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4">
@@ -185,7 +186,7 @@ export function HomeOverview(): React.JSX.Element {
                   data-testid="features-hidden-toggle"
                   aria-pressed={showHidden}
                   onClick={() => setShowHidden((value) => !value)}
-                  icon={showHidden ? <EyeOff size={11} aria-hidden /> : <Eye size={11} aria-hidden />}
+                  icon={showHidden ? <Icon icon={icons.hide} size="xs" /> : <Icon icon={icons.show} size="xs" />}
                 >
                   {t('home.overview.features.hidden', { count: hiddenGroups.length })}
                   {' — '}

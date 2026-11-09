@@ -1,4 +1,5 @@
-import { RefreshCw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { AI_PROVIDER_IDS, type AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
@@ -58,7 +59,7 @@ export function AiProvidersPage({
             size="sm"
             onClick={onRecheck}
             disabled={loading}
-            icon={<RefreshCw size={12} className={loading ? 'animate-spin' : ''} aria-hidden />}
+            icon={<Icon icon={icons.reload} size="xs" className={loading ? 'animate-spin' : ''} />}
           >
             {t('settings.cliGuide.recheck')}
           </Button>

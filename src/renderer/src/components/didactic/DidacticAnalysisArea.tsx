@@ -2,16 +2,8 @@ import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useRovingTabs } from '../../hooks/use-roving-tabs'
 import type { TFunction } from 'i18next'
-import {
-  BookOpen,
-  Building2,
-  Cloud,
-  Database,
-  Globe,
-  Layers,
-  Rocket,
-  Workflow,
-} from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
 import { useProviderStatus } from '../../hooks/use-provider-status'
 import { useScmSettings } from '../../hooks/use-scm-settings'
@@ -44,13 +36,13 @@ import {
 import { Spinner } from '../ui/Spinner'
 
 const SECTION_ICON: Record<DidacticSection['kind'], React.JSX.Element> = {
-  summary: <BookOpen size={16} />,
-  walkthrough: <Layers size={16} />,
-  setup: <Rocket size={16} />,
-  architecture: <Building2 size={16} />,
-  endpoint: <Globe size={16} />,
-  schema: <Database size={16} />,
-  cloud: <Cloud size={16} />,
+  summary: <Icon icon={icons.summary} size="md" />,
+  walkthrough: <Icon icon={icons.walkthrough} size="md" />,
+  setup: <Icon icon={icons.setup} size="md" />,
+  architecture: <Icon icon={icons.architecture} size="md" />,
+  endpoint: <Icon icon={icons.endpoint} size="md" />,
+  schema: <Icon icon={icons.schema} size="md" />,
+  cloud: <Icon icon={icons.cloud} size="md" />,
 }
 
 /**
@@ -187,7 +179,7 @@ function WalkthroughBody({
                   {t('didactic.walkthrough.fileCount', { count: layer.files.length })}
                   {layer.mermaid && (
                     <span className="flex items-center gap-0.5">
-                      <Workflow size={10} aria-hidden />
+                      <Icon icon={icons.diagram} size="xs" />
                       {t('didactic.walkthrough.withDiagram')}
                     </span>
                   )}
@@ -576,7 +568,7 @@ export function DidacticAnalysisArea({
     body = (
       <div className="flex min-w-0 flex-col gap-3" data-testid="analysis-skeleton">
         <div role="status" className="flex min-w-0 items-center gap-2 text-xs text-muted">
-          <Spinner size={12} />
+          <Spinner size="xs" />
           <span className="truncate">
             {checkingCache
               ? t('didactic.analysis.checkingCache')

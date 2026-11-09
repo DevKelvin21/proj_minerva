@@ -1,4 +1,5 @@
-import { Check } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { AI_PROVIDER_IDS } from '../../../../shared/ai-providers'
 import { useRovingTabs } from '../../hooks/use-roving-tabs'
@@ -26,7 +27,7 @@ interface ProviderTabsProps {
  * exclusivamente por clickear una card de modelo en `ProviderModelPanel`.
  *
  * Cada tab lleva un punto de estado de login (color por
- * `AiProviderStatus.status`) y un check (`lucide-react`) SOLO en el tab del
+ * `AiProviderStatus.status`) y un check (`icons.check`) SOLO en el tab del
  * proveedor ACTIVO (`info.provider`), sin importar cuál se esté viendo.
  *
  * Keyboard: `useRovingTabs` (one Tab stop, Left/Right switch with
@@ -76,7 +77,7 @@ export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsP
             {entry.label}
             {isActiveProvider && (
               <>
-                <Check size={12} className="text-accent" aria-hidden />
+                <Icon icon={icons.check} size="xs" className="text-accent" />
                 <span className="sr-only">{t('settings.providerTabs.activeProvider')}</span>
               </>
             )}

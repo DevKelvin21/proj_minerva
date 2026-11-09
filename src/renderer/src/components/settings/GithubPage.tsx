@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
+import { Spinner } from '../ui/Spinner'
 import { Trans, useTranslation } from 'react-i18next'
 import type { ScmAuthStatus } from '../../../../shared/scm'
 import type { GhAccount } from '../../../../shared/types'
@@ -98,7 +100,7 @@ function AccountCard({
       <span className="flex shrink-0 items-center gap-1.5">
         {badge}
         {busy ? (
-          <Loader2 size={14} className="mt-0.5 animate-spin text-muted" />
+          <Spinner size="sm" className="mt-0.5" />
         ) : selected ? (
           <Badge tone="success">{t('settings.github.active')}</Badge>
         ) : null}
@@ -204,7 +206,7 @@ export function GithubPage(): React.JSX.Element | null {
               size="xs"
               onClick={() => void reload()}
               disabled={loading || busy}
-              icon={<RefreshCw size={11} className={loading ? 'animate-spin' : ''} />}
+              icon={<Icon icon={icons.reload} size="xs" className={loading ? 'animate-spin' : ''} />}
             >
               {t('settings.github.refresh')}
             </Button>

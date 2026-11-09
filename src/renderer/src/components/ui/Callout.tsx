@@ -1,5 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react'
-import { CircleAlert, Info, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Icon } from './Icon'
+import { icons, type IconGlyph } from './icons'
 
 export type CalloutTone = 'warning' | 'danger' | 'info'
 
@@ -9,16 +10,16 @@ const toneClasses: Record<CalloutTone, { border: string; bg: string; icon: strin
   info: { border: 'border-info/40', bg: 'bg-info/10', icon: 'text-info' },
 }
 
-const defaultIcons: Record<CalloutTone, LucideIcon> = {
-  warning: TriangleAlert,
-  danger: CircleAlert,
-  info: Info,
+const defaultIcons: Record<CalloutTone, IconGlyph> = {
+  warning: icons.warning,
+  danger: icons.error,
+  info: icons.info,
 }
 
 interface CalloutProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   tone: CalloutTone
   /** Leading icon in the tone's color; `null` hides it. Defaults per tone. */
-  icon?: LucideIcon | null
+  icon?: IconGlyph | null
   /** The message. */
   children: ReactNode
   /** Trailing control, usually a `Button size="xs"`; wraps under the text when narrow. */
@@ -45,7 +46,7 @@ export function Callout({
   className = '',
   ...rest
 }: CalloutProps): React.JSX.Element {
-  const Icon = icon === undefined ? defaultIcons[tone] : icon
+  const glyph = icon === undefined ? defaultIcons[tone] : icon
   const tones = toneClasses[tone]
   const shape = variant === 'strip' ? 'px-3 py-1.5' : `rounded-md border p-2.5 ${tones.border}`
   return (
@@ -53,7 +54,7 @@ export function Callout({
       className={`flex min-w-0 items-start gap-2 text-xs text-text ${tones.bg} ${shape} ${className}`}
       {...rest}
     >
-      {Icon && <Icon size={14} className={`mt-px shrink-0 ${tones.icon}`} aria-hidden />}
+      {glyph && <Icon icon={glyph} size="sm" className={`mt-px shrink-0 ${tones.icon}`} />}
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <div className="min-w-0 flex-1 basis-48 break-words">{children}</div>
         {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}

@@ -1,4 +1,5 @@
-import { Layers, TriangleAlert } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { repoOwnerLabel, type RepoSummary } from '../../lib/dashboard'
 import { Badge } from '../ui/Badge'
@@ -48,7 +49,7 @@ export function RepoCard({
     >
       <span className="flex min-w-0 items-start gap-2">
         <span className="mt-0.5 text-muted">
-          <ScmProviderIcon provider={repo.provider} size={14} />
+          <ScmProviderIcon provider={repo.provider} size="sm" />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-semibold text-text" title={repo.fullName}>
@@ -98,7 +99,7 @@ export function RepoCard({
         <span className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-muted">
           {summary.stacks > 0 && (
             <span className="inline-flex items-center gap-1" title={t('home.repoCard.stacksTitle')}>
-              <Layers size={11} aria-hidden />
+              <Icon icon={icons.stack} size="xs" />
               {t('home.repoCard.stacks', { count: summary.stacks })}
             </span>
           )}
@@ -107,7 +108,7 @@ export function RepoCard({
               className="inline-flex items-center gap-1 text-warning"
               title={t('home.repoCard.orphansTitle')}
             >
-              <TriangleAlert size={11} aria-hidden />
+              <Icon icon={icons.warning} size="xs" />
               {t('home.repoCard.orphans', { count: summary.orphans })}
             </span>
           )}

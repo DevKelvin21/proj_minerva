@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Spinner } from '../ui/Spinner'
 import { Trans, useTranslation } from 'react-i18next'
 import type { AppLocale } from '../../../../shared/locale'
 import { useLocale } from '../../i18n/use-locale'
@@ -108,7 +108,7 @@ export function UpdateSection({ updater }: UpdateSectionProps): React.JSX.Elemen
               )}
               {status.phase === 'checking' && (
                 <p className="flex items-center gap-1.5 text-xs text-muted">
-                  <Loader2 size={13} className="animate-spin" />
+                  <Spinner size="sm" />
                   {t('updater.checking')}
                 </p>
               )}

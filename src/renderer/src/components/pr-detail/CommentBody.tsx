@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Lightbulb } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Markdown } from '../ui/Markdown'
 import { diffSuggestion, splitSuggestionBlocks } from '../../lib/suggestions'
 
@@ -37,7 +38,7 @@ export function SuggestionDiff({
   return (
     <figure data-testid="suggestion-diff" className="overflow-hidden rounded border border-border">
       <figcaption className="flex items-center gap-1.5 border-b border-border bg-panel px-2 py-1 text-xs text-muted">
-        <Lightbulb size={12} className="text-warning" />
+        <Icon icon={icons.suggestion} size="xs" />
         <span className="font-medium text-text">{t('comments.suggestion.title')}</span>
         {suggested.length === 0 && <span>{t('comments.suggestion.removeLines')}</span>}
         {original === null && <span>· {t('comments.suggestion.originalUnavailable')}</span>}

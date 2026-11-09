@@ -1,15 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  CheckCircle2,
-  ChevronDown,
-  CircleDashed,
-  CircleSlash,
-  ExternalLink,
-  GitBranch,
-  Layers,
-  XCircle,
-} from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { prKey } from '../../../../shared/scm'
 import type { PrCheck, PrMergeStatus, PullRequestDetail } from '../../../../shared/types'
 import { MergeControl } from './MergeControl'
@@ -45,12 +37,12 @@ const MERGE_STATUS_TONE: Record<Exclude<PrMergeStatus, 'clean'>, ScmTone> = {
 
 function CheckIcon({ status }: { status: PrCheck['status'] }): React.JSX.Element {
   if (status === 'success')
-    return <CheckCircle2 size={12} className="shrink-0 text-success" aria-hidden />
+    return <Icon icon={icons.success} size="xs" className="shrink-0 text-success" />
   if (status === 'failure')
-    return <XCircle size={12} className="shrink-0 text-danger" aria-hidden />
+    return <Icon icon={icons.error} size="xs" className="shrink-0 text-danger" />
   if (status === 'pending')
-    return <CircleDashed size={12} className="shrink-0 text-warning" aria-hidden />
-  return <CircleSlash size={12} className="shrink-0 text-muted" aria-hidden />
+    return <Icon icon={icons.pending} size="xs" className="shrink-0 text-warning" />
+  return <Icon icon={icons.skipped} size="xs" className="shrink-0 text-muted" />
 }
 
 /**
@@ -85,7 +77,7 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
         {pr.author.displayName ?? pr.author.login}
       </span>
       <span className="flex items-center gap-1 font-mono">
-        <GitBranch size={12} />
+        <Icon icon={icons.branch} size="xs" />
         <span data-testid="pr-branches">
           {pr.headRef} → {pr.baseRef}
         </span>
@@ -109,7 +101,7 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
         rel="noreferrer"
         className="flex items-center gap-1 underline decoration-dotted transition-colors hover:text-text"
       >
-        <ExternalLink size={12} aria-hidden />
+        <Icon icon={icons.openExternal} size="xs" />
         {t('prDetail.header.openIn', { provider: SCM_PROVIDER_LABEL[pr.repo.provider] })}
       </a>
     </div>
@@ -351,7 +343,7 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
       )}
       {showBranches && (
         <span className="flex min-w-0 items-center gap-1 font-mono" title={pr.headRef + ' → ' + pr.baseRef}>
-          <GitBranch size={12} className="shrink-0" aria-hidden />
+          <Icon icon={icons.branch} size="xs" className="shrink-0" />
           <span className="truncate">
             {pr.headRef} → {pr.baseRef}
           </span>
@@ -383,7 +375,7 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
           <details ref={detailsRef} className="relative shrink-0" data-testid="pr-details">
             <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted transition-colors duration-150 hover:bg-border/60 hover:text-text">
               {t('prDetail.header.details')}
-              <ChevronDown size={14} aria-hidden />
+              <Icon icon={icons.dropdown} size="sm" />
             </summary>
             <div className="absolute right-0 z-30 mt-2 flex max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-y-auto rounded-lg border border-border bg-panel p-4 shadow-2xl">
               <p className="text-sm font-semibold text-text">
@@ -403,7 +395,7 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
               // Narrow: icon only, so the label moves to the name and the tooltip.
               aria-label={compactWalkthrough ? t('prDetail.header.walkthrough') : undefined}
               title={compactWalkthrough ? t('prDetail.header.walkthrough') : undefined}
-              icon={<Layers size={14} aria-hidden />}
+              icon={<Icon icon={icons.walkthrough} size="sm" />}
             >
               {!compactWalkthrough && t('prDetail.header.walkthrough')}
             </Button>

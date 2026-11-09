@@ -1,5 +1,6 @@
 import { useId } from 'react'
-import { ArrowUp, Square } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import { MAX_CHAT_CONTEXT_ITEMS, MAX_CHAT_MESSAGE_LEN } from '../../../../shared/chat'
 import type { RepoRef } from '../../../../shared/scm'
@@ -102,7 +103,7 @@ export function ChatComposer({
             size="sm"
             onClick={() => void cancel(prKey, conversationId)}
             label={t('chat.composer.stop')}
-            icon={<Square size={12} fill="currentColor" />}
+            icon={<Icon icon={icons.stop} size="xs" filled />}
           />
         ) : (
           <IconButton
@@ -111,7 +112,7 @@ export function ChatComposer({
             tone="primary"
             disabled={!canSend}
             label={t('chat.composer.send')}
-            icon={<ArrowUp size={14} />}
+            icon={<Icon icon={icons.send} size="sm" />}
           />
         )}
       </div>

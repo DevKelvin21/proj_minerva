@@ -1,14 +1,7 @@
 import { useId, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import {
-  Archive,
-  CheckCheck,
-  CircleCheck,
-  CircleX,
-  Eye,
-  GitPullRequestArrow,
-  MessageSquareWarning,
-} from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import type { ActivityItem, ActivityReviewItem } from '../../../../shared/activity'
 import { prKey } from '../../../../shared/scm'
@@ -49,12 +42,12 @@ function UnreadDot({ unread }: { unread: boolean }): React.JSX.Element {
 /** Icon and tone of a vote: green approvals, warning for changes, danger for a rejection. */
 function VoteIcon({ vote }: { vote: ActivityReviewItem['vote'] }): React.JSX.Element {
   if (vote === 'approved' || vote === 'approved_with_suggestions') {
-    return <CircleCheck size={14} className="mt-0.5 shrink-0 text-success" aria-hidden />
+    return <Icon icon={icons.approved} size="sm" className="mt-0.5 shrink-0 text-success" />
   }
   if (vote === 'rejected') {
-    return <CircleX size={14} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+    return <Icon icon={icons.error} size="sm" className="mt-0.5 shrink-0 text-danger" />
   }
-  return <MessageSquareWarning size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+  return <Icon icon={icons.changesRequested} size="sm" className="mt-0.5 shrink-0 text-warning" />
 }
 
 /** Relative time, the absolute one in the tooltip. */
@@ -154,7 +147,7 @@ function ItemRow({
       <RowShell
         {...shell}
         lead={
-          <GitPullRequestArrow size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+          <Icon icon={icons.orphan} size="sm" className="mt-0.5 shrink-0 text-warning" />
         }
         title={
           // Branch names go in as components (plain text), never as values Trans would parse.
@@ -186,7 +179,7 @@ function ItemRow({
     return (
       <RowShell
         {...shell}
-        lead={<Eye size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />}
+        lead={<Icon icon={icons.reviewRequested} size="sm" className="mt-0.5 shrink-0 text-info" />}
         title={t(item.required ? 'layout.inbox.requested' : 'layout.inbox.requestedOptional')}
       />
     )
@@ -254,7 +247,7 @@ function ItemListRow({
         size="xs"
         onClick={() => onDone(item)}
         label={t('layout.inbox.done')}
-        icon={<Archive size={13} aria-hidden />}
+        icon={<Icon icon={icons.archive} size="sm" />}
         data-inbox-done={item.id}
         className="mr-2 mt-2 opacity-0 focus-visible:opacity-100 focus-visible:outline-offset-[-2px]! group-hover/row:opacity-100 group-focus-within/row:opacity-100"
       />
@@ -308,7 +301,7 @@ function GroupSection({
           </span>
           <span className="block truncate text-xs text-muted">{group.repo.fullName}</span>
         </span>
-        {pending && <Spinner size={13} className="mt-0.5" />}
+        {pending && <Spinner size="sm" className="mt-0.5" />}
         {/* Stays mounted once the group is read (quiet, aria-disabled), so focus is not lost. */}
         <IconButton
           size="xs"
@@ -317,13 +310,13 @@ function GroupSection({
           }}
           aria-disabled={group.unreadCount === 0 || undefined}
           label={t('layout.inbox.markPrRead', { number: group.number })}
-          icon={<CheckCheck size={13} aria-hidden />}
+          icon={<Icon icon={icons.markAllRead} size="sm" />}
         />
         <IconButton
           size="xs"
           onClick={() => onDoneGroup(group)}
           label={t('layout.inbox.donePr', { number: group.number })}
-          icon={<Archive size={13} aria-hidden />}
+          icon={<Icon icon={icons.archive} size="sm" />}
         />
       </div>
       <ul>
@@ -543,7 +536,7 @@ export function InboxView(): React.JSX.Element {
                   if (readIds.length > 0) dismiss(readIds, { kind: 'read', count: readIds.length })
                 }}
                 aria-disabled={readIds.length === 0 || undefined}
-                icon={<Archive size={12} aria-hidden />}
+                icon={<Icon icon={icons.archive} size="xs" />}
               >
                 {t('layout.inbox.clearRead')}
               </Button>
@@ -583,7 +576,7 @@ export function InboxView(): React.JSX.Element {
           data-testid="inbox-caught-up"
           className="flex flex-col items-center gap-1 px-4 py-6 text-center"
         >
-          <CheckCheck size={18} className="text-muted" aria-hidden />
+          <Icon icon={icons.markAllRead} size="lg" className="text-muted" />
           <p className="text-sm font-medium text-text">{t('layout.inbox.allRead')}</p>
           <p className="text-xs text-muted">
             <Trans
@@ -649,7 +642,7 @@ export function InboxView(): React.JSX.Element {
             onBlur={() => holdDismiss(false)}
             className="mt-2 flex min-w-0 items-center gap-2 rounded-md bg-text py-1.5 pl-3 pr-1.5 text-xs text-panel shadow-lg"
           >
-            <Archive size={13} className="shrink-0" aria-hidden />
+            <Icon icon={icons.archive} size="sm" className="shrink-0" />
             <span className="min-w-0 flex-1">{noticeText(pendingDismiss.notice)}</span>
             <button
               type="button"

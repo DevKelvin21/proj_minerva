@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { RefreshCw, Search } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
 import { repoKey } from '../../../../shared/scm'
@@ -245,7 +246,7 @@ export function Sidebar(): React.JSX.Element | null {
         <Input
           type="search"
           fieldSize="lg"
-          icon={<Search size={14} />}
+          icon={<Icon icon={icons.search} size="sm" />}
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder={t('layout.sidebar.searchPlaceholder')}
@@ -266,7 +267,7 @@ export function Sidebar(): React.JSX.Element | null {
             <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
               <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
               <IconButton
-                icon={<RefreshCw size={14} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
+                icon={<Icon icon={icons.reload} size="sm" className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
                 label={t('layout.sidebar.refresh')}
                 onClick={refetch}
                 disabled={loading}

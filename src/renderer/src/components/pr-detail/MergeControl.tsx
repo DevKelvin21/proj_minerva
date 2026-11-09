@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { CheckCircle2, ChevronDown, Clock, GitMerge } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type {
   MergeBlocker,
   MergeOptions,
@@ -160,12 +161,12 @@ export function MergeControl({ pr, compact }: MergeControlProps): React.JSX.Elem
       aria-controls={popoverOpen ? popoverId : undefined}
       onClick={() => (popoverOpen ? setPopoverOpen(false) : openPopover())}
       data-testid="merge-trigger"
-      icon={<Clock size={14} aria-hidden />}
+      icon={<Icon icon={icons.autoMerge} size="sm" />}
       aria-label={compact ? autoMergeOnLabel(t, azure, pr.autoComplete.strategy) : undefined}
       title={autoMergeOnLabel(t, azure, pr.autoComplete.strategy)}
     >
       {!compact && autoMergeOnLabel(t, azure, pr.autoComplete.strategy)}
-      <ChevronDown size={14} aria-hidden />
+      <Icon icon={icons.dropdown} size="sm" />
     </Button>
   ) : (
     <div className="flex shrink-0 items-stretch" role="group" aria-label={mergeLabel}>
@@ -178,7 +179,7 @@ export function MergeControl({ pr, compact }: MergeControlProps): React.JSX.Elem
           else openPopover()
         }}
         data-testid="merge-primary"
-        icon={busy === 'merge' ? <Spinner size={12} /> : <GitMerge size={14} aria-hidden />}
+        icon={busy === 'merge' ? <Spinner size="xs" /> : <Icon icon={icons.merge} size="sm" />}
         aria-label={compact ? mergeLabel : undefined}
         title={
           canQuickMerge && readyChoice
@@ -202,7 +203,7 @@ export function MergeControl({ pr, compact }: MergeControlProps): React.JSX.Elem
         onClick={() => (popoverOpen ? setPopoverOpen(false) : openPopover())}
         data-testid="merge-trigger"
       >
-        <ChevronDown size={14} aria-hidden />
+        <Icon icon={icons.dropdown} size="sm" />
       </Button>
     </div>
   )
@@ -211,7 +212,7 @@ export function MergeControl({ pr, compact }: MergeControlProps): React.JSX.Elem
     <div ref={wrapperRef} className="relative shrink-0" data-no-drag>
       {notice?.kind === 'completing' ? (
         <span role="status" className="flex items-center gap-1.5 text-xs text-muted">
-          <Spinner size={12} />
+          <Spinner size="xs" />
           {t('prDetail.merge.completing')}
         </span>
       ) : (
@@ -351,7 +352,7 @@ function MergePanel({
           </Callout>
         ) : (
           <p className="flex items-center gap-2 text-xs text-muted" role="status">
-            <Spinner size={12} />
+            <Spinner size="xs" />
             {t('prDetail.merge.loading')}
           </p>
         )}
@@ -385,7 +386,7 @@ function MergePanel({
         className="flex items-center gap-2 rounded-md bg-success/10 px-2.5 py-2 text-xs text-success"
         data-testid="merge-ready"
       >
-        <CheckCircle2 size={14} className="shrink-0" aria-hidden />
+        <Icon icon={icons.success} size="sm" className="shrink-0" />
         {azure ? t('prDetail.merge.readyAzure') : t('prDetail.merge.ready')}
       </p>
     )
@@ -398,7 +399,7 @@ function MergePanel({
       data-testid="auto-merge-state"
     >
       <p className="flex items-center gap-2 font-semibold text-text">
-        <Clock size={14} className="text-accent" aria-hidden />
+        <Icon icon={icons.autoMerge} size="sm" className="text-accent" />
         {azure ? t('prDetail.merge.autoCompleteOn') : t('prDetail.merge.autoMergeOn')}
       </p>
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-muted">
@@ -440,7 +441,7 @@ function MergePanel({
           variant="danger"
           disabled={busy !== null}
           onClick={onAutoOff}
-          icon={busy === 'autoOff' ? <Spinner size={12} /> : undefined}
+          icon={busy === 'autoOff' ? <Spinner size="xs" /> : undefined}
           data-testid="auto-merge-off"
         >
           {azure ? t('prDetail.merge.cancelAutoComplete') : t('prDetail.merge.disableAutoMerge')}
@@ -541,7 +542,7 @@ function MergePanel({
             disabled={!options.autoMerge.available || !choice || busy !== null}
             title={autoReason ?? undefined}
             onClick={() => choice && onAutoOn(choice)}
-            icon={busy === 'autoOn' ? <Spinner size={12} /> : <Clock size={14} aria-hidden />}
+            icon={busy === 'autoOn' ? <Spinner size="xs" /> : <Icon icon={icons.autoMerge} size="sm" />}
             data-testid="auto-merge-on"
           >
             {azure ? t('prDetail.merge.setAutoComplete') : t('prDetail.merge.enableAutoMerge')}
@@ -551,7 +552,7 @@ function MergePanel({
           variant="primary"
           disabled={blocker !== null || !choice || busy !== null}
           onClick={() => choice && onMerge(choice)}
-          icon={busy === 'merge' ? <Spinner size={12} /> : <GitMerge size={14} aria-hidden />}
+          icon={busy === 'merge' ? <Spinner size="xs" /> : <Icon icon={icons.merge} size="sm" />}
           data-testid="merge-now"
         >
           {mergeLabel}

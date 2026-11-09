@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { FileCode, MessagesSquare } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { DiffFile } from '../../../../shared/types'
 import type { ThreadGroup } from '../../lib/thread-groups'
 import { fileGroupTag, type FileAtHead } from '../../lib/thread-origin'
@@ -116,9 +117,9 @@ function ThreadGroupSection({
     >
       <h3 className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted">
         {group.path === null ? (
-          <MessagesSquare size={13} className="shrink-0" aria-hidden />
+          <Icon icon={icons.threads} size="sm" className="shrink-0" />
         ) : (
-          <FileCode size={13} className="shrink-0" aria-hidden />
+          <Icon icon={icons.file} size="sm" className="shrink-0" />
         )}
         <span
           className={`truncate font-semibold text-text ${group.path === null ? '' : 'font-mono'}`}

@@ -1,4 +1,5 @@
-import { RefreshCw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { AI_PROVIDER_IDS, AI_PROVIDER_CATALOG } from '../../../../shared/ai-providers'
 import { CLI_META } from '../../lib/cli-meta'
@@ -59,7 +60,7 @@ export function NoCliProvidersCard({ loading, onRecheck }: NoCliProvidersCardPro
         size="xs"
         onClick={onRecheck}
         disabled={loading}
-        icon={<RefreshCw size={12} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
+        icon={<Icon icon={icons.reload} size="xs" className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
       >
         {t('didactic.noCli.recheck')}
       </Button>

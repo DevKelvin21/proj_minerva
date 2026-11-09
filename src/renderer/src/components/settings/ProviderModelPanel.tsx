@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Spinner } from '../ui/Spinner'
 import { useTranslation } from 'react-i18next'
 import { findModelInList, type AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
@@ -156,7 +156,7 @@ export function ProviderModelPanel({
                 <span className="truncate font-mono text-[11px] text-muted">{model.id}</span>
               </span>
               {isThisActivating ? (
-                <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-muted" />
+                <Spinner size="sm" className="mt-0.5 shrink-0" />
               ) : isModelActive ? (
                 <Badge tone="success">{t('settings.models.active')}</Badge>
               ) : null}
@@ -198,7 +198,7 @@ export function ProviderModelPanel({
                 onClick={() => void activate(customValue)}
                 icon={
                   activating === customValue.trim() ? (
-                    <Loader2 size={13} className="animate-spin" />
+                    <Spinner size="sm" />
                   ) : undefined
                 }
               >

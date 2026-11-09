@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MessageSquareWarning } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { prKey } from '../../../../shared/scm'
 import type { CommentThread, DiffFile, RepoRef } from '../../../../shared/types'
 import type { DiffViewMode } from '../../stores/app-store'
@@ -329,7 +330,7 @@ export function DiffView({
         className="flex flex-col gap-2 border-b border-border bg-panel/40 p-2"
       >
         <p className="flex items-center gap-1.5 text-xs text-muted">
-          <MessageSquareWarning size={13} className="shrink-0" />
+          <Icon icon={icons.commentWarning} size="sm" className="shrink-0" />
           {placingThreads
             ? t('prDetail.diff.loadingUnplaced', { count: unplaced.length })
             : head.status === 'error'

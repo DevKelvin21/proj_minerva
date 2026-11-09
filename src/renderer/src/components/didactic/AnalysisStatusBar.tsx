@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { Languages, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { AnalysisGenerationInfo } from '../../../../shared/types'
 import type { AnalysisNotice } from '../../lib/analysis-status'
 import { Button } from '../ui/Button'
@@ -40,7 +41,7 @@ export function AnalysisStatusBar({
       : notice?.kind === 'language'
         ? t('didactic.analysis.regenerate')
         : t('didactic.analysis.reanalyze')
-  const NoticeIcon = notice?.kind === 'language' ? Languages : TriangleAlert
+  const NoticeIcon = notice?.kind === 'language' ? icons.language : icons.warning
 
   return (
     <div
@@ -64,9 +65,9 @@ export function AnalysisStatusBar({
           title={t('didactic.analysis.reanalyzeHint')}
           data-testid={notice?.kind === 'language' ? 'analysis-language-regenerate' : undefined}
           icon={
-            <RefreshCw
-              size={12}
-              aria-hidden
+            <Icon
+              icon={icons.reload}
+              size="xs"
               className={busy ? 'animate-spin motion-reduce:animate-none' : undefined}
             />
           }
@@ -76,7 +77,7 @@ export function AnalysisStatusBar({
       </div>
       {notice && (
         <p className="flex min-w-0 items-start gap-1.5 text-[11px] leading-snug text-text">
-          <NoticeIcon size={12} className="mt-px shrink-0 text-warning" aria-hidden />
+          <Icon icon={NoticeIcon} size="xs" className="mt-px shrink-0 text-warning" />
           <span className="min-w-0 break-words">
             {notice.kind === 'commits'
               ? t('didactic.analysis.staleNotice', { from: notice.from, to: notice.to })

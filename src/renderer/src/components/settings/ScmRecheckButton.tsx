@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { errorText } from '../../lib/error-text'
@@ -34,7 +35,7 @@ export function ScmRecheckButton(): React.JSX.Element {
         size="sm"
         onClick={() => void recheck()}
         disabled={checking}
-        icon={<RefreshCw size={12} className={checking ? 'animate-spin' : ''} aria-hidden />}
+        icon={<Icon icon={icons.reload} size="xs" className={checking ? 'animate-spin' : ''} />}
       >
         {t('settings.scmPage.recheck')}
       </Button>

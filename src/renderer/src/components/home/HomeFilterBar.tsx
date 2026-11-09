@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type KeyboardEvent } from 'react'
-import { ChevronDown, Funnel, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import {
   addValue,
@@ -84,7 +85,7 @@ function FilterToken({
         title={t('home.filterBar.removeChip', { facet: facetLabel, value: valueLabel })}
         className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full hover:bg-accent/20"
       >
-        <X size={11} aria-hidden />
+        <Icon icon={icons.close} size="xs" />
       </button>
     </span>
   )
@@ -179,7 +180,7 @@ export function HomeFilterBar({ options, statusLabel, folded }: HomeFilterBarPro
       >
         {facetLabel(facet)}
         {count > 0 && <CountBadge count={count} />}
-        <ChevronDown size={11} aria-hidden />
+        <Icon icon={icons.dropdown} size="xs" />
       </Button>
     )
   }
@@ -208,7 +209,7 @@ export function HomeFilterBar({ options, statusLabel, folded }: HomeFilterBarPro
           }}
           className={`${fieldFrameClass} flex min-h-8 min-w-0 flex-1 flex-wrap items-center gap-1.5 px-2 py-1`}
         >
-          <Funnel size={13} aria-hidden className="shrink-0 text-muted" />
+          <Icon icon={icons.filter} size="sm" className="shrink-0 text-muted" />
           {!folded && tokens}
           <input
             ref={inputRef}
@@ -256,7 +257,7 @@ export function HomeFilterBar({ options, statusLabel, folded }: HomeFilterBarPro
                   aria-label={
                     picked > 0 ? t('home.filterBar.filtersAriaLabel', { count: picked }) : undefined
                   }
-                  icon={<Funnel size={12} aria-hidden />}
+                  icon={<Icon icon={icons.filter} size="xs" />}
                   className={picked > 0 ? 'border-accent/45 text-accent' : ''}
                 >
                   {t('home.filterBar.filters')}

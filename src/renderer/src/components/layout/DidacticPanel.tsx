@@ -1,4 +1,5 @@
-import { ExternalLink, GraduationCap, MessageCircle, Sparkles, X } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, type AiPanelTab } from '../../stores/app-store'
 import { prKey } from '../../../../shared/scm'
@@ -132,7 +133,7 @@ export function DidacticPanel(): React.JSX.Element {
         )}
         <header className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-1.5">
           <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-text">
-            <Sparkles size={14} className="text-muted" aria-hidden />
+            <Icon icon={icons.ai} size="sm" className="text-muted" />
             {t('chat.panel.title')}
           </span>
           <div
@@ -142,12 +143,12 @@ export function DidacticPanel(): React.JSX.Element {
           >
             <PanelTab
               tabProps={tabs.tabProps('ask')}
-              icon={<MessageCircle size={12} aria-hidden />}
+              icon={<Icon icon={icons.threads} size="xs" />}
               label={t('chat.panel.tabs.ask')}
             />
             <PanelTab
               tabProps={tabs.tabProps('analysis')}
-              icon={<GraduationCap size={12} aria-hidden />}
+              icon={<Icon icon={icons.didactic} size="xs" />}
               label={t('chat.panel.tabs.analysis')}
             />
           </div>
@@ -155,7 +156,7 @@ export function DidacticPanel(): React.JSX.Element {
             {selectedPr && tab === 'analysis' && (
               <IconButton
                 size="sm"
-                icon={<ExternalLink size={14} />}
+                icon={<Icon icon={icons.openExternal} size="sm" />}
                 label={t('didactic.panel.openInWindow')}
                 onClick={() => {
                   void window.minerva.window.openDidactic({
@@ -169,7 +170,7 @@ export function DidacticPanel(): React.JSX.Element {
             )}
             <IconButton
               size="sm"
-              icon={<X size={14} />}
+              icon={<Icon icon={icons.close} size="sm" />}
               label={t('didactic.panel.close')}
               onClick={toggleDidacticPanel}
             />

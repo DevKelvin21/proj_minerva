@@ -1,4 +1,5 @@
-import { Tag } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { FeatureGroup } from '../../lib/dashboard'
 import { Badge } from '../ui/Badge'
@@ -70,7 +71,7 @@ export function FeatureCard({
               tone="outline"
               size="sm"
               className="min-w-0 max-w-full group-hover:text-text group-hover:ring-accent/60"
-              icon={<Tag size={10} aria-hidden />}
+              icon={<Icon icon={icons.tag} size="xs" />}
             >
               <span className="min-w-0 truncate">{group.tag}</span>
             </Badge>
@@ -90,7 +91,7 @@ export function FeatureCard({
               className="inline-flex min-w-0 items-center gap-0.5"
               title={featureRepo.repo.fullName}
             >
-              <ScmProviderIcon provider={featureRepo.repo.provider} size={10} />
+              <ScmProviderIcon provider={featureRepo.repo.provider} size="xs" />
               <span className="max-w-[7rem] truncate">{featureRepo.repo.name}</span>
             </span>
           ))}

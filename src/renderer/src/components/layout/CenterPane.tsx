@@ -1,12 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  CircleAlert,
-  FileDiff,
-  GitPullRequest,
-  MessageSquare,
-  MessagesSquare,
-  type LucideIcon,
-} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore, type CenterTab } from '../../stores/app-store'
 import { useRovingTabs, type RovingTabProps } from '../../hooks/use-roving-tabs'
@@ -19,6 +11,8 @@ import { ConversationTab } from '../pr-detail/ConversationTab'
 import { FilesTab } from '../pr-detail/FilesTab'
 import { CommentsTab } from '../pr-detail/CommentsTab'
 import { EmptyState } from '../ui/EmptyState'
+import { Icon } from '../ui/Icon'
+import { icons, type IconGlyph } from '../ui/icons'
 import { isThreadOpen, prKey, type RepoRef } from '../../../../shared/scm'
 import type { PullRequestDetail } from '../../../../shared/types'
 
@@ -31,13 +25,13 @@ const CENTER_TABS: readonly CenterTab[] = ['conversation', 'files', 'comments']
  */
 function ReviewTab({
   tabProps,
-  icon: Icon,
+  icon,
   label,
   count,
   compact,
 }: {
   tabProps: RovingTabProps
-  icon: LucideIcon
+  icon: IconGlyph
   label: string
   count?: number | null
   compact: boolean
@@ -55,7 +49,7 @@ function ReviewTab({
     >
       {compact ? (
         <>
-          <Icon size={15} aria-hidden />
+          <Icon icon={icon} size="md" />
           {count !== undefined && count !== null && <span aria-hidden>{count}</span>}
         </>
       ) : (
@@ -73,7 +67,7 @@ export function CenterPane(): React.JSX.Element {
     return (
       <section className="flex flex-1 flex-col bg-bg">
         <EmptyState
-          icon={GitPullRequest}
+          icon={icons.pullRequest}
           title={t('layout.center.choosePrTitle')}
           hint={t('layout.center.choosePrHint')}
         />
@@ -101,7 +95,7 @@ function PrDetailPane({ repo, number }: { repo: RepoRef; number: number }): Reac
   if (error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <EmptyState icon={CircleAlert} title={t('layout.center.loadFailed')} hint={error} />
+        <EmptyState icon={icons.error} title={t('layout.center.loadFailed')} hint={error} />
       </div>
     )
   }
@@ -204,13 +198,13 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
               >
                 <ReviewTab
                   tabProps={tabs.tabProps('conversation')}
-                  icon={MessageSquare}
+                  icon={icons.comment}
                   label={t('layout.center.tabs.conversation')}
                   compact={compact}
                 />
                 <ReviewTab
                   tabProps={tabs.tabProps('files')}
-                  icon={FileDiff}
+                  icon={icons.changedFiles}
                   label={
                     detail.changedFiles === null
                       ? t('layout.center.tabs.files')
@@ -221,7 +215,7 @@ function PrDetailBody({ detail }: { detail: PullRequestDetail }): React.JSX.Elem
                 />
                 <ReviewTab
                   tabProps={tabs.tabProps('comments')}
-                  icon={MessagesSquare}
+                  icon={icons.threads}
                   label={
                     threadsLoading && threads.length === 0
                       ? t('layout.center.tabs.comments')

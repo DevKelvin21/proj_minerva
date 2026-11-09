@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { useLocale } from '../../i18n/use-locale'
 import { formatRelativeTime } from '../../lib/relative-time'
@@ -100,7 +101,7 @@ export function HomePageHeader({
           )}
           <IconButton
             size="sm"
-            icon={<RefreshCw size={14} className={busy ? 'animate-spin motion-reduce:animate-none' : ''} />}
+            icon={<Icon icon={icons.reload} size="sm" className={busy ? 'animate-spin motion-reduce:animate-none' : ''} />}
             label={t('home.overview.refresh')}
             onClick={onRefresh}
             disabled={busy}

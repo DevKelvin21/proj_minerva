@@ -1,4 +1,5 @@
-import { GraduationCap } from 'lucide-react'
+import { Icon } from './components/ui/Icon'
+import { icons } from './components/ui/icons'
 import type { DidacticRouteTarget } from '../../shared/didactic-route'
 import { DidacticAnalysisArea } from './components/didactic/DidacticAnalysisArea'
 import { usePrHeadSha } from './hooks/use-pr-head-sha'
@@ -43,7 +44,7 @@ export function DidacticWindowApp({ target }: DidacticWindowAppProps): React.JSX
               narrow ? 'text-base' : 'text-lg'
             }`}
           >
-            <GraduationCap size={narrow ? 16 : 20} className="shrink-0 text-accent" />
+            <Icon icon={icons.didactic} size={narrow ? 'md' : 'lg'} className="shrink-0 text-muted" />
             {target.title ?? prLabel}
           </span>
           <span className="text-xs text-muted">{prLabel}</span>

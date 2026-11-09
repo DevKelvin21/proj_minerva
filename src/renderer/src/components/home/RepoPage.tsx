@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { FolderX, Search } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey, type PrStack } from '../../../../shared/scm'
 import type { PullRequestSummary } from '../../../../shared/types'
@@ -200,7 +201,7 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
           ) : (
             <>
               <ProviderErrorList errors={allProviderErrors} />
-              <PageEmpty icon={FolderX} title={t('home.repoPage.notFound')} />
+              <PageEmpty icon={icons.notFound} title={t('home.repoPage.notFound')} />
             </>
           )}
         </div>
@@ -226,7 +227,7 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
       <HomePageHeader
         crumbs={[homeCrumb, { key: 'owner', label: owner, text: owner }]}
         onBack={goOverview}
-        icon={<ScmProviderIcon provider={repo.provider} size={16} />}
+        icon={<ScmProviderIcon provider={repo.provider} size="md" />}
         title={repo.name}
         titleText={repo.fullName}
         meta={meta}
@@ -239,7 +240,7 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
           <Input
             type="search"
             fieldSize="sm"
-            icon={<Search size={13} />}
+            icon={<Icon icon={icons.search} size="sm" />}
             containerClassName="min-w-[12rem] flex-1"
             value={query}
             onChange={(event) => setQuery(event.target.value)}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import type { RepoRef } from '../../../../shared/scm'
 import { useRetarget } from '../../hooks/use-retarget'
@@ -38,7 +39,7 @@ function BaseChange({ from, to }: { from: string; to: string }): React.JSX.Eleme
   return (
     <span className="inline-flex min-w-0 flex-wrap items-center gap-1 font-mono text-[11px]">
       <span className="break-all text-muted line-through decoration-muted/60">{from}</span>
-      <ArrowRight size={11} className="shrink-0 text-muted" aria-hidden />
+      <Icon icon={icons.forward} size="xs" className="shrink-0 text-muted" />
       <span className="break-all text-text">{to}</span>
     </span>
   )
@@ -125,7 +126,7 @@ export function RetargetPanel({
   if (state.phase === 'pending') {
     return (
       <p role="status" className="flex items-center gap-1.5 text-xs text-muted">
-        <Spinner size={12} />
+        <Spinner size="xs" />
         <span>
           <Trans
             i18nKey="stacks.retarget.waiting"

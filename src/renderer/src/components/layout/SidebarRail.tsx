@@ -1,4 +1,5 @@
-import { Bell, FolderGit2, Layers, ListTodo, PanelLeft } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
 import { useHomeOpenPr } from '../../hooks/use-home-open-pr'
@@ -11,10 +12,10 @@ import { useStacksStore } from '../../stores/stacks-store'
 import { CountBadge } from '../ui/CountBadge'
 
 const VIEW_ICON: Record<SidebarView, React.JSX.Element> = {
-  queue: <ListTodo size={18} aria-hidden />,
-  list: <FolderGit2 size={18} aria-hidden />,
-  stacks: <Layers size={18} aria-hidden />,
-  inbox: <Bell size={18} aria-hidden />,
+  queue: <Icon icon={icons.queue} size="lg" />,
+  list: <Icon icon={icons.repos} size="lg" />,
+  stacks: <Icon icon={icons.stack} size="lg" />,
+  inbox: <Icon icon={icons.inbox} size="lg" />,
 }
 
 const VIEWS: readonly SidebarView[] = ['queue', 'list', 'stacks', 'inbox']
@@ -116,7 +117,7 @@ export function SidebarRail(): React.JSX.Element {
         title={t('layout.rail.expand', { shortcut: MOD_KEY_LABEL + 'B' })}
         className="mt-auto flex h-9 w-10 items-center justify-center rounded-md text-muted transition-colors duration-150 hover:bg-border/60 hover:text-text"
       >
-        <PanelLeft size={16} aria-hidden />
+        <Icon icon={icons.sidebar} size="md" />
       </button>
     </nav>
   )

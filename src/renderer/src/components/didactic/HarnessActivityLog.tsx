@@ -1,4 +1,5 @@
-import { Check, CircleAlert } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import type { AnalysisActivityItem } from '../../../../shared/events'
 import { Spinner } from '../ui/Spinner'
 
@@ -32,11 +33,11 @@ export function HarnessActivityLog({
           style={{ opacity: 0.45 + 0.55 * ((i + 1) / items.length) }}
         >
           {item.status === 'running' ? (
-            <Spinner size={11} />
+            <Spinner size="xs" />
           ) : item.status === 'error' ? (
-            <CircleAlert size={11} className="shrink-0 text-danger" />
+            <Icon icon={icons.error} size="xs" className="shrink-0 text-danger" />
           ) : (
-            <Check size={11} className="shrink-0 text-success" />
+            <Icon icon={icons.success} size="xs" className="shrink-0 text-success" />
           )}
           <span className="truncate">{item.label}</span>
         </li>

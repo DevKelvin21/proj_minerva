@@ -1,4 +1,5 @@
-import { RotateCcw } from 'lucide-react'
+import { Icon } from '../ui/Icon'
+import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import type { ChatContextItem, ChatMessage } from '../../../../shared/chat'
 import { useChatStore } from '../../stores/chat-store'
@@ -100,7 +101,7 @@ function AssistantMessage({
       ) : (
         streaming && (
           <span role="status" className="flex items-center gap-1.5 text-xs text-muted">
-            <Spinner size={12} />
+            <Spinner size="xs" />
             {t(`chat.message.stage.${stage}`)}
           </span>
         )
@@ -123,7 +124,7 @@ function AssistantMessage({
             <Button
               size="xs"
               className="w-fit"
-              icon={<RotateCcw size={12} aria-hidden />}
+              icon={<Icon icon={icons.retry} size="xs" />}
               onClick={() => void retry(prKey, message.conversationId)}
             >
               {t('chat.message.retry')}
