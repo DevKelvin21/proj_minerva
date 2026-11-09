@@ -7,6 +7,7 @@ import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
 import { useDashboardStore } from '../../stores/dashboard-store'
 import { buildFeatureGroups } from '../../lib/dashboard'
 import { Badge, type BadgeTone } from '../ui/Badge'
+import { BrandMark } from '../ui/BrandMark'
 import { ScmProviderIcon } from '../ui/ScmProviderIcon'
 
 const STATE_TONE: Record<'open' | 'draft' | 'merged' | 'closed', BadgeTone> = {
@@ -36,7 +37,7 @@ export function TitleBarLocation({ compact }: { compact: boolean }): React.JSX.E
   }
   return (
     <span className="flex shrink-0 items-center gap-1.5 px-1 text-sm font-semibold text-text">
-      <span aria-hidden>🦉</span>
+      <BrandMark size={18} className="text-accent" />
       {!compact && 'Minerva'}
     </span>
   )
