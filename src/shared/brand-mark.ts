@@ -3,7 +3,9 @@
  * commits on branches that merge into the beak. One definition feeds the
  * in-app mark (`renderer/src/components/ui/BrandMark.tsx`) and the app icons
  * (`scripts/build-app-icons.mjs` writes `build/icon.svg` and the .icns, .ico
- * and PNGs from `appIconSvg`), so the two never drift apart.
+ * and PNGs from `appIconSvg`), so the two never drift apart. The same script
+ * renders the macOS menu bar icon from `trayIconSvg` (`build/tray.svg`,
+ * `resources/tray/minervaTemplate*.png`).
  *
  * Geometry is on Lucide's 24-unit grid with round caps and joins, so the
  * mark sits next to the UI icons in the same line.
@@ -41,7 +43,8 @@ export const APP_ICON_COLORS = {
   tileBottom: '#13161c',
 } as const
 
-function shapeMarkup(shape: BrandMarkShape): string {
+/** One shape as SVG; the filled beak takes `fill` (the line color comes from the group). */
+function shapeMarkup(shape: BrandMarkShape, fill: string): string {
   return shape.kind === 'path'
     ? '<path d="' + shape.d + '"/>'
     : '<circle cx="' +
@@ -51,7 +54,7 @@ function shapeMarkup(shape: BrandMarkShape): string {
         '" r="' +
         shape.r +
         '"' +
-        (shape.filled ? ' fill="' + APP_ICON_COLORS.mark + '" stroke="none"' : '') +
+        (shape.filled ? ' fill="' + fill + '" stroke="none"' : '') +
         '/>'
 }
 
@@ -83,8 +86,12 @@ export function appIconSvg(options: { inset: number; stroke: number }): string {
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">' +
     '<defs>' +
     '<linearGradient id="tile" x1="0.33" y1="0" x2="0.67" y2="1">' +
-    '<stop offset="0" stop-color="' + c.tileTop + '"/>' +
-    '<stop offset="1" stop-color="' + c.tileBottom + '"/>' +
+    '<stop offset="0" stop-color="' +
+    c.tileTop +
+    '"/>' +
+    '<stop offset="1" stop-color="' +
+    c.tileBottom +
+    '"/>' +
     '</linearGradient>' +
     '<linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">' +
     '<stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>' +
@@ -92,16 +99,82 @@ export function appIconSvg(options: { inset: number; stroke: number }): string {
     '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/>' +
     '</linearGradient>' +
     '<radialGradient id="glow" cx="0.5" cy="0.62" r="0.5">' +
-    '<stop offset="0" stop-color="' + c.mark + '" stop-opacity="0.18"/>' +
-    '<stop offset="1" stop-color="' + c.mark + '" stop-opacity="0"/>' +
+    '<stop offset="0" stop-color="' +
+    c.mark +
+    '" stop-opacity="0.18"/>' +
+    '<stop offset="1" stop-color="' +
+    c.mark +
+    '" stop-opacity="0"/>' +
     '</radialGradient>' +
     '</defs>' +
-    '<rect x="' + inset + '" y="' + inset + '" width="' + tile + '" height="' + tile + '" rx="' + radius + '" fill="url(#tile)"/>' +
-    '<rect x="' + inset + '" y="' + inset + '" width="' + tile + '" height="' + tile + '" rx="' + radius + '" fill="url(#glow)"/>' +
-    '<rect x="' + (inset + 2) + '" y="' + (inset + 2) + '" width="' + (tile - 4) + '" height="' + (tile - 4) + '" rx="' + (radius - 2) + '" fill="none" stroke="url(#rim)" stroke-width="4"/>' +
-    '<g transform="translate(' + markOffset + ' ' + markOffset + ') scale(' + scale + ')" fill="none" stroke="' + c.mark + '" stroke-width="' + stroke + '" stroke-linecap="round" stroke-linejoin="round">' +
-    BRAND_MARK_SHAPES.map(shapeMarkup).join('') +
+    '<rect x="' +
+    inset +
+    '" y="' +
+    inset +
+    '" width="' +
+    tile +
+    '" height="' +
+    tile +
+    '" rx="' +
+    radius +
+    '" fill="url(#tile)"/>' +
+    '<rect x="' +
+    inset +
+    '" y="' +
+    inset +
+    '" width="' +
+    tile +
+    '" height="' +
+    tile +
+    '" rx="' +
+    radius +
+    '" fill="url(#glow)"/>' +
+    '<rect x="' +
+    (inset + 2) +
+    '" y="' +
+    (inset + 2) +
+    '" width="' +
+    (tile - 4) +
+    '" height="' +
+    (tile - 4) +
+    '" rx="' +
+    (radius - 2) +
+    '" fill="none" stroke="url(#rim)" stroke-width="4"/>' +
+    '<g transform="translate(' +
+    markOffset +
+    ' ' +
+    markOffset +
+    ') scale(' +
+    scale +
+    ')" fill="none" stroke="' +
+    c.mark +
+    '" stroke-width="' +
+    stroke +
+    '" stroke-linecap="round" stroke-linejoin="round">' +
+    BRAND_MARK_SHAPES.map((shape) => shapeMarkup(shape, c.mark)).join('') +
     '</g>' +
+    '</svg>'
+  )
+}
+
+/**
+ * Line width of the menu bar icon (Lucide units): it is shown at 16 pt, where
+ * the in-app 1.6 looks thin next to the system's own menu bar glyphs.
+ */
+export const TRAY_ICON_STROKE = 1.8
+
+/**
+ * The macOS menu bar icon: the bare mark on its 24-unit grid, no tile, all
+ * black. It becomes a template image (`minervaTemplate.png`), so macOS
+ * recolors it for light and dark menu bars and the highlighted state; only
+ * its alpha counts.
+ */
+export function trayIconSvg(options: { stroke: number }): string {
+  return (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="' +
+    options.stroke +
+    '" stroke-linecap="round" stroke-linejoin="round">' +
+    BRAND_MARK_SHAPES.map((shape) => shapeMarkup(shape, '#000000')).join('') +
     '</svg>'
   )
 }

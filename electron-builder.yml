@@ -42,6 +42,14 @@ linux:
 mac:
   icon: build/icon.icns
   category: public.app-category.developer-tools
+  # Menu bar (Tray) template images, from the same script (`--tray`). Copied next
+  # to app.asar (Contents/Resources/tray/), where `src/main/tray/tray-service.ts`
+  # loads them through `process.resourcesPath`.
+  extraResources:
+    - from: resources/tray
+      to: tray
+      filter:
+        - '*.png'
   # macOS is notify-only for now (no Developer ID yet: the real updater only
   # compares versions and links to the release). The `zip` target is still built
   # because Squirrel.Mac (electron-updater's macOS mechanism) needs it for
