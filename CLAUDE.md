@@ -62,6 +62,16 @@ unified patches built in main.
   through `scm:merge` / `scm:setAutoMerge`; refusals are `MERGE_CONFLICT`, `CHECKS_FAILING`,
   `MERGE_BLOCKED`, `FORBIDDEN`, or `CONFLICT` when the PR moved. GitHub auto-merge needs
   "Allow auto-merge" AND something pending (GitHub refuses it on a clean PR).
+- **Notification sound + menu bar** (`notifications` in settings.json: `level`, `badge`, `sound`,
+  `menuBar`; a file without the last two keeps its level/badge, missing = on): the sound rides the
+  OS notification (`silent`, macOS `sound: 'Glass'`, `notificationSound` in `activity-notifier.ts`),
+  never in-app. macOS-only `Tray` in `main/tray/` (pure `tray-menu.ts` + `tray-service.ts`): unread
+  count, newest 5 unread, Mark all read, sound checkbox; rebuilt on every inbox/settings/language
+  change, `notificationsChanged` push keeps Settings in sync. Every click into the app goes through
+  `windows/main-window-opener.ts` (creates the window when none is open; preload holds the
+  `openActivity` until React subscribes). `MINERVA_TRAY=off` (set by `e2e/fixtures.ts`) = no tray.
+  Template icon: `trayIconSvg` → `node scripts/build-app-icons.mjs --tray` writes `build/tray.svg`
+  (staleness test) + `resources/tray/minervaTemplate*.png` (shipped by mac `extraResources`).
 - `MINERVA_MOCK=1` = mock SCM: GitHub universe "shopwave" + Azure org "contoso" (the real
   `AzureScmProvider` over the in-memory `azure/fixtures/fake-server.ts`; writes stay in
   memory). It does not affect AI. NEVER test write paths against a real org.

@@ -77,6 +77,9 @@ export async function launchMinerva(
     // `updater.spec.ts` vía `opts.env`) se resuelve ANTES que este kill switch
     // en `initUpdater()` (`main/updater/updater.ts`), así que no se pisan.
     MINERVA_UPDATER: 'off',
+    // No macOS menu bar item (`src/main/tray/tray-service.ts`): a test run must not
+    // add an owl to the user's menu bar. The setting itself still saves.
+    MINERVA_TRAY: 'off',
     // Open VSX theme search/install answers from main's in-memory registry
     // (`src/main/theme/open-vsx-fake.ts`): e2e never touches open-vsx.org.
     MINERVA_MOCK_OPEN_VSX: '1',

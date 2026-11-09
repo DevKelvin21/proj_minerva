@@ -1432,6 +1432,11 @@ export const es: MessageShape<typeof en> = {
       },
       badge: 'Mostrar el número sin leer en el ícono de la app',
       badgeTitle: 'Contador en el ícono de la app',
+      soundTitle: 'Reproducir un sonido',
+      sound:
+        'Con cada notificación del sistema. Lo reproduce macOS, así que Concentración y No molestar lo silencian.',
+      menuBarTitle: 'Mostrar Minerva en la barra de menús',
+      menuBar: 'El búho con tu número sin leer y un menú con lo más reciente.',
       loadError: 'No se pudo cargar la configuración de notificaciones: {{error}}',
       saveError: 'No se pudo guardar la configuración de notificaciones: {{error}}',
     },

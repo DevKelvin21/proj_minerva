@@ -33,8 +33,8 @@ export function useUnreadActivityCount(): number {
 }
 
 /**
- * A click on a system notification (main window only): one item opens at its
- * thread; a batch (`itemId: null`) brings up the Inbox. An item that is no
+ * A click on a system notification or a menu bar entry (main window only):
+ * one item opens at its thread; a batch (`itemId: null`) brings up the Inbox. An item that is no
  * longer in the inbox (pruned meanwhile) falls back to the Inbox too.
  */
 export function useOpenActivityFromNotifications(): void {
@@ -45,11 +45,17 @@ export function useOpenActivityFromNotifications(): void {
   useEffect(
     () =>
       window.minerva.events.onOpenActivity(({ itemId }) => {
-        const item = itemId
-          ? useActivityInboxStore.getState().state?.items.find((entry) => entry.id === itemId)
-          : undefined
-        if (item) open(item)
-        else showInbox()
+        void (async () => {
+          // A window main just created for the click has not loaded the inbox yet.
+          if (itemId && !useActivityInboxStore.getState().state) {
+            await useActivityInboxStore.getState().load()
+          }
+          const item = itemId
+            ? useActivityInboxStore.getState().state?.items.find((entry) => entry.id === itemId)
+            : undefined
+          if (item) open(item)
+          else showInbox()
+        })()
       }),
     [open, showInbox],
   )

@@ -11,6 +11,10 @@
  *
  * Every string shown comes from items main already sanitized (one line,
  * capped); system notifications render plain text.
+ *
+ * Sound (`NotificationSettings.sound`) rides the OS notification, so it is
+ * one per batch too, and Focus / Do Not Disturb silence it with the
+ * notification. Nothing plays while the app is focused.
  */
 import type {
   ActivityItem,
@@ -26,11 +30,32 @@ export interface NotificationContent {
   itemId: string | null
 }
 
+/** How the OS notification sounds: `silent` mutes it; `sound` names a macOS system sound. */
+export interface NotificationSound {
+  silent: boolean
+  sound?: string
+}
+
+/**
+ * The macOS system sound the notification plays (a built-in one, so Minerva
+ * ships no audio file). Other systems play their default notification sound.
+ */
+export const MAC_NOTIFICATION_SOUND = 'Glass'
+
+/** Electron `Notification` options for the sound setting on `platform` (exported for tests). */
+export function notificationSound(enabled: boolean, platform: NodeJS.Platform): NotificationSound {
+  if (!enabled) return { silent: true }
+  return platform === 'darwin'
+    ? { silent: false, sound: MAC_NOTIFICATION_SOUND }
+    : { silent: false }
+}
+
 export interface ActivityNotifierDeps {
   getSettings: () => NotificationSettings
   setBadge: (count: number) => void
   isAppFocused: () => boolean
-  show: (content: NotificationContent) => void
+  /** Shows one notification; `playSound` = the sound setting at that moment. */
+  show: (content: NotificationContent, options: { playSound: boolean }) => void
   /** Translated text (main's `mt`), keys under `activity.notification`. */
   text: (key: NotificationTextKey, vars: Record<string, string | number>) => string
 }
@@ -138,8 +163,9 @@ export function createActivityNotifier(deps: ActivityNotifierDeps): ActivityNoti
     onActivity(state, added) {
       refreshBadge(state)
       if (deps.isAppFocused()) return
-      const content = notificationFor(notifiable(added, deps.getSettings().level), deps.text)
-      if (content) deps.show(content)
+      const settings = deps.getSettings()
+      const content = notificationFor(notifiable(added, settings.level), deps.text)
+      if (content) deps.show(content, { playSound: settings.sound })
     },
   }
 }

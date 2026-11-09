@@ -6,34 +6,42 @@
  *   build/icon.icns  macOS (iconutil, so this step runs on macOS only)
  *   build/icon.ico   Windows: 16–256 px, PNG entries
  *   build/icon.png   Linux: 1024 px
+ *   build/tray.svg   macOS menu bar icon master, checked by the same test
+ *   resources/tray/minervaTemplate.png, minervaTemplate@2x.png
+ *                    the menu bar icon at 16 and 32 px: a black template image
+ *                    (macOS recolors it), shipped via `extraResources`
  *
  * Each size is rendered on its own, with the mark's line heavier as the icon
  * shrinks (`appIconStroke`), instead of scaling one bitmap down.
  * electron-builder picks them up through `electron-builder.yml`.
  *
  * Run after changing the mark: `node scripts/build-app-icons.mjs` (Node 24
- * reads the .ts module directly). Rendering uses Playwright with the installed
+ * reads the .ts module directly); `--tray` rebuilds only the menu bar icon. Rendering uses Playwright with the installed
  * Google Chrome (`channel: 'chrome'`), falling back to Playwright's Chromium.
  */
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
-import { APP_ICON_INSET, appIconStroke, appIconSvg } from '../src/shared/brand-mark.ts'
+import {
+  APP_ICON_INSET,
+  appIconStroke,
+  appIconSvg,
+  TRAY_ICON_STROKE,
+  trayIconSvg,
+} from '../src/shared/brand-mark.ts'
 
+const trayOnly = process.argv.includes('--tray')
 const root = join(import.meta.dirname, '..')
 const out = join(root, 'build')
+const trayOut = join(root, 'resources', 'tray')
 mkdirSync(out, { recursive: true })
-
-writeFileSync(
-  join(out, 'icon.svg'),
-  appIconSvg({ inset: APP_ICON_INSET.mac, stroke: appIconStroke(1024) }) + '\n',
-)
+mkdirSync(trayOut, { recursive: true })
 
 const browser = await chromium.launch({ channel: 'chrome' }).catch(() => chromium.launch())
-/** One PNG of the icon, `pixels` square, its line chosen for `points` (the size it is shown at). */
-async function render(layout, pixels, points = pixels) {
-  const svg = appIconSvg({ inset: APP_ICON_INSET[layout], stroke: appIconStroke(points) })
+
+/** One PNG of `svg` (any viewBox), `pixels` square, on a transparent background. */
+async function renderSvg(svg, pixels) {
   // A fresh page per size: resizing one page between shots can capture a stale frame.
   const page = await browser.newPage({ viewport: { width: pixels, height: pixels } })
   await page.setContent(
@@ -44,6 +52,28 @@ async function render(layout, pixels, points = pixels) {
   const png = await page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: pixels, height: pixels } })
   await page.close()
   return png
+}
+
+// macOS menu bar: 16 pt, so 16 px and 32 px (@2x). The `Template` suffix makes
+// Electron load it as a template image, and pick the @2x file on Retina.
+const traySvg = trayIconSvg({ stroke: TRAY_ICON_STROKE })
+writeFileSync(join(out, 'tray.svg'), traySvg + '\n')
+writeFileSync(join(trayOut, 'minervaTemplate.png'), await renderSvg(traySvg, 16))
+writeFileSync(join(trayOut, 'minervaTemplate@2x.png'), await renderSvg(traySvg, 32))
+if (trayOnly) {
+  await browser.close()
+  console.log('build-app-icons: wrote build/tray.svg, resources/tray/minervaTemplate.png, @2x')
+  process.exit(0)
+}
+
+writeFileSync(
+  join(out, 'icon.svg'),
+  appIconSvg({ inset: APP_ICON_INSET.mac, stroke: appIconStroke(1024) }) + '\n',
+)
+
+/** One PNG of the icon, `pixels` square, its line chosen for `points` (the size it is shown at). */
+async function render(layout, pixels, points = pixels) {
+  return renderSvg(appIconSvg({ inset: APP_ICON_INSET[layout], stroke: appIconStroke(points) }), pixels)
 }
 
 // macOS: an .iconset folder, then iconutil.
@@ -92,4 +122,6 @@ writeFileSync(join(out, 'icon.ico'), Buffer.concat([header, ...pngs]))
 writeFileSync(join(out, 'icon.png'), await render('square', 1024))
 
 await browser.close()
-console.log('build-app-icons: wrote build/icon.svg, icon.icns, icon.ico, icon.png')
+console.log(
+  'build-app-icons: wrote build/icon.svg, icon.icns, icon.ico, icon.png, tray.svg and resources/tray/',
+)

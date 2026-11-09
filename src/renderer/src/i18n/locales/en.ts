@@ -1417,6 +1417,11 @@ export const en = {
       },
       badge: 'Show the unread count on the app icon',
       badgeTitle: 'App icon badge',
+      soundTitle: 'Play a sound',
+      sound:
+        'With each system notification. macOS plays it, so Focus and Do Not Disturb silence it.',
+      menuBarTitle: 'Show Minerva in the menu bar',
+      menuBar: 'The owl with your unread count, and a menu of the newest items.',
       loadError: 'Could not load the notification settings: {{error}}',
       saveError: 'Could not save the notification settings: {{error}}',
     },

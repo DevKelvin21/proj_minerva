@@ -1,7 +1,11 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { ChatConversationSummary, ChatEvent, ChatMessage } from '../shared/chat'
 import type { IpcChannel, IpcRequest, IpcResponse, MinervaApi } from '../shared/ipc'
-import { isActivityState } from '../shared/activity'
+import {
+  isActivityState,
+  isNotificationSettings,
+  normalizeNotificationSettings,
+} from '../shared/activity'
 import {
   MINERVA_EVENTS,
   type ActivityChangedEvent,
@@ -10,6 +14,7 @@ import {
   type AnalysisProgressEvent,
   type AppearanceChangedEvent,
   type LanguageChangedEvent,
+  type NotificationsChangedEvent,
   type PrChange,
   type PrListChangedEvent,
   type UpdaterStatusChangedEvent,
@@ -314,15 +319,55 @@ function onActivityChanged(callback: (payload: ActivityChangedEvent) => void): (
   return () => ipcRenderer.removeListener(MINERVA_EVENTS.activityChanged, listener)
 }
 
-/** A system notification was clicked: `itemId` (string) or `null` (open the Inbox). */
+/**
+ * A system notification or a menu bar entry was clicked: `itemId` (string)
+ * or `null` (open the Inbox). Listened to from the start: when main creates
+ * the window for the click, the push lands before React subscribes, so the
+ * latest one waits here and goes to the first subscriber, on the next task
+ * (after StrictMode's mount/unmount/mount has settled).
+ */
+const openActivitySubscribers = new Set<(payload: OpenActivityEvent) => void>()
+let pendingOpenActivity: OpenActivityEvent | null = null
+
+function flushPendingOpenActivity(): void {
+  const pending = pendingOpenActivity
+  if (!pending || openActivitySubscribers.size === 0) return
+  pendingOpenActivity = null
+  for (const callback of openActivitySubscribers) callback(pending)
+}
+
+ipcRenderer.on(MINERVA_EVENTS.openActivity, (_event: IpcRendererEvent, payload: unknown) => {
+  if (typeof payload !== 'object' || payload === null) return
+  const itemId = (payload as Record<string, unknown>).itemId
+  if (itemId !== null && typeof itemId !== 'string') return
+  if (openActivitySubscribers.size === 0) {
+    pendingOpenActivity = { itemId }
+    return
+  }
+  for (const callback of openActivitySubscribers) callback({ itemId })
+})
+
 function onOpenActivity(callback: (payload: OpenActivityEvent) => void): () => void {
+  openActivitySubscribers.add(callback)
+  if (pendingOpenActivity) setTimeout(flushPendingOpenActivity, 0)
+  return () => {
+    openActivitySubscribers.delete(callback)
+  }
+}
+
+/** The notification settings changed; checked with the settings guard, completed with the defaults. */
+function onNotificationsChanged(
+  callback: (payload: NotificationsChangedEvent) => void,
+): () => void {
   const listener = (_event: IpcRendererEvent, payload: unknown): void => {
     if (typeof payload !== 'object' || payload === null) return
-    const itemId = (payload as Record<string, unknown>).itemId
-    if (itemId === null || typeof itemId === 'string') callback({ itemId })
+    const settings = (payload as Record<string, unknown>).settings
+    if (isNotificationSettings(settings)) {
+      callback({ settings: normalizeNotificationSettings(settings) })
+    }
   }
-  ipcRenderer.on(MINERVA_EVENTS.openActivity, listener)
-  return () => ipcRenderer.removeListener(MINERVA_EVENTS.openActivity, listener)
+  ipcRenderer.on(MINERVA_EVENTS.notificationsChanged, listener)
+  return () => ipcRenderer.removeListener(MINERVA_EVENTS.notificationsChanged, listener)
 }
 
 const minervaApi = {
@@ -408,6 +453,7 @@ const minervaApi = {
     onChatEvent,
     onActivityChanged,
     onOpenActivity,
+    onNotificationsChanged,
   },
 } satisfies MinervaApi
 

@@ -58,6 +58,7 @@ import type {
   AnalysisProgressEvent,
   AppearanceChangedEvent,
   LanguageChangedEvent,
+  NotificationsChangedEvent,
   OpenActivityEvent,
   PrListChangedEvent,
   UpdaterStatusChangedEvent,
@@ -513,6 +514,8 @@ interface EventsApi {
   onActivityChanged(callback: (payload: ActivityChangedEvent) => void): () => void
   /** A system notification was clicked (main window only); same concrete-method pattern. */
   onOpenActivity(callback: (payload: OpenActivityEvent) => void): () => void
+  /** The notification settings changed (Settings or the menu bar); same concrete-method pattern. */
+  onNotificationsChanged(callback: (payload: NotificationsChangedEvent) => void): () => void
 }
 
 export type MinervaApi = InvokeApi & { events: EventsApi }
