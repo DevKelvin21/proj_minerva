@@ -30,13 +30,17 @@ publish:
   repo: proj_minerva
 asar: true
 npmRebuild: false
+# App icons, built from the brand mark (`src/shared/brand-mark.ts`) by
+# `node scripts/build-app-icons.mjs` (src/main/brand-mark.test.ts fails when build/icon.svg is stale).
 linux:
+  icon: build/icon.png
   target:
     - AppImage
   category: Development
   executableName: minerva
   maintainer: Edilson
 mac:
+  icon: build/icon.icns
   category: public.app-category.developer-tools
   # macOS is notify-only for now (no Developer ID yet: the real updater only
   # compares versions and links to the release). The `zip` target is still built
@@ -52,6 +56,7 @@ mac:
         - arm64
         - x64
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:

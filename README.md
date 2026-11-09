@@ -1,4 +1,6 @@
-# 🦉 Minerva
+<img src="build/icon.png" width="96" alt="">
+
+# Minerva
 
 > Review Pull Requests and **actually understand them** before you approve.
 

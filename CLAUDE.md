@@ -148,6 +148,10 @@ author's Spanish logs, not maintained)
   at `--theme-*` vars set on `<html>` (`styles.css`). Light/dark-only CSS keys off
   `:root[data-appearance]`. Shiki tokens carry both colors (`tokenClass`/`tokenStyle`).
   Mermaid re-renders with `theme/mermaid-theme.ts`; C4's hard-coded `#444444` is recolored.
+- **Brand mark** (the merge owl): one definition in `src/shared/brand-mark.ts` feeds
+  `ui/BrandMark.tsx` (title bar, `currentColor`) and the app icons. After changing it run
+  `node scripts/build-app-icons.mjs` (macOS: writes `build/icon.svg|icns|ico|png`, wired in
+  `electron-builder.yml`); `main/brand-mark.test.ts` fails while `build/icon.svg` is stale.
 - Every theme color is untrusted: it must pass `toCanonicalThemeColor` (renderer) /
   `isCanonicalThemeColor` (main validator) before it becomes a CSS value.
 - No flash on boot: `public/theme-boot.js` (classic same-origin script, no CSP change)
