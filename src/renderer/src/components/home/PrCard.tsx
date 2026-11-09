@@ -2,7 +2,12 @@ import { Icon } from '../ui/Icon'
 import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
-import type { PrLabel, PullRequestSummary, ReviewDecision } from '../../../../shared/types'
+import type {
+  PrLabel,
+  PullRequestState,
+  PullRequestSummary,
+  ReviewDecision,
+} from '../../../../shared/types'
 import { useCardFilter } from '../../hooks/use-card-filter'
 import { isUnread, needsMyReview, type ViewerIdentity } from '../../lib/dashboard'
 import { personLabel } from '../../lib/home-filter'
@@ -14,7 +19,7 @@ import { CiStatusIcon } from '../ui/CiStatusIcon'
 import { Spinner } from '../ui/Spinner'
 import { DiffStat } from '../ui/DiffStat'
 import { ActionCard, CardOpenButton } from '../ui/SelectableCard'
-import { OrphanBadge } from '../stacks/StackTree'
+import { OrphanBadge } from '../stacks/StackMarks'
 
 const MAX_LABELS = 3
 
@@ -33,10 +38,23 @@ function reviewDecisionTone(decision: ReviewDecision): string {
 }
 
 /**
- * The PR glyph before the number. Decorative: a draft says so once, with its
- * badge, so the icon only turns muted (same shape).
+ * The PR glyph before the number. Decorative: a draft, a merged or a closed
+ * PR says so once, with its badge, so the icon only changes tone (and, once
+ * it is no longer open, shape).
  */
-export function PrStateIcon({ isDraft }: { isDraft: boolean }): React.JSX.Element {
+export function PrStateIcon({
+  isDraft,
+  state = 'open',
+}: {
+  isDraft: boolean
+  state?: PullRequestState
+}): React.JSX.Element {
+  if (state === 'merged') {
+    return <Icon icon={icons.merge} size="sm" className="shrink-0 text-merged" />
+  }
+  if (state === 'closed') {
+    return <Icon icon={icons.pullRequestClosed} size="sm" className="shrink-0 text-muted" />
+  }
   return (
     <Icon
       icon={icons.pullRequest}
@@ -44,6 +62,26 @@ export function PrStateIcon({ isDraft }: { isDraft: boolean }): React.JSX.Elemen
       className={`shrink-0 ${isDraft ? 'text-muted' : 'text-success'}`}
     />
   )
+}
+
+/** "Merged" / "Closed" on a card that is no longer open (the repo page's Closed / All). */
+function StateBadge({ state }: { state: PullRequestState }): React.JSX.Element | null {
+  const { t } = useTranslation()
+  if (state === 'merged') {
+    return (
+      <Badge tone="merged" size="sm" data-pr-state="merged">
+        {t('prList.state.merged')}
+      </Badge>
+    )
+  }
+  if (state === 'closed') {
+    return (
+      <Badge tone="danger" size="sm" data-pr-state="closed">
+        {t('prList.state.closed')}
+      </Badge>
+    )
+  }
+  return null
 }
 
 type RoleKey = 'toReview' | 'required' | 'optional' | 'mine'
@@ -183,7 +221,7 @@ export function PrCard({
           <Spinner size="sm" className="mt-0.5" />
         ) : (
           <span className="mt-0.5">
-            <PrStateIcon isDraft={pr.isDraft} />
+            <PrStateIcon isDraft={pr.isDraft} state={pr.state} />
           </span>
         )}
         <span className="shrink-0 font-mono text-xs text-muted">#{pr.number}</span>
@@ -235,8 +273,9 @@ export function PrCard({
           <DiffStat additions={pr.additions} deletions={pr.deletions} size="xs" className="ml-auto" />
         )}
       </span>
-      {(pr.viewer || orphan || pr.isDraft || shownLabels.length > 0) && (
+      {(pr.viewer || orphan || pr.isDraft || pr.state !== 'open' || shownLabels.length > 0) && (
         <span className="flex min-w-0 flex-wrap items-center gap-1">
+          <StateBadge state={pr.state} />
           <RoleBadges pr={pr} identity={identity} />
           {pr.isDraft && (
             <Badge tone="outline" size="sm">

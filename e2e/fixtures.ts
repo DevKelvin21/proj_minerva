@@ -209,14 +209,19 @@ export async function openPrDetails(page: Page): Promise<void> {
 }
 
 /**
- * Switches the sidebar to "Repos" (the PR list grouped by repo, with Open /
- * Closed / All and refresh). The sidebar opens on "Queue".
+ * Opens the Home repo page of `fullName` (`owner/name`, or
+ * `org/project/name` on Azure DevOps) from the overview's repo card. Goes
+ * Home first when the review is on screen.
  */
-export async function openReposView(page: Page): Promise<void> {
+export async function openRepoPage(page: Page, fullName: string): Promise<void> {
+  if ((await page.getByTestId('home-overview').count()) === 0) {
+    await page.getByTestId('home-button').click()
+  }
   await page
-    .getByRole('group', { name: 'Left column view' })
-    .getByRole('button', { name: 'Repos', exact: true })
-    .click()
+    .getByTestId('repo-card')
+    .filter({ has: page.locator('[title="' + fullName + '"]') })
+    .click({ timeout: 20_000 })
+  await expect(page.getByTestId('repo-page')).toBeVisible()
 }
 
 /**

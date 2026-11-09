@@ -24,6 +24,8 @@ const VIEWPORTS = [
   { name: 'mitad vertical', w: 960, h: 1080 },
   { name: 'mitad horizontal', w: 1920, h: 540 },
   { name: 'un cuarto', w: 960, h: 540 },
+  // The window's minimum width (`main/index.ts`): rail + diff, everything else a drawer.
+  { name: 'mínimo', w: 560, h: 700 },
 ]
 
 /**
@@ -33,7 +35,7 @@ const VIEWPORTS = [
  */
 const diffPane = (page: Page) => page.locator('section:has([aria-label="Inline view"])').last()
 
-test('el shell sobrevive a los 4 tilings: diff usable y sin desborde horizontal', async ({
+test('el shell sobrevive a los tilings y al mínimo de 560: diff usable y sin desborde horizontal', async ({
   window,
 }, testInfo) => {
   await window.getByText('apply-coupon').first().click()
@@ -82,30 +84,44 @@ test('el shell sobrevive a los 4 tilings: diff usable y sin desborde horizontal'
   }
 })
 
-test('con la ventana angosta la lista de PRs pasa a drawer y se abre desde el TitleBar', async ({
+test('con la ventana angosta queda el rail y la lista de PRs se abre como drawer encima', async ({
   window,
 }, testInfo) => {
   const prTitle = 'Add refunds table and migration'
+  const list = window.locator('aside[aria-label="Pull request list"]')
+  const rail = window.getByTestId('sidebar-rail')
+  const toggle = window.getByTestId('sidebar-toggle')
 
-  // A 1920 la lista es una columna acoplada: se ve sin tocar nada.
+  // A 1920 la lista es una columna acoplada: se ve sin tocar nada, y su
+  // único toggle está en su pie (nunca en el title bar).
   await setViewport(window, 1920, 1080)
   await expect(window.getByText(prTitle).first()).toBeVisible()
-  await expect(window.getByRole('button', { name: 'PR list' })).toHaveCount(0)
+  await expect(rail).toHaveCount(0)
+  await expect(list.getByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'true')
+  await expect(window.locator('header.app-drag').getByTestId('sidebar-toggle')).toHaveCount(0)
 
-  // A 960 (mitad de un monitor 1080p) la columna cede el ancho al centro y la
-  // lista pasa a drawer: deja de estar en el DOM hasta que se la pide.
+  // A 960 (mitad de un monitor 1080p) la columna cede el ancho al centro:
+  // queda el rail de 56px, y la lista no está en el DOM hasta que se la pide.
   await setViewport(window, 960, 1080)
-  const toggle = window.getByRole('button', { name: 'PR list' })
-  await expect(toggle).toBeVisible()
+  await expect(rail).toBeVisible()
+  expect(Math.round((await rail.boundingBox())?.width ?? 0)).toBe(56)
+  await expect(rail.getByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'false')
   await expect(window.getByText(prTitle)).toHaveCount(0)
 
   await toggle.click()
+  const drawer = window.getByRole('dialog', { name: 'Pull request list' })
+  await expect(drawer).toBeVisible()
   await expect(window.getByText(prTitle).first()).toBeVisible()
+  // One toggle, the drawer's: the rail under it is out of reach.
+  await expect(toggle).toHaveCount(1)
+  await expect(drawer.getByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'true')
+  await expect(rail).toHaveAttribute('inert', '')
   await attachScreenshot(window, testInfo, 'drawer-lista-abierto')
 
   // Elegir un PR cierra el drawer (gesto de un solo click).
   await window.getByText(prTitle).first().click()
-  await expect(window.locator('aside[aria-label="Pull request list"]')).toHaveCount(0)
+  await expect(list).toHaveCount(0)
+  await expect(rail).toBeVisible()
   // The title bar now names the PR under review.
   await expect(window.getByTestId('review-breadcrumb')).toContainText(prTitle)
 })

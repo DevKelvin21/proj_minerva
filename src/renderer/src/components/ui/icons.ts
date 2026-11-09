@@ -52,7 +52,6 @@ import {
   FileDiff,
   FileMinusCorner,
   FilePlusCorner,
-  FolderGit2,
   FolderTree,
   Funnel,
   GitBranch,
@@ -168,8 +167,6 @@ export const icons = {
   commands: Terminal,
   /** Sidebar: review queue. */
   queue: ListTodo,
-  /** Sidebar: repositories. */
-  repos: FolderGit2,
   /** Activity inbox and its notifications. */
   inbox: Bell,
 

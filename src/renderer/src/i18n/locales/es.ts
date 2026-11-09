@@ -22,10 +22,7 @@ export const es: MessageShape<typeof en> = {
   },
   layout: {
     titleBar: {
-      prListToggle: 'Lista de PRs',
       home: 'Inicio',
-      sidebarHide: 'Ocultar la lista de pull requests',
-      sidebarShow: 'Mostrar la lista de pull requests',
       jumpTo: 'Ir a un PR, archivo o comando ({{shortcut}})',
       jumpPlaceholder: 'Ir a un PR, archivo o comando',
       jumpShort: 'Ir a',
@@ -200,7 +197,6 @@ export const es: MessageShape<typeof en> = {
       },
     },
     rail: {
-      expand: 'Mostrar la lista de pull requests ({{shortcut}})',
       ariaLabel: 'Atajos de la barra lateral',
       recent: 'Abiertos hace poco',
       openPr: 'Abrir #{{number}} {{title}}',
@@ -208,12 +204,6 @@ export const es: MessageShape<typeof en> = {
         queue: 'Cola',
         queueWithCount_one: 'Cola: {{count}} espera tu revisión',
         queueWithCount_other: 'Cola: {{count}} esperan tu revisión',
-        list: 'Repos',
-        listWithCount_one: 'Repos',
-        listWithCount_other: 'Repos',
-        stacks: 'Stacks',
-        stacksWithCount_one: 'Stacks: {{count}} PR huérfano',
-        stacksWithCount_other: 'Stacks: {{count}} PRs huérfanos',
         inbox: 'Bandeja',
         inboxWithCount_one: 'Bandeja: {{count}} sin leer',
         inboxWithCount_other: 'Bandeja: {{count}} sin leer',
@@ -226,33 +216,18 @@ export const es: MessageShape<typeof en> = {
       resize: 'Redimensionar barra lateral',
       resizeHint: 'Arrastra para redimensionar; doble clic restaura el ancho por defecto',
       viewSwitch: 'Vista de la columna izquierda',
+      collapse: 'Contraer la barra lateral ({{shortcut}})',
+      expand: 'Expandir la barra lateral ({{shortcut}})',
+      collapseHint: 'Contraer · {{shortcut}}',
       views: {
         queue: 'Cola',
-        list: 'Repos',
-        stacks: 'Stacks',
         inbox: 'Bandeja',
       },
-      refresh: 'Actualizar',
-      stateFilter: {
-        open: 'Abiertos',
-        closed: 'Cerrados',
-        all: 'Todos',
-      },
-      empty: {
-        open: 'No hay PRs abiertos.',
-        closed: 'No hay PRs cerrados.',
-        all: 'No hay PRs.',
-      },
       noMatches: 'No hay PRs que coincidan con "{{query}}".',
-      searchTipGithub:
-        'Consejo: la búsqueda de GitHub acepta cualificadores, p. ej. <code>org:mi-org</code> o <code>repo:owner/nombre</code>.',
-      searchTipAzure:
-        'Consejo: la búsqueda de Azure DevOps compara el título, el repositorio, la rama, el autor o el <code>#número</code>.',
       azureNotConfigured:
         'Azure DevOps está activado pero todavía no tiene organización. Agrega una en Configuración.',
       noProvidersTitle: 'No hay ningún control de versiones activado',
       noProvidersHint: 'Activa GitHub o Azure DevOps en Configuración para listar pull requests.',
-      loadFailed: 'No se pudo cargar la lista de PRs: {{error}}',
       loading: 'Cargando PRs…',
       accountNoSession:
         'La cuenta <account/> no tiene una sesión de gh válida. Elige otra en Configuración o renuévala con <mono>{{command}}</mono>.',
@@ -776,37 +751,10 @@ export const es: MessageShape<typeof en> = {
     },
   },
   stacks: {
-    view: {
-      loadFailed: 'No se pudieron cargar los stacks: {{error}}',
-      loading: 'Cargando stacks…',
-      loadingHint:
-        'Esto lee todos los PR abiertos del alcance, así que puede tardar unos segundos.',
-      noMatch: 'Ningún stack coincide con "{{query}}".',
-      noneMine: 'Ninguno de tus pull requests está en un stack.',
-      empty: 'No hay pull requests apilados.',
-      emptyHint:
-        'Un stack aparece cuando un PR apunta a la rama de otro PR abierto, o cuando un PR sigue apuntando a la rama de un PR que ya se completó.',
-      mineOnly: 'Solo los míos',
-      mineOnlyTitle: 'Solo los stacks que contienen un PR de tu lista de pull requests',
-      orphaned_one: '{{count}} huérfano',
-      orphaned_other: '{{count}} huérfanos',
-      refresh: 'Actualizar stacks',
-      intro:
-        'Cada PR apunta a la rama del que está encima. Revisa de arriba hacia abajo: el diff de un hijo solo muestra lo que agrega sobre su padre.',
-      refreshFailed: 'No se pudo actualizar: {{error}}',
-      providerError: '{{provider}}: {{message}}',
-      stackAriaLabel: 'Stack en {{repo}} desde #{{number}}',
-      prCount_one: '{{count}} PR',
-      prCount_other: '{{count}} PR',
-      sameFeature_one: 'Misma funcionalidad en {{count}} repo',
-      sameFeature_other: 'Misma funcionalidad en {{count}} repos',
-    },
     tree: {
       draft: 'Borrador',
       open: 'Abierto',
-      draftChip: 'borrador',
       orphaned: 'Huérfano',
-      inYourList: 'En tu lista de pull requests',
       orphanExplanation:
         'El padre #{{parent}} se completó en {{mergedInto}}, pero este PR sigue apuntando a {{base}}.',
       orphanBranchGone:
@@ -1016,6 +964,29 @@ export const es: MessageShape<typeof en> = {
       stacksFailed: 'No se pudieron cargar los stacks: {{error}}',
       notFound: 'Este repositorio ya no está en el panel.',
       untitled: 'Repositorio',
+      stateFilter: {
+        ariaLabel: 'Estado del pull request',
+        open: 'Abiertos',
+        closed: 'Cerrados',
+        all: 'Todos',
+        titles: {
+          open: 'Pull requests abiertos, con el tablero de stacks',
+          closed: 'Pull requests cerrados y mergeados',
+          all: 'Pull requests abiertos, cerrados y mergeados',
+        },
+      },
+      historyTitle: {
+        closed: 'Pull requests cerrados y mergeados',
+        all: 'Todos los pull requests',
+      },
+      historyHint:
+        'Los pull requests en los que participas, los actualizados más recientemente.',
+      historyEmpty: {
+        closed: 'No hay pull requests cerrados ni mergeados en este repositorio.',
+        all: 'No hay pull requests en este repositorio.',
+      },
+      loadingHistory: 'Cargando pull requests…',
+      historyFailed: 'No se pudieron cargar los pull requests: {{error}}',
     },
     stackBoard: {
       ariaLabel: 'Tablero de stacks',

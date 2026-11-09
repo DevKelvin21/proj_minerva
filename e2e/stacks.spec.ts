@@ -9,13 +9,16 @@ import {
   setViewport,
   attachScreenshot,
   openPrDetails,
+  openRepoPage,
 } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
- * Stacked PRs + retarget (mock, Azure org "contoso"):
- * - orders-api: #101 → #102 → #103 (draft), grouped with storefront-web's
- *   #110 → #104 (same `feature/checkout-v2-models` branch): "Checkout v2".
+ * Stacked PRs + retarget (mock, Azure org "contoso"), on the Home repo
+ * page's stack board:
+ * - orders-api: #101 → #102 → #103 (draft); storefront-web: #110 → #104,
+ *   the same feature (`feature/checkout-v2-models` branch): the review's
+ *   stack map says "Same feature in storefront-web".
  * - orders-api: #105 is orphaned (its parent #100 completed into main, #105
  *   still targets feature/refund-schema). Retarget to main fixes it.
  *
@@ -26,10 +29,17 @@ import type { Page } from './fixtures'
 
 /** The left column (the didactic panel is an `<aside>` too). */
 const aside = (page: Page) => page.getByRole('complementary', { name: 'Pull request list' })
-const node = (page: Page, number: number) => aside(page).locator(`[data-stack-node="${number}"]`)
-const nodeRow = (page: Page, number: number) => node(page, number).locator('> button')
+const repoPage = (page: Page) => page.getByTestId('repo-page')
+/** One stack of the board, by the number of its root PR. */
+const stackOf = (page: Page, root: number) => page.locator(`section[data-stack-root$="#${root}"]`)
+/** A PR card on the board (stack cards) or among the PRs outside a stack. */
+const card = (page: Page, number: number) =>
+  repoPage(page).locator(
+    `[data-testid="stack-card"][data-pr-key$="#${number}"], [data-testid="pr-card"][data-pr-key$="#${number}"]`,
+  )
 const header = (page: Page) => page.locator('header:has(h1)')
-const CHECKOUT_GROUP = '[data-stack-group="group:azure:contoso:feature/checkout-v2-models"]'
+const ORDERS_API = 'contoso/Platform/orders-api'
+const STOREFRONT_WEB = 'contoso/Platform/storefront-web'
 const ORPHAN_TEXT =
   'Parent #100 was completed into main, but this PR still targets feature/refund-schema.'
 
@@ -40,11 +50,10 @@ const VIEWPORTS = [
   { name: 'quarter', w: 960, h: 540 },
 ]
 
+/** The orders-api repo page with its stacks board loaded. */
 async function openStacks(page: Page): Promise<void> {
-  await aside(page)
-    .getByRole('button', { name: /^Stacks/ })
-    .click()
-  await expect(node(page, 101)).toBeVisible({ timeout: 20_000 })
+  await openRepoPage(page, ORDERS_API)
+  await expect(card(page, 101)).toBeVisible({ timeout: 20_000 })
 }
 
 /** Launch with an auto-answered confirmation dialog. */
@@ -61,82 +70,65 @@ async function withConfirm(
   }
 }
 
-test('stacks view: the 101→102→103 chain, the cross-repo group and the orphan', async ({
+test('stack board: the 101→102→103 chain, the storefront-web chain and the orphan', async ({
   window,
 }, testInfo) => {
+  await setViewport(window, 1600, 1000)
   await openStacks(window)
 
-  // Cross-repo group, labelled from the root PR titles.
-  const group = aside(window).locator(CHECKOUT_GROUP)
-  await expect(group).toContainText('Checkout v2')
-  await expect(group).toContainText('Same feature across 2 repos')
-  await expect(group).toContainText('contoso/Platform/orders-api')
-  await expect(group).toContainText('contoso/Platform/storefront-web')
+  // The chain, in order from its base branch, in ONE stack.
+  const chain = stackOf(window, 101)
+  await expect(chain).toContainText('3 PRs')
+  await expect(chain.getByTestId('stack-base')).toHaveText('main')
+  await expect(chain.getByTestId('stack-card')).toHaveText([/#101/, /#102/, /#103/])
+  await expect(card(window, 102)).toContainText('Checkout v2: submit validation')
+  await expect(card(window, 103)).toContainText('Draft')
 
-  // The chains, nested as a tree.
-  await expect(
-    node(window, 101).locator('[data-stack-node="102"] [data-stack-node="103"]'),
-  ).toHaveCount(1)
-  await expect(node(window, 110).locator('[data-stack-node="104"]')).toHaveCount(1)
-  await expect(group.locator('[data-stack-node]')).toHaveCount(5)
-  await expect(nodeRow(window, 102)).toContainText('Checkout v2: submit validation')
-  await expect(nodeRow(window, 102)).toContainText(
-    'feature/checkout-v2-service → feature/checkout-v2-models',
-  )
-  await expect(nodeRow(window, 103)).toContainText('draft')
-  await expect(group.locator('[data-provider="azure"]').first()).toBeVisible()
+  // Orphan: badge + the one-line explanation + the action, once.
+  const orphan = stackOf(window, 105)
+  await expect(orphan).toHaveAttribute('data-orphan', 'true')
+  await expect(card(window, 105).locator('[data-orphan-badge]')).toHaveText('Orphaned')
+  await expect(orphan).toContainText(ORPHAN_TEXT)
+  await expect(orphan.getByRole('button', { name: 'Retarget to main' })).toBeVisible()
+  await attachScreenshot(window, testInfo, 'stack-board')
 
-  // Orphan: badge + the one-line explanation + the action.
-  await expect(nodeRow(window, 105).locator('[data-orphan-badge]')).toHaveText('Orphaned')
-  await expect(node(window, 105)).toContainText(ORPHAN_TEXT)
-  await expect(node(window, 105).getByRole('button', { name: 'Retarget to main' })).toBeVisible()
-  await expect(aside(window).getByRole('button', { name: /^Stacks/ })).toContainText('1')
-  await attachScreenshot(window, testInfo, 'stacks-view')
+  // The page's text filter keeps the stacks with a matching PR.
+  const filter = repoPage(window).getByLabel('Filter the pull requests of this repository')
+  await filter.fill('refund')
+  await expect(card(window, 105)).toBeVisible()
+  await expect(card(window, 101)).toHaveCount(0)
+  await filter.fill('')
+  await expect(card(window, 101)).toBeVisible()
 
-  // Text filter from the title bar search box.
-  await window
-    .getByPlaceholder(/Buscar|Search/)
-    .first()
-    .fill('refund')
-  await expect(node(window, 105)).toBeVisible()
-  await expect(node(window, 101)).toHaveCount(0)
-  await window
-    .getByPlaceholder(/Buscar|Search/)
-    .first()
-    .fill('')
-  await expect(node(window, 101)).toBeVisible()
+  // The same feature's other half has its own board.
+  await openRepoPage(window, STOREFRONT_WEB)
+  await expect(stackOf(window, 110).getByTestId('stack-card')).toHaveText([/#110/, /#104/])
+  await openRepoPage(window, ORDERS_API)
 
   // Tiled sizes: still reachable and readable, no horizontal overflow.
   for (const viewport of VIEWPORTS) {
     await setViewport(window, viewport.w, viewport.h)
-    // React re-renders the new layout tier after the resize event: let it
-    // commit, or the checks below can pass on the old (docked) layout and
-    // then lose it when the drawer layout replaces it.
     await window.evaluate(
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     )
-    const drawerToggle = window.getByRole('button', { name: 'PR list' })
-    if ((await drawerToggle.count()) > 0 && (await aside(window).count()) === 0) {
-      await drawerToggle.click()
-    }
-    await expect(nodeRow(window, 101)).toBeVisible()
-    await expect(nodeRow(window, 101)).toContainText('#101')
-    await node(window, 105).scrollIntoViewIfNeeded()
-    await expect(node(window, 105)).toContainText(ORPHAN_TEXT)
+    await expect(card(window, 101)).toBeVisible()
+    await expect(card(window, 101)).toContainText('#101')
+    await stackOf(window, 105).scrollIntoViewIfNeeded()
+    await expect(stackOf(window, 105)).toContainText(ORPHAN_TEXT)
     const overflow = await window.evaluate(() => {
-      const sidebar = document.querySelector('aside[aria-label="Pull request list"]')
+      const page = document.querySelector('[data-testid="repo-page"]')
       return {
-        page: document.documentElement.scrollWidth - window.innerWidth,
-        sidebar: sidebar ? sidebar.scrollWidth - sidebar.clientWidth : 0,
+        document: document.documentElement.scrollWidth - window.innerWidth,
+        repoPage: page ? page.scrollWidth - page.clientWidth : 0,
       }
     })
-    expect(overflow.page, viewport.name + ': page overflows horizontally').toBeLessThanOrEqual(0)
+    expect(overflow.document, viewport.name + ': window overflows horizontally').toBeLessThanOrEqual(0)
     expect(
-      overflow.sidebar,
-      viewport.name + ': sidebar overflows horizontally',
+      overflow.repoPage,
+      viewport.name + ': repo page overflows horizontally',
     ).toBeLessThanOrEqual(0)
-    const box = await nodeRow(window, 102).boundingBox()
-    expect(box?.width ?? 0, viewport.name + ': stack rows too narrow').toBeGreaterThan(200)
+    const box = await card(window, 102).boundingBox()
+    expect(box?.width ?? 0, viewport.name + ': stack cards too narrow').toBeGreaterThan(200)
     await attachScreenshot(window, testInfo, 'stacks-' + viewport.name)
   }
 })
@@ -145,7 +137,7 @@ test('PR detail of #102 shows its stack map; chips navigate; target branch form 
   window,
 }, testInfo) => {
   await openStacks(window)
-  await nodeRow(window, 102).click()
+  await card(window, 102).click()
   await expect(header(window)).toContainText('Checkout v2: submit validation')
 
   const stack = window.getByRole('region', { name: 'Stack', exact: true })
@@ -156,8 +148,8 @@ test('PR detail of #102 shows its stack map; chips navigate; target branch form 
   await expect(stack).toContainText('2 of 3')
   await expect(stack).toContainText('Built on top of #101 (feature/checkout-v2-models)')
   await expect(stack).toContainText('#103 builds on top of this one')
+  // The cross-repo relation: the same feature's stack in storefront-web.
   await expect(stack).toContainText('Same feature in storefront-web (#110 and #104)')
-  await expect(nodeRow(window, 102)).toHaveAttribute('aria-pressed', 'true')
   await attachScreenshot(window, testInfo, 'pr-detail-stack-map')
 
   // Short window (horizontal half): the map stays visible under the PR bar.
@@ -199,7 +191,7 @@ test('PR detail of #102 shows its stack map; chips navigate; target branch form 
 test('retarget (accepted): the orphan badge clears and #105 targets main', async ({}, testInfo) => {
   await withConfirm('accept', testInfo.outputPath('user-data'), async (window) => {
     await openStacks(window)
-    const orphan = node(window, 105)
+    const orphan = stackOf(window, 105)
     await orphan.getByRole('button', { name: 'Retarget to main' }).click()
     // The consequence is shown before anything is written.
     await expect(orphan).toContainText('Target branch:')
@@ -208,16 +200,18 @@ test('retarget (accepted): the orphan badge clears and #105 targets main', async
     await attachScreenshot(window, testInfo, 'retarget-preview')
     await orphan.getByRole('button', { name: 'Retarget #105' }).click()
 
-    const note = aside(window).getByRole('status').filter({ hasText: 'now targets' })
+    // #105 left the stacks: the note follows it to the PRs outside a stack.
+    const note = repoPage(window).getByRole('status').filter({ hasText: 'now targets' })
     await expect(note).toContainText('#105 now targets main (was feature/refund-schema)')
-    await expect(node(window, 105)).toHaveCount(0)
-    await expect(aside(window).locator('[data-orphan-badge]')).toHaveCount(0)
-    await expect(node(window, 101)).toBeVisible()
+    await expect(stackOf(window, 105)).toHaveCount(0)
+    await expect(repoPage(window).locator('[data-orphan-badge]')).toHaveCount(0)
+    await expect(card(window, 105)).toHaveAttribute('data-testid', 'pr-card')
+    await expect(card(window, 101)).toBeVisible()
     await attachScreenshot(window, testInfo, 'retarget-done-stacks')
 
-    await note.getByRole('button', { name: '#105' }).click()
+    await card(window, 105).click()
     await expect(header(window)).toContainText('Refund ledger')
-    // The header now carries the note; the sidebar does not repeat it.
+    // The header now carries the note (the repo page is gone with Home).
     await expect(note).toHaveCount(0)
     await expect(window.getByTestId('pr-branches')).toHaveText('feature/refund-ledger → main')
     await expect(header(window).getByRole('status')).toContainText(
@@ -231,7 +225,7 @@ test('retarget (accepted): the orphan badge clears and #105 targets main', async
 test('retarget: a base changed behind the UI is a CONFLICT that explains and refreshes', async ({}, testInfo) => {
   await withConfirm('accept', testInfo.outputPath('user-data'), async (window) => {
     await openStacks(window)
-    await nodeRow(window, 105).click()
+    await card(window, 105).click()
     await expect(header(window)).toContainText('Refund ledger')
     const stack = window.getByRole('region', { name: 'Stack', exact: true })
     await expect(stack).toContainText(ORPHAN_TEXT)
@@ -260,7 +254,10 @@ test('retarget: a base changed behind the UI is a CONFLICT that explains and ref
     await attachScreenshot(window, testInfo, 'retarget-conflict')
     // The refresh lands: the detail now shows main and the orphan is gone.
     await expect(window.getByTestId('pr-branches')).toHaveText('feature/refund-ledger → main')
-    await expect(node(window, 105)).toHaveCount(0)
+    await openRepoPage(window, ORDERS_API)
+    await expect(card(window, 101)).toBeVisible()
+    await expect(stackOf(window, 105)).toHaveCount(0)
+    await expect(card(window, 105)).toHaveAttribute('data-testid', 'pr-card')
   })
 })
 
@@ -283,7 +280,7 @@ test('retarget (declined): nothing changes, quietly', async ({}, testInfo) => {
   )
   await withConfirm('decline', testInfo.outputPath('user-data'), async (window) => {
     await openStacks(window)
-    await nodeRow(window, 105).click()
+    await card(window, 105).click()
     await expect(header(window)).toContainText('Refund ledger')
     const stack = window.getByRole('region', { name: 'Stack', exact: true })
     await stack.getByRole('button', { name: 'Retarget to main' }).click()
@@ -295,8 +292,8 @@ test('retarget (declined): nothing changes, quietly', async ({}, testInfo) => {
     await expect(window.getByTestId('pr-branches')).toHaveText(
       'feature/refund-ledger → feature/refund-schema',
     )
-    await expect(nodeRow(window, 105).locator('[data-orphan-badge]')).toBeVisible()
-    await expect(node(window, 105)).toContainText(ORPHAN_TEXT)
+    await expect(stack.locator('[data-orphan-badge]')).toBeVisible()
+    await expect(stack).toContainText(ORPHAN_TEXT)
     await attachScreenshot(window, testInfo, 'retarget-declined')
   })
 })

@@ -468,6 +468,27 @@ export function findPullRequest(
 }
 
 /** "org / project" (Azure DevOps) or "owner" (GitHub): where a repo lives, for subtitles. */
+/**
+ * Provider-side search that narrows `scm:listPullRequests` to one repo (the
+ * repo page's Closed / All): GitHub's `repo:` qualifier, the full name as
+ * text for Azure DevOps (its search matches the repository). Text matching
+ * is loose, so the caller still keeps only `repoKey` matches
+ * (`pullRequestsOfRepo`).
+ */
+export function repoSearchQuery(repo: RepoRef): string {
+  return repo.provider === 'github' ? 'repo:' + repo.fullName : repo.fullName
+}
+
+/** The PRs of one repo (by `repoKey`), most recently updated first. */
+export function pullRequestsOfRepo(
+  pullRequests: readonly PullRequestSummary[],
+  key: string,
+): PullRequestSummary[] {
+  return pullRequests
+    .filter((pr) => repoKey(pr.repo) === key)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.number - a.number)
+}
+
 export function repoOwnerLabel(repo: RepoRef): string {
   return repo.provider === 'github' ? repo.owner : repo.organization + ' / ' + repo.project
 }

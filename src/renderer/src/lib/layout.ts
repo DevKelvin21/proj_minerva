@@ -18,10 +18,16 @@ export type HeightTier = 'tall' | 'short' | 'xshort'
 export const WIDTH_BREAKPOINTS = { xl: 1360, lg: 1040, md: 760 } as const
 export const HEIGHT_BREAKPOINTS = { tall: 700, short: 560 } as const
 
-/** Ancho de la sidebar acoplada por tier; en `md`/`sm` no está acoplada (drawer). */
+/**
+ * Ancho de la sidebar acoplada por tier; en `md`/`sm` no está acoplada: el
+ * rail de 56px queda siempre y la lista se abre como drawer encima.
+ */
 export const SIDEBAR_WIDTH: Record<WidthTier, number> = { xl: 280, lg: 240, md: 0, sm: 0 }
 
-/** Docked sidebar drag limits (px). The rail it folds to is 56px (`SidebarRail`, `w-14`). */
+/**
+ * Docked sidebar drag limits (px). The rail it folds to is 56px
+ * (`SidebarRail`, `w-14`), and the rail is all the drawer tiers dock.
+ */
 export const SIDEBAR_MIN_WIDTH = 220
 const SIDEBAR_MAX_WIDTH = 480
 /** Most of the viewport a dragged sidebar may take. */
@@ -106,13 +112,17 @@ export function dockedSidebarWidth(preferred: number | null, viewportWidth: numb
   return clampSidebarWidth(preferred, viewportWidth)
 }
 
-/** Room the left column takes from the center: the rail when folded, 0 as a drawer. */
+/**
+ * Room the left column takes from the center: the rail when folded, and
+ * always the rail on the drawer tiers (the open drawer covers the page, it
+ * takes no room of its own).
+ */
 export function sidebarFootprint(
   preferred: number | null,
   collapsed: boolean,
   viewportWidth: number,
 ): number {
-  if (sidebarIsDrawer(widthTier(viewportWidth))) return 0
+  if (sidebarIsDrawer(widthTier(viewportWidth))) return SIDEBAR_RAIL_WIDTH
   return collapsed ? SIDEBAR_RAIL_WIDTH : dockedSidebarWidth(preferred, viewportWidth)
 }
 

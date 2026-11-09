@@ -16,9 +16,11 @@ describe('docked sidebar width', () => {
     expect(dockedSidebarWidth(null, 1200)).toBe(240)
   })
 
-  it('is 0 on the drawer tiers, whatever was dragged', () => {
+  it('docks only the rail on the drawer tiers, whatever was dragged or folded', () => {
     expect(dockedSidebarWidth(400, 900)).toBe(0)
-    expect(sidebarFootprint(400, true, 900)).toBe(0)
+    expect(sidebarFootprint(400, true, 900)).toBe(SIDEBAR_RAIL_WIDTH)
+    expect(sidebarFootprint(400, false, 900)).toBe(SIDEBAR_RAIL_WIDTH)
+    expect(sidebarFootprint(null, false, 560)).toBe(SIDEBAR_RAIL_WIDTH)
   })
 
   it('clamps a dragged width between the minimum and 32% of the window (480px max)', () => {
@@ -45,6 +47,15 @@ describe('clampDidacticWidth', () => {
     expect(clampDidacticWidth(2000, 1600)).toBe(900)
     expect(clampDidacticWidth(2000, 1600, 480)).toBe(700)
     expect(clampDidacticWidth(2000, 1600, SIDEBAR_RAIL_WIDTH)).toBe(960)
+  })
+
+  it('next to the rail on the drawer tiers, keeps the tier fraction or the 300px floor', () => {
+    // 960x540 (quarter of 1080p, md): 45% = 432 is under 960 - 56 - 420 = 484.
+    expect(clampDidacticWidth(2000, 960, sidebarFootprint(null, false, 960))).toBe(432)
+    // 800 (md): 800 - 56 - 420 = 324 beats 45% = 360.
+    expect(clampDidacticWidth(2000, 800, sidebarFootprint(null, false, 800))).toBe(324)
+    // The 560px window minimum (sm): never under the panel's 300px floor.
+    expect(clampDidacticWidth(2000, 560, sidebarFootprint(null, false, 560))).toBe(300)
   })
 })
 

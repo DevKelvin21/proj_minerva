@@ -5,96 +5,111 @@ import {
   closeMinerva,
   mainWindow,
   attachScreenshot,
-  openReposView,
+  openRepoPage,
+  setViewport,
 } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
- * Port de scripts/smoke-pr-list.mjs (F10): filtro de estado, refresh manual,
- * dots de no-visto + markPrSeen y watcher de cambios. El caso del watcher
- * lanza SU app con `MINERVA_WATCH_INTERVAL_MS=1500` (con el default de 60s
- * haría timeout) vía el fixture parametrizado.
+ * Closed and merged PRs, which the dashboard (open only) does not carry:
+ * the Home repo page's Open / Closed / All (`scm:listPullRequests`), its
+ * refresh and unseen dots + markPrSeen, and main's watcher refreshing the
+ * sidebar Queue without a manual refresh. The watcher case launches ITS
+ * app with `MINERVA_WATCH_INTERVAL_MS=1500` (the 60 s default would time out).
  */
 
-// Títulos de fixtures del universo shopwave usados como señales.
+// Shopwave fixture titles used as signals.
 const OPEN_PR = 'apply-coupon' // #482 shopwave/api, open, commentCount 2
 const CLOSED_PR = 'GraphQL gateway proxy' // #455 shopwave/api, closed
-const MERGED_PR_A = 'pagination to order history' // #185 shopwave/web, merged
-const MERGED_PR_B = 'multi-currency support' // #68 shopwave/checkout-service, merged
-const WATCHED_PR = 'race condition in payment webhook' // open, para el watcher
+const MERGED_PR = 'pagination to order history' // #185 shopwave/web, merged
+const OTHER_REPO_MERGED = 'multi-currency support' // #68 shopwave/checkout-service, merged
+const WATCHED_PR = 'race condition in payment webhook' // open, for the watcher
 
-const aside = (page: Page) => page.locator('aside')
-const filterButton = (page: Page, label: string) =>
-  aside(page).getByRole('button', { name: label, exact: true })
-const refreshButton = (page: Page) =>
-  page.locator('aside button[aria-label="Refresh"], aside button[title="Refresh"]')
+const repoPage = (page: Page) => page.getByTestId('repo-page')
+const cards = (page: Page) => repoPage(page).getByTestId('pr-card')
+const card = (page: Page, title: string) => cards(page).filter({ hasText: title })
+const stateButton = (page: Page, state: 'open' | 'closed' | 'all') =>
+  page.getByTestId('repo-state-' + state)
+const history = (page: Page) => page.getByTestId('repo-history')
 
-/** Datos de dots/contador del item de la lista cuyo texto contiene `title`. */
+/** Dots / comment counter of the sidebar list row whose text contains `title`. */
 const itemInfo = (page: Page, title: string) =>
   page.evaluate((t) => {
     const item = [...document.querySelectorAll('aside button')].find((b) =>
       (b as HTMLElement).innerText.includes(t),
     ) as HTMLElement | undefined
     if (!item) return null
-    // Contador de comentarios: ÚNICO span del item que envuelve un svg y cuyo
-    // texto es solo dígitos (MessageSquare + count). No usar includes(dígito)
-    // sobre el texto completo: +adds/-dels y #número dan falsos positivos.
+    // Comment counter: the ONE span of the row that wraps an svg and whose
+    // text is only digits (MessageSquare + count). Not includes(digit) over
+    // the whole text: +adds/-dels and #number give false positives.
     const counter = [...item.querySelectorAll('span')].find(
       (s) => s.querySelector('svg') && /^\d+$/.test((s as HTMLElement).innerText.trim()),
     ) as HTMLElement | undefined
-    return {
-      unseenDot: Boolean(item.querySelector('span[title="Unseen changes"]')),
-      commentsDot: Boolean(item.querySelector('span[title="New comments"]')),
-      commentCount: counter ? counter.innerText.trim() : null,
-    }
+    return { commentCount: counter ? counter.innerText.trim() : null }
   }, title)
 
-test('filtros de estado: Abiertos (default), Cerrados con badges, Todos', async ({
+test('repo page: Open (default), Closed with state badges, All; another repo starts on Open', async ({
   window,
 }, testInfo) => {
-  // The state filters belong to the Repos view (the Queue is open PRs only).
-  await openReposView(window)
-  // (1) Default "Abiertos": open visible, closed/merged fuera.
-  await expect(aside(window).getByText(OPEN_PR).first()).toBeVisible()
-  await expect(aside(window).getByText(CLOSED_PR)).toHaveCount(0)
-  await expect(aside(window).getByText(MERGED_PR_A)).toHaveCount(0)
+  await setViewport(window, 1600, 1000)
+  await openRepoPage(window, 'shopwave/api')
 
-  // (2) "Cerrados": solo closed+merged, con badges de estado.
-  await filterButton(window, 'Closed').click()
-  await expect(aside(window).getByText(CLOSED_PR).first()).toBeVisible()
-  await expect(aside(window).getByText(MERGED_PR_A).first()).toBeVisible()
-  await expect(aside(window).getByText(MERGED_PR_B).first()).toBeVisible()
-  await expect(aside(window).getByText(OPEN_PR)).toHaveCount(0)
-  const badges = await window.evaluate(() => {
-    const spans = [...document.querySelectorAll('aside span')]
-    return {
-      merged: spans.filter((s) => s.textContent?.trim() === 'merged').length,
-      closed: spans.filter((s) => s.textContent?.trim() === 'closed').length,
-    }
-  })
-  expect(badges.merged, 'badges merged en Cerrados').toBeGreaterThanOrEqual(2)
-  expect(badges.closed, 'badges closed en Cerrados').toBeGreaterThanOrEqual(1)
-  await attachScreenshot(window, testInfo, 'pr-list-cerrados')
+  // (1) Open: today's dashboard, closed and merged left out.
+  await expect(stateButton(window, 'open')).toHaveAttribute('aria-pressed', 'true')
+  await expect(card(window, OPEN_PR)).toBeVisible()
+  await expect(card(window, CLOSED_PR)).toHaveCount(0)
+  await expect(history(window)).toHaveCount(0)
 
-  // (3) "Todos": open y closed conviven.
-  await filterButton(window, 'All').click()
-  await expect(aside(window).getByText(OPEN_PR).first()).toBeVisible()
-  await expect(aside(window).getByText(CLOSED_PR).first()).toBeVisible()
+  // (2) Closed: only that repo's closed + merged, with a state badge.
+  await stateButton(window, 'closed').click()
+  await expect(history(window)).toHaveAttribute('data-state', 'closed')
+  await expect(card(window, CLOSED_PR)).toBeVisible()
+  await expect(card(window, CLOSED_PR).locator('[data-pr-state="closed"]')).toHaveText('Closed')
+  await expect(card(window, OPEN_PR)).toHaveCount(0)
+  // Another repo's closed PRs stay on their own page.
+  await expect(card(window, OTHER_REPO_MERGED)).toHaveCount(0)
+  await expect(card(window, MERGED_PR)).toHaveCount(0)
+  // No stacks board here: Closed is a plain list.
+  await expect(window.getByTestId('stack-board')).toHaveCount(0)
+  await attachScreenshot(window, testInfo, 'repo-page-closed')
+
+  // (3) All: open and closed together.
+  await stateButton(window, 'all').click()
+  await expect(history(window)).toHaveAttribute('data-state', 'all')
+  await expect(card(window, OPEN_PR)).toBeVisible()
+  await expect(card(window, CLOSED_PR)).toBeVisible()
+
+  // (4) The viewer filter works on the list shown: its counts follow it.
+  await expect(window.getByTestId('repo-filter-all').locator('span')).toHaveText(
+    String(await cards(window).count()),
+  )
+
+  // (5) Another repo starts on Open; its Closed shows its merged PR.
+  await openRepoPage(window, 'shopwave/web')
+  await expect(stateButton(window, 'open')).toHaveAttribute('aria-pressed', 'true')
+  await stateButton(window, 'closed').click()
+  await expect(card(window, MERGED_PR).locator('[data-pr-state="merged"]')).toHaveText('Merged')
+  await expect(card(window, CLOSED_PR)).toHaveCount(0)
+
+  // (6) A closed PR opens into the review like any card.
+  await card(window, MERGED_PR).click()
+  await expect(window.locator('header:has(h1)')).toContainText('#185')
 })
 
-test('refresh manual y dots de no-visto con markPrSeen', async ({ window }, testInfo) => {
-  await openReposView(window)
-  // (4) Refresh manual: re-fetchea sin error.
-  await refreshButton(window).click()
-  await expect(aside(window).getByText(OPEN_PR).first()).toBeVisible()
-  await expect(window.getByText('Could not load')).toHaveCount(0)
+test('repo page Closed: refresh, unseen dot, opening it marks it seen', async ({
+  window,
+}, testInfo) => {
+  await setViewport(window, 1600, 1000)
+  await openRepoPage(window, 'shopwave/api')
+  await stateButton(window, 'closed').click()
+  await expect(card(window, CLOSED_PR)).toBeVisible()
+  const dot = card(window, CLOSED_PR).getByRole('img', { name: 'Unread changes' })
 
-  // (5) Sellar "visto" con valores VIEJOS fuerza un estado unread
-  // determinístico (updatedAt actual > sellado ⇒ hasUpdates; commentCount
-  // 2 > 0 ⇒ hasNewComments), inmune al pr-seen.json del userData (aquí
-  // limpio por construcción, pero el sellado lo hace explícito).
+  // Sealing "seen" with OLD values forces a deterministic unread state
+  // (current updatedAt > sealed ⇒ hasUpdates; commentCount 1 > 0 ⇒
+  // hasNewComments), whatever pr-seen.json holds.
   const target = await window.evaluate(async (title) => {
-    const { items: prs } = await window.minerva.scm.listPullRequests({ state: 'open' })
+    const { items: prs } = await window.minerva.scm.listPullRequests({ state: 'closed' })
     const pr = prs.find((p) => p.title.includes(title))
     if (!pr) return null
     await window.minerva.scm.markPrSeen({
@@ -103,38 +118,40 @@ test('refresh manual y dots de no-visto con markPrSeen', async ({ window }, test
       updatedAt: '2020-01-01T00:00:00Z',
       commentCount: 0,
     })
-    const again = await window.minerva.scm.listPullRequests({ state: 'open' })
+    const again = await window.minerva.scm.listPullRequests({ state: 'closed' })
     return again.items.find((p) => p.id === pr.id)?.unread ?? null
-  }, OPEN_PR)
-  expect(target, 'unread por IPC tras sellar visto viejo').toMatchObject({
+  }, CLOSED_PR)
+  expect(target, 'unread over IPC after sealing an old "seen"').toMatchObject({
     isNew: false,
     hasUpdates: true,
     hasNewComments: true,
   })
 
-  // Refetch de la UI para que pinte los dots.
-  await refreshButton(window).click()
-  await expect
-    .poll(() => itemInfo(window, OPEN_PR), { message: 'dots visibles tras el refetch' })
-    .toMatchObject({ unseenDot: true, commentsDot: true })
-  await attachScreenshot(window, testInfo, 'pr-list-dots')
+  // The page's refresh refetches the Closed list: the dot shows.
+  await repoPage(window).getByRole('button', { name: 'Refresh dashboard' }).click()
+  await expect(dot).toBeVisible()
+  await expect(window.getByText('Could not load')).toHaveCount(0)
+  await attachScreenshot(window, testInfo, 'repo-page-closed-unseen')
 
-  // Seleccionar el PR = marcar visto ⇒ dots se apagan (clear optimista).
-  await aside(window).getByText(OPEN_PR).first().click()
-  await expect
-    .poll(() => itemInfo(window, OPEN_PR), { message: 'dots apagados al seleccionar' })
-    .toMatchObject({ unseenDot: false, commentsDot: false })
+  // Opening the PR seals it seen: back on the page, the dot is gone.
+  await card(window, CLOSED_PR).click()
+  await expect(window.locator('header:has(h1)')).toContainText('#455')
+  await window.getByTestId('review-breadcrumb').getByText('api', { exact: true }).click()
+  await expect(repoPage(window)).toBeVisible()
+  await expect(stateButton(window, 'closed')).toHaveAttribute('aria-pressed', 'true')
+  await expect(card(window, CLOSED_PR)).toBeVisible()
+  await expect(dot).toHaveCount(0)
 
-  // markPrSeen persistió en main: una query nueva viene limpia.
+  // markPrSeen persisted in main: a fresh query comes back clean.
   const persisted = await window.evaluate(async (title) => {
-    const { items: prs } = await window.minerva.scm.listPullRequests({ state: 'open' })
+    const { items: prs } = await window.minerva.scm.listPullRequests({ state: 'closed' })
     return prs.find((p) => p.title.includes(title))?.unread ?? null
-  }, OPEN_PR)
+  }, CLOSED_PR)
   expect(persisted).toMatchObject({ isNew: false, hasUpdates: false, hasNewComments: false })
 })
 
 // eslint-disable-next-line no-empty-pattern
-test('watcher: un comentario nuevo refresca la lista sin refresh manual', async ({}, testInfo) => {
+test('watcher: a new comment refreshes the Queue without a manual refresh', async ({}, testInfo) => {
   const app = await launchMinerva(testInfo.outputPath('user-data'), {
     env: { MINERVA_WATCH_INTERVAL_MS: '1500' },
   })
@@ -147,17 +164,17 @@ test('watcher: un comentario nuevo refresca la lista sin refresh manual', async 
       await window.minerva.scm.postComment({
         repo: pr.repo,
         number: pr.number,
-        bodyMarkdown: 'comentario del e2e pr-list (watcher)',
+        bodyMarkdown: 'comment from the pr-list e2e (watcher)',
       })
       return { commentCount: pr.commentCount ?? 0 }
     }, WATCHED_PR)
-    expect(seed, 'fixture objetivo del watcher encontrado').not.toBeNull()
+    expect(seed, 'watcher target fixture found').not.toBeNull()
 
-    // El watcher (1.5s) detecta commentCount+1 y el hook refetchea SOLO.
+    // The watcher (1.5 s) sees commentCount+1 and the Queue refetches ON ITS OWN.
     const expected = String(seed!.commentCount + 1)
     await expect
       .poll(async () => (await itemInfo(window, WATCHED_PR))?.commentCount, {
-        message: `contador ${seed!.commentCount} → ${expected} sin click (evento prListChanged)`,
+        message: `counter ${seed!.commentCount} → ${expected} without a click (prListChanged)`,
         timeout: 15_000,
       })
       .toBe(expected)

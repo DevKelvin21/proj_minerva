@@ -1,6 +1,6 @@
 /**
- * Shared cache of `scm:getStacks` for the renderer: the Stacks view and the
- * stack map in the PR header read the SAME result, so opening a PR never
+ * Shared cache of `scm:getStacks` for the renderer: the Home stack board and
+ * the stack map in the PR header read the SAME result, so opening a PR never
  * triggers a second cold fetch (~10 s on a real org).
  *
  * Stale-while-revalidate: a reload keeps the previous `result` on screen and

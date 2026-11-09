@@ -287,7 +287,7 @@ test('a feature rename and the collapsed sidebar survive an app relaunch', async
   }
 })
 
-test('docked sidebar: TitleBar toggle and Cmd/Ctrl+B, ignored while typing in the search box', async ({
+test('docked sidebar: its own toggle and Cmd/Ctrl+B, ignored while typing in the search box', async ({
   window,
 }) => {
   await setViewport(window, 1600, 1000)
@@ -372,8 +372,8 @@ test('md tier: Esc closes the PR-list drawer without leaving the repo page', asy
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   )
   await openRepo(window, 'orders-api')
-  const drawerToggle = window.getByRole('button', { name: 'PR list' })
-  await drawerToggle.click()
+  // The rail's toggle opens the drawer over it.
+  await window.getByTestId('sidebar-toggle').click()
   await expect(sidebar(window)).toBeVisible()
   await window.keyboard.press('Escape')
   await expect(sidebar(window)).toHaveCount(0)

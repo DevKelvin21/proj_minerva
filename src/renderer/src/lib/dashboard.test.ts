@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   prKey,
+  repoKey,
   type AzureRepoRef,
   type GithubRepoRef,
   type PrStack,
@@ -25,6 +26,8 @@ import {
   normalizeFeatureName,
   parseFeatureNames,
   parseHiddenFeatures,
+  pullRequestsOfRepo,
+  repoSearchQuery,
   retargetNoteKey,
   scopeOwnerLabel,
   uniqueProviderErrors,
@@ -481,5 +484,25 @@ describe('page header helpers', () => {
       prKey(API, 105),
     )
     expect(retargetNoteKey({ kind: 'conflict', prKey: 'k' })).toBe('k')
+  })
+})
+
+describe('repo history (Closed / All on the repo page)', () => {
+  it("repoSearchQuery: GitHub's repo: qualifier, the full name for Azure DevOps", () => {
+    expect(repoSearchQuery(GH)).toBe('repo:shopwave/checkout')
+    expect(repoSearchQuery(API)).toBe('contoso/Platform/orders-api')
+  })
+
+  it('pullRequestsOfRepo: only that repo (a loose text match is not enough), newest first', () => {
+    const lookalike = azure('orders-api-v2')
+    const list = [
+      pr(API, 1, { updatedAt: '2026-01-01T00:00:00Z' }),
+      pr(lookalike, 2, { updatedAt: '2026-03-01T00:00:00Z' }),
+      pr(API, 3, { updatedAt: '2026-02-01T00:00:00Z' }),
+      pr(API, 4, { updatedAt: '2026-02-01T00:00:00Z' }),
+      pr(GH, 5),
+    ]
+    expect(pullRequestsOfRepo(list, repoKey(API)).map((item) => item.number)).toEqual([4, 3, 1])
+    expect(pullRequestsOfRepo(list, repoKey(GH)).map((item) => item.number)).toEqual([5])
   })
 })

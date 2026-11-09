@@ -100,7 +100,9 @@ test('Azure #102: code as commented, Latest switch, removed file, header at a ti
   await attachScreenshot(window, testInfo, 'outdated-azure-102')
 
   // Tiled: the long path gives way from the left; count and pills keep their room.
-  await setViewport(window, 960, 1080)
+  // 1016 = half a 1080p screen (960) plus the 56px sidebar rail the md tier docks:
+  // the review column gets the width a 960 window gave it before the rail.
+  await setViewport(window, 1016, 1080)
   await expect(removed.getByTestId('thread-path')).toBeVisible()
   const truncated = await removed
     .getByTestId('thread-path')

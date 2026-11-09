@@ -45,18 +45,28 @@ unified patches built in main.
   Azure round-robin; ids diffed in `activity.json`; own comments skipped via `PrComment.isViewer`;
   `docs/plan-notifications.md`). Composition root: `default-scm.ts`. `viewer` (author / required / optional reviewer + own vote) is
   matched by identity in main, never by display login in the renderer.
-- **Title bar** (`components/layout/TitleBar.tsx`): where you are (`TitleBarLocation`: repo or
-  feature › #n Title), the Cmd/Ctrl+K `CommandPalette` (PRs from the dashboard cache, files of
-  the PR under review, commands; filter in `lib/command-palette.ts`), `AiStatusChip` (model +
-  that PR's analysis state), `AccountsMenu` (signed-in providers; ones needing the user stay
-  inline as chips) and Settings. The PR search field lives in the Sidebar.
+- **Title bar** (`components/layout/TitleBar.tsx`): OS-controls band, Home, then where you are
+  (`TitleBarLocation`: owl + repo or feature › #n Title), the Cmd/Ctrl+K `CommandPalette` (PRs
+  from the dashboard cache, files of the PR under review, commands; filter in
+  `lib/command-palette.ts`), `AiStatusChip` (model + that PR's analysis state), `AccountsMenu`
+  (signed-in providers; ones needing the user stay inline as chips) and Settings. No sidebar
+  toggle: the sidebar owns it. The PR search field lives in the Sidebar.
+- **Sidebar** (`layout/Sidebar.tsx`): two views, Queue | Inbox (`SidebarView`). ONE show/hide
+  toggle (`SidebarToggle`, `data-testid="sidebar-toggle"`, `aria-expanded`) at its bottom-left,
+  same spot in both states: the expanded footer's Collapse, the 56 px rail's Expand.
+  `xl`/`lg` dock the column (draggable) and fold it to the rail (`sidebarCollapsed`, persisted);
+  `md`/`sm` always show the rail (`sidebarFootprint` = 56) and open the list as a drawer over
+  it (`sidebarOpen`; Esc/scrim close; the covered rail is `inert` and drops the test id).
+  Cmd/Ctrl+B, the palette's `cmd:prList` and the toggle all call `toggleSidebarPanel`.
 - **Home dashboard** (`renderer/src/components/home/`): the app opens on `mainView: 'home'`
-  (overview → repo page with viewer filters + full-width `StackBoard` → feature page);
+  (overview → repo page with viewer filters, Open / Closed / All and the full-width
+  `StackBoard` → feature page); Open is the dashboard (open PRs only), Closed / All list that
+  repo through `usePullRequests` / `scm:listPullRequests` (GitHub `repo:` qualifier);
   selecting a PR switches to `'review'`. The review subtree stays MOUNTED but `hidden` +
   `inert` on home (drafts survive), so global key listeners in it must check
   `mainView === 'review'`. Feature groups = a label/tag shared by open PRs in ≥ 2 repos of
   the same provider + owner/org (key `provider:owner:tag`); custom names and hidden groups
-  live in localStorage (prototype-less maps). Sidebar collapses on every tier (Cmd/Ctrl+B).
+  live in localStorage (prototype-less maps).
 - **Merge control** (`pr-detail/MergeControl.tsx`, end of the PR bar): split button + popover
   fed by `scm:getMergeOptions` (allowed strategies, blocker, auto-merge offer/state). Writes go
   through `scm:merge` / `scm:setAutoMerge`; refusals are `MERGE_CONFLICT`, `CHECKS_FAILING`,
@@ -166,7 +176,7 @@ author's Spanish logs, not maintained)
   `:root[data-appearance]`. Shiki tokens carry both colors (`tokenClass`/`tokenStyle`).
   Mermaid re-renders with `theme/mermaid-theme.ts`; C4's hard-coded `#444444` is recolored.
 - **Brand mark** (the merge owl): one definition in `src/shared/brand-mark.ts` feeds
-  `ui/ProviderMark.tsx` (title bar, `currentColor`) and the app icons. After changing it run
+  `ui/BrandMark.tsx` (title bar, `currentColor`) and the app icons. After changing it run
   `node scripts/build-app-icons.mjs` (macOS: writes `build/icon.svg|icns|ico|png`, wired in
   `electron-builder.yml`); `main/brand-mark.test.ts` fails while `build/icon.svg` is stale.
 - Every theme color is untrusted: it must pass `toCanonicalThemeColor` (renderer) /

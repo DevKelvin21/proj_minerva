@@ -3,7 +3,6 @@ import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/app-store'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
-import { sidebarIsDrawer } from '../../lib/layout'
 import { useUpdater } from '../../hooks/use-updater'
 import { MOD_KEY_LABEL } from '../../lib/platform'
 import { Button } from '../ui/Button'
@@ -81,12 +80,13 @@ function CommandBarButton({ size }: { size: 'wide' | 'short' | 'icon' }): React.
  * The window's title bar (the native frame is gone: `main/windows/title-bar.ts`).
  * One row for where you are, what you can do and who is working:
  *
- *   [OS controls] [PR list] [Home] | repo › #n Title   [Jump to… ⌘K]   [AI] [panel] [accounts] [⚙]
+ *   [OS controls] [Home] | owl repo › #n Title   [Jump to… ⌘K]   [AI] [panel] [accounts] [⚙]
  *
  * The whole row drags the window (`app-drag`); every control opts out. The
  * OS window controls get their band back through `env(titlebar-area-*)`:
  * the traffic lights on the left on macOS (gone in full screen), the
- * overlay on the right on Windows and Linux.
+ * overlay on the right on Windows and Linux. The PR list's show/hide toggle
+ * is not here: the sidebar owns it, at its bottom-left on every tier.
  *
  * Progressive disclosure by tier (F16), in the order content gives way:
  * `lg` drops the "via …" badges and the AI chip's model and status text
@@ -97,10 +97,6 @@ export function TitleBar(): React.JSX.Element {
   const { t } = useTranslation()
   const didacticPanelOpen = useAppStore((s) => s.didacticPanelOpen)
   const toggleDidacticPanel = useAppStore((s) => s.toggleDidacticPanel)
-  const sidebarOpen = useAppStore((s) => s.sidebarOpen)
-  const toggleSidebar = useAppStore((s) => s.toggleSidebar)
-  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
-  const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
   const mainView = useAppStore((s) => s.mainView)
   const goHome = useAppStore((s) => s.goHome)
   const selectedPr = useAppStore((s) => s.selectedPr)
@@ -110,7 +106,6 @@ export function TitleBar(): React.JSX.Element {
   const closeFocus = useAppStore((s) => s.closeWalkthroughFocus)
   const tier = useLayoutTier()
 
-  const showDrawerToggle = sidebarIsDrawer(tier.w)
   const compact = tier.w === 'md' || tier.w === 'sm'
   const authDensity: AuthChipDensity =
     tier.w === 'xl' ? 'full' : tier.w === 'lg' ? 'identity' : 'icon'
@@ -140,31 +135,7 @@ export function TitleBar(): React.JSX.Element {
           {tier.w !== 'sm' && t('prDetail.focus.exit')}
           <Kbd>{ESC_KEY}</Kbd>
         </Button>
-      ) : /* PR list toggle: the drawer on narrow tiers (its label is what the
-          e2e suite looks for), the hideable docked column on wide ones. */
-      showDrawerToggle ? (
-        <IconButton
-          icon={<Icon icon={icons.sidebar} size="md" />}
-          label={t('layout.titleBar.prListToggle')}
-          active={sidebarOpen}
-          onClick={toggleSidebar}
-          aria-expanded={sidebarOpen}
-          data-testid="sidebar-toggle"
-        />
       ) : (
-        <IconButton
-          icon={sidebarCollapsed ? <Icon icon={icons.sidebar} size="md" /> : <Icon icon={icons.sidebarCollapse} size="md" />}
-          label={
-            sidebarCollapsed ? t('layout.titleBar.sidebarShow') : t('layout.titleBar.sidebarHide')
-          }
-          active={!sidebarCollapsed}
-          onClick={toggleSidebarCollapsed}
-          aria-expanded={!sidebarCollapsed}
-          data-testid="sidebar-toggle"
-        />
-      )}
-
-      {!focusPr && (
         <IconButton
           icon={<Icon icon={icons.home} size="md" />}
           label={t('layout.titleBar.home')}
