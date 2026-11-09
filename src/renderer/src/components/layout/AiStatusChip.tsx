@@ -5,8 +5,7 @@ import { useAppStore } from '../../stores/app-store'
 import { useSettings } from '../../hooks/use-settings'
 import { useDidacticAnalysis } from '../../hooks/use-didactic-analysis'
 import { modelDisplayLabel, resolveModelHintLabels } from '../../lib/model-labels'
-import { Icon } from '../ui/Icon'
-import { icons } from '../ui/icons'
+import { AiProviderIcon } from '../ui/AiProviderIcon'
 import { Spinner } from '../ui/Spinner'
 
 /** What the AI is doing for the PR on screen; `null` = no PR under review. */
@@ -108,7 +107,7 @@ function ChipView({
       data-ai-status={status ?? 'none'}
       className="flex h-8 shrink-0 items-center gap-2 rounded-full border border-border px-2.5 text-xs text-text transition-colors duration-150 hover:border-accent"
     >
-      <Icon icon={icons.ai} size="sm" className="shrink-0 text-accent" />
+      <AiProviderIcon provider={info.provider} size="sm" className="text-muted" />
       {!compact && <span className="max-w-[160px] truncate font-semibold">{modelLabel}</span>}
       {status &&
         (busy ? (

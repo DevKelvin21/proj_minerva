@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { AiProviderIcon } from '../ui/AiProviderIcon'
 import type { AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
 import { resolveModelHintLabels } from '../../lib/model-labels'
@@ -78,7 +79,10 @@ export function ActiveConfigSummary({
   return (
     <div className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-text">{info.catalog[info.provider].label}</span>
+        <span className="flex items-center gap-1.5 text-sm font-medium text-text">
+          <AiProviderIcon provider={info.provider} size="md" color />
+          {info.catalog[info.provider].label}
+        </span>
         {statusBadge}
       </div>
 

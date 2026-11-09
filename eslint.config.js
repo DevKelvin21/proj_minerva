@@ -50,7 +50,7 @@ export default tseslint.config(
     // whose `IconSize` type also rules out pixel sizes and stroke widths).
     // The logos set is banned statically too: it adds ~7 MB (CLAUDE.md
     // gotcha 7); MermaidDiagram loads it with a dynamic `import()`, which
-    // this rule does not see, and brand marks are copied into `ui/brand-marks.ts`.
+    // this rule does not see, and provider logos are copied into `ui/provider-marks.ts`.
     files: ['src/renderer/**/*.{ts,tsx}'],
     ignores: ['src/renderer/src/components/ui/icons.ts'],
     rules: {
@@ -66,13 +66,13 @@ export default tseslint.config(
             {
               name: '@iconify-json/logos',
               message:
-                'Never import the logos set statically (~7 MB, CLAUDE.md gotcha 7). Brand marks live in components/ui/brand-marks.ts.',
+                'Never import the logos set statically (~7 MB, CLAUDE.md gotcha 7). Provider logos live in components/ui/provider-marks.ts.',
             },
           ],
           patterns: [
             {
               group: ['lucide-react/*', '@iconify-json/logos/*'],
-              message: 'Use components/ui/icons.ts (UI icons) or components/ui/brand-marks.ts (brand marks).',
+              message: 'Use components/ui/icons.ts (UI icons) or components/ui/provider-marks.ts (provider logos).',
             },
           ],
         },

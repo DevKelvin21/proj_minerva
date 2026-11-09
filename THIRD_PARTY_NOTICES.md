@@ -37,3 +37,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## SVG Logos (via Iconify `@iconify-json/logos`)
+
+- Source: https://github.com/gilbarbara/logos (Gil Barbara), packaged by Iconify
+  as `@iconify-json/logos`.
+- Used in: `src/renderer/src/components/ui/provider-marks.ts` (the path data of
+  `github-icon`, `azure-icon`, `claude-icon` and `openai-icon`, copied).
+- License: CC0-1.0 (public domain dedication; no attribution required, noted
+  here as a courtesy). The marks themselves remain trademarks of their owners
+  and are shown only to identify each provider.

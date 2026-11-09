@@ -1,6 +1,7 @@
 import { Icon } from '../ui/Icon'
 import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
+import { AiProviderIcon } from '../ui/AiProviderIcon'
 import { AI_PROVIDER_IDS, type AiProviderId } from '../../../../shared/ai-providers'
 import type { AiProviderStatus, AiSettingsInfo } from '../../../../shared/types'
 import { Badge } from '../ui/Badge'
@@ -39,6 +40,7 @@ export function AiProvidersPage({
           testId={'settings-ai-provider-' + provider}
           title={
             <span className="flex flex-wrap items-center gap-2">
+              <AiProviderIcon provider={provider} size="md" color />
               {info.catalog[provider].label}
               {info.provider === provider && (
                 <Badge tone="accent" size="sm">

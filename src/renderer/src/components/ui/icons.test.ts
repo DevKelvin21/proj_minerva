@@ -3,6 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { Icon } from './Icon'
 import { ICON_PX, ICON_STROKE, icons } from './icons'
+import { PROVIDER_MARKS } from './provider-marks'
+import { ProviderMark } from './ProviderMark'
+import { AiProviderIcon } from './AiProviderIcon'
 
 const html = (el: Parameters<typeof renderToStaticMarkup>[0]): string => renderToStaticMarkup(el)
 
@@ -51,5 +54,26 @@ describe('Icon', () => {
     expect(html(createElement(Icon, { icon: icons.stop, filled: true }))).toContain(
       'fill="currentColor"',
     )
+  })
+})
+
+describe('brand marks', () => {
+  it('render in currentColor unless full color is asked for', () => {
+    for (const mark of Object.keys(PROVIDER_MARKS) as (keyof typeof PROVIDER_MARKS)[]) {
+      const mono = html(createElement(ProviderMark, { mark }))
+      expect(mono, mark).toContain('fill="currentColor"')
+      expect(mono, mark).not.toMatch(/#[0-9a-f]{3,6}/i)
+      const color = html(createElement(ProviderMark, { mark, color: true }))
+      const brand = PROVIDER_MARKS[mark].color
+      expect(color, mark).toContain(brand === null ? 'fill="currentColor"' : `fill="${brand}"`)
+    }
+  })
+
+  it('draws OpenCode as a lettermark without hard-coded colors outside its mask', () => {
+    const mono = html(createElement(AiProviderIcon, { provider: 'opencode' }))
+    expect(mono).toContain('>oc</text>')
+    expect(mono).not.toMatch(/#[0-9a-f]{3,6}/i)
+    const filled = html(createElement(AiProviderIcon, { provider: 'opencode', color: true }))
+    expect(filled).toMatch(/<mask id="oc-mark-[\w-]+"/)
   })
 })

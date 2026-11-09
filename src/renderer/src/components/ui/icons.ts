@@ -11,7 +11,7 @@
  * one meaning never gets two glyphs.
  *
  * Brand marks (GitHub, Azure DevOps, Claude, OpenAI, OpenCode) are not here:
- * see `ScmProviderIcon` / `AiProviderIcon` and `brand-marks.ts`.
+ * see `ScmProviderIcon` / `AiProviderIcon` and `provider-marks.ts`.
  */
 import {
   Archive,

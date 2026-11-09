@@ -1,6 +1,7 @@
 import { Icon } from '../ui/Icon'
 import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
+import { AiProviderIcon } from '../ui/AiProviderIcon'
 import { AI_PROVIDER_IDS } from '../../../../shared/ai-providers'
 import { useRovingTabs } from '../../hooks/use-roving-tabs'
 import type { AiProviderId } from '../../../../shared/ai-providers'
@@ -74,6 +75,7 @@ export function ProviderTabs({ info, statuses, viewed, onChange }: ProviderTabsP
                   : t('settings.providerStatus.checking')
               }
             />
+            <AiProviderIcon provider={provider} size="sm" color />
             {entry.label}
             {isActiveProvider && (
               <>
