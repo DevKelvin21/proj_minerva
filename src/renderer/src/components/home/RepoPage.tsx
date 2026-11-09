@@ -3,9 +3,10 @@ import { Icon } from '../ui/Icon'
 import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
 import { prKey, type PrStack } from '../../../../shared/scm'
-import type { PullRequestSummary } from '../../../../shared/types'
-import { useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
+import type { PrStateFilter, PullRequestSummary } from '../../../../shared/types'
+import { authSignature, useDashboard, useViewerIdentity } from '../../hooks/use-dashboard'
 import { useHomeOpenPr } from '../../hooks/use-home-open-pr'
+import { usePullRequests } from '../../hooks/use-pull-requests'
 import { useStacks } from '../../hooks/use-stacks'
 import {
   boardStacks,
@@ -13,7 +14,9 @@ import {
   filterByViewer,
   filterPullRequestsByText,
   matchesViewerFilter,
+  pullRequestsOfRepo,
   repoOwnerLabel,
+  repoSearchQuery,
   retargetNoteKey,
   stackOrder,
   stacksByRepo,
@@ -42,6 +45,49 @@ import { StackBoard } from './StackBoard'
 import { InlineError } from '../ui/InlineError'
 
 const keyOf = (pr: PullRequestSummary): string => prKey(pr.repo, pr.number)
+
+const REPO_STATES: readonly PrStateFilter[] = ['open', 'closed', 'all']
+
+/**
+ * "Open · Closed · All": Open is the dashboard (stacks board + the PRs
+ * outside a stack); Closed and All list the repo through
+ * `scm:listPullRequests`, the only path that carries closed and merged PRs.
+ */
+function StateSegments({
+  value,
+  onChange,
+}: {
+  value: PrStateFilter
+  onChange: (state: PrStateFilter) => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <div
+      role="group"
+      aria-label={t('home.repoPage.stateFilter.ariaLabel')}
+      className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-border bg-bg p-0.5"
+    >
+      {REPO_STATES.map((state) => {
+        const active = value === state
+        return (
+          <button
+            key={state}
+            type="button"
+            data-testid={'repo-state-' + state}
+            aria-pressed={active}
+            title={t(`home.repoPage.stateFilter.titles.${state}`)}
+            onClick={() => onChange(state)}
+            className={`inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded px-2 text-xs font-medium transition-colors duration-150 ${
+              active ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-border/60 hover:text-text'
+            }`}
+          >
+            {t(`home.repoPage.stateFilter.${state}`)}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 /**
  * "All · To review · Optional · Yours · Others" as one segmented control,
@@ -99,10 +145,12 @@ function stacksMatchingText(
 }
 
 /**
- * One repository: its stacks as a board (chains, not a list) and the PRs
- * outside any stack as cards, both under the viewer filter and a local text
- * filter. Remounted per repo (`key` in `HomeView`), so the text filter
- * starts empty on another repo.
+ * One repository. Open (the default): its stacks as a board (chains, not a
+ * list) and the PRs outside any stack as cards. Closed / All: that repo's
+ * PRs from `scm:listPullRequests` as cards (closed and merged included, no
+ * board). All of it under the viewer filter and a local text filter.
+ * Remounted per repo (`key` in `HomeView`), so the text filter starts empty
+ * on another repo (and the store sends both filters back to All / Open).
  */
 export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
   const { t } = useTranslation()
@@ -117,6 +165,9 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
   const identity = useViewerIdentity()
   const filter = useAppStore((s) => s.repoFilter)
   const setFilter = useAppStore((s) => s.setRepoFilter)
+  const stateFilter = useAppStore((s) => s.repoStateFilter)
+  const setStateFilter = useAppStore((s) => s.setRepoStateFilter)
+  const authKey = useAppStore((s) => authSignature(s.scmAuth))
   const navigateHome = useAppStore((s) => s.navigateHome)
   const noteKey = useStacksStore((s) => retargetNoteKey(s.lastRetarget))
   const [query, setQuery] = useState('')
@@ -130,14 +181,39 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
     [pullRequests, stacks, identity, repoKey],
   )
   const repoPrs = useMemo(() => summary?.pullRequests ?? [], [summary])
+  const showHistory = stateFilter !== 'open'
+  const history = usePullRequests(
+    {
+      search: summary ? repoSearchQuery(summary.repo) : undefined,
+      state: stateFilter,
+      enabled: summary !== undefined && showHistory,
+    },
+    authKey,
+  )
+  const historyPrs = useMemo(
+    () => (history.pullRequests ? pullRequestsOfRepo(history.pullRequests, repoKey) : null),
+    [history.pullRequests, repoKey],
+  )
+  const historyErrors = useMemo(
+    () =>
+      summary
+        ? history.providerErrors.filter((error) => error.provider === summary.repo.provider)
+        : [],
+    [history.providerErrors, summary],
+  )
+  // What the viewer filter and the text filter work on: the open PRs, or the history.
+  const listedPrs = useMemo(
+    () => (showHistory ? (historyPrs ?? []) : repoPrs),
+    [showHistory, historyPrs, repoPrs],
+  )
   const repoStacks = useMemo(() => stacksByRepo(stacks).get(repoKey) ?? [], [stacks, repoKey])
   const board = useMemo(() => boardStacks(repoStacks), [repoStacks])
 
   const counts = useMemo(() => {
     const result = {} as Record<ViewerFilter, number>
-    for (const item of VIEWER_FILTERS) result[item] = filterByViewer(repoPrs, item).length
+    for (const item of VIEWER_FILTERS) result[item] = filterByViewer(listedPrs, item).length
     return result
-  }, [repoPrs])
+  }, [listedPrs])
   const filteredCounts = useMemo(
     () => countPullRequests(filterByViewer(repoPrs, filter), identity),
     [repoPrs, filter, identity],
@@ -156,7 +232,14 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
       ),
     [textMatched, board.stackedKeys, filter],
   )
-  const hasUnknownRelation = repoPrs.some((pr) => !pr.viewer)
+  const historyShown = useMemo(
+    () =>
+      filterPullRequestsByText(historyPrs ?? [], query).filter((pr) =>
+        matchesViewerFilter(pr, filter),
+      ),
+    [historyPrs, query, filter],
+  )
+  const hasUnknownRelation = listedPrs.some((pr) => !pr.viewer)
   // The retarget outcome sits under its stack (StackBoard). Once the PR has
   // left every stack on screen (a fixed orphan is no stack any more), it
   // sits with the PRs not in a stack, where that PR now is.
@@ -171,8 +254,9 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
   const refreshAll = (): void => {
     refresh()
     refreshStacks()
+    if (showHistory) history.refetch()
   }
-  const busy = loading || stacksLoading
+  const busy = loading || stacksLoading || history.loading
   const homeCrumb = {
     key: 'home',
     label: t('home.breadcrumb.home'),
@@ -236,6 +320,7 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
         onRefresh={refreshAll}
       >
         <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <StateSegments value={stateFilter} onChange={setStateFilter} />
           <FilterSegments value={filter} counts={counts} onChange={setFilter} />
           <Input
             type="search"
@@ -258,82 +343,153 @@ export function RepoPage({ repoKey }: { repoKey: string }): React.JSX.Element {
           <InlineError message={t('home.overview.refreshFailed', { error })} onRetry={refreshAll} />
         )}
         {openError && <InlineError message={openError} />}
-        <ProviderErrorList errors={allProviderErrors} />
+        <ProviderErrorList errors={showHistory ? historyErrors : allProviderErrors} />
 
-        {showStacksSection && (
-          <section aria-label={t('home.repoPage.stacksTitle')} className="flex min-w-0 flex-col gap-2">
+        {showHistory ? (
+          <section
+            aria-label={t(`home.repoPage.historyTitle.${stateFilter}`)}
+            data-testid="repo-history"
+            data-state={stateFilter}
+            className="flex min-w-0 flex-col gap-2"
+          >
             <SectionHeading
-              title={t('home.repoPage.stacksTitle')}
-              hint={t('home.repoPage.stacksHint')}
-              trailing={
-                hiddenStacks > 0 ? (
-                  <span className="text-[11px] text-muted">
-                    {t('home.repoPage.stacksHidden', { count: hiddenStacks })}
-                  </span>
-                ) : undefined
-              }
+              title={t(`home.repoPage.historyTitle.${stateFilter}`)}
+              hint={t('home.repoPage.historyHint')}
             />
-            {stacks === null ? (
-              stacksError ? (
+            {historyPrs === null ? (
+              history.error ? (
                 <InlineError
-                  message={t('home.repoPage.stacksFailed', { error: stacksError })}
-                  onRetry={refreshStacks}
+                  message={t('home.repoPage.historyFailed', { error: history.error })}
+                  onRetry={history.refetch}
                 />
               ) : (
                 <>
                   <p role="status" className="sr-only">
-                    {t('home.repoPage.loadingStacks')}
+                    {t('home.repoPage.loadingHistory')}
                   </p>
-                  <CardSkeleton count={3} className="h-20" />
+                  <CardSkeleton count={6} />
                 </>
               )
             ) : (
-              <StackBoard
-                stacks={boardVisible}
-                pullRequests={repoPrs}
-                identity={identity}
-                filter={filter}
-                pendingKey={pendingKey}
-                noteKey={noteInBoard ? noteKey : null}
-                onOpenNode={openNode}
-                onReviewStack={reviewStack}
-              />
+              <>
+                {history.error && (
+                  <InlineError
+                    message={t('home.overview.refreshFailed', { error: history.error })}
+                    onRetry={history.refetch}
+                  />
+                )}
+                {historyShown.length === 0 ? (
+                  <SectionEmpty
+                    title={
+                      historyPrs.length === 0
+                        ? t(`home.repoPage.historyEmpty.${stateFilter}`)
+                        : t('home.repoPage.noMatch')
+                    }
+                  />
+                ) : (
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
+                    {historyShown.map((pr) => (
+                      <PrCard
+                        key={keyOf(pr)}
+                        pr={pr}
+                        identity={identity}
+                        onOpen={(item) => {
+                          history.markSeen(item)
+                          open(item)
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </section>
-        )}
-
-        <section aria-label={t('home.repoPage.prsTitle')} className="flex min-w-0 flex-col gap-2">
-          <SectionHeading
-            title={
-              board.stacks.length > 0
-                ? t('home.repoPage.prsNotInStack')
-                : t('home.repoPage.prsTitle')
-            }
-          />
-          {noteWithLoose && noteKey !== null && (
-            <RetargetNote
-              onlyFor={noteKey}
-              className="rounded-md border border-border bg-panel px-3 py-2"
-            />
-          )}
-          {loosePrs.length === 0 ? (
-            <SectionEmpty
-              title={repoPrs.length === 0 ? t('home.repoPage.empty') : t('home.repoPage.noMatch')}
-            />
-          ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
-              {loosePrs.map((pr) => (
-                <PrCard
-                  key={keyOf(pr)}
-                  pr={pr}
-                  identity={identity}
-                  pending={pendingKey === keyOf(pr)}
-                  onOpen={(item) => open(item)}
+        ) : (
+          <>
+            {showStacksSection && (
+              <section
+                aria-label={t('home.repoPage.stacksTitle')}
+                className="flex min-w-0 flex-col gap-2"
+              >
+                <SectionHeading
+                  title={t('home.repoPage.stacksTitle')}
+                  hint={t('home.repoPage.stacksHint')}
+                  trailing={
+                    hiddenStacks > 0 ? (
+                      <span className="text-[11px] text-muted">
+                        {t('home.repoPage.stacksHidden', { count: hiddenStacks })}
+                      </span>
+                    ) : undefined
+                  }
                 />
-              ))}
-            </div>
-          )}
-        </section>
+                {stacks === null ? (
+                  stacksError ? (
+                    <InlineError
+                      message={t('home.repoPage.stacksFailed', { error: stacksError })}
+                      onRetry={refreshStacks}
+                    />
+                  ) : (
+                    <>
+                      <p role="status" className="sr-only">
+                        {t('home.repoPage.loadingStacks')}
+                      </p>
+                      <CardSkeleton count={3} className="h-20" />
+                    </>
+                  )
+                ) : (
+                  <StackBoard
+                    stacks={boardVisible}
+                    pullRequests={repoPrs}
+                    identity={identity}
+                    filter={filter}
+                    pendingKey={pendingKey}
+                    noteKey={noteInBoard ? noteKey : null}
+                    onOpenNode={openNode}
+                    onReviewStack={reviewStack}
+                  />
+                )}
+              </section>
+            )}
+
+            <section
+              aria-label={t('home.repoPage.prsTitle')}
+              className="flex min-w-0 flex-col gap-2"
+            >
+              <SectionHeading
+                title={
+                  board.stacks.length > 0
+                    ? t('home.repoPage.prsNotInStack')
+                    : t('home.repoPage.prsTitle')
+                }
+              />
+              {noteWithLoose && noteKey !== null && (
+                <RetargetNote
+                  onlyFor={noteKey}
+                  className="rounded-md border border-border bg-panel px-3 py-2"
+                />
+              )}
+              {loosePrs.length === 0 ? (
+                <SectionEmpty
+                  title={
+                    repoPrs.length === 0 ? t('home.repoPage.empty') : t('home.repoPage.noMatch')
+                  }
+                />
+              ) : (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
+                  {loosePrs.map((pr) => (
+                    <PrCard
+                      key={keyOf(pr)}
+                      pr={pr}
+                      identity={identity}
+                      pending={pendingKey === keyOf(pr)}
+                      onOpen={(item) => open(item)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </div>
   )

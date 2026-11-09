@@ -14,7 +14,6 @@ import {
   type PaletteGroup,
   type PaletteItem,
 } from '../../lib/command-palette'
-import { sidebarIsDrawer, widthTier } from '../../lib/layout'
 import { MOD_KEY_LABEL } from '../../lib/platform'
 import { Dialog } from '../ui/Dialog'
 import { fieldBareClass } from '../ui/field-classes'
@@ -49,11 +48,8 @@ function useCommandItems(): PaletteItem[] {
         group: 'commands',
         label: t('layout.palette.command.prList'),
         shortcut: MOD_KEY_LABEL + 'B',
-        run: () => {
-          // Same rule as the shortcut: the drawer on narrow tiers, the docked column otherwise.
-          if (sidebarIsDrawer(widthTier(window.innerWidth))) store().toggleSidebar()
-          else store().toggleSidebarCollapsed()
-        },
+        // Same as the shortcut: the drawer on narrow tiers, the docked column otherwise.
+        run: () => store().toggleSidebarPanel(),
       },
       {
         id: 'cmd:settings',

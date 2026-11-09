@@ -21,8 +21,8 @@ interface UseDashboardResult {
   markSeen: (pr: PullRequestSummary) => void
 }
 
-/** Opaque signature of every provider's auth state (same idea as the Sidebar's list refetch). */
-function authSignature(scmAuth: Record<ScmProviderId, ScmAuthStatus> | null): string {
+/** Opaque signature of every provider's auth state: a change (sign-in, account switch) refetches. */
+export function authSignature(scmAuth: Record<ScmProviderId, ScmAuthStatus> | null): string {
   return scmAuth
     ? Object.values(scmAuth)
         .map((status) => status.provider + ':' + status.state + ':' + (status.user?.login ?? ''))

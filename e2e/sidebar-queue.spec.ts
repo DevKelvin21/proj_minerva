@@ -4,7 +4,7 @@ import type { Page } from './fixtures'
 /**
  * The sidebar's Queue view (default) and the folded rail: open PRs sorted by
  * what they need from you, sections that fold and stay folded, the local
- * filter, and the 56px rail with its view buttons and recent PRs.
+ * filter, and the 56px rail with its two view buttons and recent PRs.
  */
 
 const aside = (page: Page) => page.locator('aside[aria-label="Pull request list"]')
@@ -82,14 +82,18 @@ test('Rail: Cmd/Ctrl+B folds the sidebar to view buttons and recent PRs', async 
 
   // A view button expands the sidebar on that view.
   await rail(window)
-    .getByRole('button', { name: /^Stacks/ })
+    .getByRole('button', { name: /^Inbox/ })
     .click()
   await expect(rail(window)).toHaveCount(0)
   await expect(
     aside(window)
       .getByRole('group', { name: 'Left column view' })
-      .getByRole('button', { name: /^Stacks/ }),
+      .getByRole('button', { name: /^Inbox/ }),
   ).toHaveAttribute('aria-pressed', 'true')
+  // Two views only: Queue and Inbox.
+  await expect(
+    aside(window).getByRole('group', { name: 'Left column view' }).getByRole('button'),
+  ).toHaveCount(2)
 })
 
 test('Resize: drag the sidebar edge, the width is remembered, double-click restores it', async ({

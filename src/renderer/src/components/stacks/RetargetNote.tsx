@@ -2,19 +2,13 @@ import { Icon } from '../ui/Icon'
 import { icons } from '../ui/icons'
 import { Trans, useTranslation } from 'react-i18next'
 import { prKey } from '../../../../shared/scm'
-import type { PullRequestSummary } from '../../../../shared/types'
 import { useStacksStore } from '../../stores/stacks-store'
 import { transText } from '../../lib/trans-text'
-import { Button } from '../ui/Button'
 import { IconButton } from '../ui/IconButton'
 
 interface RetargetNoteProps {
   /** Only show the note when it is about this PR (`prKey`). */
   onlyFor?: string
-  /** Hide it when it is about this PR (the open PR's header already shows it). */
-  except?: string | null
-  /** Makes the PR number a link (Stacks view: the PR may have left the stacks). */
-  onOpenPr?: (pr: PullRequestSummary) => void
   className?: string
 }
 
@@ -25,8 +19,6 @@ interface RetargetNoteProps {
  */
 export function RetargetNote({
   onlyFor,
-  except,
-  onOpenPr,
   className = '',
 }: RetargetNoteProps): React.JSX.Element | null {
   const { t } = useTranslation()
@@ -35,7 +27,6 @@ export function RetargetNote({
   if (!note) return null
   const key = note.kind === 'retargeted' ? prKey(note.pr.repo, note.pr.number) : note.prKey
   if (onlyFor !== undefined && key !== onlyFor) return null
-  if (except && key === except) return null
 
   const dismissButton = (
     <IconButton size="xs" onClick={dismiss} label={t('stacks.retarget.dismiss')} icon={<Icon icon={icons.close} size="xs" />} />
@@ -75,11 +66,7 @@ export function RetargetNote({
           i18nKey="stacks.retarget.retargeted"
           values={{ number: pr.number }}
           components={{
-            pr: onOpenPr ? (
-              <Button variant="link" size="xs" onClick={() => onOpenPr(pr)} />
-            ) : (
-              <span className="font-medium" />
-            ),
+            pr: <span className="font-medium" />,
             base: transText(pr.baseRef, 'font-mono'),
             previous: transText(oldBase, 'font-mono'),
           }}

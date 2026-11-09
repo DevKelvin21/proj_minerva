@@ -120,8 +120,8 @@ test('the didactic panel card jumps to a layer in the Files tab, two cohorts for
 
 test('layers view works in the narrow tier where the file column is a drawer', async ({ window }, testInfo) => {
   await setViewport(window, 960, 540)
-  // At this width the PR list is a drawer too (`responsive.spec.ts`).
-  await window.getByRole('button', { name: 'PR list' }).click()
+  // At this width the PR list is a drawer over the rail (`responsive.spec.ts`).
+  await window.getByTestId('sidebar-toggle').click()
   await window.getByText('Fix race condition in payment webhook').first().click()
   // Narrow bar: the tabs show icon + count, so find Files by its accessible name.
   await window.getByRole('tab', { name: /^Files/ }).click()

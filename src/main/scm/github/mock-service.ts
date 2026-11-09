@@ -237,9 +237,16 @@ export class MockGithubService implements ScmDataSource {
       if (state === 'closed') return pr.state === 'closed' || pr.state === 'merged'
       return pr.state === 'open'
     })
-    const query = req.search?.trim().toLowerCase()
-    if (!query) return byState
-    return byState.filter(
+    // `repo:owner/name` narrows to one repo, like GitHub's qualifier (the Home
+    // repo page's Closed / All); the rest is a plain text match.
+    const words = (req.search ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const repos = words.filter((word) => word.startsWith('repo:')).map((word) => word.slice(5))
+    const query = words.filter((word) => !word.startsWith('repo:')).join(' ')
+    const byRepo = repos.length
+      ? byState.filter((pr) => repos.includes(pr.repo.fullName.toLowerCase()))
+      : byState
+    if (!query) return byRepo
+    return byRepo.filter(
       (pr) =>
         pr.title.toLowerCase().includes(query) || pr.repo.fullName.toLowerCase().includes(query),
     )

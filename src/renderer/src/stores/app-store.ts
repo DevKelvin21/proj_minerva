@@ -19,6 +19,7 @@ import {
   DIDACTIC_PANEL_MIN_WIDTH,
   SIDEBAR_MIN_WIDTH,
   sidebarFootprint,
+  sidebarIsDrawer,
   widthTier,
 } from '../lib/layout'
 import type {
@@ -43,11 +44,11 @@ export type DiffViewMode = 'split' | 'inline'
 export type FileTreeMode = 'tree' | 'list' | 'layers'
 /** Tab of the right-hand AI panel: the chat (default) or the didactic analysis. */
 export type AiPanelTab = 'ask' | 'analysis'
-/** What the left column shows: the review queue, the PR list by repo, or the stacked-PR view. */
 /** How many recently opened PRs the collapsed sidebar rail keeps. */
 const MAX_RECENT_PRS = 5
 
-export type SidebarView = 'queue' | 'list' | 'stacks' | 'inbox'
+/** What the left column shows: the review queue or the activity inbox. */
+export type SidebarView = 'queue' | 'inbox'
 /** The reviewer's call on one walkthrough layer (full-screen walkthrough footer). */
 export type LayerVerdict = 'good' | 'changes' | 'question'
 
@@ -210,16 +211,17 @@ interface AppState {
   selectedPr: PullRequestSummary | null
   searchQuery: string
   /**
-   * Filtro de estado de la lista de PRs (T52, F10): `'open'` por defecto
-   * (comportamiento previo). Vive SOLO en sesión — a diferencia de
-   * `didacticPanelWidth`, no se persiste en `localStorage` (decisión de
-   * diseño de PLAN.md: no hay razón para recordar "Cerrados" entre arranques).
+   * Open / Closed / All on the Home repo page: `'open'` is the dashboard
+   * (with the stack board), the others list that repo through
+   * `scm:listPullRequests`. Session only, back to `'open'` on another repo
+   * (like `repoFilter`): no reason to remember "Closed" across launches.
    */
-  prStateFilter: PrStateFilter
+  repoStateFilter: PrStateFilter
   centerTab: CenterTab
   /**
    * Drawer de la lista de PRs (F16/T82): SOLO tiene efecto en los tiers donde
-   * la sidebar no está acoplada (`md`/`sm`, ver `sidebarIsDrawer`). En `xl`/`lg`
+   * la sidebar no está acoplada (`md`/`sm`, ver `sidebarIsDrawer`): ahí el
+   * rail de 56px queda siempre y este flag abre la lista encima. En `xl`/`lg`
    * la lista es una columna fija y este flag se ignora — así, al ensanchar la
    * ventana, no queda un overlay abierto encima de la columna.
    */
@@ -311,12 +313,12 @@ interface AppState {
   layerVerdicts: Record<string, Record<string, LayerVerdict>>
   aiModelInfo: AiSettingsInfo | null
 
-  /** Left column: PR list or stacks. Session only. */
+  /** Left column: the queue or the inbox. Session only. */
   sidebarView: SidebarView
   /**
-   * Docked sidebar (`xl`/`lg`) hidden by the user (TitleBar toggle or
-   * Cmd/Ctrl+B). Persisted in `localStorage`. Ignored on the drawer tiers,
-   * where `sidebarOpen` rules.
+   * Docked sidebar (`xl`/`lg`) folded to the rail by the user (the sidebar's
+   * own toggle or Cmd/Ctrl+B). Persisted in `localStorage`. Ignored on the
+   * drawer tiers, where `sidebarOpen` rules.
    */
   sidebarCollapsed: boolean
   /**
@@ -333,7 +335,7 @@ interface AppState {
 
   mainView: MainView
   homeRoute: HomeRoute
-  /** Viewer filter of the repo page. Session only (like `prStateFilter`). */
+  /** Viewer filter of the repo page. Session only (like `repoStateFilter`). */
   repoFilter: ViewerFilter
   stackNav: StackNavContext | null
 
@@ -348,12 +350,21 @@ interface AppState {
   /** Back to the review of `selectedPr`; no-op without one. */
   showReview: () => void
   setRepoFilter: (filter: ViewerFilter) => void
+  setRepoStateFilter: (filter: PrStateFilter) => void
   /**
    * Arms (or clears) the stack navigation BEFORE `selectPr`: `selectPr` keeps
    * it only while the picked PR is one of `keys`.
    */
   setStackNav: (nav: StackNavContext | null) => void
   toggleSidebarCollapsed: () => void
+  /**
+   * The ONE sidebar toggle (its own button, Cmd/Ctrl+B, the palette), by the
+   * current window width: folds or unfolds the docked column on `xl`/`lg`,
+   * opens or closes the drawer over the rail on `md`/`sm`.
+   */
+  toggleSidebarPanel: () => void
+  /** Brings the sidebar up on `view` (a rail button): unfolds the column or opens the drawer. */
+  expandSidebar: (view: SidebarView) => void
   /**
    * Brings the sidebar up on the Inbox, whatever the tier (docked column
    * unfolded, drawer opened), leaving the full-screen walkthrough.
@@ -369,9 +380,7 @@ interface AppState {
   setSidebarView: (view: SidebarView) => void
   bumpScmData: () => void
   setSearchQuery: (query: string) => void
-  setPrStateFilter: (filter: PrStateFilter) => void
   setCenterTab: (tab: CenterTab) => void
-  toggleSidebar: () => void
   closeSidebar: () => void
   toggleDidacticPanel: () => void
   /** Fija el ancho del panel didáctico acoplado (clampeado y persistido); ver `clampDidacticPanelWidth`. */
@@ -451,7 +460,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   selectedPr: null,
   searchQuery: '',
-  prStateFilter: 'open',
+  repoStateFilter: 'open',
   centerTab: 'conversation',
   sidebarOpen: false,
   didacticPanelOpen: true,
@@ -536,20 +545,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       walkthroughFocus: false,
     }),
   navigateHome: (route) =>
-    set((state) => ({
-      mainView: 'home',
-      walkthroughFocus: false,
-      homeRoute: sameRoute(state.homeRoute, route) ? state.homeRoute : route,
-      // The viewer filter belongs to a repo page: a new repo starts at "All".
-      repoFilter:
+    set((state) => {
+      // Both filters belong to a repo page: a new repo starts at "All" and "Open".
+      const newRepo =
         route.kind === 'repo' &&
         !(state.homeRoute.kind === 'repo' && state.homeRoute.repoKey === route.repoKey)
-          ? 'all'
-          : state.repoFilter,
-      sidebarOpen: false,
-    })),
+      return {
+        mainView: 'home',
+        walkthroughFocus: false,
+        homeRoute: sameRoute(state.homeRoute, route) ? state.homeRoute : route,
+        repoFilter: newRepo ? 'all' : state.repoFilter,
+        repoStateFilter: newRepo ? 'open' : state.repoStateFilter,
+        sidebarOpen: false,
+      }
+    }),
   showReview: () => set((state) => (state.selectedPr ? { mainView: 'review' } : {})),
   setRepoFilter: (filter) => set({ repoFilter: filter }),
+  setRepoStateFilter: (filter) => set({ repoStateFilter: filter }),
   setStackNav: (nav) => set({ stackNav: nav }),
   toggleSidebarCollapsed: () =>
     set((state) => {
@@ -561,6 +573,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return { sidebarCollapsed: collapsed }
     }),
+  toggleSidebarPanel: () => {
+    if (sidebarIsDrawer(widthTier(window.innerWidth))) {
+      set((state) => ({ sidebarOpen: !state.sidebarOpen }))
+    } else {
+      get().toggleSidebarCollapsed()
+    }
+  },
+  expandSidebar: (view) => {
+    if (sidebarIsDrawer(widthTier(window.innerWidth))) {
+      set({ sidebarView: view, sidebarOpen: true })
+      return
+    }
+    set({ sidebarView: view })
+    if (get().sidebarCollapsed) get().toggleSidebarCollapsed()
+  },
   showInbox: () => {
     try {
       window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, 'false')
@@ -594,9 +621,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSidebarView: (view) => set({ sidebarView: view }),
   bumpScmData: () => set((state) => ({ scmDataVersion: state.scmDataVersion + 1 })),
   setSearchQuery: (query) => set({ searchQuery: query }),
-  setPrStateFilter: (filter) => set({ prStateFilter: filter }),
   setCenterTab: (tab) => set({ centerTab: tab }),
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   closeSidebar: () => set({ sidebarOpen: false }),
   toggleDidacticPanel: () => set((state) => ({ didacticPanelOpen: !state.didacticPanelOpen })),
   setDidacticPanelWidth: (width) => {

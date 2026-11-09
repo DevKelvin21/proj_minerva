@@ -52,9 +52,9 @@ function writeFolded(folded: Set<QueueSection>): void {
 
 /**
  * The sidebar's default view: open PRs sorted by what they need from you
- * (`lib/review-queue.ts`). Same rows as the Repos view, plus their repo and
- * one status. Every section folds; nothing is folded until you do it, so no
- * PR is ever hidden by default. The search field above filters it locally.
+ * (`lib/review-queue.ts`). One row per PR with its repo and one status.
+ * Every section folds; nothing is folded until you do it, so no PR is ever
+ * hidden by default. The search field above filters it locally.
  */
 export function QueueView(): React.JSX.Element {
   const { t } = useTranslation()

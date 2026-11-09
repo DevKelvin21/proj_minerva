@@ -14,7 +14,7 @@ import { useAppStore } from '../../stores/app-store'
 import { useDashboardStore } from '../../stores/dashboard-store'
 import { Chip } from '../ui/Chip'
 import { IconButton } from '../ui/IconButton'
-import { OrphanBadge, OrphanNotice, StackStateIcon } from './StackTree'
+import { OrphanBadge, OrphanNotice, StackStateIcon } from './StackMarks'
 import { InlineError } from '../ui/InlineError'
 import { transText } from '../../lib/trans-text'
 

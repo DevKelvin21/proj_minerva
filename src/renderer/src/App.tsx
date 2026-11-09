@@ -15,7 +15,8 @@ import { useAppStore } from './stores/app-store'
  * Shell: TitleBar | [Sidebar] | center | [didactic panel]. The center is the
  * home dashboard (`mainView === 'home'`: repos, features, stacks) or the PR
  * review (`CenterPane` + `DidacticPanel`). The Sidebar is a column on wide
- * tiers (hideable, Cmd/Ctrl+B) and a drawer on narrow ones.
+ * tiers (foldable to its 56px rail, Cmd/Ctrl+B) and, on narrow ones, the
+ * rail with a drawer over the page; its one show/hide toggle is its own.
  *
  * Going Home keeps the review tree MOUNTED but hidden (`display: none` +
  * `inert`): an unsent comment, the open tab/file/layer and a streaming
@@ -43,8 +44,8 @@ function App(): React.JSX.Element {
     <div className="flex h-full flex-col">
       <TitleBar />
       {/* `relative`: en los tiers angostos (F16/T82) la `Sidebar` se pinta como
-          drawer `absolute` DENTRO de esta fila — no sobre el TitleBar, que
-          conserva el botón para abrirla y cerrarla. */}
+          drawer `absolute` DENTRO de esta fila (sobre su rail), no sobre el
+          TitleBar. */}
       <div className="relative flex flex-1 overflow-hidden">
         <Sidebar />
         {onHome && <HomeView />}

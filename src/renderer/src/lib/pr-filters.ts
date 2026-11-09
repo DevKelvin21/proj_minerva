@@ -1,9 +1,6 @@
 /**
- * Helper puro de agrupación para la lista de PRs. Vive fuera de los
- * componentes para que `Sidebar`/`RepoGroup` se limiten a renderizar.
- *
- * El filtrado por `search` ya no ocurre acá: desde T4 se pide a `main` vía
- * `scm:listPullRequests({ search })` (ver `hooks/use-pull-requests.ts`).
+ * Pure grouping helper: PRs by repo, for the Home filter results. Lives
+ * outside the components so they only render.
  */
 import { repoKey, type RepoRef } from '../../../shared/scm'
 import type { PullRequestSummary } from '../../../shared/types'

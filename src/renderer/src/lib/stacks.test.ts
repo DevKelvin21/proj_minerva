@@ -5,13 +5,9 @@ import { prKey, type AzureRepoRef, type PrStack, type StackNode } from '../../..
 import {
   countOrphans,
   descendantsOf,
-  filterStacks,
   flattenStackNodes,
-  groupLabel,
-  groupStacks,
   locatePrInStacks,
   orphanExplanation,
-  stacksContaining,
 } from './stacks'
 
 const repo = (name: string): AzureRepoRef => ({
@@ -97,49 +93,6 @@ describe('locatePrInStacks', () => {
   it('is null for a PR in no stack (same number, other repo included)', () => {
     expect(locatePrInStacks(STACKS, prKey(API, 999))).toBeNull()
     expect(locatePrInStacks(STACKS, prKey(WEB, 101))).toBeNull()
-  })
-})
-
-describe('groupLabel', () => {
-  it('uses the common word prefix of the root titles, without trailing separators', () => {
-    expect(groupLabel(['Checkout v2: order status', 'Checkout v2: client models'])).toBe(
-      'Checkout v2',
-    )
-    expect(groupLabel(['Task 23590 - api', 'task 23590 - ui'])).toBe('Task 23590')
-  })
-
-  it('falls back to the first title when nothing useful is shared', () => {
-    expect(groupLabel(['Add login', 'Fix cart'])).toBe('Add login')
-    expect(groupLabel(['A b', 'A c'])).toBe('A b')
-    expect(groupLabel(['Only one title'])).toBe('Only one title')
-    expect(groupLabel([])).toBe('')
-  })
-})
-
-describe('groupStacks', () => {
-  it('puts same-group stacks together in first-appearance order; others stay alone', () => {
-    const groups = groupStacks(STACKS)
-    expect(groups.map((g) => [g.label, g.stacks.map((s) => s.root.number)])).toEqual([
-      ['Checkout v2', [101, 110]],
-      [null, [105]],
-    ])
-    expect(new Set(groups.map((g) => g.key)).size).toBe(groups.length)
-  })
-})
-
-describe('filters', () => {
-  it('stacksContaining keeps stacks with any PR in the set', () => {
-    const mine = new Set([prKey(WEB, 104)])
-    expect(stacksContaining(STACKS, mine).map((s) => s.root.number)).toEqual([110])
-    expect(stacksContaining(STACKS, new Set())).toEqual([])
-  })
-
-  it('filterStacks matches every word against title, number, branches and repo', () => {
-    expect(filterStacks(STACKS, '').length).toBe(3)
-    expect(filterStacks(STACKS, 'refund').map((s) => s.root.number)).toEqual([105])
-    expect(filterStacks(STACKS, '#103').map((s) => s.root.number)).toEqual([101])
-    expect(filterStacks(STACKS, 'storefront button').map((s) => s.root.number)).toEqual([110])
-    expect(filterStacks(STACKS, 'storefront refund')).toEqual([])
   })
 })
 

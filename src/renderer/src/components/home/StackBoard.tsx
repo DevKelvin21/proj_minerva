@@ -11,7 +11,7 @@ import {
   type ViewerFilter,
   type ViewerIdentity,
 } from '../../lib/dashboard'
-import { OrphanNotice } from '../stacks/StackTree'
+import { OrphanNotice } from '../stacks/StackMarks'
 import { RetargetNote } from '../stacks/RetargetNote'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'

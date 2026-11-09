@@ -126,7 +126,7 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
     'Inbox: 1 unread',
   )
 
-  // At the narrowest sidebar (220px) the four views still read: no label is cut.
+  // At the narrowest sidebar (220px) both views still read: no label is cut.
   const handle = window.getByRole('separator', { name: 'Resize sidebar' })
   await handle.focus()
   await window.keyboard.press('Home')
@@ -165,7 +165,7 @@ test('Mark all read, the rail badge, and the tiled 960x540 drawer', async ({
     'true',
   )
 
-  // Tiled: the sidebar is a drawer; the four views still fit and the row still reads.
+  // Tiled: the rail's toggle opens the drawer; both views fit and the row still reads.
   await setViewport(window, 960, 540)
   await window.getByTestId('sidebar-toggle').click()
   await expect(viewSwitch(window).getByRole('button', { name: /^Inbox/ })).toBeVisible()

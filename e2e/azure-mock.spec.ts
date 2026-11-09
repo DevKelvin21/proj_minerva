@@ -5,7 +5,6 @@ import {
   closeMinerva,
   openPrDetails,
   openAnalysisTab,
-  openReposView,
   launchMinerva,
   type MinervaApp,
 } from './fixtures'
@@ -63,12 +62,13 @@ test('Azure repos listed with the Azure icon; detail, diff and thread statuses',
   })
   expect(JSON.stringify(auth)).not.toMatch(/Basic |Bearer /)
 
-  // Repos view: one group per Azure repo, each with the Azure provider icon.
-  await openReposView(window)
+  // Home overview: one card per Azure repo, each with the Azure provider icon.
   for (const fullName of AZURE_REPOS) {
-    const header = aside(window).getByRole('button', { name: new RegExp(fullName) })
-    await expect(header).toBeVisible()
-    await expect(header.locator('[data-provider="azure"]')).toHaveCount(1)
+    const repoCard = window
+      .getByTestId('repo-card')
+      .filter({ has: window.locator('[title="' + fullName + '"]') })
+    await expect(repoCard).toBeVisible({ timeout: 20_000 })
+    await expect(repoCard.locator('[data-provider="azure"]')).toHaveCount(1)
   }
   await expect(aside(window).getByText('Fix cart rounding').first()).toBeVisible()
   await attachScreenshot(window, testInfo, 'azure-list')

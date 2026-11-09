@@ -24,10 +24,7 @@ export const en = {
   },
   layout: {
     titleBar: {
-      prListToggle: 'PR list',
       home: 'Home',
-      sidebarHide: 'Hide pull request list',
-      sidebarShow: 'Show pull request list',
       jumpTo: 'Jump to a PR, file or command ({{shortcut}})',
       jumpPlaceholder: 'Jump to a PR, file or command',
       jumpShort: 'Jump to',
@@ -201,7 +198,6 @@ export const en = {
       },
     },
     rail: {
-      expand: 'Show pull request list ({{shortcut}})',
       ariaLabel: 'Sidebar shortcuts',
       recent: 'Recently opened',
       openPr: 'Open #{{number}} {{title}}',
@@ -209,12 +205,6 @@ export const en = {
         queue: 'Queue',
         queueWithCount_one: 'Queue: {{count}} waits for your review',
         queueWithCount_other: 'Queue: {{count}} wait for your review',
-        list: 'Repos',
-        listWithCount_one: 'Repos',
-        listWithCount_other: 'Repos',
-        stacks: 'Stacks',
-        stacksWithCount_one: 'Stacks: {{count}} orphaned PR',
-        stacksWithCount_other: 'Stacks: {{count}} orphaned PRs',
         inbox: 'Inbox',
         inboxWithCount_one: 'Inbox: {{count}} unread',
         inboxWithCount_other: 'Inbox: {{count}} unread',
@@ -227,32 +217,17 @@ export const en = {
       resize: 'Resize sidebar',
       resizeHint: 'Drag to resize; double-click restores the default width',
       viewSwitch: 'Left column view',
+      collapse: 'Collapse sidebar ({{shortcut}})',
+      expand: 'Expand sidebar ({{shortcut}})',
+      collapseHint: 'Collapse · {{shortcut}}',
       views: {
         queue: 'Queue',
-        list: 'Repos',
-        stacks: 'Stacks',
         inbox: 'Inbox',
       },
-      refresh: 'Refresh',
-      stateFilter: {
-        open: 'Open',
-        closed: 'Closed',
-        all: 'All',
-      },
-      empty: {
-        open: 'No open PRs.',
-        closed: 'No closed PRs.',
-        all: 'No PRs.',
-      },
       noMatches: 'No PRs match "{{query}}".',
-      searchTipGithub:
-        'Tip: GitHub search accepts qualifiers, e.g. <code>org:my-org</code> or <code>repo:owner/name</code>.',
-      searchTipAzure:
-        'Tip: Azure DevOps search matches the title, repository, branch, author or <code>#number</code>.',
       azureNotConfigured: 'Azure DevOps is on but has no organization yet. Add one in Settings.',
       noProvidersTitle: 'No source control is turned on',
       noProvidersHint: 'Turn on GitHub or Azure DevOps in Settings to list pull requests.',
-      loadFailed: 'Could not load the PR list: {{error}}',
       loading: 'Loading PRs…',
       accountNoSession:
         'The account <account/> has no valid gh session. Pick another one in Settings, or renew it with <mono>{{command}}</mono>.',
@@ -768,36 +743,10 @@ export const en = {
     },
   },
   stacks: {
-    view: {
-      loadFailed: 'Could not load stacks: {{error}}',
-      loading: 'Loading stacks…',
-      loadingHint: 'This reads every open PR in scope, so it can take a few seconds.',
-      noMatch: 'No stacks match "{{query}}".',
-      noneMine: 'None of your pull requests is in a stack.',
-      empty: 'No stacked pull requests.',
-      emptyHint:
-        'A stack appears when a PR targets another open PR’s branch, or when a PR still targets the branch of a PR that was already completed.',
-      mineOnly: 'Mine only',
-      mineOnlyTitle: 'Only stacks that contain a PR from your pull request list',
-      orphaned_one: '{{count}} orphaned',
-      orphaned_other: '{{count}} orphaned',
-      refresh: 'Refresh stacks',
-      intro:
-        'Each PR targets the branch of the one above it. Review from the top down: a child’s diff only shows what it adds on top of its parent.',
-      refreshFailed: 'Refresh failed: {{error}}',
-      providerError: '{{provider}}: {{message}}',
-      stackAriaLabel: 'Stack in {{repo}} from #{{number}}',
-      prCount_one: '{{count}} PR',
-      prCount_other: '{{count}} PRs',
-      sameFeature_one: 'Same feature across {{count}} repo',
-      sameFeature_other: 'Same feature across {{count}} repos',
-    },
     tree: {
       draft: 'Draft',
       open: 'Open',
-      draftChip: 'draft',
       orphaned: 'Orphaned',
-      inYourList: 'In your pull request list',
       orphanExplanation:
         'Parent #{{parent}} was completed into {{mergedInto}}, but this PR still targets {{base}}.',
       orphanBranchGone:
@@ -1003,6 +952,28 @@ export const en = {
       stacksFailed: 'Could not load stacks: {{error}}',
       notFound: 'This repository is no longer in the dashboard.',
       untitled: 'Repository',
+      stateFilter: {
+        ariaLabel: 'Pull request state',
+        open: 'Open',
+        closed: 'Closed',
+        all: 'All',
+        titles: {
+          open: 'Open pull requests, with the stacks board',
+          closed: 'Closed and merged pull requests',
+          all: 'Open, closed and merged pull requests',
+        },
+      },
+      historyTitle: {
+        closed: 'Closed and merged pull requests',
+        all: 'All pull requests',
+      },
+      historyHint: 'The most recently updated pull requests that involve you.',
+      historyEmpty: {
+        closed: 'No closed or merged pull requests in this repository.',
+        all: 'No pull requests in this repository.',
+      },
+      loadingHistory: 'Loading pull requests…',
+      historyFailed: 'Could not load the pull requests: {{error}}',
     },
     stackBoard: {
       ariaLabel: 'Stacks board',

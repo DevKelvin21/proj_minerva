@@ -4,94 +4,78 @@ import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../s
 import { useAppStore } from '../stores/app-store'
 import { errorText } from '../lib/error-text'
 
-const SEARCH_DEBOUNCE_MS = 250
+export interface PullRequestsQuery {
+  /** Provider-side search (GitHub qualifiers such as `repo:owner/name` work). */
+  search?: string
+  state: PrStateFilter
+  /** `false`: nothing is fetched (and nothing is watched) until it turns on. */
+  enabled?: boolean
+}
 
 interface UsePullRequestsResult {
-  pullRequests: PullRequestSummary[]
+  /** The answer to the CURRENT query; `null` until it arrives (an older query's never shows). */
+  pullRequests: PullRequestSummary[] | null
   /** Providers that failed this time (typed codes); the others' items are still listed. */
   providerErrors: ScmListError[]
   loading: boolean
-  /** The whole call failed (IPC/main), not a single provider. */
+  /** The whole call failed (IPC/main), not a single provider. Already `errorText`'d. */
   error: string | null
-  /** Re-pide la lista de inmediato (sin debounce), con `search`/`state` vigentes. */
+  /** Asks again right away, with the current query. */
   refetch: () => void
   /**
-   * Sella "visto" para `pr` (T52, F10): fire-and-forget contra
-   * `scm:markPrSeen` (el fallo se loguea con `console.warn`, no bloquea la
-   * UI) + clear optimista del `unread` de ESE item en el estado local, para
-   * que el dot desaparezca al instante sin esperar un refetch.
+   * Seals "seen" for `pr` (T52, F10): fire-and-forget `scm:markPrSeen` (a
+   * failure is a `console.warn`, it does not block the UI) plus an
+   * optimistic clear of THAT item's `unread`, so its dot goes at once.
    */
   markSeen: (pr: PullRequestSummary) => void
 }
 
-function toErrorMessage(error: unknown): string {
-  return errorText(error)
+interface Answer {
+  key: string
+  items: PullRequestSummary[]
+  errors: ScmListError[]
 }
 
+const NO_ERRORS: ScmListError[] = []
+
 /**
- * Lista PRs vía `scm:listPullRequests` (fan-out over every enabled provider), re-pidiendo a `main` cuando cambia
- * `search` (con debounce), `state` (T52, filtro de estado — SIN debounce,
- * fetch inmediato) o `authState`, y cuando se llama `refetch()` manualmente
- * o llega un evento `prListChanged` del watcher de main.
+ * Lists PRs through `scm:listPullRequests` (fan-out over every enabled
+ * provider, `unread` decorated in main): the path for closed and merged PRs,
+ * which the dashboard (open only) does not carry. Used by the Home repo
+ * page's Closed / All. Asks again when the query or `authState` (an opaque
+ * auth signature: signing in must refetch) changes, after a retarget
+ * (`scmDataVersion`), on `refetch()`, and on every `prListChanged` from
+ * main's watcher.
  *
- * El debounce de `search` vive en un efecto SEPARADO que solo depende de
- * `search`: escribe `debouncedSearch` tras `SEARCH_DEBOUNCE_MS`. El efecto de
- * fetch depende de `debouncedSearch`/`state`/`authState`/`refetchToken` y
- * dispara de inmediato — así un cambio de `state` (o un refetch) no hereda el
- * debounce pensado para el tecleo del buscador.
- *
- * Toda la lógica async (incluido el `setLoading(true)` inicial) vive dentro
- * de una función anidada invocada de inmediato: si esas llamadas a
- * `setState` fueran sentencias directas del cuerpo del efecto,
- * `react-hooks/set-state-in-effect` las marca como anti-patrón (setState
- * síncrono en un efecto). Envolverlas en una función anidada evita el falso
- * positivo sin cambiar el comportamiento.
+ * The async work (the first `setLoading(true)` included) runs inside a
+ * nested function: direct `setState` calls in the effect body trip
+ * `react-hooks/set-state-in-effect`.
  */
 export function usePullRequests(
-  search: string,
-  authState?: string,
-  state: PrStateFilter = 'open',
+  { search, state, enabled = true }: PullRequestsQuery,
+  authState = '',
 ): UsePullRequestsResult {
-  const [pullRequests, setPullRequests] = useState<PullRequestSummary[]>([])
-  const [providerErrors, setProviderErrors] = useState<ScmListError[]>([])
-  const [loading, setLoading] = useState(true)
+  const [answer, setAnswer] = useState<Answer | null>(null)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [debouncedSearch, setDebouncedSearch] = useState(search)
   const [refetchToken, setRefetchToken] = useState(0)
   // Bumped after a retarget: the list must show the new base.
   const scmDataVersion = useAppStore((s) => s.scmDataVersion)
+  const trimmed = search?.trim() || undefined
+  const key = (trimmed ?? '') + '\n' + state
 
-  // Debounce: solo aplica al tecleo del buscador. Si `search` no cambió
-  // (p. ej. re-render por otra razón) el timeout igual dispara, pero
-  // `setDebouncedSearch` con el mismo valor no re-renderiza (bail-out de
-  // React por igualdad referencial en primitivos).
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [search])
-
-  // `authState` está en las dependencias a propósito: al pasar de
-  // `signed_out` a `signed_in` (o al cerrar sesión) hay que volver a pedir la
-  // lista — un UNAUTHENTICATED previo al login no se corrige solo.
-  // `state` e `refetchToken` disparan un fetch inmediato (sin debounce).
-  useEffect(() => {
+    if (!enabled) return
     let cancelled = false
 
     void (async () => {
       setLoading(true)
       setError(null)
-
       try {
-        const result = await window.minerva.scm.listPullRequests({
-          search: debouncedSearch.trim() || undefined,
-          state,
-        })
-        if (!cancelled) {
-          setPullRequests(result.items)
-          setProviderErrors(result.errors)
-        }
+        const result = await window.minerva.scm.listPullRequests({ search: trimmed, state })
+        if (!cancelled) setAnswer({ key, items: result.items, errors: result.errors })
       } catch (err: unknown) {
-        if (!cancelled) setError(toErrorMessage(err))
+        if (!cancelled) setError(errorText(err))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -100,21 +84,18 @@ export function usePullRequests(
     return () => {
       cancelled = true
     }
-  }, [debouncedSearch, state, authState, refetchToken, scmDataVersion])
+  }, [enabled, key, trimmed, state, authState, refetchToken, scmDataVersion])
 
   const refetch = useCallback(() => {
     setRefetchToken((token) => token + 1)
   }, [])
 
-  // Watcher de main (T50/T51, F10): cualquier cambio detectado (PR nuevo,
-  // cerrado/mergeado, comentarios, actualización) refresca la lista vigente
-  // (respeta `search`/`state` actuales, ver el efecto de fetch de arriba).
+  // Main's watcher (T50/T51, F10): any change it sees (new, closed or merged
+  // PR, comments, updates) refreshes the current query.
   useEffect(() => {
-    const unsubscribe = window.minerva.events.onPrListChanged(() => {
-      refetch()
-    })
-    return unsubscribe
-  }, [refetch])
+    if (!enabled) return
+    return window.minerva.events.onPrListChanged(() => refetch())
+  }, [enabled, refetch])
 
   const markSeen = useCallback((pr: PullRequestSummary) => {
     window.minerva.scm
@@ -125,17 +106,31 @@ export function usePullRequests(
         commentCount: pr.commentCount,
       })
       .catch((err: unknown) => {
-        console.warn('No se pudo marcar el PR como visto', err)
+        console.warn('Could not mark the PR as seen', err)
       })
 
-    setPullRequests((prev) =>
-      prev.map((item) =>
-        prKey(item.repo, item.number) === prKey(pr.repo, pr.number)
-          ? { ...item, unread: { isNew: false, hasUpdates: false, hasNewComments: false } }
-          : item,
-      ),
+    const seen = prKey(pr.repo, pr.number)
+    setAnswer((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.map((item) =>
+              prKey(item.repo, item.number) === seen
+                ? { ...item, unread: { isNew: false, hasUpdates: false, hasNewComments: false } }
+                : item,
+            ),
+          }
+        : prev,
     )
   }, [])
 
-  return { pullRequests, providerErrors, loading, error, refetch, markSeen }
+  const current = answer !== null && answer.key === key ? answer : null
+  return {
+    pullRequests: enabled && current ? current.items : null,
+    providerErrors: enabled && current ? current.errors : NO_ERRORS,
+    loading: enabled && loading,
+    error: enabled ? error : null,
+    refetch,
+    markSeen,
+  }
 }

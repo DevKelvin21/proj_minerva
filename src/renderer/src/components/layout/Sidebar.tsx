@@ -1,13 +1,10 @@
-import { useMemo } from 'react'
 import { Icon } from '../ui/Icon'
 import { icons } from '../ui/icons'
-import { Trans, useTranslation } from 'react-i18next'
-import type { PrStateFilter, PullRequestSummary, ScmListError } from '../../../../shared/types'
-import { repoKey } from '../../../../shared/scm'
+import { useTranslation } from 'react-i18next'
+import type { ScmListError } from '../../../../shared/types'
 import { SCM_PROVIDER_LABEL } from '../../lib/scm-labels'
 import { enabledProviders, isSignInError } from '../../lib/scm-connection'
-import { groupByRepo } from '../../lib/pr-filters'
-import { usePullRequests } from '../../hooks/use-pull-requests'
+import { useDashboard } from '../../hooks/use-dashboard'
 import { useScmSettings } from '../../hooks/use-scm-settings'
 import { useLayoutTier } from '../../hooks/use-layout-tier'
 import {
@@ -19,31 +16,27 @@ import {
   sidebarIsDrawer,
 } from '../../lib/layout'
 import { useAppStore, type SidebarView } from '../../stores/app-store'
-import { useStacksStore } from '../../stores/stacks-store'
-import { countOrphans } from '../../lib/stacks'
-import { RepoGroup } from '../pr-list/RepoGroup'
-import { StacksView } from '../stacks/StacksView'
 import { QueueView } from '../pr-list/QueueView'
 import { InboxView } from '../pr-list/InboxView'
 import { useUnreadActivityCount } from '../../hooks/use-activity'
 import { useNeedsReviewCount } from '../../hooks/use-needs-review-count'
 import { Button } from '../ui/Button'
-import { IconButton } from '../ui/IconButton'
 import { Input } from '../ui/Input'
 import { SignInHint } from './SignInHint'
 import { SidebarRail } from './SidebarRail'
+import { SIDEBAR_SHORTCUT_LABEL, SidebarToggle } from './SidebarToggle'
 import { ResizeHandle } from '../ui/ResizeHandle'
 import { CountBadge } from '../ui/CountBadge'
 import { InlineError } from '../ui/InlineError'
 import { Drawer } from '../ui/Drawer'
 import { settingsPageForScm } from '../../lib/settings-pages'
 
-const STATE_FILTER_OPTIONS: readonly PrStateFilter[] = ['open', 'closed', 'all']
+const VIEWS: readonly SidebarView[] = ['queue', 'inbox']
 
 /** One line per provider that failed while the others still listed (typed code + message). */
 function ProviderErrors({ errors }: { errors: ScmListError[] }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-1 border-b border-border p-3">
+    <div className="flex w-full flex-col gap-1 border-b border-border p-3">
       {errors.map((providerError) => (
         <InlineError
           key={providerError.provider}
@@ -55,39 +48,9 @@ function ProviderErrors({ errors }: { errors: ScmListError[] }): React.JSX.Eleme
   )
 }
 
-/** Segmented control de 3 opciones (T52, F10) para `prStateFilter`. */
-function StateFilterControl({
-  value,
-  onChange,
-}: {
-  value: PrStateFilter
-  onChange: (filter: PrStateFilter) => void
-}): React.JSX.Element {
-  const { t } = useTranslation()
-  return (
-    <div className="flex rounded-md border border-border bg-bg p-0.5 text-xs">
-      {STATE_FILTER_OPTIONS.map((option) => (
-        <button
-          key={option}
-          type="button"
-          aria-pressed={value === option}
-          onClick={() => onChange(option)}
-          className={`rounded px-2 py-1 font-medium transition-colors duration-150 ${
-            value === option ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
-          }`}
-        >
-          {t(`layout.sidebar.stateFilter.${option}`)}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 /**
- * "Queue | Repos | Stacks" switch for the left column. Queue carries how many
- * PRs need your review; Stacks the orphan count once some consumer loaded the
- * stacks (it does not trigger the fetch itself: that is a cold ~10 s read on
- * a real org).
+ * "Queue | Inbox" switch for the left column: Queue carries how many PRs
+ * need your review, Inbox how many activity items are unread.
  */
 function SidebarViewSwitch({
   value,
@@ -97,50 +60,35 @@ function SidebarViewSwitch({
   onChange: (view: SidebarView) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const orphans = useStacksStore((s) => (s.result ? countOrphans(s.result.stacks) : 0))
   const toReview = useNeedsReviewCount()
   const unreadActivity = useUnreadActivityCount()
-  const count: Record<SidebarView, number> = {
-    queue: toReview,
-    list: 0,
-    stacks: orphans,
-    inbox: unreadActivity,
-  }
-  const options: { value: SidebarView; label: string }[] = [
-    { value: 'queue', label: t('layout.sidebar.views.queue') },
-    { value: 'list', label: t('layout.sidebar.views.list') },
-    { value: 'stacks', label: t('layout.sidebar.views.stacks') },
-    { value: 'inbox', label: t('layout.sidebar.views.inbox') },
-  ]
+  const count: Record<SidebarView, number> = { queue: toReview, inbox: unreadActivity }
   return (
     <div
       role="group"
       aria-label={t('layout.sidebar.viewSwitch')}
-      // Wraps instead of clipping a label; at the narrowest widths (220px) as two rows of two.
-      className="@container flex w-full flex-wrap rounded-md border border-border bg-bg p-0.5 text-xs"
+      className="flex w-full rounded-md border border-border bg-bg p-0.5 text-xs"
     >
-      {options.map((option) => (
+      {VIEWS.map((view) => (
         <button
-          key={option.value}
+          key={view}
           type="button"
-          aria-pressed={value === option.value}
+          aria-pressed={value === view}
           // The badge is decorative: the name says the count in words, like the rail.
           aria-label={
-            count[option.value] > 0
-              ? t(`layout.rail.view.${option.value}WithCount`, { count: count[option.value] })
-              : undefined
+            count[view] > 0 ? t(`layout.rail.view.${view}WithCount`, { count: count[view] }) : undefined
           }
-          onClick={() => onChange(option.value)}
-          className={`flex min-w-0 flex-auto items-center justify-center gap-0.5 rounded px-0.5 py-1 font-medium @max-[13.5rem]:basis-1/2 transition-colors duration-150 ${
-            value === option.value ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
+          onClick={() => onChange(view)}
+          className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-1 py-1 font-medium transition-colors duration-150 ${
+            value === view ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
           }`}
         >
-          <span className="truncate">{option.label}</span>
-          {count[option.value] > 0 && (
+          <span className="truncate">{t(`layout.sidebar.views.${view}`)}</span>
+          {count[view] > 0 && (
             <CountBadge
-              count={count[option.value]}
-              tone={option.value === 'stacks' ? 'warning' : 'accent'}
-              data-testid={option.value === 'inbox' ? 'inbox-unread-badge' : undefined}
+              count={count[view]}
+              tone="accent"
+              data-testid={view === 'inbox' ? 'inbox-unread-badge' : undefined}
             />
           )}
         </button>
@@ -150,45 +98,16 @@ function SidebarViewSwitch({
 }
 
 /**
- * Lista de PRs. Dos formas según el tier de layout (F16/T82):
- *
- * - `xl`/`lg`: columna acoplada de 280/240px, como siempre.
- * - `md`/`sm` (ventana tileada a media pantalla o menos): **drawer overlay**
- *   sobre el centro, cerrado por defecto y abierto desde el botón del TitleBar.
- *   Motivo medido (PLAN.md § F16): con la columna fija, a 960px de ancho la
- *   sidebar + el árbol de archivos + el panel didáctico dejaban el diff en
- *   40px. Elegir un PR cierra el drawer (`selectPr` en el store).
- *
- * Los hooks de datos corren SIEMPRE, también con el drawer cerrado: la lista
- * (y su watcher) no debe depender de si el overlay está visible.
- *
- * On the docked tiers the column can also be hidden (`sidebarCollapsed`,
- * TitleBar toggle or Cmd/Ctrl+B): the home dashboard is the main way to
- * reach a PR, so the list is optional there.
+ * The Queue, or what stands in for it when nothing can be listed: no
+ * provider turned on, or every listing provider needs a sign-in. Both come
+ * from the dashboard answer the queue itself reads (and the auth state), so
+ * the sidebar never fetches a list of its own.
  */
-export function Sidebar(): React.JSX.Element | null {
+function QueuePane(): React.JSX.Element {
   const { t } = useTranslation()
-  const searchQuery = useAppStore((s) => s.searchQuery)
-  const setSearchQuery = useAppStore((s) => s.setSearchQuery)
   const scmAuth = useAppStore((s) => s.scmAuth)
   const openSettings = useAppStore((s) => s.openSettings)
-  const prStateFilter = useAppStore((s) => s.prStateFilter)
-  const setPrStateFilter = useAppStore((s) => s.setPrStateFilter)
-  const selectPr = useAppStore((s) => s.selectPr)
-  const sidebarView = useAppStore((s) => s.sidebarView)
-  const setSidebarView = useAppStore((s) => s.setSidebarView)
-  // Opaque key of every provider's auth state: signing in (or switching
-  // accounts) refetches the list.
-  const authKey = scmAuth
-    ? Object.values(scmAuth)
-        .map((status) => status.provider + ':' + status.state + ':' + (status.user?.login ?? ''))
-        .join(',')
-    : ''
-  const { pullRequests, providerErrors, loading, error, refetch, markSeen } = usePullRequests(
-    searchQuery,
-    authKey,
-    prStateFilter,
-  )
+  const { pullRequests, providerErrors } = useDashboard()
   const scmSettings = useScmSettings().info
   const githubAccount = scmSettings?.githubAccount ?? null
   const azureOrganization = scmSettings?.providers.azure.organizations[0]?.organization
@@ -197,6 +116,79 @@ export function Sidebar(): React.JSX.Element | null {
   // Azure turned on without an organization: main reports it `disabled`.
   const azureNotConfigured =
     enabled?.includes('azure') === true && scmAuth?.azure?.state === 'disabled'
+
+  const signInErrors = providerErrors.filter(isSignInError)
+  // Full-panel sign-in CTA (one hint per provider that needs it) only when
+  // nothing could be listed at all; otherwise the queue shows them as banners.
+  const needsLogin = signInErrors.length > 0 && (pullRequests?.length ?? 0) === 0
+  const otherErrors = providerErrors.filter((providerError) => !isSignInError(providerError))
+
+  if (noProviders) {
+    return (
+      <div data-testid="no-providers" className="flex flex-col items-center gap-3 p-6 text-center">
+        <p className="text-sm font-medium text-text">{t('layout.sidebar.noProvidersTitle')}</p>
+        <p className="text-xs text-muted">{t('layout.sidebar.noProvidersHint')}</p>
+        <Button variant="primary" onClick={() => openSettings('github')}>
+          {t('layout.sidebar.openSettings')}
+        </Button>
+      </div>
+    )
+  }
+  if (needsLogin) {
+    return (
+      <div data-testid="sign-in-needed" className="flex flex-col items-center gap-4 p-6 text-center">
+        <Icon icon={icons.signIn} size="lg" className="text-muted" />
+        {signInErrors.map((signInError) => (
+          <SignInHint
+            key={signInError.provider}
+            error={signInError}
+            githubAccount={githubAccount}
+            azureOrganization={azureOrganization}
+          />
+        ))}
+        <Button
+          variant="primary"
+          onClick={() => openSettings(settingsPageForScm(signInErrors[0].provider))}
+        >
+          {t('layout.sidebar.openSettings')}
+        </Button>
+        {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
+      </div>
+    )
+  }
+  return (
+    <>
+      {azureNotConfigured && (
+        <p className="px-3 pt-2 text-xs text-warning">{t('layout.sidebar.azureNotConfigured')}</p>
+      )}
+      <QueueView />
+    </>
+  )
+}
+
+/**
+ * Left column: the Queue (open PRs by what they need from you) or the
+ * activity Inbox. Two shapes by layout tier (F16/T82):
+ *
+ * - `xl`/`lg`: a docked column (280/240px, draggable), foldable to the 56px
+ *   rail (`sidebarCollapsed`, persisted).
+ * - `md`/`sm` (a window tiled to half a screen or less): the rail always,
+ *   and the full list as a **drawer overlay** over the page, closed by
+ *   default. Measured reason (PLAN.md § F16): with a fixed column, at 960px
+ *   the sidebar + file tree + didactic panel left the diff 40px. Picking a
+ *   PR closes the drawer (`selectPr` in the store).
+ *
+ * In both, ONE toggle shows or hides the list, at the sidebar's
+ * bottom-left: the expanded list's footer and the rail's last button sit in
+ * the same spot (`SidebarToggle`). Cmd/Ctrl+B and the palette do the same.
+ * The home dashboard is the main way to reach a PR, so the list is optional.
+ */
+export function Sidebar(): React.JSX.Element | null {
+  const { t } = useTranslation()
+  const searchQuery = useAppStore((s) => s.searchQuery)
+  const setSearchQuery = useAppStore((s) => s.setSearchQuery)
+  const sidebarView = useAppStore((s) => s.sidebarView)
+  const setSidebarView = useAppStore((s) => s.setSidebarView)
   const tier = useLayoutTier()
   const isDrawer = sidebarIsDrawer(tier.w)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
@@ -206,181 +198,72 @@ export function Sidebar(): React.JSX.Element | null {
   const preferredWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
 
-  const groups = useMemo(() => groupByRepo(pullRequests), [pullRequests])
-  const signInErrors = providerErrors.filter(isSignInError)
-  // Full-panel sign-in CTA (one hint per provider that needs it) only when
-  // nothing could be listed at all.
-  const needsLogin = signInErrors.length > 0 && pullRequests.length === 0
-  // Everything else (or a sign-in error while other providers did list) is a banner.
-  const otherErrors = needsLogin
-    ? providerErrors.filter((providerError) => !isSignInError(providerError))
-    : providerErrors
-
-  const handleSelectPr = (pr: PullRequestSummary): void => {
-    selectPr(pr)
-    markSeen(pr)
-  }
-
-  // The full-screen walkthrough takes the whole window (the hooks above keep running).
+  // The full-screen walkthrough takes the whole window.
   if (walkthroughFocus) return null
-  if (isDrawer && !sidebarOpen) return null
-  // Docked tiers, folded by the TitleBar toggle / Cmd+B (persisted): the rail.
+  // Docked tiers, folded by the toggle / Cmd+B (persisted): the rail.
   if (!isDrawer && sidebarCollapsed) return <SidebarRail />
+  // Drawer tiers, drawer closed: only the rail.
+  if (isDrawer && !sidebarOpen) return <SidebarRail />
 
   // As a drawer, `ui/Drawer` draws the edge and the shadow (and claims Esc,
   // so a dashboard page's `useEscapeBack` does not also go back).
   const asideClass = isDrawer
-    ? 'flex h-full w-full min-w-0 flex-col overflow-y-auto bg-panel'
-    : 'flex w-full min-w-0 flex-col overflow-y-auto border-r border-border bg-panel'
-  const width = dockedSidebarWidth(preferredWidth, tier.width)
-  const maxWidth = clampSidebarWidth(Number.POSITIVE_INFINITY, tier.width)
+    ? 'flex h-full w-full min-w-0 flex-col bg-panel'
+    : 'flex w-full min-w-0 flex-col border-r border-border bg-panel'
 
   const aside = (
     <aside aria-label={t('layout.sidebar.ariaLabel')} className={asideClass}>
-      <div className="shrink-0 px-2 pt-2">
-        <SidebarViewSwitch value={sidebarView} onChange={setSidebarView} />
+      {/* Scrolls on its own so the footer toggle never scrolls away (and the
+          Inbox's sticky toast stays above it). */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="shrink-0 px-2 pt-2">
+          <SidebarViewSwitch value={sidebarView} onChange={setSidebarView} />
+        </div>
+        {/* Filters both views locally. */}
+        <div className="shrink-0 px-2 pt-2">
+          <Input
+            type="search"
+            fieldSize="lg"
+            icon={<Icon icon={icons.search} size="sm" />}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={t('layout.sidebar.searchPlaceholder')}
+            aria-label={t('layout.sidebar.search')}
+            title={t('layout.sidebar.searchPlaceholder')}
+          />
+        </div>
+        {sidebarView === 'inbox' ? <InboxView /> : <QueuePane />}
       </div>
-      {/* Filters both views: a provider-side search for the list (GitHub
-          qualifiers work), a text filter for the stacks. */}
-      <div className="shrink-0 px-2 pt-2">
-        <Input
-          type="search"
-          fieldSize="lg"
-          icon={<Icon icon={icons.search} size="sm" />}
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={t('layout.sidebar.searchPlaceholder')}
-          aria-label={t('layout.sidebar.search')}
-          title={t('layout.sidebar.searchPlaceholder')}
-        />
+      <div className="@container flex shrink-0 items-center gap-2 border-t border-border px-2 py-2">
+        <SidebarToggle expanded />
+        <span aria-hidden className="min-w-0 truncate text-[11px] text-muted @max-[9rem]:hidden">
+          {t('layout.sidebar.collapseHint', { shortcut: SIDEBAR_SHORTCUT_LABEL })}
+        </span>
       </div>
-      {sidebarView === 'inbox' ? (
-        <InboxView />
-      ) : sidebarView === 'stacks' ? (
-        <StacksView pullRequests={pullRequests} onSelectPr={handleSelectPr} />
-      ) : sidebarView === 'queue' && !noProviders && !needsLogin ? (
-        <QueueView />
-      ) : (
-        <>
-          {/* Open / Closed / All belongs to the Repos list; the queue is open PRs only. */}
-          {sidebarView === 'list' && (
-            <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2">
-              <StateFilterControl value={prStateFilter} onChange={setPrStateFilter} />
-              <IconButton
-                icon={<Icon icon={icons.reload} size="sm" className={loading ? 'animate-spin motion-reduce:animate-none' : ''} />}
-                label={t('layout.sidebar.refresh')}
-                onClick={refetch}
-                disabled={loading}
-                className="ml-auto"
-              />
-            </div>
-          )}
-          {noProviders ? (
-            <div
-              data-testid="no-providers"
-              className="flex flex-col items-center gap-3 p-6 text-center"
-            >
-              <p className="text-sm font-medium text-text">
-                {t('layout.sidebar.noProvidersTitle')}
-              </p>
-              <p className="text-xs text-muted">{t('layout.sidebar.noProvidersHint')}</p>
-              <Button variant="primary" onClick={() => openSettings('github')}>
-                {t('layout.sidebar.openSettings')}
-              </Button>
-            </div>
-          ) : needsLogin ? (
-            <div
-              data-testid="sign-in-needed"
-              className="flex flex-col items-center gap-4 p-6 text-center"
-            >
-              <span className="text-3xl" aria-hidden>
-                🔒
-              </span>
-              {signInErrors.map((signInError) => (
-                <SignInHint
-                  key={signInError.provider}
-                  error={signInError}
-                  githubAccount={githubAccount}
-                  azureOrganization={azureOrganization}
-                />
-              ))}
-              <Button
-                variant="primary"
-                onClick={() => openSettings(settingsPageForScm(signInErrors[0].provider))}
-              >
-                {t('layout.sidebar.openSettings')}
-              </Button>
-              {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
-            </div>
-          ) : error ? (
-            <InlineError
-              className="p-4"
-              message={t('layout.sidebar.loadFailed', { error })}
-              onRetry={refetch}
-            />
-          ) : otherErrors.length > 0 && pullRequests.length === 0 ? (
-            <ProviderErrors errors={otherErrors} />
-          ) : loading && pullRequests.length === 0 ? (
-            <p className="p-4 text-sm text-muted">{t('layout.sidebar.loading')}</p>
-          ) : groups.length === 0 ? (
-            searchQuery.trim() ? (
-              <p className="p-4 text-sm text-muted">
-                {t('layout.sidebar.noMatches', { query: searchQuery })}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2 p-4 text-sm text-muted">
-                <p>{t(`layout.sidebar.empty.${prStateFilter}`)}</p>
-                {azureNotConfigured && (
-                  <p className="text-xs text-warning">{t('layout.sidebar.azureNotConfigured')}</p>
-                )}
-                {/* Search help per enabled provider: GitHub qualifiers mean nothing to Azure. */}
-                {enabled?.includes('github') && (
-                  <p className="text-xs" data-search-tip="github">
-                    <Trans
-                      i18nKey="layout.sidebar.searchTipGithub"
-                      components={{ code: <code className="rounded bg-bg px-1" /> }}
-                    />
-                  </p>
-                )}
-                {enabled?.includes('azure') && !azureNotConfigured && (
-                  <p className="text-xs" data-search-tip="azure">
-                    <Trans
-                      i18nKey="layout.sidebar.searchTipAzure"
-                      components={{ code: <code className="rounded bg-bg px-1" /> }}
-                    />
-                  </p>
-                )}
-              </div>
-            )
-          ) : (
-            <>
-              {otherErrors.length > 0 && <ProviderErrors errors={otherErrors} />}
-              {groups.map((group) => (
-                <RepoGroup key={repoKey(group.repo)} group={group} onSelectPr={handleSelectPr} />
-              ))}
-            </>
-          )}
-        </>
-      )}
     </aside>
   )
 
   if (isDrawer) {
+    // The rail stays in the row (the drawer covers it), out of reach while it does.
     return (
-      <Drawer
-        side="left"
-        label={t('layout.sidebar.ariaLabel')}
-        width={drawerWidth(DRAWER_WIDTH.sidebar, tier.width)}
-        onClose={closeSidebar}
-      >
-        {aside}
-      </Drawer>
+      <>
+        <SidebarRail covered />
+        <Drawer
+          side="left"
+          label={t('layout.sidebar.ariaLabel')}
+          width={drawerWidth(DRAWER_WIDTH.sidebar, tier.width)}
+          onClose={closeSidebar}
+        >
+          {aside}
+        </Drawer>
+      </>
     )
   }
 
-  // Docked: the column wraps the scrolling aside so the drag handle on its
-  // right edge neither scrolls away nor gets clipped; double-click goes back
-  // to the tier's default width.
+  // Docked: the column wraps the aside so the drag handle on its right edge
+  // never gets clipped; double-click goes back to the tier's default width.
+  const width = dockedSidebarWidth(preferredWidth, tier.width)
+  const maxWidth = clampSidebarWidth(Number.POSITIVE_INFINITY, tier.width)
   return (
     <div style={{ width }} className="relative flex shrink-0">
       {aside}

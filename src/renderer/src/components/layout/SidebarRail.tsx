@@ -5,53 +5,51 @@ import { prKey } from '../../../../shared/scm'
 import { useHomeOpenPr } from '../../hooks/use-home-open-pr'
 import { useNeedsReviewCount } from '../../hooks/use-needs-review-count'
 import { useUnreadActivityCount } from '../../hooks/use-activity'
-import { countOrphans } from '../../lib/stacks'
-import { MOD_KEY_LABEL } from '../../lib/platform'
 import { useAppStore, type SidebarView } from '../../stores/app-store'
-import { useStacksStore } from '../../stores/stacks-store'
 import { CountBadge } from '../ui/CountBadge'
+import { SidebarToggle } from './SidebarToggle'
 
 const VIEW_ICON: Record<SidebarView, React.JSX.Element> = {
   queue: <Icon icon={icons.queue} size="lg" />,
-  list: <Icon icon={icons.repos} size="lg" />,
-  stacks: <Icon icon={icons.stack} size="lg" />,
   inbox: <Icon icon={icons.inbox} size="lg" />,
 }
 
-const VIEWS: readonly SidebarView[] = ['queue', 'list', 'stacks', 'inbox']
+const VIEWS: readonly SidebarView[] = ['queue', 'inbox']
 
 /**
- * The docked sidebar folded (Cmd/Ctrl+B, title bar toggle): 56px that keep
- * what matters in reach. The three views with their badges (PRs waiting for
- * your review, orphaned stacks) expand the sidebar on that view, and the PRs
- * opened this session reopen in one click. Never a `aside`: the full list is
- * the "Pull request list" landmark, this is navigation.
+ * The sidebar folded: 56px that keep what matters in reach. The docked
+ * column folds to it (Cmd/Ctrl+B, the toggle), and on the drawer tiers it
+ * is always there, with the drawer opening over it. The two views with
+ * their badges (PRs waiting for your review, unread activity) expand the
+ * sidebar on that view, the PRs opened this session reopen in one click,
+ * and the last button is the expand toggle, where the expanded footer has
+ * its collapse one. Never an `aside`: the full list is the "Pull request
+ * list" landmark, this is navigation.
+ *
+ * `covered`: the drawer is open on top of it. It stays in the row (the page
+ * does not jump) but out of reach, and its toggle drops the test id so one
+ * `sidebar-toggle` is ever on screen.
  */
-export function SidebarRail(): React.JSX.Element {
+export function SidebarRail({ covered = false }: { covered?: boolean }): React.JSX.Element {
   const { t } = useTranslation()
   const sidebarView = useAppStore((s) => s.sidebarView)
-  const setSidebarView = useAppStore((s) => s.setSidebarView)
-  const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
+  const expandSidebar = useAppStore((s) => s.expandSidebar)
   const recentPrs = useAppStore((s) => s.recentPrs)
   const selectedKey = useAppStore((s) =>
     s.selectedPr && s.mainView === 'review' ? prKey(s.selectedPr.repo, s.selectedPr.number) : null,
   )
   const toReview = useNeedsReviewCount()
   const unreadActivity = useUnreadActivityCount()
-  const orphans = useStacksStore((s) => (s.result ? countOrphans(s.result.stacks) : 0))
   const { open } = useHomeOpenPr()
 
-  const badge: Record<SidebarView, number> = {
-    queue: toReview,
-    list: 0,
-    stacks: orphans,
-    inbox: unreadActivity,
-  }
+  const badge: Record<SidebarView, number> = { queue: toReview, inbox: unreadActivity }
 
   return (
     <nav
       aria-label={t('layout.rail.ariaLabel')}
       data-testid="sidebar-rail"
+      inert={covered}
+      aria-hidden={covered || undefined}
       className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-border bg-panel py-2"
     >
       {VIEWS.map((view) => {
@@ -63,10 +61,7 @@ export function SidebarRail(): React.JSX.Element {
           <button
             key={view}
             type="button"
-            onClick={() => {
-              setSidebarView(view)
-              toggleSidebarCollapsed()
-            }}
+            onClick={() => expandSidebar(view)}
             aria-label={label}
             title={label}
             className={`relative flex h-10 w-10 items-center justify-center rounded-md transition-colors duration-150 ${
@@ -75,7 +70,7 @@ export function SidebarRail(): React.JSX.Element {
           >
             {VIEW_ICON[view]}
             {badge[view] > 0 && (
-              <CountBadge count={badge[view]} tone={view === 'stacks' ? 'warning' : 'accent'} overlay />
+              <CountBadge count={badge[view]} tone="accent" overlay />
             )}
           </button>
         )
@@ -110,15 +105,9 @@ export function SidebarRail(): React.JSX.Element {
         </ul>
       )}
 
-      <button
-        type="button"
-        onClick={toggleSidebarCollapsed}
-        aria-label={t('layout.titleBar.sidebarShow')}
-        title={t('layout.rail.expand', { shortcut: MOD_KEY_LABEL + 'B' })}
-        className="mt-auto flex h-9 w-10 items-center justify-center rounded-md text-muted transition-colors duration-150 hover:bg-border/60 hover:text-text"
-      >
-        <Icon icon={icons.sidebar} size="md" />
-      </button>
+      <div className="mt-auto">
+        <SidebarToggle expanded={false} testId={!covered} />
+      </div>
     </nav>
   )
 }
