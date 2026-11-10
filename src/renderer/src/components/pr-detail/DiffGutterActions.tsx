@@ -125,8 +125,9 @@ export function DiffGutterActions({
   )
 
   // Transparent border at rest so the pill appears without moving the row.
+  // mt-px: the 18 px pill sits centered on the first 20 px line (gutters are top-aligned).
   const frame =
-    'inline-flex shrink-0 items-center gap-0.5 rounded border border-transparent transition-colors duration-100'
+    'mt-px inline-flex shrink-0 items-center gap-0.5 rounded border border-transparent transition-colors duration-100'
   if (line === undefined || buttons.length === 0) {
     return <span className={frame}>{slots}</span>
   }

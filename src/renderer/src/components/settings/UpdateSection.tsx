@@ -149,7 +149,7 @@ export function UpdateSection({ updater }: UpdateSectionProps): React.JSX.Elemen
             <p className="mb-1 truncate text-sm text-text">
               {t('updater.downloading', { version: status.info.version })}
             </p>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/60">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/20">
               <div
                 className="h-full rounded-full bg-accent transition-[width] duration-150"
                 style={{ width: Math.max(0, Math.min(100, status.percent)) + '%' }}

@@ -648,7 +648,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ aiPanelTab: tab })
   },
   openAskPanel: (fromDiff = false) => {
-    get().setAiPanelTab('ask')
+    // Switch without saving: adding a line to the chat is not the user picking
+    // Ask as their default tab (only a click on the tab is, `setAiPanelTab`).
+    set({ aiPanelTab: 'ask' })
     if (fromDiff && widthTier(window.innerWidth) === 'sm') return
     set({ didacticPanelOpen: true })
   },

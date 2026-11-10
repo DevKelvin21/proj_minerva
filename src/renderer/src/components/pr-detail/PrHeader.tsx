@@ -232,7 +232,7 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
             key={label.name}
             role="listitem"
             className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-              style ? '' : 'bg-border/60 text-muted'
+              style ? '' : 'bg-muted/15 text-muted'
             }`}
             style={style ?? undefined}
           >
