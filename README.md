@@ -34,7 +34,7 @@ maintained by Kelvin Rojas ([DevKelvin21](https://github.com/DevKelvin21))._
 - 📐 Responsive for tiled windows: half and quarter screens work.
 
 ### Didactic AI panel (the differentiator)
-- 🏛️ **C4 diagrams (Mermaid)** showing how the PR affects the architecture.
+- 🏛️ **Architecture diagrams** (C4-style, drawn as themed HTML/SVG) showing how the PR affects the architecture.
 - 🔌 **New endpoints**: generated docs plus curl / HTTPie / `.http` snippets to try them locally.
 - 🗃️ **Schema changes**: new tables and fields, with an `erDiagram`.
 - ☁️ **Cloud infrastructure**: if the repo declares AWS/Cloudflare IaC (Terraform, CDK, SAM,
