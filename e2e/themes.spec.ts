@@ -11,6 +11,8 @@ import {
   openInsightTab,
   type Page,
   openAnalysisTab,
+  htmlDiagrams,
+  diagramVar,
 } from './fixtures'
 import { themeColorToHex } from '../src/shared/theme/color'
 import {
@@ -63,12 +65,9 @@ async function openSettings(page: Page): Promise<void> {
 const themeCard = (page: Page, id: string) =>
   page.locator('[data-testid="theme-card"][data-theme-id="' + id + '"]')
 
-/** The first Mermaid SVG's markup (its <style> carries the theme colors). */
-const mermaidMarkup = (page: Page): Promise<string> =>
-  page
-    .locator('svg[aria-roledescription]')
-    .first()
-    .evaluate((svg) => svg.outerHTML)
+/** The raised-surface color the first HTML diagram's document resolved. */
+const diagramRaised = (page: Page): Promise<string> =>
+  diagramVar(htmlDiagrams(page).first(), '--theme-surface-raised')
 
 // eslint-disable-next-line no-empty-pattern
 test('appearance: mode and theme apply live to both windows, persist, and restore at boot', async ({}, testInfo) => {
@@ -76,7 +75,7 @@ test('appearance: mode and theme apply live to both windows, persist, and restor
   const app1 = await launchMinerva(userDataDir)
   const win1 = await mainWindow(app1)
 
-  // Analysis + detached window, to check Mermaid and the second window.
+  // Analysis + detached window, to check the diagrams and the second window.
   await win1.getByText('apply-coupon').first().click()
   await win1.evaluate((p) => window.minerva.ai.analyzePullRequest(p), PR_482)
   const detachedPromise = app1.context.waitForEvent('page')
@@ -87,9 +86,7 @@ test('appearance: mode and theme apply live to both windows, persist, and restor
   const detached = await detachedPromise
   await detached.waitForLoadState('domcontentloaded')
   await openInsightTab(detached, 'Architecture')
-  await expect(detached.locator('svg[aria-roledescription]').first()).toBeVisible({
-    timeout: 30_000,
-  })
+  await expect(htmlDiagrams(detached).first()).toBeVisible({ timeout: 30_000 })
 
   // --- Light mode: both windows repaint with Minerva light ---
   await openSettings(win1)
@@ -105,19 +102,15 @@ test('appearance: mode and theme apply live to both windows, persist, and restor
   await expect.poll(() => rootVar(detached, '--theme-canvas')).toBe(canvasOf('minerva', 'light'))
   await attachScreenshot(win1, testInfo, 'appearance-settings-light')
 
-  // --- Grove for both halves: canvas and the Mermaid palette follow ---
+  // --- Grove for both halves: canvas and the diagram palette follow ---
   const groveLight = getThemeColorsForMode(getBuiltInTheme('grove')!, 'light')!
   await themeCard(win1, 'grove').getByTestId('theme-use').click()
   await expect(themeCard(win1, 'grove')).toHaveAttribute('data-active-halves', 'light dark')
   await expect.poll(() => rootVar(win1, '--theme-canvas')).toBe(groveLight.canvas)
   await expect.poll(() => rootVar(detached, '--theme-canvas')).toBe(groveLight.canvas)
-  await detached.waitForTimeout(400)
-  const groveRaised = themeColorToHex(groveLight.surfaceRaised)!.slice(0, 7)
   await expect
-    .poll(() => mermaidMarkup(detached).then((svg) => svg.toLowerCase().includes(groveRaised)), {
-      message: 'Mermaid re-rendered with the Grove palette',
-    })
-    .toBe(true)
+    .poll(() => diagramRaised(detached), { message: 'diagram rebuilt with the Grove palette' })
+    .toBe(groveLight.surfaceRaised)
   await attachScreenshot(detached, testInfo, 'appearance-detached-grove-light')
 
   // --- Dark half only: Iris; switch to dark mode ---
@@ -267,9 +260,9 @@ test('screenshots: every built-in theme, light and dark, with a diff and a diagr
   })
   await window.getByText('Files').first().click()
   await expect(window.getByText('@@').first()).toBeVisible()
-  // Bring the C4 diagram into the docked didactic panel's view.
+  // Bring the architecture diagram into the docked didactic panel's view.
   await openInsightTab(window, 'Architecture')
-  await window.locator('svg[aria-roledescription]').first().scrollIntoViewIfNeeded()
+  await htmlDiagrams(window).first().scrollIntoViewIfNeeded()
 
   for (const theme of getBuiltInThemes()) {
     for (const mode of ['light', 'dark'] as const) {
@@ -285,22 +278,20 @@ test('screenshots: every built-in theme, light and dark, with a diff and a diagr
         [theme.id, mode] as const,
       )
       await expect.poll(() => rootVar(window, '--theme-canvas')).toBe(canvasOf(theme.id, mode))
-      const raised = themeColorToHex(getThemeColorsForMode(theme, mode)!.surfaceRaised)!.slice(0, 7)
-      await expect
-        .poll(() => mermaidMarkup(window).then((svg) => svg.toLowerCase().includes(raised)))
-        .toBe(true)
+      const raised = getThemeColorsForMode(theme, mode)!.surfaceRaised
+      await expect.poll(() => diagramRaised(window)).toBe(raised)
       // Let the 150 ms color transitions finish before capturing.
       await window.waitForTimeout(400)
       await attachScreenshot(window, testInfo, 'theme-' + theme.id + '-' + mode)
 
-      // The C4 diagram at full size, in the zoom viewer.
+      // The architecture diagram at full size, in the zoom viewer.
       await window.locator('button[aria-label="Expand diagram"]').first().click()
       const viewer = window.locator('.fixed.inset-0').last()
-      await expect(viewer.locator('svg[aria-roledescription]').first()).toBeVisible()
+      await expect(htmlDiagrams(viewer).first()).toBeVisible()
       await window.waitForTimeout(400)
       await attachScreenshot(window, testInfo, 'diagram-' + theme.id + '-' + mode)
       await window.keyboard.press('Escape')
-      await expect(viewer.locator('svg[aria-roledescription]')).toHaveCount(0)
+      await expect(htmlDiagrams(viewer)).toHaveCount(0)
     }
   }
 })

@@ -8,7 +8,7 @@ import { Markdown } from '../ui/Markdown'
 import { Chip } from '../ui/Chip'
 import { IconButton } from '../ui/IconButton'
 import { ExpandableResource } from '../didactic/ExpandableResource'
-import { MermaidDiagram } from '../didactic/MermaidDiagram'
+import { DiagramView } from '../didactic/DiagramView'
 import { ResourceViewer, type ViewerResource } from '../didactic/ResourceViewer'
 import { FileStatusIcon } from './FileStatusIcon'
 
@@ -113,7 +113,7 @@ export function LayerContextBar({
             </Chip>
           )
         })}
-        {layer.mermaid && (
+        {layer.diagram && (
           <Chip
             onClick={() => setDiagramOpen((open) => !open)}
             aria-expanded={diagramOpen}
@@ -132,15 +132,15 @@ export function LayerContextBar({
         </p>
       )}
 
-      {layer.mermaid && diagramOpen && (
+      {layer.diagram && diagramOpen && (
         <div className="max-h-72 overflow-auto rounded-md border border-border bg-bg p-2">
           <ExpandableResource
             label={t('didactic.resources.expandDiagram')}
-            onExpand={() =>
-              setViewer({ kind: 'mermaid', title: diagramTitle, code: layer.mermaid ?? '' })
-            }
+            onExpand={() => {
+              if (layer.diagram) setViewer({ kind: 'diagram', title: diagramTitle, diagram: layer.diagram })
+            }}
           >
-            <MermaidDiagram key={layer.mermaid} code={layer.mermaid} />
+            <DiagramView key={layer.diagram.source} diagram={layer.diagram} />
           </ExpandableResource>
         </div>
       )}

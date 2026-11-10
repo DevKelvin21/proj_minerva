@@ -6,7 +6,9 @@
  * `fs.readFileSync` en runtime.
  *
  * Adaptado del contrato del subagente `.claude/agents/pr-didactic-analyzer.md`
- * (mismo rol, mismas reglas de clasificación y de Mermaid válido).
+ * (mismo rol, mismas reglas de clasificación). Diagrams are HTML + inline
+ * SVG written with the diagram kit (`shared/diagram-kit.ts`), drawn in a
+ * script-less sandboxed iframe; Mermaid is no longer requested.
  *
  * T13 (streaming): la forma de salida pedida al modelo cambió de un único
  * objeto JSON (`{ "sections": [...] }`) a un protocolo de texto por líneas,
@@ -89,42 +91,49 @@ const ANALYZE_PR_BASE_PROMPT =
   '3. Be honest about uncertainty: if the diff does not give enough context for something, say ' +
   'so in the markdown of the section instead of making it up.\n\n' +
   '## Content rules\n' +
-  '- All visual output is Mermaid (C4Context/C4Container/C4Component, erDiagram, flowchart) or ' +
-  'Markdown. Never binary images or HTML.\n' +
-  '- The Mermaid must be syntactically valid and actually renderable: use only real Mermaid ' +
-  'syntax (C4, `erDiagram` or `architecture-beta`), no invented pseudo-syntax, no loose text ' +
-  'outside nodes/edges, with C4 diagrams starting with their directive (`C4Context`, ' +
-  '`C4Container` or `C4Component`), ER diagrams with `erDiagram` and cloud diagrams with ' +
-  '`architecture-beta`.\n' +
-  '- The Mermaid must be sober and readable: the labels of `Rel()` (or of any edge) have at most ' +
-  '4 words, the detail goes in the Markdown of the section, never on the arrow; each diagram has ' +
-  'at most 8 elements (persons, containers, components or systems); and the technology argument ' +
-  'of each element is short, one or two words (e.g. "Node.js", not a list of libraries). Never ' +
-  'use the "#" character inside a C4 diagram (neither in the title nor in labels): the Mermaid ' +
-  'parser rejects it — write "PR 482", not "PR #482".\n' +
-  '- `architecture-beta` grammar (Mermaid 11; it is a DIFFERENT syntax from a flowchart, do not ' +
-  'mix them): the first line is literally `architecture-beta`; group with ' +
-  '`group id(icon)[Label]` and attach services with `service id(icon)[Label] in groupId` (the ' +
-  '`in groupId` is optional); edges ALWAYS carry a side on BOTH ends, format `a:R -- L:b` (sides ' +
-  '`T`|`B`|`L`|`R`) — `-->` or an edge without a side on both ends is invalid; optionally you ' +
-  'can use `junction id` to branch an edge or `align row a b c` to align a row; the `id`s are ' +
-  'alphanumeric, without hyphens or spaces; the `[Label]`s contain ONLY letters, digits and ' +
-  'spaces — no parentheses, hyphens or other symbols, the lexer rejects them — and have at most ' +
-  '3 words (add the word "PR" at the END of the label of a service to mark that the PR touches ' +
-  'it, e.g. `[CouponService PR]`).\n' +
-  '- `architecture-beta` icons: use EXCLUSIVELY this whitelist (or the built-in `cloud`, ' +
-  '`database`, `disk`, `internet`, `server` if a service fits none of them) — never invent an ' +
-  'icon that is not here: `logos:aws-lambda`, `logos:aws-s3`, `logos:aws-dynamodb`, ' +
-  '`logos:aws-sqs`, `logos:aws-sns`, `logos:aws-eventbridge`, `logos:aws-api-gateway`, ' +
-  '`logos:aws-step-functions`, `logos:aws-cloudfront`, `logos:aws-cloudformation`, `logos:aws-ec2`, ' +
-  '`logos:aws-ecs`, `logos:aws-fargate`, `logos:aws-eks`, `logos:aws-rds`, `logos:aws-aurora`, ' +
-  '`logos:aws-elasticache`, `logos:aws-cognito`, `logos:aws-kinesis`, `logos:aws-route53`, ' +
-  '`logos:aws-vpc`, `logos:aws-cloudwatch`, `logos:aws-secrets-manager`, `logos:aws-ses`, ' +
-  '`logos:aws-iam`, `logos:aws`, `logos:cloudflare`, `logos:cloudflare-workers`, `cf:r2`, `cf:d1`, ' +
-  '`cf:kv`, `cf:durable-objects`, `cf:pages`, `cf:queues`.\n' +
-  '- `architecture-beta` size: the big-picture diagram (1st of `cloud`) has at most 10 services ' +
-  '(group by provider or domain with `group` if there are more pieces); the zoom one (2nd) has at ' +
-  'most 6; prefer short chains of edges and use `align row` when the layout calls for it.\n' +
+  '- Every diagram is an HTML DIAGRAM: a fragment of HTML (optionally with inline SVG) between ' +
+  '`@@@HTML` and `@@@END_HTML`. Everything else is Markdown. Never Mermaid, never binary ' +
+  'images, never a whole page (no `<html>`, `<head>` or `<body>`).\n' +
+  '- Where it is drawn: a sandboxed frame with NO JavaScript (`<script>`, `on*` attributes and ' +
+  '`javascript:` never run), NO network (external images, fonts, stylesheets and `@import` are ' +
+  'blocked; every `href`/`src` except `#id` references is removed) and no forms. So: no scripts, ' +
+  'no links, no interactivity beyond CSS `:hover`. The frame is as wide as the reader\'s panel ' +
+  '(320 to 1000 px): use fluid layouts, never a fixed width over 320 px, no `vh` units, no ' +
+  '`position: fixed`. Keep each diagram under 8 KB.\n' +
+  '- Colors: NEVER hard-code a color (no hex, rgb or named colors): the reader picks the theme. ' +
+  'Use only these CSS variables: `--text`, `--muted`, `--border`, `--panel`, `--raised`, `--bg`, ' +
+  '`--accent`, `--accent-fg`, `--success`, `--warning`, `--danger`, `--info`, `--merged`, ' +
+  '`--code-bg`, the tinted fills `--accent-soft`, `--success-soft`, `--warning-soft`, ' +
+  '`--danger-soft`, `--info-soft`, `--merged-soft`, plus `--font-sans`, `--font-mono` and ' +
+  '`--radius`. Leave the page background transparent.\n' +
+  '- The diagram kit (already loaded, prefer it over your own CSS; a short `<style>` block at the ' +
+  'top is allowed for small extras): `.diagram` (vertical stack, the usual root), `.row` ' +
+  '(horizontal chain, wraps), `.col` (vertical chain), `.grid` (responsive columns, e.g. ' +
+  'before/after), `.node` (a box: `<div class="node"><span class="name">CouponService</span>' +
+  '<span class="meta">TypeScript</span></div>`, `.meta` holds the technology in 1 or 2 words), ' +
+  '`.group` with a first child `<span class="label">` (a dashed boundary: system, module, cloud ' +
+  'provider), `.edge` (a labelled arrow between two siblings of a `.row`: ' +
+  '`<div class="edge">delegates validation</div>`; `.edge.down` points down inside a `.col`; ' +
+  '`.edge.both` is two-way), `.tag` (small pill), `.legend` (row of tags), `.entities` holding ' +
+  '`<table class="entity">` (a `<caption>` with the table name, one `<tr><td>column<span ' +
+  'class="pk">PK</span></td><td>type</td></tr>` per column, `.fk` for foreign keys) and ' +
+  '`<span class="rel">1 ──&lt; N</span>` between related tables, `<ol class="steps">` (a ' +
+  'numbered call sequence, one `<li>` per message: `<span class="actor">Router</span> → ' +
+  '<span class="actor">CouponService</span> <span class="msg">apply(cart, code)</span>`), ' +
+  '`.note` (a short callout) and `.mono`.\n' +
+  '- Marking the change is the point of every diagram: add `.new`, `.changed` or `.removed` to ' +
+  'the nodes, edges, table rows (`tr`), tables and steps the PR adds, modifies or deletes, ' +
+  '`.focus` to highlight the piece under discussion, `.external` for actors outside the system, ' +
+  'and end with a `.legend` of the tags you used (`<span class="tag new">NEW</span>`).\n' +
+  '- When the structure is a real graph (fan-out, cycles, more than two chains) draw it in inline ' +
+  'SVG instead: `<svg viewBox="0 0 W H" width="100%">`, coordinates inside the viewBox, kit ' +
+  'classes for color (`.s-node` boxes plus `.s-new`/`.s-changed`/`.s-removed`/`.s-focus`, ' +
+  '`.s-edge` lines with a `<marker>` whose path has `.s-arrowhead`, `.s-label` and `.s-muted` ' +
+  'text, at least 11 px) and no `fill`/`stroke` color attributes.\n' +
+  '- Diagrams must be sober and readable: at most 8 elements (nodes, tables or participants) per ' +
+  'diagram, edge labels of at most 4 words (the detail goes in the Markdown of the section, never ' +
+  'on the arrow), node names that are the real identifiers of the code, and nothing that is not ' +
+  'backed by the diff or the repo.\n' +
   '- In "endpoint" sections, the snippets to try the endpoint locally must be `curl` or a ' +
   '`.http` file (`language: "http"`), copyable as is. In the "setup" section, the snippets are ' +
   'startup ones (`language: "bash"`, install/start commands) or environment variables ready to ' +
@@ -147,13 +156,13 @@ const ANALYZE_PR_BASE_PROMPT =
   '`start-end` (NEW-file line numbers taken from the `+` side of the diff hunks; for a DELETED ' +
   'file use the old-file numbers): `files="src/routes/carts.ts:13,20-27;src/services/coupon-service.ts:1-21"`. ' +
   'A path without ranges means the whole file. The Markdown after the marker (until the next ' +
-  'marker) is the summary of THAT layer, and a `@@@MERMAID` block inside it is the diagram of ' +
+  'marker) is the summary of THAT layer, and a `@@@HTML` block inside it is the diagram of ' +
   'that layer.\n' +
-  '- `@@@MERMAID` ... `@@@END_MERMAID` delimit the Mermaid diagram of the CURRENTLY open section ' +
+  '- `@@@HTML` ... `@@@END_HTML` delimit the HTML diagram of the CURRENTLY open section ' +
   '(only meaningful inside an `architecture`, `schema` or `cloud` section, or inside a layer of ' +
   'the `walkthrough`). In `architecture`/`schema` there is ONE single block; in `cloud` you can ' +
   'repeat the pair up to TWO times (big picture and zoom, in that order); in a layer, at most ' +
-  'ONE. After `@@@END_MERMAID` you can continue with more Markdown of the same section if needed.\n' +
+  'ONE. After `@@@END_HTML` you can continue with more Markdown of the same section if needed.\n' +
   '- `@@@SNIPPET label=<text without spaces> language=<curl|http|bash|env>` ... `@@@END_SNIPPET` ' +
   'delimit a copyable snippet of the currently open `endpoint` or `setup` section; you can repeat ' +
   'the pair for several examples. `curl`/`http` are for `endpoint` (trying the endpoint); ' +
@@ -175,10 +184,10 @@ const ANALYZE_PR_BASE_PROMPT =
   'changed file appears in at least one layer (a file may appear in several); a layer has 1 to 6 ' +
   'files; never invent a path that is not in the diff. After each marker write 1 to 3 sentences ' +
   'of Markdown explaining what that layer changes and why it matters for the reviewer. Add a ' +
-  '`@@@MERMAID` block to a layer ONLY when a visual genuinely helps (a new call sequence across ' +
-  'modules or services -> `sequenceDiagram`; a state transition -> `stateDiagram-v2`; a data ' +
-  'model change -> `erDiagram`; a branching flow -> `flowchart`), at most one per layer and at ' +
-  'most 8 elements; most layers get none.\n' +
+  '`@@@HTML` block to a layer ONLY when a visual genuinely helps (a new call sequence across ' +
+  'modules or services -> `ol.steps`; a state transition or a short flow -> a `.row` of `.node`s ' +
+  'and `.edge`s; a data model change -> `.entities`; a branching flow -> inline SVG), at most ' +
+  'one per layer and at most 8 elements; most layers get none.\n' +
   '- `setup`: ALWAYS present, exactly once, third section of the answer (right after ' +
   '`walkthrough`). It is the GUIDE FOR THE DEVELOPER who is going to try this PR on their machine. ' +
   'Markdown with: (a) how to run the app with Docker, with the exact command, IF the diff or the ' +
@@ -195,22 +204,25 @@ const ANALYZE_PR_BASE_PROMPT =
   'and one `@@@SNIPPET` `language=env` with the block ready to paste into `.env` when the PR ' +
   'introduces new variables.\n' +
   '- `architecture`: only if you detected that category. Markdown explaining the diagram in brief ' +
-  'prose, plus ONE `@@@MERMAID` block with the complete C4 diagram (mark what is new/modified in ' +
-  'the node labels, e.g. "(NEW)").\n' +
+  'prose, plus ONE `@@@HTML` block with a C4-style container or component view: `.group`s for ' +
+  'the system or module boundaries, `.node`s for the containers/components (technology in ' +
+  '`.meta`), `.external` nodes for people and outside systems, labelled `.edge`s, and the ' +
+  'new/changed/removed pieces marked.\n' +
   '- `cloud`: only if you detected that category (see the anti-hallucination rule in step 1 of ' +
   '"Process" — never invent infra you did not see in real files of the repo). Markdown: first ' +
   'the BIG PICTURE (what the whole deployed system does, which cloud pieces exist and how they ' +
   'interact — the goal is that the reviewer understands how the app works in general), then ' +
   'WHERE this PR has an effect (which pieces it touches and how it changes the interaction of ' +
-  'the system). Exactly TWO `@@@MERMAID` blocks in `architecture-beta` (grammar and icon ' +
-  'whitelist above): the 1st the complete cloud system of the repo, the 2nd a zoom on the area ' +
-  'the PR modifies, marking the services it touches with the word "PR" at the end of the label.\n' +
+  'the system). Exactly TWO `@@@HTML` blocks: the 1st the complete cloud system of the repo (at ' +
+  'most 10 services, one `.group` per provider or domain, the service type in `.meta`, e.g. ' +
+  '"Lambda", "DynamoDB", "R2"), the 2nd a zoom on the area the PR modifies (at most 6 services), ' +
+  'marking the services it touches with `.changed` or `.new`.\n' +
   '- `endpoint`: only if you detected that category. Markdown documenting method + path, params, ' +
   'body and responses of each new/changed endpoint, plus at least one runnable `@@@SNIPPET` ' +
   '(`curl` or a `.http` file, `language=http`) to try it locally.\n' +
   '- `schema`: only if you detected that category. Markdown with a table of new/changed fields ' +
-  '(type and constraints), plus ONE `@@@MERMAID` block with an `erDiagram` of the affected model ' +
-  '(before/after if it applies, marking what is new).\n\n' +
+  '(type and constraints), plus ONE `@@@HTML` block with `.entities` of the affected tables ' +
+  '(`.rel` between related ones), marking the new/changed/removed tables and columns.\n\n' +
   'Example of the shape (with content shortened for illustration):\n\n' +
   '@@@SECTION kind=summary\n' +
   '- What changed: the apply-coupon endpoint is added.\n' +
@@ -221,12 +233,12 @@ const ANALYZE_PR_BASE_PROMPT =
   'New `CouponService.apply`: checks expiry and double application, then recalculates the total.\n' +
   '@@@LAYER cohort="Apply-coupon endpoint" title="Route wiring and handler" files="src/routes/carts.ts:13,20-27"\n' +
   'Registers `POST /carts/:id/apply-coupon` and maps the service result to 200/409.\n' +
-  '@@@MERMAID\n' +
-  'sequenceDiagram\n' +
-  '  Client->>Router: POST apply-coupon\n' +
-  '  Router->>CouponService: apply(cart, code)\n' +
-  '  CouponService-->>Router: result\n' +
-  '@@@END_MERMAID\n' +
+  '@@@HTML\n' +
+  '<ol class="steps">\n' +
+  '  <li><span class="actor">Client</span> → <span class="actor">Router</span> <span class="msg">POST apply-coupon</span></li>\n' +
+  '  <li class="new"><span class="actor">Router</span> → <span class="actor">CouponService</span> <span class="msg">apply(cart, code)</span></li>\n' +
+  '</ol>\n' +
+  '@@@END_HTML\n' +
   '@@@SECTION kind=setup\n' +
   'There is no Dockerfile in the diff, so it runs locally.\n' +
   '@@@SNIPPET label=local-start language=bash\n' +
@@ -236,32 +248,40 @@ const ANALYZE_PR_BASE_PROMPT =
   'The PR adds no new environment variables.\n' +
   '@@@SECTION kind=architecture\n' +
   '`CouponService` is added, independent from `CartService`.\n' +
-  '@@@MERMAID\n' +
-  'C4Container\n' +
-  '  title Architectural impact\n' +
-  '  Container(api, "API", "Node.js")\n' +
-  '  Container(coupon, "CouponService (NEW)", "TypeScript")\n' +
-  '  Rel(api, coupon, "delegates validation")\n' +
-  '@@@END_MERMAID\n' +
+  '@@@HTML\n' +
+  '<div class="diagram">\n' +
+  '  <div class="group"><span class="label">Shopwave</span>\n' +
+  '    <div class="row">\n' +
+  '      <div class="node"><span class="name">API</span><span class="meta">Node.js</span></div>\n' +
+  '      <div class="edge new">delegates validation</div>\n' +
+  '      <div class="node new"><span class="name">CouponService</span><span class="meta">TypeScript</span></div>\n' +
+  '    </div>\n' +
+  '  </div>\n' +
+  '  <div class="legend"><span class="tag new">NEW</span></div>\n' +
+  '</div>\n' +
+  '@@@END_HTML\n' +
   '@@@SECTION kind=cloud\n' +
   'The system runs on AWS: API Gateway receives the requests, a Lambda runs the API logic and ' +
   'DynamoDB stores carts and coupons. This PR adds `CouponService` inside that same Lambda, ' +
   'with no new infra pieces.\n' +
-  '@@@MERMAID\n' +
-  'architecture-beta\n' +
-  'group aws(logos:aws)[AWS]\n' +
-  'service gateway(logos:aws-api-gateway)[API Gateway] in aws\n' +
-  'service api(logos:aws-lambda)[API Lambda] in aws\n' +
-  'service db(logos:aws-dynamodb)[Carts Table] in aws\n' +
-  'gateway:R -- L:api\n' +
-  'api:R -- L:db\n' +
-  '@@@END_MERMAID\n' +
-  '@@@MERMAID\n' +
-  'architecture-beta\n' +
-  'service api(logos:aws-lambda)[CouponService PR]\n' +
-  'service db(logos:aws-dynamodb)[Carts Table]\n' +
-  'api:R -- L:db\n' +
-  '@@@END_MERMAID\n' +
+  '@@@HTML\n' +
+  '<div class="group"><span class="label">AWS</span>\n' +
+  '  <div class="row">\n' +
+  '    <div class="node"><span class="name">API Gateway</span><span class="meta">API Gateway</span></div>\n' +
+  '    <div class="edge"></div>\n' +
+  '    <div class="node"><span class="name">API</span><span class="meta">Lambda</span></div>\n' +
+  '    <div class="edge">reads and writes</div>\n' +
+  '    <div class="node"><span class="name">Carts</span><span class="meta">DynamoDB</span></div>\n' +
+  '  </div>\n' +
+  '</div>\n' +
+  '@@@END_HTML\n' +
+  '@@@HTML\n' +
+  '<div class="row">\n' +
+  '  <div class="node changed"><span class="name">API + CouponService</span><span class="meta">Lambda</span></div>\n' +
+  '  <div class="edge">reads and writes</div>\n' +
+  '  <div class="node"><span class="name">Carts</span><span class="meta">DynamoDB</span></div>\n' +
+  '</div>\n' +
+  '@@@END_HTML\n' +
   '@@@SECTION kind=endpoint\n' +
   '### `POST /api/v1/carts/:id/apply-coupon`\n' +
   '| **Body** | `{ "code": string }` |\n' +
@@ -270,7 +290,7 @@ const ANALYZE_PR_BASE_PROMPT =
   '  -d \'{"code":"WELCOME10"}\'\n' +
   '@@@END_SNIPPET\n\n' +
   'Do not repeat the word "Example" or add explanations about the format: each line of your ' +
-  'real answer is either a `@@@...` marker or content (Markdown, Mermaid or code) of the section ' +
+  'real answer is either a `@@@...` marker or content (Markdown, HTML or code) of the section ' +
   'that is open at that moment.'
 
 /**
@@ -284,7 +304,7 @@ export function buildAnalyzeSystemPrompt(language: AppLocale): string {
     '- Write the whole response (every section\'s Markdown, diagram labels and snippet labels) ' +
     'in ' +
     name +
-    ', regardless of the PR\'s language. The protocol markers (`@@@...`), Mermaid keywords and ' +
+    ', regardless of the PR\'s language. The protocol markers (`@@@...`), HTML tags, CSS classes and ' +
     'code stay as they are.'
   return ANALYZE_PR_BASE_PROMPT.replace('{{OUTPUT_LANGUAGE_RULE}}', rule)
 }

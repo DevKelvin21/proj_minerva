@@ -50,7 +50,7 @@ test('analysis panel: placeholder, streaming, done with route-titled endpoints, 
 
   // Diagrams: the expand control is visible without hovering.
   await openInsightTab(window, 'Architecture')
-  await expect(window.locator('svg[aria-roledescription]').first()).toBeVisible()
+  await expect(window.locator('[data-testid="html-diagram"]').first()).toBeVisible()
   await expect(window.getByRole('button', { name: 'Expand diagram' }).first()).toBeVisible()
   await attachScreenshot(window, testInfo, 'analysis-architecture')
 

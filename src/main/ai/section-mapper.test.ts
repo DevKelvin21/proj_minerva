@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { mapRawSection, mapSnippet, parseFileRefs } from './section-mapper'
+import { MAX_DIAGRAM_SOURCE_CHARS, mapDiagram, mapRawSection, mapSnippet, parseFileRefs } from './section-mapper'
+import type { DidacticDiagram } from '../../shared/types'
+
+/** A legacy Mermaid diagram, as the parser records a `@@@MERMAID` block. */
+const mermaid = (source: string): DidacticDiagram => ({ format: 'mermaid', source })
+const mermaids = (...sources: string[]): DidacticDiagram[] => sources.map(mermaid)
+/** An HTML diagram, as the parser records a `@@@HTML` block. */
+const html = (source: string): DidacticDiagram => ({ format: 'html', source })
 
 describe('mapRawSection', () => {
   it('mapea una sección summary válida', () => {
@@ -11,15 +18,15 @@ describe('mapRawSection', () => {
 
   it('mapea una sección architecture válida', () => {
     expect(
-      mapRawSection({ kind: 'architecture', markdown: 'texto', mermaid: 'C4Context\n  x' }),
-    ).toEqual({ kind: 'architecture', markdown: 'texto', mermaid: 'C4Context\n  x' })
+      mapRawSection({ kind: 'architecture', markdown: 'texto', diagram: mermaid('C4Context\n  x') }),
+    ).toEqual({ kind: 'architecture', markdown: 'texto', diagram: mermaid('C4Context\n  x') })
   })
 
   it('mapea una sección schema válida', () => {
-    expect(mapRawSection({ kind: 'schema', markdown: 'texto', mermaid: 'erDiagram' })).toEqual({
+    expect(mapRawSection({ kind: 'schema', markdown: 'texto', diagram: mermaid('erDiagram') })).toEqual({
       kind: 'schema',
       markdown: 'texto',
-      mermaid: 'erDiagram',
+      diagram: mermaid('erDiagram'),
     })
   })
 
@@ -96,7 +103,22 @@ describe('mapRawSection', () => {
     })
   })
 
-  it('rechaza architecture/schema sin mermaid', () => {
+  it('maps an architecture section with an HTML diagram', () => {
+    expect(
+      mapRawSection({ kind: 'architecture', markdown: 'texto', diagram: html('<div class="box">API</div>') }),
+    ).toEqual({ kind: 'architecture', markdown: 'texto', diagram: html('<div class="box">API</div>') })
+  })
+
+  it('keeps at most two cloud diagrams', () => {
+    const result = mapRawSection({
+      kind: 'cloud',
+      markdown: 'texto',
+      diagrams: [html('<p>1</p>'), html('<p>2</p>'), html('<p>3</p>')],
+    })
+    expect(result).toEqual({ kind: 'cloud', markdown: 'texto', diagrams: [html('<p>1</p>'), html('<p>2</p>')] })
+  })
+
+  it('rechaza architecture/schema sin diagrama', () => {
     expect(mapRawSection({ kind: 'architecture', markdown: 'texto' })).toBeNull()
     expect(mapRawSection({ kind: 'schema', markdown: 'texto' })).toBeNull()
   })
@@ -106,38 +128,42 @@ describe('mapRawSection', () => {
       mapRawSection({
         kind: 'cloud',
         markdown: 'texto',
-        mermaids: ['C4Context\n  big picture', 'C4Container\n  zoom'],
+        diagrams: mermaids('C4Context\n  big picture', 'C4Container\n  zoom'),
       }),
     ).toEqual({
       kind: 'cloud',
       markdown: 'texto',
-      mermaids: ['C4Context\n  big picture', 'C4Container\n  zoom'],
+      diagrams: mermaids('C4Context\n  big picture', 'C4Container\n  zoom'),
     })
   })
 
   it('mapea una sección cloud válida con 1 diagrama', () => {
     expect(
-      mapRawSection({ kind: 'cloud', markdown: 'texto', mermaids: ['C4Context\n  x'] }),
-    ).toEqual({ kind: 'cloud', markdown: 'texto', mermaids: ['C4Context\n  x'] })
+      mapRawSection({ kind: 'cloud', markdown: 'texto', diagrams: mermaids('C4Context\n  x') }),
+    ).toEqual({ kind: 'cloud', markdown: 'texto', diagrams: mermaids('C4Context\n  x') })
   })
 
   it('mapea una sección cloud válida sin diagramas (nunca null solo por faltar mermaid)', () => {
-    expect(mapRawSection({ kind: 'cloud', markdown: 'texto', mermaids: [] })).toEqual({
+    expect(mapRawSection({ kind: 'cloud', markdown: 'texto', diagrams: [] })).toEqual({
       kind: 'cloud',
       markdown: 'texto',
-      mermaids: [],
+      diagrams: [],
     })
     expect(mapRawSection({ kind: 'cloud', markdown: 'texto' })).toEqual({
       kind: 'cloud',
       markdown: 'texto',
-      mermaids: [],
+      diagrams: [],
     })
   })
 
   it('descarta mermaids individuales malformados de una sección cloud sin invalidarla', () => {
     expect(
-      mapRawSection({ kind: 'cloud', markdown: 'texto', mermaids: ['ok', '   ', 42, null] }),
-    ).toEqual({ kind: 'cloud', markdown: 'texto', mermaids: ['ok'] })
+      mapRawSection({
+        kind: 'cloud',
+        markdown: 'texto',
+        diagrams: [mermaid('ok'), mermaid('   '), { format: 'svg', source: 'x' }, 'ok', 42, null],
+      }),
+    ).toEqual({ kind: 'cloud', markdown: 'texto', diagrams: mermaids('ok') })
   })
 
   it('rechaza endpoint sin snippets (o snippets no-array)', () => {
@@ -188,7 +214,7 @@ describe('mapRawSection · walkthrough', () => {
       kind: 'walkthrough',
       markdown: '',
       layers: [
-        { cohort: 'A', title: 'one', files: [{ path: 'a.ts', ranges: [] }], markdown: 'm', mermaid: 'flowchart TD\n' },
+        { cohort: 'A', title: 'one', files: [{ path: 'a.ts', ranges: [] }], markdown: 'm', diagram: mermaid('flowchart TD\n') },
         { cohort: 'A', title: 'two', files: [{ path: 'b.ts', ranges: [{ start: 1, end: 2 }] }], markdown: '' },
         { cohort: '', title: 'three', files: [{ path: 'c.ts', ranges: [] }], markdown: '' },
       ],
@@ -200,7 +226,7 @@ describe('mapRawSection · walkthrough', () => {
         {
           title: 'A',
           layers: [
-            { title: 'one', markdown: 'm', files: [{ path: 'a.ts', ranges: [] }], mermaid: 'flowchart TD\n' },
+            { title: 'one', markdown: 'm', files: [{ path: 'a.ts', ranges: [] }], diagram: mermaid('flowchart TD\n') },
             { title: 'two', markdown: '', files: [{ path: 'b.ts', ranges: [{ start: 1, end: 2 }] }] },
           ],
         },
@@ -212,5 +238,24 @@ describe('mapRawSection · walkthrough', () => {
   it('rejects a walkthrough without layers array or with no valid layer', () => {
     expect(mapRawSection({ kind: 'walkthrough', markdown: 'x' })).toBeNull()
     expect(mapRawSection({ kind: 'walkthrough', markdown: 'x', layers: [{ title: 'no files', files: [] }] })).toBeNull()
+  })
+})
+
+describe('mapDiagram', () => {
+  it('accepts html and mermaid sources', () => {
+    expect(mapDiagram(html('<svg></svg>'))).toEqual(html('<svg></svg>'))
+    expect(mapDiagram(mermaid('erDiagram'))).toEqual(mermaid('erDiagram'))
+  })
+
+  it('rejects unknown formats, blank sources and non-objects', () => {
+    expect(mapDiagram({ format: 'svg', source: '<svg/>' })).toBeNull()
+    expect(mapDiagram(html('  \n'))).toBeNull()
+    expect(mapDiagram('erDiagram')).toBeNull()
+    expect(mapDiagram(null)).toBeNull()
+  })
+
+  it('rejects a source over the size cap', () => {
+    expect(mapDiagram(html('x'.repeat(MAX_DIAGRAM_SOURCE_CHARS)))).not.toBeNull()
+    expect(mapDiagram(html('x'.repeat(MAX_DIAGRAM_SOURCE_CHARS + 1)))).toBeNull()
   })
 })

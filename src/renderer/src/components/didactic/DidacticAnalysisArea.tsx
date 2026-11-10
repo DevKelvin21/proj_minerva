@@ -15,7 +15,7 @@ import { DidacticSectionCard } from './DidacticSectionCard'
 import { Markdown } from '../ui/Markdown'
 import { Button } from '../ui/Button'
 import { Callout } from '../ui/Callout'
-import { MermaidDiagram } from './MermaidDiagram'
+import { DiagramView } from './DiagramView'
 import { CodeSnippet } from './CodeSnippet'
 import { DidacticPlaceholder } from './DidacticPlaceholder'
 import { HarnessActivityLog } from './HarnessActivityLog'
@@ -24,7 +24,7 @@ import { ActiveModelHint } from './ActiveModelHint'
 import { AnalysisStatusBar, type StatusBarNotice } from './AnalysisStatusBar'
 import { ExpandableResource } from './ExpandableResource'
 import { ResourceViewer, type ViewerResource } from './ResourceViewer'
-import type { DidacticSection, RepoRef, WalkthroughCohort } from '../../../../shared/types'
+import type { DidacticDiagram, DidacticSection, RepoRef, WalkthroughCohort } from '../../../../shared/types'
 import type { DraftDidacticSection } from '../../../../shared/events'
 import { flattenLayers, type LayerRef } from '../../lib/walkthrough'
 import {
@@ -118,7 +118,7 @@ function sectionMeta(
 }
 
 /**
- * Subtítulo fijo por posición para los `mermaids[]` de una sección `cloud`
+ * Subtítulo fijo por posición para los `diagrams[]` de una sección `cloud`
  * (T77): el 1º diagrama es SIEMPRE el big picture del sistema cloud completo,
  * el 2º el zoom a lo que el PR modifica (contrato de `DidacticSection`/
  * `DraftDidacticSection`, ver `shared/types.ts`/`shared/events.ts`). Un 3º+
@@ -177,7 +177,7 @@ function WalkthroughBody({
               const meta = (
                 <span className="flex items-center gap-2 text-[11px] text-muted">
                   {t('didactic.walkthrough.fileCount', { count: layer.files.length })}
-                  {layer.mermaid && (
+                  {layer.diagram && (
                     <span className="flex items-center gap-0.5">
                       <Icon icon={icons.diagram} size="xs" />
                       {t('didactic.walkthrough.withDiagram')}
@@ -229,9 +229,9 @@ function WalkthroughBody({
 
 /**
  * Diagramas de una sección `cloud` (T77): a diferencia de `architecture`/
- * `schema` (un `mermaid` único), acá `mermaids` es un array de hasta 2
- * `architecture-beta` — cada uno con su propio subtítulo fijo por posición
- * (`cloudDiagramSubtitle`) y su propio `ExpandableResource`/`MermaidDiagram`.
+ * `schema` (un `diagram` único), acá `diagrams` es un array de hasta 2 —
+ * cada uno con su propio subtítulo fijo por posición
+ * (`cloudDiagramSubtitle`) y su propio `ExpandableResource`/`DiagramView`.
  * Con el array vacío no renderiza nada (la sección se sostiene solo con el
  * markdown de arriba, sin huecos visuales).
  *
@@ -239,15 +239,15 @@ function WalkthroughBody({
  * durante el streaming el array crece 0→1→2 append-only — un diagrama ya
  * cerrado nunca cambia de contenido en una posición ya emitida, así que
  * indexar por posición no le causa un remount espurio, y evita uno real si
- * (por lo que sea) el DSL de un diagrama cerrado se repitiera dos veces.
+ * (por lo que sea) el source de un diagrama cerrado se repitiera dos veces.
  */
 function renderCloudDiagrams(
-  mermaids: string[],
+  diagrams: DidacticDiagram[],
   sectionTitle: string,
   onExpand: (resource: ViewerResource) => void,
   t: TFunction,
 ): React.JSX.Element[] {
-  return mermaids.map((mermaid, i) => {
+  return diagrams.map((diagram, i) => {
     const subtitle = cloudDiagramSubtitle(i, t)
     return (
       <div key={i} className="flex flex-col gap-1.5">
@@ -256,13 +256,13 @@ function renderCloudDiagrams(
           label={t('didactic.resources.expandDiagram')}
           onExpand={() =>
             onExpand({
-              kind: 'mermaid',
+              kind: 'diagram',
               title: t('didactic.resources.diagramTitle', { section: sectionTitle, diagram: subtitle }),
-              code: mermaid,
+              diagram,
             })
           }
         >
-          <MermaidDiagram code={mermaid} framed={false} />
+          <DiagramView diagram={diagram} framed={false} />
         </ExpandableResource>
       </div>
     )
@@ -302,12 +302,12 @@ function renderSection(
       {(section.kind === 'architecture' || section.kind === 'schema') && (
         <ExpandableResource
           label={t('didactic.resources.expandDiagram')}
-          onExpand={() => onExpand({ kind: 'mermaid', title: meta.title, code: section.mermaid })}
+          onExpand={() => onExpand({ kind: 'diagram', title: meta.title, diagram: section.diagram })}
         >
-          <MermaidDiagram key={section.mermaid} code={section.mermaid} framed={false} />
+          <DiagramView key={section.diagram.source} diagram={section.diagram} framed={false} />
         </ExpandableResource>
       )}
-      {section.kind === 'cloud' && renderCloudDiagrams(section.mermaids, meta.title, onExpand, t)}
+      {section.kind === 'cloud' && renderCloudDiagrams(section.diagrams, meta.title, onExpand, t)}
       {(section.kind === 'endpoint' || section.kind === 'setup') &&
         section.snippets.map((snippet, i) => (
           <CodeSnippet
@@ -323,16 +323,14 @@ function renderSection(
 /**
  * Variante de `renderSection` para un snapshot EN VIVO de streaming (T13):
  * `section` es `DraftDidacticSection` (`../../../../shared/events.ts`), no
- * `DidacticSection` — a diferencia del tipo final, el Mermaid de una
+ * `DidacticSection` — a diferencia del tipo final, el diagrama de una
  * `architecture`/`schema` es OPCIONAL: solo se pinta si ya cerró
- * (`section.mermaid` presente). Mientras el bloque `@@@MERMAID` sigue
- * abierto, el campo directamente no existe, así que nunca hay riesgo de
- * montar `MermaidDiagram` con un DSL a medio escribir. La sección todavía
- * abierta (`section.streaming`) muestra el cursor parpadeante. Mismo criterio
- * para `cloud.mermaids` (T77): el array solo contiene los diagramas YA
- * cerrados (ver `DraftDidacticSection` en `shared/events.ts`), así que
- * `renderCloudDiagrams` recibe siempre contenido completo, nunca un DSL a
- * medio escribir.
+ * (`section.diagram` presente). Mientras el bloque `@@@HTML` sigue abierto,
+ * el campo directamente no existe, así que nunca hay riesgo de montar un
+ * diagrama a medio escribir. La sección todavía abierta (`section.streaming`)
+ * muestra el cursor parpadeante. Mismo criterio para `cloud.diagrams` (T77):
+ * el array solo contiene los diagramas YA cerrados (ver
+ * `DraftDidacticSection` en `shared/events.ts`).
  */
 function renderDraftSection(
   section: DraftDidacticSection,
@@ -365,19 +363,19 @@ function renderDraftSection(
         <WalkthroughBody cohorts={section.cohorts} onOpenLayer={onOpenLayer} />
       )}
       {section.streaming && <StreamingCursor />}
-      {(section.kind === 'architecture' || section.kind === 'schema') && section.mermaid && (
+      {(section.kind === 'architecture' || section.kind === 'schema') && section.diagram && (
         <ExpandableResource
           label={t('didactic.resources.expandDiagram')}
           onExpand={() => {
-            if (section.mermaid)
-              onExpand({ kind: 'mermaid', title: meta.title, code: section.mermaid })
+            if (section.diagram)
+              onExpand({ kind: 'diagram', title: meta.title, diagram: section.diagram })
           }}
         >
-          <MermaidDiagram key={section.mermaid} code={section.mermaid} framed={false} />
+          <DiagramView key={section.diagram.source} diagram={section.diagram} framed={false} />
         </ExpandableResource>
       )}
       {section.kind === 'cloud' &&
-        renderCloudDiagrams(section.mermaids ?? [], meta.title, onExpand, t)}
+        renderCloudDiagrams(section.diagrams ?? [], meta.title, onExpand, t)}
       {(section.kind === 'endpoint' || section.kind === 'setup') &&
         section.snippets.map((snippet, i) => (
           <CodeSnippet

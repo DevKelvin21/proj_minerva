@@ -5,19 +5,20 @@ import { useResolvedAppearance } from '../../stores/appearance-store'
 import { mermaidInk, mermaidThemeConfig, type MermaidInk } from '../../theme/mermaid-theme'
 import { Skeleton } from '../ui/Skeleton'
 import { Callout } from '../ui/Callout'
+import type { DiagramSize } from './diagram-size'
 
 interface MermaidDiagramProps {
   code: string
   /**
-   * Modo lightbox (`MermaidZoomPan`): fija el SVG a su tamaño natural (el de
+   * Modo lightbox (`DiagramZoomPan`): fija el SVG a su tamaño natural (el de
    * su viewBox, en px) en vez del `width:100%` + `max-width` con el que lo
    * emite mermaid. Necesario porque el wrapper del visor es `absolute` con
    * ancho shrink-to-fit: con `width:100%` el SVG colapsaba a 0px y el visor
    * se veía vacío.
    */
   naturalSize?: boolean
-  /** Se dispara cuando el SVG ya está montado en el DOM (para auto-ajustar zoom). */
-  onRendered?: () => void
+  /** Fires once the SVG is in the DOM, with its viewBox size (to fit the zoom). */
+  onRendered?: (size: DiagramSize) => void
   /**
    * `false` drops the bordered box: the analysis cards draw the diagram
    * straight on the card (no box inside a box). Default `true` (the Files
@@ -201,9 +202,9 @@ const BASE_MERMAID_CONFIG: MermaidConfig = {
 }
 
 /**
- * Renderiza un diagrama Mermaid (C4, `erDiagram`, ...) generado por la IA a
- * partir del DSL de texto — la IA nunca dibuja, solo escribe Mermaid (ver
- * `CLAUDE.md`). Si el parse falla (DSL inválido, p. ej. por un modelo real
+ * Renders a legacy Mermaid diagram (C4, `erDiagram`, ...): analyses persisted
+ * before HTML diagrams (`main/ai/legacy-diagrams.ts`). New analyses go
+ * through `HtmlDiagram`. Si el parse falla (DSL inválido, p. ej. por un modelo real
  * que alucine sintaxis), cae a una tarjeta con el código fuente en vez de
  * romper el panel.
  *
@@ -258,13 +259,14 @@ export function MermaidDiagram({
   // vez (StrictMode): el consumidor debe ser idempotente.
   useEffect(() => {
     if (!svg) return
-    if (containerRef.current?.querySelector('svg')) onRendered?.()
+    const viewBox = containerRef.current?.querySelector('svg')?.viewBox.baseVal
+    if (viewBox) onRendered?.({ width: viewBox.width, height: viewBox.height })
   }, [svg, onRendered])
 
   if (failed) {
     return (
       <Callout tone="warning">
-        <p className="mb-2 font-medium">{t('didactic.mermaid.unrenderable')}</p>
+        <p className="mb-2 font-medium">{t('didactic.diagram.unrenderable')}</p>
         <pre className="overflow-x-auto text-[11px] whitespace-pre-wrap text-muted">{code}</pre>
       </Callout>
     )

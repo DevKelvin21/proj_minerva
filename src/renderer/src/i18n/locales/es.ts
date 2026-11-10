@@ -1199,8 +1199,9 @@ export const es: MessageShape<typeof en> = {
     modelHint: {
       title: 'Proveedor y modelo activos: {{summary}}',
     },
-    mermaid: {
+    diagram: {
       unrenderable: 'Diagrama no renderizable.',
+      frameTitle: 'Diagrama',
       zoomOut: 'Reducir zoom',
       zoomIn: 'Aumentar zoom',
       fit: 'Ajustar al contenedor',

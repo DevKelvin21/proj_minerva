@@ -15,33 +15,45 @@
  * - `@@@SECTION kind=<summary|setup|architecture|endpoint|schema|cloud>` abre
  *   una sección nueva (cierra la anterior, si había una abierta). Todo texto
  *   hasta el próximo marcador es markdown de esa sección.
- * - `@@@MERMAID` / `@@@END_MERMAID` delimitan el Mermaid de la sección
- *   ACTUALMENTE abierta. Mientras el bloque no cerró, su contenido no es
- *   observable desde `snapshot()` bajo ninguna forma: evita que el renderer
- *   intente montar un diagrama a medio escribir (ver `DraftDidacticSection`
- *   en `../../shared/events.ts`). En `architecture`/`schema` hay a lo sumo UN
- *   bloque; en `cloud` puede haber hasta DOS (big picture + zoom al cambio),
- *   acumulados en `mermaids[]` en orden de cierre.
+ * - `@@@HTML` / `@@@END_HTML` delimit a diagram (an HTML + inline SVG
+ *   fragment) of the CURRENTLY open section or walkthrough layer. The legacy
+ *   `@@@MERMAID` / `@@@END_MERMAID` pair is still parsed the same way (the
+ *   mock serializes old analyses with it and a model may fall back to it);
+ *   each block records its format. While a block has not closed, its content
+ *   is not observable from `snapshot()` in any form: the renderer never mounts
+ *   a half-written diagram (see `DraftDidacticSection` in
+ *   `../../shared/events.ts`). `architecture`/`schema` hold at most ONE block;
+ *   `cloud` up to TWO (big picture + zoom), in `diagrams[]` in closing order.
+ *   An end marker of the other format (`@@@END_MERMAID` inside `@@@HTML`) is
+ *   content of the open block, not a close.
  * - `@@@SNIPPET label=... language=...` / `@@@END_SNIPPET` delimitan un
- *   snippet de una sección `endpoint` o `setup`; mismo criterio que el Mermaid.
+ *   snippet de una sección `endpoint` o `setup`; mismo criterio que el diagrama.
  *
  * Tolerancia (nunca lanza durante el streaming; solo `finalize()` puede
  * lanzar, y solo si NINGUNA sección sobrevive):
  * - Texto antes de la primera sección: se ignora.
  * - Un marcador desconocido (línea que empieza con `@@@` pero no matchea
  *   ningún patrón reconocido): se trata como texto normal de lo que esté
- *   abierto en ese momento (markdown / mermaid / snippet, según corresponda).
+ *   abierto en ese momento (markdown / diagrama / snippet, según corresponda).
  * - `kind` que no es uno de los seis válidos: la sección se sigue
  *   parseando igual (para no desincronizar el resto del stream con el resto
  *   de marcadores) pero se descarta por completo al construir cualquier
  *   snapshot o el resultado final.
- * - Un `@@@SECTION` que llega con un mermaid/snippet todavía sin cerrar:
+ * - Un `@@@SECTION` que llega con un diagrama/snippet todavía sin cerrar:
  *   el bloque parcial se descarta (nunca se cuela a medio cerrar).
  */
-import type { DidacticSection, DidacticSnippet, WalkthroughFileRef } from '../../shared/types'
+import type {
+  DiagramFormat,
+  DidacticDiagram,
+  DidacticSection,
+  DidacticSnippet,
+  WalkthroughFileRef,
+} from '../../shared/types'
 import type { DraftDidacticSection } from '../../shared/events'
 import {
+  MAX_DIAGRAM_SOURCE_CHARS,
   buildCohorts,
+  mapDiagram,
   mapLayer,
   mapRawSection,
   mapSnippet,
@@ -68,26 +80,33 @@ function isKnownKind(kind: string): kind is KnownKind {
 interface SectionAcc {
   kind: string
   markdown: string
-  /** Presente solo si ya cerró un bloque `@@@MERMAID`/`@@@END_MERMAID` para esta sección. */
-  mermaid?: string
-  /** Solo para `kind: 'cloud'`: cada bloque `@@@MERMAID` ya cerrado, en orden de aparición (hasta 2). */
-  mermaids: string[]
+  /** Present only once a diagram block of this section closed. */
+  diagram?: DidacticDiagram
+  /** Only for `kind: 'cloud'`: every closed diagram block, in order (up to 2). */
+  diagrams: DidacticDiagram[]
   snippets: DidacticSnippet[]
   /**
    * Solo para `kind: 'walkthrough'`: una entrada por `@@@LAYER` recibido, en
-   * orden. Mientras hay al menos una, el markdown y el mermaid de la sección
+   * orden. Mientras hay al menos una, el markdown y el diagrama de la sección
    * van a la ÚLTIMA capa, no a la sección (su `markdown` es solo la intro
    * previa a la primera capa).
    */
   layers: RawWalkthroughLayer[]
 }
 
-type Mode = 'idle' | 'section' | 'mermaid' | 'snippet'
+type Mode = 'idle' | 'section' | 'diagram' | 'snippet'
 
 const SECTION_RE = /^@@@SECTION\s+kind=(\S+)\s*$/
 const LAYER_RE = /^@@@LAYER(?:\s+(.*))?$/
-const MERMAID_START_RE = /^@@@MERMAID\s*$/
-const MERMAID_END_RE = /^@@@END_MERMAID\s*$/
+const DIAGRAM_START_RE = /^@@@(HTML|MERMAID)\s*$/
+const DIAGRAM_END_RE = /^@@@END_(HTML|MERMAID)\s*$/
+
+/** Marker word of each diagram format (`@@@HTML` / `@@@END_HTML`, ...). */
+const DIAGRAM_MARKER: Record<DiagramFormat, string> = { html: 'HTML', mermaid: 'MERMAID' }
+
+function formatOfMarker(word: string): DiagramFormat {
+  return word === 'HTML' ? 'html' : 'mermaid'
+}
 const SNIPPET_START_RE = /^@@@SNIPPET(?:\s+(.*))?$/
 const SNIPPET_END_RE = /^@@@END_SNIPPET\s*$/
 const ATTR_RE = /(\w+)=(?:"([^"]*)"|(\S+))/g
@@ -128,14 +147,14 @@ function toDraft(acc: SectionAcc, streaming: boolean): DraftDidacticSection | nu
       kind: acc.kind,
       markdown: acc.markdown,
       ...streamingFlag,
-      ...(acc.mermaid !== undefined ? { mermaid: acc.mermaid } : {}),
+      ...(acc.diagram !== undefined ? { diagram: acc.diagram } : {}),
     }
   }
   if (acc.kind === 'cloud') {
     return {
       kind: 'cloud',
       markdown: acc.markdown,
-      mermaids: acc.mermaids,
+      diagrams: acc.diagrams,
       ...streamingFlag,
     }
   }
@@ -153,7 +172,8 @@ export class StreamSectionParser {
   private closedSections: SectionAcc[] = []
   private current: SectionAcc | null = null
   private mode: Mode = 'idle'
-  private mermaidBuf = ''
+  private diagramBuf = ''
+  private diagramFormat: DiagramFormat = 'html'
   private snippetBuf = ''
   private snippetMeta: { label: string; language: string } | null = null
 
@@ -210,8 +230,8 @@ export class StreamSectionParser {
       const mapped = mapRawSection({
         kind: acc.kind,
         markdown: acc.markdown,
-        mermaid: acc.mermaid,
-        mermaids: acc.mermaids,
+        diagram: acc.diagram,
+        diagrams: acc.diagrams,
         snippets: acc.snippets,
         layers: acc.layers,
       })
@@ -237,7 +257,7 @@ export class StreamSectionParser {
         const kind = SECTION_RE.exec(clean)![1]
         this.discardOpenBlock()
         this.closeCurrentSection()
-        this.current = { kind, markdown: '', snippets: [], mermaids: [], layers: [] }
+        this.current = { kind, markdown: '', snippets: [], diagrams: [], layers: [] }
         this.mode = 'section'
         return
       }
@@ -258,35 +278,29 @@ export class StreamSectionParser {
         }
         return
       }
-      if (MERMAID_START_RE.test(clean)) {
+      if (this.mode === 'diagram') {
+        // Inside a diagram only its own end marker means something (a
+        // `@@@SECTION`/`@@@LAYER` above already discarded it); any other
+        // `@@@` line, including the other format's end, is content.
+        const end = DIAGRAM_END_RE.exec(clean)
+        if (end && formatOfMarker(end[1]) === this.diagramFormat) {
+          this.closeDiagram()
+          return
+        }
+        this.appendContentLine(clean)
+        return
+      }
+      const start = DIAGRAM_START_RE.exec(clean)
+      if (start) {
         if (this.current) {
-          this.mode = 'mermaid'
-          this.mermaidBuf = ''
+          this.mode = 'diagram'
+          this.diagramFormat = formatOfMarker(start[1])
+          this.diagramBuf = ''
         }
         return
       }
-      if (MERMAID_END_RE.test(clean)) {
-        if (this.mode === 'mermaid' && this.current) {
-          // A diferencia del snippet (abajo), se conserva el `\n` final que
-          // deja la última línea acumulada: los diagramas Mermaid de las
-          // fixtures (y el DSL típico que produce un modelo) suelen incluir
-          // ese salto de línea de cierre, y `mermaid.render()` lo tolera sin
-          // problema.
-          const lastLayer = this.current.layers[this.current.layers.length - 1]
-          if (this.current.kind === 'cloud') {
-            // Hasta DOS bloques por sección, acumulados en orden de cierre.
-            this.current.mermaids.push(this.mermaidBuf)
-          } else if (this.current.kind === 'walkthrough' && lastLayer) {
-            // El diagrama pertenece a la capa abierta, no a la sección.
-            lastLayer.mermaid = this.mermaidBuf
-          } else {
-            this.current.mermaid = this.mermaidBuf
-          }
-        }
-        this.mermaidBuf = ''
-        this.mode = this.current ? 'section' : 'idle'
-        return
-      }
+      // A stray end marker outside a diagram is ignored.
+      if (DIAGRAM_END_RE.test(clean)) return
       if (SNIPPET_START_RE.test(clean)) {
         if (this.current) {
           const attrs = parseAttrs(SNIPPET_START_RE.exec(clean)![1])
@@ -317,9 +331,33 @@ export class StreamSectionParser {
     this.appendContentLine(clean)
   }
 
+  /** Closes the open diagram block and files it under the section, its last layer or `diagrams`. */
+  private closeDiagram(): void {
+    const current = this.current
+    // Unlike snippets (below) the trailing newline of the last line is kept:
+    // Mermaid tolerates it and HTML does not care.
+    const diagram = mapDiagram({ format: this.diagramFormat, source: this.diagramBuf })
+    this.diagramBuf = ''
+    this.mode = current ? 'section' : 'idle'
+    // Empty or over the size cap: dropped, the section stays.
+    if (!current || !diagram) return
+    const lastLayer = current.layers[current.layers.length - 1]
+    if (current.kind === 'cloud') {
+      current.diagrams.push(diagram)
+    } else if (current.kind === 'walkthrough' && lastLayer) {
+      // The diagram belongs to the open layer, not to the section.
+      lastLayer.diagram = diagram
+    } else {
+      current.diagram = diagram
+    }
+  }
+
   private appendContentLine(line: string): void {
-    if (this.mode === 'mermaid') {
-      this.mermaidBuf += line + '\n'
+    if (this.mode === 'diagram') {
+      // Past the cap the block is already lost (`mapDiagram` drops it on
+      // close): stop buffering so a block that never closes cannot grow
+      // without bound.
+      if (this.diagramBuf.length <= MAX_DIAGRAM_SOURCE_CHARS) this.diagramBuf += line + '\n'
       return
     }
     if (this.mode === 'snippet') {
@@ -338,9 +376,9 @@ export class StreamSectionParser {
     // mode === 'idle': texto huérfano antes de la primera sección, se ignora.
   }
 
-  /** Descarta un mermaid/snippet sin cerrar antes de abrir la próxima sección: nunca se cuela a medio cerrar. */
+  /** Descarta un diagrama/snippet sin cerrar antes de abrir la próxima sección: nunca se cuela a medio cerrar. */
   private discardOpenBlock(): void {
-    this.mermaidBuf = ''
+    this.diagramBuf = ''
     this.snippetBuf = ''
     this.snippetMeta = null
   }
@@ -383,6 +421,11 @@ function attrValue(value: string): string {
   return value.replace(/["\r\n]/g, ' ').trim()
 }
 
+function diagramToText(diagram: DidacticDiagram): string {
+  const word = DIAGRAM_MARKER[diagram.format]
+  return '@@@' + word + '\n' + diagram.source.trimEnd() + '\n@@@END_' + word + '\n'
+}
+
 function sectionToText(section: DidacticSection): string {
   // El markdown de un walkthrough es una intro OPCIONAL: vacío ⇒ sin línea
   // en blanco, para que el round-trip devuelva '' y no '\n'.
@@ -401,19 +444,17 @@ function sectionToText(section: DidacticSection): string {
           fileRefsToAttr(layer.files) +
           '"\n'
         if (layer.markdown.trimEnd().length > 0) out += layer.markdown.trimEnd() + '\n'
-        if (layer.mermaid) out += '@@@MERMAID\n' + layer.mermaid.trimEnd() + '\n@@@END_MERMAID\n'
+        if (layer.diagram) out += diagramToText(layer.diagram)
       }
     }
   }
 
   if (section.kind === 'architecture' || section.kind === 'schema') {
-    out += '@@@MERMAID\n' + section.mermaid.trimEnd() + '\n@@@END_MERMAID\n'
+    out += diagramToText(section.diagram)
   }
 
   if (section.kind === 'cloud') {
-    for (const mermaid of section.mermaids) {
-      out += '@@@MERMAID\n' + mermaid.trimEnd() + '\n@@@END_MERMAID\n'
-    }
+    for (const diagram of section.diagrams) out += diagramToText(diagram)
   }
 
   if (section.kind === 'endpoint' || section.kind === 'setup') {

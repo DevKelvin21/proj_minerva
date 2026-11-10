@@ -55,42 +55,39 @@ test('desacoplar: cierra el panel, muestra cache sin click, visor y reutilizaci�
   await expect(detached.getByRole('button', { name: /Re-?analyze/i })).toBeVisible()
 
   // Visor de recursos: el análisis mock del #482 trae diagrama ⇒ expandir
-  // debe abrir el overlay con zoom y el SVG visible dentro (el gotcha del
-  // visor colapsado a 0px que pasaba los checks geométricos).
+  // debe abrir el overlay con zoom y el diagrama visible dentro (el gotcha
+  // del visor colapsado a 0px que pasaba los checks geométricos).
   await openInsightTab(detached, 'Architecture')
   await detached.locator('button[aria-label="Expand diagram"]').first().click()
   const overlay = detached.locator('.fixed.inset-0')
   await expect(overlay).toBeVisible()
   await expect(detached.getByText(/^\d+%$/).first()).toBeVisible()
-  const overlaySvg = overlay.locator('svg[id*="mermaid"], svg[aria-roledescription]').first()
-  await expect(overlaySvg).toBeVisible({ timeout: 10_000 })
-  // Find the diagram AND measure it in one page-side step, polled. Measuring
-  // through a locator (`boundingBox()`, `evaluate`) resolves the element in
-  // one round trip and measures it in another: the viewer swaps the SVG node
-  // shortly after it first shows, and a node swapped in between measures as
-  // detached (`boundingBox()` null, no `closest()` ancestor, height 0) while
-  // the page shows the diagram at full size.
+  await expect(overlay.locator('[data-testid="html-diagram"]')).toBeVisible({ timeout: 10_000 })
+  // Find the diagram AND measure it in one page-side step, polled (the
+  // viewer can swap the node right after it first shows).
   await expect
     .poll(
       () =>
         detached.evaluate(() => {
-          const svg = document.querySelector(
-            '.fixed.inset-0 svg[id*="mermaid"], .fixed.inset-0 svg[aria-roledescription]',
+          const frame = document.querySelector<HTMLIFrameElement>(
+            '.fixed.inset-0 [data-testid="html-diagram"]',
           )
-          const zoomArea = svg?.closest('[class*="overflow-hidden"]')
-          const svgWidth = svg?.getBoundingClientRect().width ?? 0
+          const zoomArea = frame?.closest('[class*="overflow-hidden"]')
+          const frameWidth = frame?.getBoundingClientRect().width ?? 0
           const zoomAreaHeight = zoomArea?.getBoundingClientRect().height ?? 0
+          const nodes = frame?.contentDocument?.querySelectorAll('.node').length ?? 0
           // The numbers ride along so a failure says what was measured.
           return {
-            svgSized: svgWidth > 100,
+            frameSized: frameWidth > 100,
             zoomAreaTall: zoomAreaHeight > 300,
-            svgWidth: Math.round(svgWidth),
+            hasNodes: nodes > 0,
+            frameWidth: Math.round(frameWidth),
             zoomAreaHeight: Math.round(zoomAreaHeight),
           }
         }),
       { message: 'diagrama con tamaño real, en un área de zoom no colapsada' },
     )
-    .toMatchObject({ svgSized: true, zoomAreaTall: true })
+    .toMatchObject({ frameSized: true, zoomAreaTall: true, hasNodes: true })
 
   await attachScreenshot(detached, testInfo, 'detached-viewer-482')
 

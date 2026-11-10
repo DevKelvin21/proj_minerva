@@ -96,15 +96,22 @@ commit** and the model explores it with **read-only tools**. Jails: OpenCode
   > default `opencode/big-pickle`. Model catalogs are dynamic (asked from each CLI,
   `main/ai/providers/*-model-catalog.ts`); `src/shared/ai-providers.ts` is only a fallback.
 - Streaming: SSE in main + tagged section protocol (`@@@SECTION kind=…`,
-  `@@@MERMAID…@@@END_MERMAID`, `@@@SNIPPET…`) parsed by `StreamSectionParser`, pushed
+  `@@@HTML…@@@END_HTML`, `@@@SNIPPET…`) parsed by `StreamSectionParser`, pushed
   via `onAnalysisProgress`. Do not return to monolithic JSON. 20-entry LRU analysis
   cache in main; prompts in `src/main/ai/prompts/`.
-- Mermaid renders in the renderer (lazy, `securityLevel: 'strict'`); the AI writes
-  Mermaid text, it does not draw.
+- **Diagrams are AI-written HTML + inline SVG** (`DidacticDiagram { format, source }`), drawn by
+  `HtmlDiagram.tsx` in a srcdoc iframe: `sandbox="allow-same-origin"` WITHOUT `allow-scripts`
+  (never add it: the source is model output after reading a hostile PR), its own no-network CSP
+  and `sanitizeDiagramHtml` (`lib/diagram-document.ts`). The model writes with the diagram kit
+  (`shared/diagram-kit.ts`: classes + theme variables, injected into every frame; the prompt
+  test fails if it names a class the kit lacks). Never hard-code colors in the kit or the
+  fixtures (`main/ai/fixtures-diagrams.ts`). Mermaid stays ONLY for analyses persisted before
+  the switch (`main/ai/legacy-diagrams.ts` upgrades them on load; `MermaidDiagram`, lazy,
+  `securityLevel: 'strict'`); the prompt never asks for it.
 - **Guided walkthrough** (CodeRabbit "Change Stack" style): the mandatory `walkthrough`
   section (2nd, after `summary`) groups the PR into cohorts of ordered layers via
   `@@@LAYER cohort="…" title="…" files="path:12-40,55;other.ts"` markers; the markdown and an
-  optional `@@@MERMAID` after a marker belong to that layer. Ranges are NEW-file lines
+  optional `@@@HTML` after a marker belong to that layer. Ranges are NEW-file lines
   (OLD-file for deleted files); `section-mapper.ts` drops layers without title/files. The
   Files tab's third left-column mode (`fileTreeMode: 'layers'`, `LayerNavigator` +
   `LayerContextBar`, J/K keys) consumes it through `useWalkthrough` (same analysis as the
@@ -122,7 +129,7 @@ commit** and the model explores it with **read-only tools**. Jails: OpenCode
 - The preload exposes concrete functions (`window.minerva.*`), never raw `ipcRenderer`;
   one concrete method per push event.
 - Main validates each channel's payload (`src/main/ipc/validators.ts`).
-- Explicit CSP in `src/renderer/index.html`; `data:` is needed for Mermaid C4 sprites,
+- Explicit CSP in `src/renderer/index.html`; `data:` is needed for (legacy) Mermaid C4 sprites,
   `https:` for avatars/comment images.
 - PR content (titles, diffs, comments) is **untrusted**: prompt injection when building
   prompts, no raw HTML when rendering (react-markdown).
@@ -174,7 +181,8 @@ author's Spanish logs, not maintained)
   on accent fills, `text-success|danger|warning|merged|info`, `bg-diff-add|del`); they point
   at `--theme-*` vars set on `<html>` (`styles.css`). Light/dark-only CSS keys off
   `:root[data-appearance]`. Shiki tokens carry both colors (`tokenClass`/`tokenStyle`).
-  Mermaid re-renders with `theme/mermaid-theme.ts`; C4's hard-coded `#444444` is recolored.
+  HTML diagrams rebuild their frame with `themeCssVariables` (the kit maps them to `--text`,
+  `--accent`, …); legacy Mermaid re-renders with `theme/mermaid-theme.ts`.
 - **Brand mark** (the merge owl): one definition in `src/shared/brand-mark.ts` feeds
   `ui/BrandMark.tsx` (title bar, `currentColor`) and the app icons. After changing it run
   `node scripts/build-app-icons.mjs` (macOS: writes `build/icon.svg|icns|ico|png`, wired in
@@ -216,8 +224,10 @@ author's Spanish logs, not maintained)
 3. No **backticks** as delimiters in long main strings (same plugin regex); concatenate quotes.
 4. Electron binary missing after install: `node node_modules/electron/install.js`.
 5. Kill the app with `pkill -f "[e]lectron"` alone in its own command (in a compound command it can kill your shell, exit 144).
-6. `architecture-beta` `[Label]`s accept only letters, digits and spaces.
-7. Mermaid icon packs load via dynamic `import()` in `MermaidDiagram.tsx` (static import of `@iconify-json/logos` adds ~7 MB); packs are local because CSP is `connect-src 'self'`.
+6. HTML diagram frames are measured from the parent (`contentDocument`, same origin): a hidden
+   tab measures 0, so `HtmlDiagram` re-measures on width changes. In e2e, reach inside with
+   `htmlDiagrams(scope).first().contentFrame()` (`e2e/fixtures.ts`).
+7. (Legacy Mermaid) icon packs load via dynamic `import()` in `MermaidDiagram.tsx` (static import of `@iconify-json/logos` adds ~7 MB); packs are local because CSP is `connect-src 'self'`.
 8. The mock snapshot is cached on disk by `headSha`: after editing `fixtures-snapshot.ts`, delete the `userData/snapshots/` entry and restart the app.
 9. **E2E: never `_electron.launch`** (`close()` hangs, playwright#39248). `e2e/fixtures.ts` spawns Electron with `--remote-debugging-port=0` and uses `connectOverCDP`.
 10. Measure nodes with the callback ref of `useElementWidth`, not `useRef` + `useEffect([])` (early returns leave the ref null).

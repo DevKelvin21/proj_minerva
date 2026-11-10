@@ -142,6 +142,28 @@ describe('AnalysisStore', () => {
     expect(entry.analysis.prId).toBe('legacy')
   })
 
+  it('upgrades a Mermaid-era entry to mermaid diagrams on load', () => {
+    const legacy = {
+      ...analysis('mermaid-era'),
+      sections: [
+        { kind: 'summary', markdown: 's' },
+        { kind: 'architecture', markdown: 'a', mermaid: 'C4Context\n' },
+      ],
+    }
+    writeFileSync(
+      analysesFilePath(),
+      JSON.stringify({ version: 2, entries: [{ key: 'shopwave/api#9', analysis: legacy }] }),
+      'utf-8',
+    )
+
+    const [entry] = new AnalysisStore().loadEntries()
+    expect(entry.analysis.sections[1]).toEqual({
+      kind: 'architecture',
+      markdown: 'a',
+      diagram: { format: 'mermaid', source: 'C4Context\n' },
+    })
+  })
+
   it('keeps the recorded language and drops an entry with an unknown one', () => {
     const english = { key: 'shopwave/api#1', analysis: analysis('en', { language: 'en' }) }
     const spanish = { key: 'shopwave/api#2', analysis: analysis('es', { language: 'es' }) }

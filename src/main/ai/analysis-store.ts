@@ -28,6 +28,9 @@
  * entries que no validan se DESCARTAN sin tumbar las demás (defensivo ante,
  * p. ej., una versión vieja de la app que persistió una forma distinta).
  *
+ * Entries from before HTML diagrams store Mermaid as bare strings; they are
+ * upgraded on load (`./legacy-diagrams.ts`) and keep rendering with Mermaid.
+ *
  * `analysis.language` (i18n): entries written before it existed have no field
  * and were generated with the Spanish prompt, so they load as `es` (the
  * renderer then offers to regenerate in English). A present but unknown
@@ -39,6 +42,7 @@ import { app } from 'electron'
 import { isAiProviderId } from '../../shared/ai-providers'
 import { isAppLocale } from '../../shared/locale'
 import type { AnalysisGenerationInfo, DidacticAnalysis, DidacticSection } from '../../shared/types'
+import { normalizeStoredSection } from './legacy-diagrams'
 
 const ANALYSES_FILE_NAME = 'analyses.json'
 
@@ -69,6 +73,10 @@ interface PersistedAnalyses {
 export interface AnalysisStoreLike {
   loadEntries(): AnalysisStoreEntry[]
   saveEntries(entries: AnalysisStoreEntry[]): void
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -118,8 +126,17 @@ function isPersistedAnalysis(value: unknown): value is Omit<DidacticAnalysis, 'l
 function toValidEntry(value: unknown): AnalysisStoreEntry | null {
   if (typeof value !== 'object' || value === null) return null
   const v = value as Record<string, unknown>
-  if (!isNonEmptyString(v.key) || !isPersistedAnalysis(v.analysis)) return null
-  return { key: v.key, analysis: { ...v.analysis, language: v.analysis.language ?? 'es' } }
+  if (!isNonEmptyString(v.key) || !isRecord(v.analysis)) return null
+  // Mermaid-era entries keep loading (their bare strings become diagrams),
+  // and every diagram is re-checked like a fresh one.
+  const analysis = Array.isArray(v.analysis.sections)
+    ? {
+        ...v.analysis,
+        sections: v.analysis.sections.map(normalizeStoredSection).filter((s) => s !== null),
+      }
+    : v.analysis
+  if (!isPersistedAnalysis(analysis)) return null
+  return { key: v.key, analysis: { ...analysis, language: analysis.language ?? 'es' } }
 }
 
 /** Forma superficial del archivo (antes de validar cada entry individualmente). */

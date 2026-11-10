@@ -1186,8 +1186,9 @@ export const en = {
     modelHint: {
       title: 'Active provider and model: {{summary}}',
     },
-    mermaid: {
+    diagram: {
       unrenderable: 'This diagram could not be rendered.',
+      frameTitle: 'Diagram',
       zoomOut: 'Zoom out',
       zoomIn: 'Zoom in',
       fit: 'Fit to container',
