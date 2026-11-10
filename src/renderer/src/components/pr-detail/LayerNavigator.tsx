@@ -164,7 +164,7 @@ export function LayerNavigator({
                             {t('prDetail.layers.commentCount', { count: comments })}
                           </span>
                         )}
-                        {layer.mermaid && <Icon icon={icons.diagram} size="xs" />}
+                        {layer.diagram && <Icon icon={icons.diagram} size="xs" />}
                       </span>
                     </span>
                   </button>

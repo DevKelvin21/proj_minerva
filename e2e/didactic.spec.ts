@@ -1,4 +1,4 @@
-import { test, expect, attachScreenshot, openInsightTab, openAnalysisTab } from './fixtures'
+import { test, expect, attachScreenshot, openInsightTab, openAnalysisTab, htmlDiagrams } from './fixtures'
 import type { Page } from './fixtures'
 
 /**
@@ -52,9 +52,17 @@ test('PR #482: resumen, endpoint con snippet y diagrama C4', async ({ window }, 
   await expect(window.locator('pre', { hasText: 'curl' }).first()).toBeVisible()
   await expect(window.getByRole('button', { name: /Copy/ }).first()).toBeVisible()
   await expect(card).toHaveCount(0)
-  // Architecture tab: the Mermaid diagram renders as SVG (lazy ⇒ expect timeout).
+  // Architecture tab: the HTML diagram, with its real content and the change marked.
   await openInsightTab(window, 'Architecture')
-  await expect(window.locator('svg[aria-roledescription]').first()).toBeVisible()
+  const architecture = htmlDiagrams(window).first()
+  await expect(architecture).toBeVisible()
+  await expect(architecture.contentFrame().locator('.node.new', { hasText: 'CouponService' })).toBeVisible()
+  await expect(architecture.contentFrame().getByText('delegates validation')).toBeVisible()
+  // Sandboxed without scripts, behind its own no-network CSP.
+  await expect(architecture).toHaveAttribute('sandbox', 'allow-same-origin')
+  await expect(
+    architecture.contentFrame().locator('meta[http-equiv="Content-Security-Policy"]'),
+  ).toHaveAttribute('content', /default-src 'none'/)
   await attachScreenshot(window, testInfo, 'pr-482-didactic-architecture')
 })
 
@@ -70,9 +78,9 @@ test('PR #479: esquema con diagrama ER y setup sin env vars', async ({ window },
   // Data tab: the ER diagram.
   await openInsightTab(window, 'Data')
   await expect(window.getByText('refunds').first()).toBeVisible()
-  await expect(
-    window.locator('svg[aria-roledescription="er"], svg[id*="mermaid"]').first(),
-  ).toBeVisible()
+  const schema = htmlDiagrams(window).first().contentFrame()
+  await expect(schema.locator('table.entity.new caption', { hasText: 'refunds' })).toBeVisible()
+  await expect(schema.locator('tr.new', { hasText: 'amount_cents' })).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'pr-479-didactic')
 })
@@ -81,7 +89,9 @@ test('PR #201: sección de arquitectura con diagrama', async ({ window }, testIn
   await analyze(window, 'Refactor checkout state machine')
 
   await openInsightTab(window, 'Architecture')
-  await expect(window.locator('svg[aria-roledescription]').first()).toBeVisible()
+  const diagram = htmlDiagrams(window).first().contentFrame()
+  await expect(diagram.locator('.node.new', { hasText: 'checkoutReducer' })).toBeVisible()
+  await expect(diagram.locator('.node.removed', { hasText: 'CheckoutMachine' })).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'pr-201-didactic')
 })

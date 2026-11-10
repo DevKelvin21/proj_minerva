@@ -58,7 +58,10 @@ test('layers view offers the analysis, then lists cohorts and layers with their 
   await expect(window.locator('[data-layer-line][data-new-line="20"]').first()).toBeVisible()
   await expect(window.locator('[data-layer-line][data-new-line="13"]').first()).toBeVisible()
   await context.getByRole('button', { name: 'Show diagram' }).click()
-  await expect(context.locator('svg[aria-roledescription]').first()).toBeVisible({ timeout: 20_000 })
+  // The layer's call sequence, as an HTML diagram with the new steps marked.
+  const sequence = context.locator('[data-testid="html-diagram"]').first()
+  await expect(sequence).toBeVisible()
+  await expect(sequence.contentFrame().locator('ol.steps li.new', { hasText: 'apply(cart, code)' })).toBeVisible()
 
   await attachScreenshot(window, testInfo, 'walkthrough-layer-2')
 

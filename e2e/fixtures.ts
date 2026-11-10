@@ -249,6 +249,19 @@ export async function openInsightTab(page: Page, name: string): Promise<void> {
   await page.getByTestId('insight-tabs').first().getByRole('tab', { name, exact: true }).click()
 }
 
+/** The analysis' HTML diagrams: sandboxed srcdoc iframes (`HtmlDiagram.tsx`). */
+export function htmlDiagrams(scope: Page | Locator): Locator {
+  return scope.locator('[data-testid="html-diagram"]')
+}
+
+/** A theme property as the diagram's own document resolves it (its <style> carries the window's theme). */
+export function diagramVar(diagram: Locator, name: string): Promise<string> {
+  return diagram.evaluate(
+    (el, n) => getComputedStyle((el as HTMLIFrameElement).contentDocument!.documentElement).getPropertyValue(n).trim(),
+    name,
+  )
+}
+
 /** Unfolds a diff thread (they start folded to their one-line header). No-op when open. */
 export async function expandThread(thread: Locator): Promise<void> {
   const toggle = thread.locator('button[aria-expanded]').first()

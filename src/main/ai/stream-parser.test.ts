@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { StreamSectionParser, stringifySections } from './stream-parser'
 import { richDidacticSections } from './fixtures'
-import type { DidacticSection } from '../../shared/types'
+import type { DidacticDiagram, DidacticSection } from '../../shared/types'
+
+/** A legacy Mermaid diagram, as the parser records a `@@@MERMAID` block. */
+const mermaid = (source: string): DidacticDiagram => ({ format: 'mermaid', source })
+const mermaids = (...sources: string[]): DidacticDiagram[] => sources.map(mermaid)
+/** An HTML diagram, as the parser records a `@@@HTML` block. */
+const html = (source: string): DidacticDiagram => ({ format: 'html', source })
 
 /** Empuja `text` a `parser` en `n` trozos de tamaño parejo, cortando en cualquier punto (incluso a mitad de un marcador). */
 function pushInChunks(parser: StreamSectionParser, text: string, n: number): void {
@@ -64,7 +70,7 @@ describe('StreamSectionParser', () => {
     const section = snap[0]
     expect(section.kind).toBe('architecture')
     expect(section.markdown).toBe('texto antes')
-    expect('mermaid' in section).toBe(false)
+    expect('diagram' in section).toBe(false)
   })
 
   it('expone el mermaid recién cerrado, y permite markdown adicional después', () => {
@@ -78,7 +84,7 @@ describe('StreamSectionParser', () => {
       {
         kind: 'architecture',
         markdown: 'texto antes\ntexto después',
-        mermaid: 'C4Context\n  title x\n',
+        diagram: mermaid('C4Context\n  title x\n'),
         streaming: true,
       },
     ])
@@ -96,7 +102,7 @@ describe('StreamSectionParser', () => {
       {
         kind: 'architecture',
         markdown: 'intro',
-        mermaid: 'C4Container\n  title Impacto\n  Person(a, "A")\n',
+        diagram: mermaid('C4Container\n  title Impacto\n  Person(a, "A")\n'),
       },
     ])
   })
@@ -118,7 +124,7 @@ describe('StreamSectionParser', () => {
 
     const final = parser.finalize()
     expect(final).toEqual([
-      { kind: 'schema', markdown: 'texto', mermaid: 'erDiagram\n  A ||--o{ B : x\n' },
+      { kind: 'schema', markdown: 'texto', diagram: mermaid('erDiagram\n  A ||--o{ B : x\n') },
     ])
   })
 
@@ -251,7 +257,7 @@ describe('StreamSectionParser', () => {
         {
           kind: 'cloud',
           markdown: 'texto',
-          mermaids: ['C4Context\n  title big picture\n', 'C4Container\n  title zoom\n'],
+          diagrams: mermaids('C4Context\n  title big picture\n', 'C4Container\n  title zoom\n'),
         },
       ])
     })
@@ -264,7 +270,7 @@ describe('StreamSectionParser', () => {
 
       const final = parser.finalize()
       expect(final).toEqual([
-        { kind: 'cloud', markdown: 'texto', mermaids: ['C4Context\n  x\n'] },
+        { kind: 'cloud', markdown: 'texto', diagrams: mermaids('C4Context\n  x\n') },
       ])
     })
 
@@ -274,7 +280,7 @@ describe('StreamSectionParser', () => {
 
       const final = parser.finalize()
       expect(final).toEqual([
-        { kind: 'cloud', markdown: 'solo texto, sin diagramas', mermaids: [] },
+        { kind: 'cloud', markdown: 'solo texto, sin diagramas', diagrams: [] },
       ])
     })
 
@@ -284,14 +290,14 @@ describe('StreamSectionParser', () => {
 
       let snap = parser.snapshot()
       expect(snap).toEqual([
-        { kind: 'cloud', markdown: 'texto', mermaids: [], streaming: true },
+        { kind: 'cloud', markdown: 'texto', diagrams: [], streaming: true },
       ])
 
       parser.push('@@@MERMAID\nC4Context\n  big picture\n')
       snap = parser.snapshot()
       // Bloque todavía abierto: no entra al array.
       expect(snap).toEqual([
-        { kind: 'cloud', markdown: 'texto', mermaids: [], streaming: true },
+        { kind: 'cloud', markdown: 'texto', diagrams: [], streaming: true },
       ])
 
       parser.push('@@@END_MERMAID\n')
@@ -300,7 +306,7 @@ describe('StreamSectionParser', () => {
         {
           kind: 'cloud',
           markdown: 'texto',
-          mermaids: ['C4Context\n  big picture\n'],
+          diagrams: mermaids('C4Context\n  big picture\n'),
           streaming: true,
         },
       ])
@@ -311,7 +317,7 @@ describe('StreamSectionParser', () => {
         {
           kind: 'cloud',
           markdown: 'texto',
-          mermaids: ['C4Context\n  big picture\n', 'C4Container\n  zoom\n'],
+          diagrams: mermaids('C4Context\n  big picture\n', 'C4Container\n  zoom\n'),
           streaming: true,
         },
       ])
@@ -322,9 +328,9 @@ describe('StreamSectionParser', () => {
         {
           kind: 'cloud',
           markdown: 'La infra corre en AWS con CDN de Cloudflare.',
-          mermaids: [
-            'C4Context\n  title Infra actual\n  System(app, "App")\n',
-            'C4Container\n  title Zoom al cambio\n  Container(api, "API")\n',
+          diagrams: [
+            mermaid('C4Context\n  title Infra actual\n  System(app, "App")\n'),
+            html('<div class="box new">Zoom</div>\n'),
           ],
         },
       ]
@@ -339,7 +345,7 @@ describe('StreamSectionParser', () => {
 
     it('round-trip: sección cloud sin diagramas', () => {
       const original: DidacticSection[] = [
-        { kind: 'cloud', markdown: 'Sin cambios de infra en este PR.', mermaids: [] },
+        { kind: 'cloud', markdown: 'Sin cambios de infra en este PR.', diagrams: [] },
       ]
       const text = stringifySections(original)
 
@@ -438,7 +444,7 @@ describe('StreamSectionParser · walkthrough layers', () => {
                 title: 'Coupon service',
                 markdown: 'New `CouponService.apply`.',
                 files: [{ path: 'src/services/coupon-service.ts', ranges: [{ start: 1, end: 21 }] }],
-                mermaid: 'sequenceDiagram\n  A->>B: apply\n',
+                diagram: mermaid('sequenceDiagram\n  A->>B: apply\n'),
               },
               {
                 title: 'Route wiring',
@@ -515,5 +521,73 @@ describe('StreamSectionParser · walkthrough layers', () => {
     const again = new StreamSectionParser()
     again.push(stringifySections(final))
     expect(again.finalize()).toEqual(final)
+  })
+})
+
+describe('StreamSectionParser — HTML diagrams', () => {
+  it('parses an @@@HTML block as an html diagram, hidden until it closes', () => {
+    const parser = new StreamSectionParser()
+    parser.push('@@@SECTION kind=architecture\nprosa\n@@@HTML\n<div class="flow">\n')
+    expect(parser.snapshot()).toEqual([{ kind: 'architecture', markdown: 'prosa', streaming: true }])
+    parser.push('  <div class="box new">API</div>\n</div>\n@@@END_HTML\nmás prosa\n')
+    expect(parser.finalize()).toEqual([
+      {
+        kind: 'architecture',
+        markdown: 'prosa\nmás prosa',
+        diagram: html('<div class="flow">\n  <div class="box new">API</div>\n</div>\n'),
+      },
+    ])
+  })
+
+  it('treats other markers inside an open HTML block as content', () => {
+    const parser = new StreamSectionParser()
+    parser.push(
+      '@@@SECTION kind=schema\ntexto\n@@@HTML\n<p>a</p>\n@@@END_MERMAID\n@@@SNIPPET label=x language=bash\n@@@END_HTML\n',
+    )
+    expect(parser.finalize()).toEqual([
+      {
+        kind: 'schema',
+        markdown: 'texto',
+        diagram: html('<p>a</p>\n@@@END_MERMAID\n@@@SNIPPET label=x language=bash\n'),
+      },
+    ])
+  })
+
+  it('attaches an HTML block to the open walkthrough layer', () => {
+    const parser = new StreamSectionParser()
+    parser.push(
+      '@@@SECTION kind=walkthrough\n@@@LAYER cohort="C" title="L1" files="a.ts"\nresumen\n@@@HTML\n<svg></svg>\n@@@END_HTML\n',
+    )
+    const [section] = parser.finalize()
+    expect(section.kind === 'walkthrough' && section.cohorts[0].layers[0].diagram).toEqual(html('<svg></svg>\n'))
+  })
+
+  it('drops an empty HTML block without dropping the cloud section', () => {
+    const parser = new StreamSectionParser()
+    parser.push('@@@SECTION kind=cloud\ninfra\n@@@HTML\n\n@@@END_HTML\n@@@HTML\n<p>zoom</p>\n@@@END_HTML\n')
+    expect(parser.finalize()).toEqual([{ kind: 'cloud', markdown: 'infra', diagrams: [html('<p>zoom</p>\n')] }])
+  })
+
+  it('round-trips html and mermaid diagrams through stringifySections', () => {
+    const original: DidacticSection[] = [
+      { kind: 'architecture', markdown: 'a', diagram: html('<div class="box">x</div>\n') },
+      { kind: 'schema', markdown: 'b', diagram: mermaid('erDiagram\n  A ||--o{ B : x\n') },
+    ]
+    const parser = new StreamSectionParser()
+    pushInChunks(parser, stringifySections(original), 5)
+    expect(parser.finalize()).toEqual(original)
+  })
+})
+
+describe('StreamSectionParser — diagram size cap', () => {
+  it('stops buffering an oversized block and drops it on close', () => {
+    const parser = new StreamSectionParser()
+    parser.push('@@@SECTION kind=cloud\ninfra\n@@@HTML\n')
+    const line = 'x'.repeat(1000) + '\n'
+    for (let i = 0; i < 200; i++) parser.push(line)
+    // The buffer holds at most the cap plus one line, not all 200 KB.
+    expect((parser as unknown as { diagramBuf: string }).diagramBuf.length).toBeLessThan(62_000)
+    parser.push('@@@END_HTML\n')
+    expect(parser.finalize()).toEqual([{ kind: 'cloud', markdown: 'infra', diagrams: [] }])
   })
 })

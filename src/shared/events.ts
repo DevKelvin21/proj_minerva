@@ -16,7 +16,13 @@ import type { ActivityState, NotificationSettings } from './activity'
 import type { AppLocale } from './locale'
 import type { AppearanceSettings } from './theme/appearance'
 import type { ChatEvent } from './chat'
-import type { DidacticSnippet, RepoRef, UpdaterStatus, WalkthroughCohort } from './types'
+import type {
+  DidacticDiagram,
+  DidacticSnippet,
+  RepoRef,
+  UpdaterStatus,
+  WalkthroughCohort,
+} from './types'
 
 interface DraftSectionCommon {
   markdown: string
@@ -33,36 +39,33 @@ interface DraftSectionCommon {
  * Variante "en construcción" de `DidacticSection` (`./types.ts`) que viaja en
  * los snapshots de progreso del streaming (`src/main/ai/stream-parser.ts`).
  *
- * Diferencia clave con `DidacticSection`: en `architecture`/`schema`, el
- * campo `mermaid` es OPCIONAL. Mientras el bloque `@@@MERMAID` de esa sección
- * no cerró con `@@@END_MERMAID`, el campo simplemente está ausente — nunca
- * llega un DSL de Mermaid a medio escribir. Así el renderer solo necesita
- * comprobar `'mermaid' in section` (o `section.mermaid`) para saber si ya
- * puede montar el diagrama; nunca puede confundir uno parcial con uno final,
- * porque uno parcial no existe como valor observable desde afuera del parser.
- * Mismo criterio para los `snippets` de una sección `endpoint`: solo aparecen
- * en el array una vez que su `@@@END_SNIPPET` cerró.
+ * Key difference with `DidacticSection`: in `architecture`/`schema` the
+ * `diagram` field is OPTIONAL. While that section's `@@@HTML` (or legacy
+ * `@@@MERMAID`) block has not closed, the field is simply absent: a half
+ * written diagram never leaves the parser. The renderer only checks
+ * `section.diagram` to know whether it can mount it. Same rule for the
+ * `snippets` of an `endpoint` section: they appear in the array only once
+ * their `@@@END_SNIPPET` closed.
  */
 export type DraftDidacticSection =
   | ({ kind: 'summary' } & DraftSectionCommon)
   /**
    * `cohorts` only holds layers whose `@@@LAYER` marker already arrived (a
    * layer appears as soon as it opens; its markdown keeps growing while the
-   * section streams). Same rule as `mermaid` above: a layer's diagram is only
-   * set once its `@@@END_MERMAID` closed.
+   * section streams). Same rule as `diagram` above: a layer's diagram is only
+   * set once its closing marker arrived.
    */
   | ({ kind: 'walkthrough'; cohorts: WalkthroughCohort[] } & DraftSectionCommon)
   | ({ kind: 'setup'; snippets: DidacticSnippet[] } & DraftSectionCommon)
-  | ({ kind: 'architecture'; mermaid?: string } & DraftSectionCommon)
+  | ({ kind: 'architecture'; diagram?: DidacticDiagram } & DraftSectionCommon)
   | ({ kind: 'endpoint'; snippets: DidacticSnippet[] } & DraftSectionCommon)
-  | ({ kind: 'schema'; mermaid?: string } & DraftSectionCommon)
+  | ({ kind: 'schema'; diagram?: DidacticDiagram } & DraftSectionCommon)
   /**
-   * `cloud` lleva hasta DOS mermaid (big picture + zoom al cambio). Igual
-   * criterio que `mermaid` en `architecture`/`schema`: un bloque todavía
-   * abierto no entra al array — `mermaids` solo acumula los ya cerrados, en
-   * orden de aparición.
+   * `cloud` carries up to TWO diagrams (big picture + zoom on the change).
+   * Same rule as `diagram` above: a block still open is not in the array,
+   * `diagrams` only holds the closed ones, in order.
    */
-  | ({ kind: 'cloud'; mermaids?: string[] } & DraftSectionCommon)
+  | ({ kind: 'cloud'; diagrams?: DidacticDiagram[] } & DraftSectionCommon)
 
 /**
  * Verbo canónico de una acción interna del harness agéntico (F13): a qué

@@ -5,7 +5,7 @@
  * Fixtures de `DidacticAnalysis` para el universo mock "shopwave" (mismos PRs
  * que `src/main/scm/github/fixtures.ts`). Cuatro PRs tienen contenido enriquecido
  * (secciones `endpoint`/`schema`/`architecture`/`cloud` con diagramas
- * Mermaid, esta última solo en `shopwave/checkout-service#77`, T76); el
+ * HTML (`./fixtures-diagrams.ts`), esta última solo en `shopwave/checkout-service#77`, T76); el
  * resto recibe un resumen genérico armado a partir de su `PullRequestDetail`.
  *
  * IMPORTANTE (gotcha de build, ver `.agents/TASKS.md`): el contenido largo de
@@ -21,6 +21,9 @@ import { githubRepo } from '../../shared/scm-guards'
 import type { ChatContextItem } from '../../shared/chat'
 import type { DidacticSection, PullRequestDetail } from '../../shared/types'
 import type { ChatTurnInput } from './service'
+import { fixtureDiagrams } from './fixtures-diagrams'
+
+const D = fixtureDiagrams('en')
 
 /**
  * Where a context item points, for the mock answer (`path:12`, `path:3-5`, `path`,
@@ -136,15 +139,7 @@ const pr482Sections: DidacticSection[] = [
             markdown:
               '`registerCartRoutes` gains `POST /carts/:id/apply-coupon`; the handler loads the cart, delegates to the service and maps `result.ok` to 200 or 409. Note there is no input validation on `req.body.code` yet.',
             files: [{ path: 'src/routes/carts.ts', ranges: [{ start: 13, end: 13 }, { start: 20, end: 27 }] }],
-            mermaid:
-              'sequenceDiagram\n' +
-              '  participant C as Client\n' +
-              '  participant R as carts router\n' +
-              '  participant S as CouponService\n' +
-              '  C->>R: POST /carts/:id/apply-coupon\n' +
-              '  R->>S: apply(cart, code)\n' +
-              '  S-->>R: { ok, total, reason? }\n' +
-              '  R-->>C: 200 or 409\n',
+            diagram: D.pr482Route,
           },
           {
             title: 'Unit test for the expired case',
@@ -228,23 +223,7 @@ const pr482Sections: DidacticSection[] = [
       '`CouponService` is a new service, independent from `CartService`: the ' +
       '`POST /carts/:id/apply-coupon` route calls it to keep coupon validation out of the HTTP ' +
       'handler.',
-    mermaid:
-      'C4Container\n' +
-      // Sin '#' en el título: el lexer C4 de mermaid (11.16) lanza "Lexical
-      // error" con '#' dentro del DSL (descubierto en T16; misma regla en el
-      // prompt real y en la skill mermaid-c4-diagram).
-      '  title Architectural impact of PR 482 (apply-coupon)\n' +
-      '  Person(customer, "Customer", "Shops on Shopwave")\n' +
-      '  System_Boundary(shopwave, "Shopwave") {\n' +
-      '    Container(api, "API", "Node.js / Express", "Exposes REST to customers")\n' +
-      '    Container(couponService, "CouponService (NEW)", "TypeScript", "Validates and applies coupons to a cart")\n' +
-      '    ContainerDb(db, "Database", "PostgreSQL", "Carts, coupons, orders")\n' +
-      '  }\n' +
-      '  Rel(customer, api, "POST /carts/:id/apply-coupon")\n' +
-      // Etiquetas de Rel ≤4 palabras (misma regla que el prompt real, T16):
-      // las largas se enciman con las cajas vecinas en el layout C4.
-      '  Rel(api, couponService, "delegates validation")\n' +
-      '  Rel(couponService, db, "reads and writes")\n',
+    diagram: D.pr482Architecture,
   },
 ]
 
@@ -330,23 +309,7 @@ const pr479Sections: DidacticSection[] = [
       '| `reason` | `text` | optional |\n' +
       '| `created_at` | `timestamptz` | default `now()` |\n\n' +
       'Index `idx_refunds_order_id` on `order_id` to list refunds per order.',
-    mermaid:
-      'erDiagram\n' +
-      '    ORDER ||--o{ REFUND : has\n' +
-      '    ORDER {\n' +
-      '        string id PK\n' +
-      '        string status\n' +
-      '        int total\n' +
-      '        int refundedAmount\n' +
-      '    }\n' +
-      '    REFUND {\n' +
-      '        string id PK "NEW"\n' +
-      '        string orderId FK "NEW"\n' +
-      '        string orderLineId FK "NEW"\n' +
-      '        int amountCents "NEW"\n' +
-      '        string reason "NEW"\n' +
-      '        string createdAt "NEW"\n' +
-      '    }\n',
+    diagram: D.pr479Schema,
   },
 ]
 
@@ -381,13 +344,7 @@ const pr201Sections: DidacticSection[] = [
             markdown:
               '`checkoutReducer` encodes the transitions as a `switch` on the current state. Compare it against the old class: the `payment -> confirmation` transition is missing from the diff.',
             files: [{ path: 'src/features/checkout/checkout-reducer.ts', ranges: [{ start: 1, end: 12 }] }],
-            mermaid:
-              'stateDiagram-v2\n' +
-              '  [*] --> cart\n' +
-              '  cart --> shipping: CONTINUE\n' +
-              '  shipping --> payment: CONTINUE\n' +
-              '  shipping --> cart: other event\n' +
-              '  payment --> confirmation: missing in diff\n',
+            diagram: D.pr201Reducer,
           },
           {
             title: 'CheckoutPage switches to useReducer',
@@ -430,18 +387,7 @@ const pr201Sections: DidacticSection[] = [
       'The `CheckoutPage` component goes from orchestrating a class instance (`CheckoutMachine`) to ' +
       'dispatching events against a pure reducer. `checkout-validation.ts` no longer depends on ' +
       'mutable state (`this.errors`) and exposes independent functions per step.',
-    mermaid:
-      'C4Component\n' +
-      '  title Checkout (web) - before and after the reducer refactor\n' +
-      '  Container_Boundary(checkout, "Checkout module") {\n' +
-      '    Component(page, "CheckoutPage", "React component", "Orchestrates the purchase flow")\n' +
-      '    Component(machineOld, "CheckoutMachine (REMOVED)", "Class with mutable state", "Imperative transition logic, ~130 lines")\n' +
-      '    Component(reducerNew, "checkoutReducer (NEW)", "Pure function", "Replaces CheckoutMachine")\n' +
-      '    Component(validation, "checkout-validation", "Pure functions", "Before: CheckoutValidator class with mutable state")\n' +
-      '  }\n' +
-      '  Rel(page, machineOld, "used (before refactor)")\n' +
-      '  Rel(page, reducerNew, "uses useReducer (after)")\n' +
-      '  Rel(page, validation, "validates with validateCheckout")\n',
+    diagram: D.pr201Architecture,
   },
 ]
 
@@ -477,15 +423,7 @@ const pr77Sections: DidacticSection[] = [
             markdown:
               'The read-check-write sequence now runs inside `acquireOrderLock(orderId)` with a `finally` release. Ask whether the lock is per process or distributed: with several instances an in-memory lock does not close the race.',
             files: [{ path: 'src/webhooks/payment-webhook-handler.ts', ranges: [{ start: 14, end: 22 }] }],
-            mermaid:
-              'sequenceDiagram\n' +
-              '  participant W as Webhook\n' +
-              '  participant L as OrderLock\n' +
-              '  participant O as OrderRepository\n' +
-              '  W->>L: acquire(orderId)\n' +
-              '  W->>O: findById\n' +
-              '  W->>O: markPaid\n' +
-              '  W->>L: release\n',
+            diagram: D.pr77Lock,
           },
           {
             title: 'Concurrency regression test',
@@ -543,29 +481,7 @@ const pr77Sections: DidacticSection[] = [
       'the fix would be useless in production: the lock needs to live outside the function, in a ' +
       'place shared by every invocation — for example a conditional write against the DynamoDB ' +
       '`Orders` table (already on the path) or a separate locks table.',
-    mermaids: [
-      'architecture-beta\n' +
-        'group aws(logos:aws)[AWS]\n' +
-        'service payer(internet)[Payment Provider]\n' +
-        'service gw(logos:aws-api-gateway)[Webhook Gateway] in aws\n' +
-        'service handler(logos:aws-lambda)[Webhook Handler] in aws\n' +
-        'service orders(logos:aws-dynamodb)[Orders Table] in aws\n' +
-        'service queue(logos:aws-sqs)[Notify Queue] in aws\n' +
-        'service notifier(logos:aws-lambda)[Order Notifier] in aws\n' +
-        'service email(logos:aws-ses)[Email] in aws\n' +
-        'payer:R -- L:gw\n' +
-        'gw:R -- L:handler\n' +
-        'handler:R -- L:orders\n' +
-        'handler:B -- T:queue\n' +
-        'queue:R -- L:notifier\n' +
-        'notifier:R -- L:email\n',
-      'architecture-beta\n' +
-        'service handler(logos:aws-lambda)[Webhook Handler PR]\n' +
-        'service orders(logos:aws-dynamodb)[Orders Table PR]\n' +
-        'service queue(logos:aws-sqs)[Notify Queue]\n' +
-        'handler:R -- L:orders\n' +
-        'handler:B -- T:queue\n',
-    ],
+    diagrams: [D.pr77CloudBigPicture, D.pr77CloudZoom],
   },
 ]
 

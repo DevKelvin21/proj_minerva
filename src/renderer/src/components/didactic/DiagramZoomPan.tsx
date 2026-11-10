@@ -3,11 +3,13 @@ import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent }
 import { Icon } from '../ui/Icon'
 import { icons } from '../ui/icons'
 import { useTranslation } from 'react-i18next'
-import { MermaidDiagram } from './MermaidDiagram'
 import { IconButton } from '../ui/IconButton'
+import type { DidacticDiagram } from '../../../../shared/types'
+import { DiagramView } from './DiagramView'
+import type { DiagramSize } from './diagram-size'
 
-interface MermaidZoomPanProps {
-  code: string
+interface DiagramZoomPanProps {
+  diagram: DidacticDiagram
 }
 
 const MIN_ZOOM = 0.25
@@ -20,24 +22,20 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Zoom (rueda, 0.25x-4x, hacia el cursor) + pan (drag) + reset (doble click)
- * para un diagrama Mermaid ya renderizado (T14, lightbox de `ResourceViewer`).
+ * Zoom (wheel, 0.25x-4x, toward the cursor) + pan (drag) + reset (double
+ * click) for a rendered diagram of either format (T14, `ResourceViewer`'s
+ * lightbox).
  *
- * Clave de la implementación: NO se vuelve a renderizar el SVG en cada
- * cambio de zoom/pan. `MermaidDiagram` (en modo `naturalSize`, que fija el
- * SVG a los px de su viewBox — dentro de un wrapper `absolute` el
- * `width:100%` de mermaid colapsaba a 0 y el visor se veía vacío) renderiza
- * el SVG una sola vez; este componente solo envuelve ese resultado en un `div` al que le
- * aplica un `transform: translate(...) scale(...)` por CSS — el mismo SVG de
- * siempre, solo transformado visualmente. El "ajustar" mide el SVG ya
- * montado (`querySelector('svg')` sobre el contenedor) para calcular el
- * factor de escala que lo hace caber, dividiendo por el zoom vigente para
- * obtener su tamaño "natural" (el `getBoundingClientRect` ya refleja el
- * transform CSS activo).
+ * The diagram renders ONCE, in `naturalSize` mode (Mermaid: the SVG pinned
+ * to its viewBox px; HTML: the frame at a fixed layout width, without pointer
+ * events so the drag lands here), and reports that natural size through
+ * `onRendered`. Zoom and pan are only a CSS `transform` on its wrapper, and
+ * "fit" divides the container by the reported size.
  */
-export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element {
+export function DiagramZoomPan({ diagram }: DiagramZoomPanProps): React.JSX.Element {
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const naturalSizeRef = useRef<DiagramSize | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -71,25 +69,22 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
     })
   }, [])
 
-  // El tamaño natural sale del viewBox (con `naturalSize`, `MermaidDiagram`
-  // fija el SVG exactamente a esos px), NO de getBoundingClientRect/zoom:
-  // medir el rect y dividir por el zoom vigente es orden-dependiente (si el
-  // fit corre dos veces en el mismo frame — StrictMode dispara `onRendered`
-  // doble — la segunda medición aún no refleja el zoom de la primera y el
-  // factor se compone hasta clavarse en MIN_ZOOM). Con el viewBox el cálculo
-  // es idempotente: mismas entradas, mismo zoom.
+  // The natural size comes from the diagram itself (`onRendered`), never
+  // from getBoundingClientRect / zoom: measuring the rect and dividing by the
+  // current zoom is order-dependent (StrictMode fires `onRendered` twice and
+  // the factor compounded down to MIN_ZOOM). With the reported size the fit
+  // is idempotent: same inputs, same zoom.
   const fitToContainer = useCallback(() => {
     const container = containerRef.current
-    const svg = container?.querySelector('svg')
-    const viewBox = svg?.viewBox.baseVal
-    if (!container || !viewBox || viewBox.width === 0 || viewBox.height === 0) {
+    const size = naturalSizeRef.current
+    if (!container || !size || size.width === 0 || size.height === 0) {
       resetView()
       return
     }
 
     const containerRect = container.getBoundingClientRect()
-    const scaleX = (containerRect.width - FIT_PADDING_PX) / viewBox.width
-    const scaleY = (containerRect.height - FIT_PADDING_PX) / viewBox.height
+    const scaleX = (containerRect.width - FIT_PADDING_PX) / size.width
+    const scaleY = (containerRect.height - FIT_PADDING_PX) / size.height
     setZoom(clamp(Math.min(scaleX, scaleY), MIN_ZOOM, MAX_ZOOM))
     setPan({ x: 0, y: 0 })
   }, [resetView])
@@ -103,14 +98,17 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
     [zoomBy],
   )
 
-  // Auto-ajuste inicial: cuando `MermaidDiagram` avisa que el SVG ya está en
-  // el DOM (render asíncrono de mermaid), se ajusta al contenedor en el
-  // siguiente frame (el rAF deja que el estilo de tamaño natural aplique
-  // antes de medir). Sin esto el visor abría en 100% con pan (0,0), que para
-  // diagramas grandes mostraba una esquina — o nada.
-  const handleRendered = useCallback(() => {
-    requestAnimationFrame(() => fitToContainer())
-  }, [fitToContainer])
+  // Initial fit: once the diagram reports its natural size, fit it on the
+  // next frame (the rAF lets the natural-size style apply first). Without it
+  // the viewer opened at 100% with pan (0,0), which for a large diagram
+  // showed a corner, or nothing.
+  const handleRendered = useCallback(
+    (size: DiagramSize) => {
+      naturalSizeRef.current = size
+      requestAnimationFrame(() => fitToContainer())
+    },
+    [fitToContainer],
+  )
 
   const handlePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -167,13 +165,13 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
             transformOrigin: 'center center',
           }}
         >
-          <MermaidDiagram code={code} naturalSize onRendered={handleRendered} />
+          <DiagramView diagram={diagram} naturalSize onRendered={handleRendered} />
         </div>
       </div>
       <div className="flex items-center justify-center gap-2 border-t border-border bg-panel px-3 py-2">
         <IconButton
           icon={<Icon icon={icons.zoomOut} size="sm" />}
-          label={t('didactic.mermaid.zoomOut')}
+          label={t('didactic.diagram.zoomOut')}
           onClick={() => zoomBy(1 / (1 + ZOOM_STEP))}
         />
         <span className="w-12 text-center text-xs text-muted tabular-nums">
@@ -181,15 +179,15 @@ export function MermaidZoomPan({ code }: MermaidZoomPanProps): React.JSX.Element
         </span>
         <IconButton
           icon={<Icon icon={icons.zoomIn} size="sm" />}
-          label={t('didactic.mermaid.zoomIn')}
+          label={t('didactic.diagram.zoomIn')}
           onClick={() => zoomBy(1 + ZOOM_STEP)}
         />
         <IconButton
           icon={<Icon icon={icons.fit} size="sm" />}
-          label={t('didactic.mermaid.fit')}
+          label={t('didactic.diagram.fit')}
           onClick={fitToContainer}
         />
-        <IconButton icon={<Icon icon={icons.resetView} size="sm" />} label={t('didactic.mermaid.reset')} onClick={resetView} />
+        <IconButton icon={<Icon icon={icons.resetView} size="sm" />} label={t('didactic.diagram.reset')} onClick={resetView} />
       </div>
     </div>
   )

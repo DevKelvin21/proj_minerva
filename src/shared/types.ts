@@ -537,16 +537,30 @@ export interface WalkthroughFileRef {
 }
 
 /**
+ * How a diagram's `source` is written. New analyses are always `html` (an
+ * HTML + inline SVG fragment drawn in a script-less sandboxed iframe, see
+ * `renderer/src/components/didactic/HtmlDiagram.tsx`); `mermaid` remains only
+ * for analyses persisted before the switch (`main/ai/legacy-diagrams.ts`).
+ */
+export type DiagramFormat = 'html' | 'mermaid'
+
+/** One AI-written diagram. The `source` is untrusted model output in either format. */
+export interface DidacticDiagram {
+  format: DiagramFormat
+  source: string
+}
+
+/**
  * One step of the guided walkthrough: a title, the files (and line ranges)
  * it covers, a short AI summary and, only when the structure warrants it, a
- * Mermaid diagram (sequence, state, ER, flowchart). Always has at least one
- * file after validation (`main/ai/section-mapper.ts`).
+ * diagram (call sequence, state transitions, data model, branching flow).
+ * Always has at least one file after validation (`main/ai/section-mapper.ts`).
  */
 export interface WalkthroughLayer {
   title: string
   markdown: string
   files: WalkthroughFileRef[]
-  mermaid?: string
+  diagram?: DidacticDiagram
 }
 
 /** An independent group of related layers, in reading order. */
@@ -565,16 +579,16 @@ export type DidacticSection =
    */
   | ({ kind: 'walkthrough'; cohorts: WalkthroughCohort[] } & DidacticSectionCommon)
   | ({ kind: 'setup'; snippets: DidacticSnippet[] } & DidacticSectionCommon)
-  | ({ kind: 'architecture'; mermaid: string } & DidacticSectionCommon)
+  | ({ kind: 'architecture'; diagram: DidacticDiagram } & DidacticSectionCommon)
   | ({ kind: 'endpoint'; snippets: DidacticSnippet[] } & DidacticSectionCommon)
-  | ({ kind: 'schema'; mermaid: string } & DidacticSectionCommon)
+  | ({ kind: 'schema'; diagram: DidacticDiagram } & DidacticSectionCommon)
   /**
-   * A diferencia de `architecture`/`schema` (un solo `mermaid`), `cloud`
-   * lleva hasta DOS diagramas Mermaid en orden de aparición: el 1º es el big
-   * picture de la infra (AWS/Cloudflare/...) y el 2º un zoom a lo que toca el
-   * PR. Con 0 diagramas la sección sigue siendo válida (solo markdown).
+   * Unlike `architecture`/`schema` (one `diagram`), `cloud` carries up to TWO
+   * diagrams in order: the 1st is the big picture of the infra
+   * (AWS/Cloudflare/...), the 2nd a zoom on what the PR touches. With 0
+   * diagrams the section is still valid (markdown only).
    */
-  | ({ kind: 'cloud'; mermaids: string[] } & DidacticSectionCommon)
+  | ({ kind: 'cloud'; diagrams: DidacticDiagram[] } & DidacticSectionCommon)
 
 /**
  * Lo que produce un `AiService.analyzePullRequest` (T39): el contenido puro

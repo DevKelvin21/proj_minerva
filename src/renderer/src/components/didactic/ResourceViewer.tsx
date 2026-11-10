@@ -1,8 +1,8 @@
-import type { DidacticSnippet } from '../../../../shared/types'
+import type { DidacticDiagram, DidacticSnippet } from '../../../../shared/types'
 import { Dialog } from '../ui/Dialog'
 import { Markdown } from '../ui/Markdown'
 import { CodeSnippet } from './CodeSnippet'
-import { MermaidZoomPan } from './MermaidZoomPan'
+import { DiagramZoomPan } from './DiagramZoomPan'
 
 /**
  * Recurso que puede abrirse en el lightbox (T14). `markdown` cubre tanto el
@@ -10,7 +10,7 @@ import { MermaidZoomPan } from './MermaidZoomPan'
  * `DidacticSectionCard`) como cualquier otro texto largo.
  */
 export type ViewerResource =
-  | { kind: 'mermaid'; title: string; code: string }
+  | { kind: 'diagram'; title: string; diagram: DidacticDiagram }
   | { kind: 'markdown'; title: string; markdown: string }
   | { kind: 'snippet'; title: string; snippet: DidacticSnippet }
 
@@ -23,13 +23,13 @@ interface ResourceViewerProps {
  * Overlay a pantalla completa (dentro de la ventana que lo abre — panel
  * principal o ventana didáctica desacoplada, ambas reutilizan este mismo
  * componente) para inspeccionar un recurso del panel didáctico en grande:
- * diagramas Mermaid con zoom/pan (`MermaidZoomPan`), o tablas/snippets en una
+ * diagramas con zoom/pan (`DiagramZoomPan`), o tablas/snippets en una
  * vista ancha centrada con scroll. Cierra con el botón X o con Escape
  * (`ui/Dialog`, which also ignores the key while the review is hidden under home).
  */
 export function ResourceViewer({ resource, onClose }: ResourceViewerProps): React.JSX.Element {
-  // Altura del diálogo: para mermaid debe ser FIJA (h-[90vh]) y no
-  // max-h-[90vh] — el diagrama dentro de MermaidZoomPan está posicionado
+  // Altura del diálogo: para un diagrama debe ser FIJA (h-[90vh]) y no
+  // max-h-[90vh] — el diagrama dentro de DiagramZoomPan está posicionado
   // `absolute` (fuera de flujo, no aporta altura), así que con altura
   // basada en contenido el diálogo colapsaba a header+toolbar y el visor
   // se veía vacío (bug reportado con captura; los checks geométricos por
@@ -41,11 +41,11 @@ export function ResourceViewer({ resource, onClose }: ResourceViewerProps): Reac
       onClose={onClose}
       title={resource.title}
       className={
-        'w-[96vw] max-w-[1100px] ' + (resource.kind === 'mermaid' ? 'h-[92vh]' : 'max-h-[92vh]')
+        'w-[96vw] max-w-[1100px] ' + (resource.kind === 'diagram' ? 'h-[92vh]' : 'max-h-[92vh]')
       }
     >
       <div className="min-h-0 flex-1">
-        {resource.kind === 'mermaid' && <MermaidZoomPan code={resource.code} />}
+        {resource.kind === 'diagram' && <DiagramZoomPan diagram={resource.diagram} />}
 
         {resource.kind === 'markdown' && (
           <div className="h-full overflow-y-auto p-4">

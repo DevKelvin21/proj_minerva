@@ -19,6 +19,7 @@
  * sección malformada se descarta en vez de tirar abajo todo el análisis.
  */
 import type {
+  DidacticDiagram,
   DidacticSection,
   DidacticSnippet,
   WalkthroughCohort,
@@ -82,13 +83,32 @@ export function parseFileRefs(raw: string): WalkthroughFileRef[] {
   return [...byPath.entries()].map(([path, ranges]) => ({ path, ranges }))
 }
 
+/**
+ * Cap on one diagram's source. A real HTML diagram is a few KB; a runaway
+ * model (or an injected PR) could stream megabytes into an iframe.
+ */
+export const MAX_DIAGRAM_SOURCE_CHARS = 60_000
+
+/**
+ * A diagram survives with a known format and a non-empty source under the
+ * cap. Exported for the stream parser and for the legacy migration of
+ * persisted analyses (`./legacy-diagrams.ts`).
+ */
+export function mapDiagram(raw: unknown): DidacticDiagram | null {
+  if (!isRecord(raw)) return null
+  if (raw.format !== 'html' && raw.format !== 'mermaid') return null
+  if (!isNonEmptyString(raw.source)) return null
+  if (raw.source.length > MAX_DIAGRAM_SOURCE_CHARS) return null
+  return { format: raw.format, source: raw.source }
+}
+
 /** Raw layer as the stream parser accumulates it (`cohort` is the grouping key). */
 export interface RawWalkthroughLayer {
   cohort: string
   title: string
   files: WalkthroughFileRef[]
   markdown: string
-  mermaid?: string
+  diagram?: DidacticDiagram
 }
 
 /**
@@ -108,7 +128,8 @@ export function mapLayer(raw: unknown): (WalkthroughLayer & { cohort: string }) 
   const cohort = typeof raw.cohort === 'string' ? raw.cohort.trim() : ''
   const markdown = typeof raw.markdown === 'string' ? raw.markdown : ''
   const layer: WalkthroughLayer & { cohort: string } = { cohort, title: raw.title.trim(), markdown, files }
-  if (isNonEmptyString(raw.mermaid)) layer.mermaid = raw.mermaid
+  const diagram = mapDiagram(raw.diagram)
+  if (diagram) layer.diagram = diagram
   return layer
 }
 
@@ -170,21 +191,23 @@ export function mapRawSection(raw: unknown): DidacticSection | null {
       return { kind: 'summary', markdown: raw.markdown }
 
     case 'architecture':
-      if (!isNonEmptyString(raw.mermaid)) return null
-      return { kind: 'architecture', markdown: raw.markdown, mermaid: raw.mermaid }
-
-    case 'schema':
-      if (!isNonEmptyString(raw.mermaid)) return null
-      return { kind: 'schema', markdown: raw.markdown, mermaid: raw.mermaid }
+    case 'schema': {
+      const diagram = mapDiagram(raw.diagram)
+      if (!diagram) return null
+      return { kind: raw.kind, markdown: raw.markdown, diagram }
+    }
 
     case 'cloud': {
-      // A diferencia de architecture/schema, los diagramas son OPCIONALES:
-      // 0, 1 o 2 bloques son todos válidos — nunca se descarta la sección
-      // solo por falta de mermaid (el markdown solo ya es un resultado útil).
-      const mermaids = Array.isArray(raw.mermaids)
-        ? raw.mermaids.filter((m): m is string => isNonEmptyString(m))
+      // Unlike architecture/schema the diagrams are OPTIONAL: 0, 1 or 2
+      // blocks are all valid, the section is never dropped for lack of one
+      // (the markdown alone is already useful). At most two survive.
+      const diagrams = Array.isArray(raw.diagrams)
+        ? raw.diagrams
+            .map(mapDiagram)
+            .filter((d): d is DidacticDiagram => d !== null)
+            .slice(0, 2)
         : []
-      return { kind: 'cloud', markdown: raw.markdown, mermaids }
+      return { kind: 'cloud', markdown: raw.markdown, diagrams }
     }
 
     case 'endpoint': {

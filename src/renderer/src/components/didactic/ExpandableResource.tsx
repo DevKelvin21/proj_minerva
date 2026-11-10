@@ -8,7 +8,7 @@ interface ExpandableResourceProps {
 }
 
 /**
- * A Mermaid diagram with its expand control (`ExpandButton`, the same one as
+ * A diagram with its expand control (`ExpandButton`, the same one as
  * sections and snippets) pinned to the top-right corner, always visible. It
  * opens the `ResourceViewer` (`./ResourceViewer.tsx`) with that resource.
  * Snippets carry their own button in their header (an overlay there would

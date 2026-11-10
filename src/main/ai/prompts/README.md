@@ -4,7 +4,11 @@
 > `buildAnalyzeSystemPrompt(language)`); only the output-language rule changes with the UI
 > language (`en` default, `es`). The handler captures the language when the analysis starts,
 > passes it to the service and seals it as `DidacticAnalysis.language`. The protocol tokens,
-> the prompt-injection rules and the Mermaid rules are unchanged by the translation.
+> the prompt-injection rules and the diagram rules are unchanged by the translation.
+>
+> **Diagrams:** the model writes HTML + inline SVG between `@@@HTML` / `@@@END_HTML`, with the
+> classes and theme variables of the diagram kit (`src/shared/diagram-kit.ts`). The parser still
+> reads the legacy `@@@MERMAID` pair, but the prompt no longer asks for it.
 
 
 Los prompts del pipeline didáctico viven versionados aquí, para poder auditarlos como
@@ -73,13 +77,12 @@ ejemplo corto):
 @@@SECTION kind=walkthrough
 ...intro opcional...
 @@@LAYER cohort="Apply-coupon endpoint" title="Route wiring" files="src/routes/carts.ts:13,20-27;src/a.ts"
-...markdown de ESA capa (y un @@@MERMAID opcional, también de la capa)...
+...markdown de ESA capa (y un @@@HTML opcional, también de la capa)...
 @@@SECTION kind=architecture
 ...markdown...
-@@@MERMAID
-C4Container
-  ...
-@@@END_MERMAID
+@@@HTML
+<div class="diagram">...</div>
+@@@END_HTML
 ...más markdown opcional...
 @@@SECTION kind=endpoint
 ...markdown...
@@ -89,9 +92,9 @@ curl -X POST ...
 ```
 
 Reglas: los marcadores van solos en su línea y empiezan con `@@@`; `kind` es uno de
-`summary|walkthrough|setup|architecture|endpoint|schema|cloud`; `@@@MERMAID`/`@@@SNIPPET`
+`summary|walkthrough|setup|architecture|endpoint|schema|cloud`; `@@@HTML`/`@@@SNIPPET`
 pertenecen siempre a la sección abierta en ese momento; `@@@LAYER` solo vale dentro de
-`walkthrough` (abre una capa: el markdown y el mermaid siguientes son de esa capa; `files`
+`walkthrough` (abre una capa: el markdown y el diagrama siguientes son de esa capa; `files`
 usa líneas del archivo NUEVO, del viejo si el archivo se borró); todo lo demás es Markdown
 de esa sección; nada puede quedar fuera de una sección.
 
