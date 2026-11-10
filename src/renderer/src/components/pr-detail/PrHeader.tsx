@@ -292,8 +292,10 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
   const barWidth = measuredBarWidth ?? 0
   const showSummaryText = barWidth >= 860
   const showBranches = barWidth >= 1040
-  // Same breakpoint as Merge: the didactic entry point keeps its label as long as Merge does.
-  const compactWalkthrough = barWidth < 640
+  // The label goes before the tabs' labels do: below this a labeled Walkthrough
+  // pushes the tab strip into clipping (measured: ~760 px in English, ~820 px in
+  // Spanish; merge.spec.ts sweeps both). Icon-only it keeps its own glyph and tooltip.
+  const compactWalkthrough = barWidth < 820
   // Below this the three tab labels plus the actions don't fit: icon + count.
   const compactTabs = barWidth > 0 && barWidth < 680
 

@@ -30,7 +30,11 @@ const STATUS_TONE: Record<Exclude<QueueStatus, null>, BadgeTone> = {
 }
 
 /** Statuses that restate the PR's review decision, so the row drops its review dot. */
-const REVIEW_STATUSES: ReadonlySet<QueueStatus> = new Set<QueueStatus>(['changesRequested', 'approved', 'waiting'])
+const REVIEW_STATUSES: ReadonlySet<QueueStatus> = new Set<QueueStatus>([
+  'changesRequested',
+  'approved',
+  'waiting',
+])
 
 const FOLDED_KEY = 'minerva.queueFolded'
 
@@ -152,7 +156,12 @@ export function QueueView(): React.JSX.Element {
                       pr={pr}
                       onSelect={(picked) => open(picked)}
                       showRepo
-                      badgeShowsReview={status !== null && REVIEW_STATUSES.has(status)}
+                      // An Azure "Rejected" is stronger than the badge's "Changes requested": keep its dot.
+                      badgeShowsReview={
+                        status !== null &&
+                        REVIEW_STATUSES.has(status) &&
+                        pr.reviewDecision !== 'rejected'
+                      }
                       badge={
                         status ? (
                           <Badge data-queue-status={status} tone={STATUS_TONE[status]} size="sm">
