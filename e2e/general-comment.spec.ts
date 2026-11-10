@@ -24,7 +24,10 @@ test('flujo T4: lista → detalle → Archivos → publicar comentario general',
 
   // Volver a Conversación y publicar por el composer GENERAL (identificado
   // por su placeholder: desde T8 hay varios textareas de replies de hilos).
-  await window.getByText('Conversation').first().click()
+  await window
+    .getByRole('tablist', { name: 'Pull request views' })
+    .getByRole('tab', { name: /^Conversation/ })
+    .click()
   const composer = window.locator('textarea[placeholder*="Write a comment on this pull request"]')
   await composer.fill('Comentario de humo e2e — publicado vía Playwright')
   // Nombre EXACTO: /comentar/i también matchea "· 1 comentario" en el header

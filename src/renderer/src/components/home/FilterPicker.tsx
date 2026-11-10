@@ -15,7 +15,7 @@ const STATUS_ICON: Record<StatusId, React.JSX.Element> = {
   changesRequested: <Icon icon={icons.changesRequested} size="xs" className="text-warning" />,
   approved: <Icon icon={icons.approved} size="xs" className="text-success" />,
   ciFailing: <Icon icon={icons.error} size="xs" className="text-danger" />,
-  unread: <span aria-hidden className="mx-[3px] h-1.5 w-1.5 rounded-full bg-danger" />,
+  unread: <span aria-hidden className="mx-[3px] h-1.5 w-1.5 rounded-full bg-accent" />,
 }
 
 /** The small picture before an option: avatar, tag, provider or status glyph. */

@@ -157,7 +157,7 @@ author's Spanish logs, not maintained)
   error; loading always goes through `Spinner`. Provider logos: `ScmProviderIcon` /
   `AiProviderIcon` over path data copied into `ui/provider-marks.ts` (never import
   `@iconify-json/logos` statically, gotcha 7). Color: muted next to text, accent only for
-  on/selected, status colors only for status.
+  on/selected and unread/new marks, status colors only for status (red = a problem, never "unread").
 - Network/AI errors: visible loading and error state, never a silent throw. Show IPC errors
   with `errorText()` (`renderer/src/lib/error-text.ts`: drops Electron's wrapper and `[SCM:CODE]`).
 

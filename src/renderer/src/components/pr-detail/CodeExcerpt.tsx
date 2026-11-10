@@ -18,6 +18,7 @@ import {
 import { transText } from '../../lib/trans-text'
 import { Button } from '../ui/Button'
 import { Callout } from '../ui/Callout'
+import { SEGMENTED_TRACK, segmentClasses } from '../ui/segmented-classes'
 
 interface CodeExcerptProps {
   lines: readonly string[]
@@ -219,12 +220,10 @@ function VersionedExcerpt({
     panelId: () => `${baseId}-panel`,
   })
   const tabClass = (selected: boolean, disabled = false): string =>
-    `rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-colors duration-150 ${
-      selected
-        ? 'bg-panel text-text shadow-sm'
-        : disabled
-          ? 'cursor-not-allowed text-muted/50'
-          : 'text-muted hover:text-text'
+    `px-2 py-0.5 whitespace-nowrap ${
+      !selected && disabled
+        ? 'rounded text-xs font-medium cursor-not-allowed text-muted/50'
+        : segmentClasses(selected)
     }`
   const latestReason = latestDisabled
     ? removedIn !== null
@@ -296,7 +295,7 @@ function VersionedExcerpt({
         <div
           role="tablist"
           aria-label={t('comments.excerpt.versions')}
-          className="ml-auto flex shrink-0 items-center gap-0.5 rounded-md bg-bg p-0.5"
+          className={`ml-auto flex shrink-0 items-center gap-0.5 ${SEGMENTED_TRACK}`}
         >
           <button
             type="button"

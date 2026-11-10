@@ -99,7 +99,10 @@ test('GitHub: auto-merge on #479 while checks run, shown with who and how, then 
     await openPr(window, GH_PENDING)
     await openMergePopover(window)
     const panel = popover(window)
-    await expect(panel.getByTestId('merge-blocker')).toHaveAttribute('data-blocker', 'checks_pending')
+    await expect(panel.getByTestId('merge-blocker')).toHaveAttribute(
+      'data-blocker',
+      'checks_pending',
+    )
     await expect(panel.getByTestId('merge-now')).toBeDisabled()
     await panel.getByRole('radio', { name: 'Squash' }).check()
     await panel.getByTestId('auto-merge-on').click()
@@ -255,7 +258,7 @@ test('tiled sizes: the control stays reachable and its popover fits the window',
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     )
     // Narrow windows open the AI panel as a modal drawer over the review: close it.
-    const aiDrawer = window.getByRole('dialog', { name: 'AI' })
+    const aiDrawer = window.getByRole('dialog', { name: /^(AI|IA)$/ })
     if (await aiDrawer.isVisible()) {
       await window.keyboard.press('Escape')
       await expect(aiDrawer).toHaveCount(0)
@@ -284,7 +287,7 @@ async function barEdges(page: Page) {
     const tabs = document.querySelector('[role="tablist"][aria-label]')?.parentElement ?? null
     const details = document.querySelector('[data-testid="pr-details"]')
     const walkthrough = [...document.querySelectorAll('header button')].find((b) =>
-      /Walkthrough/.test(b.getAttribute('aria-label') ?? b.textContent ?? ''),
+      /Walkthrough|Recorrido/.test(b.getAttribute('aria-label') ?? b.textContent ?? ''),
     )
     const merge = document.querySelector('[data-testid="merge-trigger"]')?.closest('[data-no-drag]')
     const bar = details?.closest('div.h-12')
@@ -299,33 +302,61 @@ async function barEdges(page: Page) {
   })
 }
 
-test('narrow windows: tabs, Details, Walkthrough and Merge never overlap', async ({
-  window,
-}, testInfo) => {
-  await openPr(window, 'Checkout v2: submit validation')
-  for (const width of [1280, 960, 860, 760, 700, 600]) {
-    await setViewport(window, width, 800)
-    await window.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    )
-    const aiDrawer = window.getByRole('dialog', { name: 'AI' })
-    if (await aiDrawer.isVisible()) {
-      await window.keyboard.press('Escape')
-      await expect(aiDrawer).toHaveCount(0)
+// With both panels docked, 1520 leaves a bar whose content (what PrHeader
+// measures: the box minus its 24 px padding) is ~836 px, past the 820 px
+// Walkthrough breakpoint; 1440–1300 leave ~756–656 px: the band where a labeled
+// Walkthrough would crowd the labeled tabs (Spanish labels are longer).
+const LABELED_WALKTHROUGH_WIDTH = 1520
+const BAR_WIDTHS = {
+  en: [LABELED_WALKTHROUGH_WIDTH, 1440, 1400, 1360, 1320, 1300, 1280, 960, 860, 760, 700, 600],
+  // Known gap (pre-existing): Spanish tab labels clip on ~686–726 px bar contents even
+  // with an icon-only Walkthrough, because the tabs' own breakpoint is 680.
+  es: [LABELED_WALKTHROUGH_WIDTH, 1440, 1420, 1360],
+}
+
+for (const language of ['en', 'es'] as const) {
+  test(`narrow windows (${language}): tabs, Details, Walkthrough and Merge never overlap`, async ({
+    window,
+  }, testInfo) => {
+    await openPr(window, 'Checkout v2: submit validation')
+    if (language === 'es') {
+      await window.evaluate(() => window.minerva.settings.setLanguage({ language: 'es' }))
+      await expect.poll(() => window.evaluate(() => document.documentElement.lang)).toBe('es')
     }
-    await expect(window.getByTestId('merge-trigger')).toBeVisible()
-    const edges = await barEdges(window)
-    const parts = [edges.tabs, edges.details, edges.walkthrough, edges.merge]
-    for (const part of parts) expect(part, `width ${width}`).not.toBeNull()
-    for (let i = 1; i < parts.length; i++) {
-      expect(parts[i]!.left, `width ${width}: part ${i} starts after part ${i - 1}`).toBeGreaterThanOrEqual(
-        parts[i - 1]!.right,
+    for (const width of BAR_WIDTHS[language]) {
+      await setViewport(window, width, 800)
+      await window.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
       )
+      const aiDrawer = window.getByRole('dialog', { name: /^(AI|IA)$/ })
+      if (await aiDrawer.isVisible()) {
+        await window.keyboard.press('Escape')
+        await expect(aiDrawer).toHaveCount(0)
+      }
+      await expect(window.getByTestId('merge-trigger')).toBeVisible()
+      const edges = await barEdges(window)
+      const parts = [edges.tabs, edges.details, edges.walkthrough, edges.merge]
+      for (const part of parts) expect(part, `width ${width}`).not.toBeNull()
+      for (let i = 1; i < parts.length; i++) {
+        expect(
+          parts[i]!.left,
+          `width ${width}: part ${i} starts after part ${i - 1}`,
+        ).toBeGreaterThanOrEqual(parts[i - 1]!.right)
+      }
+      expect(edges.tabsClipped, `width ${width}: every tab fits`).toBe(false)
+      expect(edges.merge!.right, `width ${width}: Merge inside the bar`).toBeLessThanOrEqual(
+        edges.bar!.right,
+      )
+      if (width === LABELED_WALKTHROUGH_WIDTH) {
+        // Pins the threshold from above: a breakpoint over 820 px would hide this label.
+        // Icon-only, the name moves to aria-label; labeled, the visible text names it.
+        const walkthrough = window.getByRole('button', { name: /^(Walkthrough|Recorrido)$/ })
+        await expect(walkthrough, `width ${width}: Walkthrough keeps its label`).toHaveText(
+          /Walkthrough|Recorrido/,
+        )
+        await expect(walkthrough).not.toHaveAttribute('aria-label')
+      }
+      await attachScreenshot(window, testInfo, `bar-${language}-${width}`)
     }
-    expect(edges.tabsClipped, `width ${width}: every tab fits`).toBe(false)
-    expect(edges.merge!.right, `width ${width}: Merge inside the bar`).toBeLessThanOrEqual(
-      edges.bar!.right,
-    )
-    await attachScreenshot(window, testInfo, 'bar-' + width)
-  }
-})
+  })
+}

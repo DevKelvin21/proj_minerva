@@ -234,7 +234,7 @@ export function PrCard({
         </span>
         {unread && (
           <span
-            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger"
+            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
             role="img"
             aria-label={t('home.prCard.unread')}
             title={t('home.prCard.unread')}

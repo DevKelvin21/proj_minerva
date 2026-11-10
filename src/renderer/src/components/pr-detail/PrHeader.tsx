@@ -232,7 +232,7 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
             key={label.name}
             role="listitem"
             className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-              style ? '' : 'bg-border/60 text-muted'
+              style ? '' : 'bg-muted/15 text-muted'
             }`}
             style={style ?? undefined}
           >
@@ -292,7 +292,11 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
   const barWidth = measuredBarWidth ?? 0
   const showSummaryText = barWidth >= 860
   const showBranches = barWidth >= 1040
-  const compactWalkthrough = barWidth < 900
+  // The label goes before the tabs' labels do: below this a labeled Walkthrough
+  // pushes the tab strip into clipping (measured bar content: ~736 px in English,
+  // ~796 px in Spanish; merge.spec.ts sweeps both). Icon-only it keeps its own
+  // glyph and tooltip.
+  const compactWalkthrough = barWidth < 820
   // Below this the three tab labels plus the actions don't fit: icon + count.
   const compactTabs = barWidth > 0 && barWidth < 680
 

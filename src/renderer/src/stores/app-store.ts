@@ -92,12 +92,16 @@ function readInitialSidebarWidth(): number | null {
   }
 }
 
-/** Persisted AI panel tab; anything but the literal 'analysis' = the chat. */
+/**
+ * Persisted AI panel tab; anything but the literal 'ask' = the analysis. A new
+ * user lands on Analysis (summary, walkthrough, diagrams: the didactic part)
+ * rather than an empty chat; a user who picked Ask keeps it.
+ */
 function readInitialAiPanelTab(): AiPanelTab {
   try {
-    return window.localStorage.getItem(AI_PANEL_TAB_KEY) === 'analysis' ? 'analysis' : 'ask'
+    return window.localStorage.getItem(AI_PANEL_TAB_KEY) === 'ask' ? 'ask' : 'analysis'
   } catch {
-    return 'ask'
+    return 'analysis'
   }
 }
 
@@ -644,7 +648,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ aiPanelTab: tab })
   },
   openAskPanel: (fromDiff = false) => {
-    get().setAiPanelTab('ask')
+    // Switch without saving: adding a line to the chat is not the user picking
+    // Ask as their default tab (only a click on the tab is, `setAiPanelTab`).
+    set({ aiPanelTab: 'ask' })
     if (fromDiff && widthTier(window.innerWidth) === 'sm') return
     set({ didacticPanelOpen: true })
   },

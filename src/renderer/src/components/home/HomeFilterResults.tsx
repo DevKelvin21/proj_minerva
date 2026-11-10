@@ -70,7 +70,7 @@ function ResultRow({
         <span
           role="img"
           aria-label={t('home.prCard.unread')}
-          className="h-1.5 w-1.5 rounded-full bg-danger"
+          className="h-1.5 w-1.5 rounded-full bg-accent"
         />
       ) : (
         <span aria-hidden />

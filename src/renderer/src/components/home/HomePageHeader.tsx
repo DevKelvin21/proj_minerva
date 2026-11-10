@@ -89,7 +89,8 @@ export function HomePageHeader({
               <PageTitle text={titleText}>{title}</PageTitle>
             ))}
           {meta && (
-            <span className="min-w-0 shrink truncate text-xs text-muted">{meta}</span>
+            // basis-0: the subtitle only takes what the title leaves, so it truncates first ("H…" at 720 px otherwise).
+            <span className="min-w-0 flex-1 basis-0 truncate text-xs text-muted">{meta}</span>
           )}
         </div>
         <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2">

@@ -61,7 +61,7 @@ export function RepoCard({
         </span>
         {summary.unread > 0 && (
           <span
-            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger"
+            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
             role="img"
             aria-label={t('home.repoCard.unread')}
             title={t('home.repoCard.unread')}

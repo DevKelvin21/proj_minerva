@@ -43,6 +43,7 @@ import {
 import { PrCard } from './PrCard'
 import { StackBoard } from './StackBoard'
 import { InlineError } from '../ui/InlineError'
+import { SEGMENTED_TRACK, segmentClasses } from '../ui/segmented-classes'
 
 const keyOf = (pr: PullRequestSummary): string => prKey(pr.repo, pr.number)
 
@@ -65,7 +66,7 @@ function StateSegments({
     <div
       role="group"
       aria-label={t('home.repoPage.stateFilter.ariaLabel')}
-      className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-border bg-bg p-0.5"
+      className={`inline-flex shrink-0 items-center gap-0.5 ${SEGMENTED_TRACK}`}
     >
       {REPO_STATES.map((state) => {
         const active = value === state
@@ -77,9 +78,7 @@ function StateSegments({
             aria-pressed={active}
             title={t(`home.repoPage.stateFilter.titles.${state}`)}
             onClick={() => onChange(state)}
-            className={`inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded px-2 text-xs font-medium transition-colors duration-150 ${
-              active ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-border/60 hover:text-text'
-            }`}
+            className={`inline-flex h-6 shrink-0 items-center whitespace-nowrap px-2 ${segmentClasses(active)}`}
           >
             {t(`home.repoPage.stateFilter.${state}`)}
           </button>
@@ -108,7 +107,7 @@ function FilterSegments({
     <div
       role="group"
       aria-label={t('home.filters.ariaLabel')}
-      className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-0.5 overflow-x-auto rounded-md border border-border bg-bg p-0.5"
+      className={`inline-flex min-w-0 max-w-full shrink-0 items-center gap-0.5 overflow-x-auto ${SEGMENTED_TRACK}`}
     >
       {VIEWER_FILTERS.map((filter) => {
         const active = value === filter
@@ -120,9 +119,7 @@ function FilterSegments({
             aria-pressed={active}
             title={t(`home.filters.titles.${filter}`)}
             onClick={() => onChange(filter)}
-            className={`inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 text-xs font-medium transition-colors duration-150 ${
-              active ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-border/60 hover:text-text'
-            }`}
+            className={`inline-flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap px-2 ${segmentClasses(active)}`}
           >
             {t(`home.filters.${filter}`)}
             <span className="tabular-nums text-[11px] opacity-80">{counts[filter]}</span>

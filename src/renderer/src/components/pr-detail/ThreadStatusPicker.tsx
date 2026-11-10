@@ -11,7 +11,7 @@ import { threadStatusLabel, THREAD_STATUS_TONE, type ScmTone } from '../../lib/s
 const QUIET_CLASS = 'bg-transparent text-muted hover:bg-border/60 hover:text-text'
 
 const TONE_CLASS: Record<ScmTone, string> = {
-  neutral: 'bg-border/60 text-muted',
+  neutral: 'bg-muted/15 text-muted',
   accent: 'bg-accent/15 text-accent',
   success: 'bg-success/15 text-success',
   danger: 'bg-danger/15 text-danger',
