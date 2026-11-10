@@ -302,13 +302,16 @@ async function barEdges(page: Page) {
   })
 }
 
-// 1440–1300 leave a ~780–640 px bar with both panels docked: the band where a
-// labeled Walkthrough would crowd the labeled tabs (Spanish labels are longer).
+// With both panels docked, 1520 leaves a bar whose content (what PrHeader
+// measures: the box minus its 24 px padding) is ~836 px, past the 820 px
+// Walkthrough breakpoint; 1440–1300 leave ~756–656 px: the band where a labeled
+// Walkthrough would crowd the labeled tabs (Spanish labels are longer).
+const LABELED_WALKTHROUGH_WIDTH = 1520
 const BAR_WIDTHS = {
-  en: [1440, 1400, 1360, 1320, 1300, 1280, 960, 860, 760, 700, 600],
-  // Known gap (pre-existing): Spanish tab labels clip on ~700–750 px bars even
+  en: [LABELED_WALKTHROUGH_WIDTH, 1440, 1400, 1360, 1320, 1300, 1280, 960, 860, 760, 700, 600],
+  // Known gap (pre-existing): Spanish tab labels clip on ~686–726 px bar contents even
   // with an icon-only Walkthrough, because the tabs' own breakpoint is 680.
-  es: [1440, 1420, 1360],
+  es: [LABELED_WALKTHROUGH_WIDTH, 1440, 1420, 1360],
 }
 
 for (const language of ['en', 'es'] as const) {
@@ -344,6 +347,15 @@ for (const language of ['en', 'es'] as const) {
       expect(edges.merge!.right, `width ${width}: Merge inside the bar`).toBeLessThanOrEqual(
         edges.bar!.right,
       )
+      if (width === LABELED_WALKTHROUGH_WIDTH) {
+        // Pins the threshold from above: a breakpoint over 820 px would hide this label.
+        // Icon-only, the name moves to aria-label; labeled, the visible text names it.
+        const walkthrough = window.getByRole('button', { name: /^(Walkthrough|Recorrido)$/ })
+        await expect(walkthrough, `width ${width}: Walkthrough keeps its label`).toHaveText(
+          /Walkthrough|Recorrido/,
+        )
+        await expect(walkthrough).not.toHaveAttribute('aria-label')
+      }
       await attachScreenshot(window, testInfo, `bar-${language}-${width}`)
     }
   })
