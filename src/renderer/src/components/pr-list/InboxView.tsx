@@ -28,13 +28,14 @@ import { CountBadge } from '../ui/CountBadge'
 import { IconButton } from '../ui/IconButton'
 import { InlineError } from '../ui/InlineError'
 import { Spinner } from '../ui/Spinner'
+import { SEGMENTED_TRACK, segmentClasses } from '../ui/segmented-classes'
 
 /** The unread mark: the PR list's dot for unseen PRs; read rows keep its room so leads line up. */
 function UnreadDot({ unread }: { unread: boolean }): React.JSX.Element {
   return (
     <span
       aria-hidden
-      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${unread ? 'bg-danger' : 'bg-transparent'}`}
+      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${unread ? 'bg-accent' : 'bg-transparent'}`}
     />
   )
 }
@@ -481,7 +482,7 @@ export function InboxView(): React.JSX.Element {
             <div
               role="tablist"
               aria-label={t('layout.inbox.filter.label')}
-              className="flex w-full rounded-md border border-border bg-bg p-0.5 text-xs"
+              className={`flex w-full ${SEGMENTED_TRACK}`}
             >
               {INBOX_FILTERS.map((key) => (
                 <button
@@ -494,9 +495,7 @@ export function InboxView(): React.JSX.Element {
                       ? t('layout.inbox.filter.unreadWithCount', { count: unread })
                       : undefined
                   }
-                  className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-1 py-1 font-medium transition-colors duration-150 ${
-                    filter === key ? 'bg-panel text-text shadow-sm' : 'text-muted hover:text-text'
-                  }`}
+                  className={`flex min-w-0 flex-1 items-center justify-center gap-1 px-1 py-1 ${segmentClasses(filter === key)}`}
                 >
                   <span className="truncate">{t(`layout.inbox.filter.${key}`)}</span>
                   {key === 'unread' && unread > 0 && <CountBadge count={unread} />}

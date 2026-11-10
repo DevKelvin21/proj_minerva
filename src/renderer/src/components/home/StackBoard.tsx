@@ -195,7 +195,8 @@ function StackRow({
       data-orphan={orphan || undefined}
     >
       <header className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+        {/* No uppercase: it would turn "PRs" into "PRS". */}
+        <span className="text-[11px] font-semibold text-muted">
           {t('home.stackBoard.prCount', { count: stack.size })}
         </span>
         <Button

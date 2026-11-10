@@ -29,6 +29,9 @@ const STATUS_TONE: Record<Exclude<QueueStatus, null>, BadgeTone> = {
   waiting: 'neutral',
 }
 
+/** Statuses that restate the PR's review decision, so the row drops its review dot. */
+const REVIEW_STATUSES: ReadonlySet<QueueStatus> = new Set<QueueStatus>(['changesRequested', 'approved', 'waiting'])
+
 const FOLDED_KEY = 'minerva.queueFolded'
 
 /** Folded sections, remembered per machine. Unreadable storage = nothing folded. */
@@ -149,6 +152,7 @@ export function QueueView(): React.JSX.Element {
                       pr={pr}
                       onSelect={(picked) => open(picked)}
                       showRepo
+                      badgeShowsReview={status !== null && REVIEW_STATUSES.has(status)}
                       badge={
                         status ? (
                           <Badge data-queue-status={status} tone={STATUS_TONE[status]} size="sm">

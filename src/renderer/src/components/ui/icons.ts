@@ -7,8 +7,7 @@
  * Adding an icon: pick the meaning first. If a key already says it, reuse
  * it; otherwise add one key here (Lucide's current name, not a deprecated
  * alias) with a line saying what it means. Two keys may share a glyph when
- * they are different ideas (`stack` and `walkthrough` are both layers), but
- * one meaning never gets two glyphs.
+ * they are different ideas, but one meaning never gets two glyphs.
  *
  * Brand marks (GitHub, Azure DevOps, Claude, OpenAI, OpenCode) are not here:
  * see `ScmProviderIcon` / `AiProviderIcon` and `provider-marks.ts`.
@@ -93,6 +92,7 @@ import {
   Reply,
   Rocket,
   RotateCcw,
+  Route,
   Search,
   SearchX,
   Settings,
@@ -275,8 +275,8 @@ export const icons = {
   branch: GitBranch,
   /** A stack of dependent PRs. */
   stack: Layers,
-  /** The guided walkthrough (its layers). */
-  walkthrough: Layers,
+  /** The guided walkthrough (a route through the PR's layers; not `stack`). */
+  walkthrough: Route,
   /** A diagram (Mermaid). */
   diagram: Workflow,
   /** A file (path, file group). */

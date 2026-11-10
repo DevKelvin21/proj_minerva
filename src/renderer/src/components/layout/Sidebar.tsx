@@ -30,6 +30,7 @@ import { CountBadge } from '../ui/CountBadge'
 import { InlineError } from '../ui/InlineError'
 import { Drawer } from '../ui/Drawer'
 import { settingsPageForScm } from '../../lib/settings-pages'
+import { SEGMENTED_TRACK, segmentClasses } from '../ui/segmented-classes'
 
 const VIEWS: readonly SidebarView[] = ['queue', 'inbox']
 
@@ -67,7 +68,7 @@ function SidebarViewSwitch({
     <div
       role="group"
       aria-label={t('layout.sidebar.viewSwitch')}
-      className="flex w-full rounded-md border border-border bg-bg p-0.5 text-xs"
+      className={`flex w-full ${SEGMENTED_TRACK}`}
     >
       {VIEWS.map((view) => (
         <button
@@ -79,9 +80,7 @@ function SidebarViewSwitch({
             count[view] > 0 ? t(`layout.rail.view.${view}WithCount`, { count: count[view] }) : undefined
           }
           onClick={() => onChange(view)}
-          className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded px-1 py-1 font-medium transition-colors duration-150 ${
-            value === view ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
-          }`}
+          className={`flex min-w-0 flex-1 items-center justify-center gap-1 px-1 py-1 ${segmentClasses(value === view)}`}
         >
           <span className="truncate">{t(`layout.sidebar.views.${view}`)}</span>
           {count[view] > 0 && (

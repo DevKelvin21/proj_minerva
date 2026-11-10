@@ -25,7 +25,7 @@ export function ApprovalBar({
       aria-valuemin={0}
       aria-valuemax={total}
       aria-valuenow={approved}
-      className="block h-1.5 w-full overflow-hidden rounded-full bg-border/60"
+      className="block h-1.5 w-full overflow-hidden rounded-full bg-muted/20"
     >
       <span className="block h-full rounded-full bg-success" style={{ width: percent + '%' }} />
     </span>

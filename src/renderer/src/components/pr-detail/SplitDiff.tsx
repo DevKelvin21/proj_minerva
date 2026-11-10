@@ -91,7 +91,7 @@ function SideCells({
   const commentCount = threadList.reduce((sum, t) => sum + t.comments.length, 0)
   return (
     <>
-      <span className={`flex items-center justify-end gap-1 px-2 text-muted/70 ${bg} ${marks}`}>
+      <span className={`flex items-start justify-end gap-1 px-2 text-muted/70 ${bg} ${marks}`}>
         <DiffGutterActions
           line={position?.line}
           indicator={

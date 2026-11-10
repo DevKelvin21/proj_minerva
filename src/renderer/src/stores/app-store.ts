@@ -92,12 +92,16 @@ function readInitialSidebarWidth(): number | null {
   }
 }
 
-/** Persisted AI panel tab; anything but the literal 'analysis' = the chat. */
+/**
+ * Persisted AI panel tab; anything but the literal 'ask' = the analysis. A new
+ * user lands on Analysis (summary, walkthrough, diagrams: the didactic part)
+ * rather than an empty chat; a user who picked Ask keeps it.
+ */
 function readInitialAiPanelTab(): AiPanelTab {
   try {
-    return window.localStorage.getItem(AI_PANEL_TAB_KEY) === 'analysis' ? 'analysis' : 'ask'
+    return window.localStorage.getItem(AI_PANEL_TAB_KEY) === 'ask' ? 'ask' : 'analysis'
   } catch {
-    return 'ask'
+    return 'analysis'
   }
 }
 

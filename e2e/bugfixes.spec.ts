@@ -12,7 +12,10 @@ import { test, expect, attachScreenshot, openAnalysisTab } from './fixtures'
 
 test('descripción y comentarios del PR renderizan Markdown (no crudo)', async ({ window }) => {
   await window.getByText('Add POST /carts/:id/apply-coupon').first().click()
-  await window.getByText('Conversation').first().click()
+  await window
+    .getByRole('tablist', { name: 'Pull request views' })
+    .getByRole('tab', { name: /^Conversation/ })
+    .click()
 
   // Descripción: h2 reales dentro del article, sin "##" crudos.
   const article = window.locator('article').first()

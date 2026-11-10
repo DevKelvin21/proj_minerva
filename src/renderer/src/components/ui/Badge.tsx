@@ -11,7 +11,8 @@ export type BadgeTone =
   | 'merged'
 
 const toneClasses: Record<BadgeTone, string> = {
-  neutral: 'bg-border/60 text-muted',
+  // muted, not border: a border-tinted fill vanishes on dark panels.
+  neutral: 'bg-muted/15 text-muted',
   // Quieter than neutral: a tag, a branch, a draft. An inset ring, so it keeps the same height.
   outline: 'text-muted ring-1 ring-inset ring-border',
   accent: 'bg-accent/15 text-accent',

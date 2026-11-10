@@ -20,6 +20,8 @@ interface PrListItemProps {
   showRepo?: boolean
   /** One short status on the right (the Queue view's "Required", "Approved"…); replaces +/-. */
   badge?: ReactNode
+  /** The badge already states the review decision (approved, changes requested, waiting): hide the dot. */
+  badgeShowsReview?: boolean
 }
 
 function reviewDecisionTone(decision: ReviewDecision): string {
@@ -110,6 +112,7 @@ export function PrListItem({
   onSelect,
   showRepo = false,
   badge,
+  badgeShowsReview = false,
 }: PrListItemProps): React.JSX.Element {
   const { t } = useTranslation()
   const selectedPrKey = useAppStore((s) =>
@@ -135,7 +138,7 @@ export function PrListItem({
         <StateIcon state={pr.state} isDraft={pr.isDraft} />
         {isUnseen && (
           <span
-            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger"
+            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
             aria-hidden
             title={t('prList.unseenChanges')}
           />
@@ -161,7 +164,8 @@ export function PrListItem({
         <span>#{pr.number}</span>
         <StateBadge state={pr.state} />
         <CiStatusIcon status={pr.ciStatus} size="xs" />
-        {pr.reviewDecision && (
+        {/* The badge already says the review decision in words: no second, colored copy. */}
+        {pr.reviewDecision && !badgeShowsReview && (
           <span
             data-review={pr.reviewDecision}
             className={`h-1.5 w-1.5 rounded-full ${reviewDecisionTone(pr.reviewDecision)}`}
@@ -177,7 +181,7 @@ export function PrListItem({
             <span>{pr.commentCount}</span>
             {hasNewComments && (
               <span
-                className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-danger"
+                className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-accent"
                 aria-hidden
                 title={t('prList.newComments')}
               />

@@ -19,12 +19,13 @@ import { DidacticAnalysisArea } from '../didactic/DidacticAnalysisArea'
 import { DidacticPlaceholder } from '../didactic/DidacticPlaceholder'
 import { AskTab } from '../chat/AskTab'
 import { useRovingTabs, type RovingTabProps } from '../../hooks/use-roving-tabs'
+import { SEGMENTED_TRACK, segmentClasses } from '../ui/segmented-classes'
 
 const AI_PANEL_TABS: readonly AiPanelTab[] = ['ask', 'analysis']
 
 /**
- * Right-hand AI panel, two tabs: **Ask** (default; the side-panel chat,
- * `components/chat/`) and **Analysis** (the didactic analysis below). The
+ * Right-hand AI panel, two tabs: **Ask** (the side-panel chat,
+ * `components/chat/`) and **Analysis** (default; the didactic analysis below). The
  * chosen tab is remembered (`aiPanelTab`). Both stay mounted while the panel
  * is open, so switching keeps a half-typed question and a streaming analysis.
  * The detached window (`#didactic/…`) shows the analysis only.
@@ -139,7 +140,7 @@ export function DidacticPanel(): React.JSX.Element {
           <div
             role="tablist"
             aria-label={t('chat.panel.tabsLabel')}
-            className="flex min-w-0 items-center gap-0.5 rounded-md bg-bg p-0.5"
+            className={`flex min-w-0 items-center gap-0.5 ${SEGMENTED_TRACK}`}
           >
             <PanelTab
               tabProps={tabs.tabProps('ask')}
@@ -225,9 +226,7 @@ function PanelTab({
     <button
       type="button"
       {...tabProps}
-      className={`flex min-w-0 items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors duration-150 ${
-        tabProps['aria-selected'] ? 'bg-panel text-text shadow-sm' : 'text-muted hover:text-text'
-      }`}
+      className={`flex min-w-0 items-center gap-1 px-2 py-0.5 ${segmentClasses(Boolean(tabProps['aria-selected']))}`}
     >
       {icon}
       <span className="truncate">{label}</span>

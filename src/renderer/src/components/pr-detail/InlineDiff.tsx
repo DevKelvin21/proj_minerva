@@ -86,7 +86,7 @@ export function InlineDiff({
           <span className={`select-none px-2 text-right text-muted/70 ${bg} ${marks}`}>
             {row.oldNumber ?? ''}
           </span>
-          <span className={`flex items-center gap-1 px-2 text-muted/70 ${bg}`}>
+          <span className={`flex items-start gap-1 px-2 text-muted/70 ${bg}`}>
             <DiffGutterActions
               line={position?.line}
               indicator={

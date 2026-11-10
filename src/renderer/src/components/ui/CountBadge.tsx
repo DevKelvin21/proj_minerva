@@ -6,7 +6,7 @@ export type CountBadgeTone = 'accent' | 'warning' | 'neutral'
 const toneClasses: Record<CountBadgeTone, string> = {
   accent: 'bg-accent text-accent-fg',
   warning: 'bg-warning text-bg',
-  neutral: 'bg-border/60 text-muted',
+  neutral: 'bg-muted/15 text-muted',
 }
 
 interface CountBadgeProps extends HTMLAttributes<HTMLSpanElement> {

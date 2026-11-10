@@ -60,25 +60,26 @@ test('lines and a thread become chips, the answer streams in, and it can become 
   await setViewport(window, 1600, 1000)
   await openCouponService(window)
 
-  // The panel opens on Ask, with the hint while nothing is open.
-  await expect(window.getByRole('tab', { name: 'Ask', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  )
-  await expect(window.getByTestId('ask-tab')).toContainText('Ask about this pull request')
-
-  // Real tabs: one Tab stop, arrows switch and move focus, the panel is labelled by its tab.
+  // A new user's panel opens on Analysis (the didactic part), not an empty chat.
   const askTab = window.getByRole('tab', { name: 'Ask', exact: true })
   const analysisTab = window.getByRole('tab', { name: 'Analysis', exact: true })
-  await expect(analysisTab).toHaveAttribute('tabindex', '-1')
-  await askTab.focus()
-  await window.keyboard.press('ArrowRight')
+  await expect(analysisTab).toHaveAttribute('aria-selected', 'true')
+
+  // Real tabs: one Tab stop, arrows switch and move focus, the panel is labelled by its tab.
+  await expect(askTab).toHaveAttribute('tabindex', '-1')
+  await analysisTab.focus()
+  await window.keyboard.press('ArrowLeft')
+  await expect(askTab).toBeFocused()
+  await expect(askTab).toHaveAttribute('aria-selected', 'true')
+  await window.keyboard.press('End')
   await expect(analysisTab).toBeFocused()
   await expect(analysisTab).toHaveAttribute('aria-selected', 'true')
   await expect(window.getByRole('tabpanel', { name: 'Analysis' })).toBeVisible()
   await window.keyboard.press('Home')
   await expect(askTab).toBeFocused()
   await expect(askTab).toHaveAttribute('aria-selected', 'true')
+  // Ask shows the hint while nothing is open.
+  await expect(window.getByTestId('ask-tab')).toContainText('Ask about this pull request')
 
   // Two lines (one with a note) and the thread on line 16.
   await addLine(window, 12, 'Is the expiry check inclusive?')
@@ -284,6 +285,7 @@ test('narrow window: the chat is an overlay and adding a line leaves the diff in
   await setViewport(window, 700, 900)
 
   // The panel opens over the center on `sm`; close it to work on the diff.
+  await openAskTab(window)
   const askTab = window.getByTestId('ask-tab')
   await expect(askTab).toBeVisible()
   // The tier follows the resize a frame later: wait for the overlay width.
