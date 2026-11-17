@@ -39,6 +39,7 @@ import {
   type GithubRepoRef,
   type RepoRef,
   type ReviewerVote,
+  type ReviewVerdict,
 } from '../../../shared/scm'
 import { looksBinary } from '../azure/patch-builder'
 import { ScmError, isScmError } from '../errors'
@@ -49,6 +50,8 @@ import type {
   ListPullRequestsQuery,
   MergeWrite,
   MergeWriteResult,
+  ReviewWrite,
+  ReviewWriteResult,
   ScmDataSource,
   ScopePullRequest,
   SnapshotRequest,
@@ -185,6 +188,8 @@ interface PullRequestDetailNode {
 }
 
 interface PullRequestDetailResponse {
+  /** The token's user: who `viewer` (author? reviewer? own vote) is computed against. */
+  viewer?: { login?: string } | null
   repository: { pullRequest: PullRequestDetailNode | null } | null
 }
 
@@ -269,6 +274,7 @@ const SEARCH_PULL_REQUESTS_QUERY = `
 
 const PULL_REQUEST_DETAIL_QUERY = `
   query PullRequestDetail($owner: String!, $name: String!, $number: Int!) {
+    viewer { login }
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
         id
@@ -865,6 +871,38 @@ export function mapGithubMergeError(error: unknown, repoFullName: string): ScmEr
   return mapGithubError(error, repoFullName)
 }
 
+const GITHUB_REVIEW_EVENTS: Record<
+  ReviewVerdict,
+  'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES' | null
+> = {
+  comment: 'COMMENT',
+  approved: 'APPROVE',
+  changes_requested: 'REQUEST_CHANGES',
+  // Azure DevOps only (the validator refuses them for GitHub).
+  approved_with_suggestions: null,
+  rejected: null,
+}
+
+/**
+ * A refused review: 422 says why (your own PR, a commit no longer in the PR,
+ * a missing body). Your own PR is `FORBIDDEN`; a commit that is not the head
+ * any more is `CONFLICT`; the rest keeps GitHub's reason.
+ */
+export function mapGithubReviewError(error: unknown, repoFullName: string): ScmError {
+  if (isScmError(error)) return error
+  const err = asGithubErrorLike(error)
+  if (err.status === 422) {
+    const reason = githubReason(error)
+    const options = { cause: error }
+    if (/own pull request/i.test(reason)) {
+      return new ScmError('FORBIDDEN', mt('scm.review.ownPullRequest'), options)
+    }
+    const code = /commit/i.test(reason) ? 'CONFLICT' : 'UNKNOWN'
+    return new ScmError(code, mt('github.reviewRefused', { repo: repoFullName, reason }), options)
+  }
+  return mapGithubError(error, repoFullName)
+}
+
 // ---------------------------------------------------------------------------
 // Servicio real.
 // ---------------------------------------------------------------------------
@@ -953,7 +991,10 @@ export class RealGithubService implements ScmDataSource {
       if (!pr) {
         throw new ScmError('NOT_FOUND', mt('scm.prNotFound', { repo: repo.fullName, number }))
       }
-      return mapDetailNode(pr, repo)
+      const detail = mapDetailNode(pr, repo)
+      const viewerLogin = data.viewer?.login
+      if (viewerLogin) detail.viewer = githubViewerRelation(pr.author?.login, pr, viewerLogin)
+      return detail
     } catch (error) {
       throw mapGithubError(error, repo.fullName)
     }
@@ -1310,6 +1351,31 @@ export class RealGithubService implements ScmDataSource {
       return { completed: true }
     } catch {
       return { completed: true, branchDeleteFailed: true }
+    }
+  }
+
+  /**
+   * `POST /pulls/{n}/reviews` with the event, pinned to the head commit main
+   * re-checked (`commit_id`), so it never lands on commits the user did not see.
+   */
+  async submitReview(req: ReviewWrite): Promise<ReviewWriteResult> {
+    const repo = asGithubRepo(req.repo)
+    const event = GITHUB_REVIEW_EVENTS[req.verdict]
+    if (!event) throw new ScmError('CONFLICT', mt('scm.review.verdictNotAllowed'))
+    const token = this.requireToken()
+    const client = this.client(token)
+    try {
+      await client.rest.pulls.createReview({
+        owner: repo.owner,
+        repo: repo.name,
+        pull_number: req.number,
+        commit_id: req.headSha,
+        event,
+        ...(req.body ? { body: req.body } : {}),
+      })
+      return {}
+    } catch (error) {
+      throw mapGithubReviewError(error, repo.fullName)
     }
   }
 

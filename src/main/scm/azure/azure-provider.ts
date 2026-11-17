@@ -49,6 +49,7 @@ import {
   type AzureRepoRef,
   type FileContent,
   type RepoRef,
+  type ReviewVerdict,
   type ScmAuthStatus,
 } from '../../../shared/scm'
 import type {
@@ -71,6 +72,8 @@ import type {
   ListPullRequestsQuery,
   MergeWrite,
   MergeWriteResult,
+  ReviewWrite,
+  ReviewWriteResult,
   ScmProvider,
   ScopePullRequest,
   SnapshotRequest,
@@ -171,6 +174,15 @@ const MAX_WORK_ITEMS = 50
 const MAX_COMMITS_COUNTED = 1000
 const POLICY_API_VERSION = '7.1-preview.1'
 const COMMIT_SHA_RE = /^[0-9a-f]{40}$/i
+
+/** Azure DevOps vote per verdict; `null` = no vote (a plain comment). */
+const AZURE_VOTES: Record<ReviewVerdict, number | null> = {
+  comment: null,
+  approved: 10,
+  approved_with_suggestions: 5,
+  changes_requested: -5,
+  rejected: -10,
+}
 
 interface Identity {
   id: string
@@ -738,7 +750,7 @@ export class AzureScmProvider implements ScmProvider {
     const org = repo.organization
     const pr = await this.rawPullRequest(repo, number)
     const projectId = pr.repository.project.id
-    const [{ iterations, changes }, statuses, evaluations, workItems, commits] = await Promise.all([
+    const [{ iterations, changes }, statuses, evaluations, workItems, commits, me] = await Promise.all([
       // The changes give the true file count (cheap: counted, not diffed; cached).
       this.iterations(repo, number)
         .catch(() => [] as AzIteration[])
@@ -765,16 +777,19 @@ export class AzureScmProvider implements ScmProvider {
         })
         .then((list) => list.length)
         .catch(() => 0),
+      // Best-effort: without the identity the detail just carries no `viewer`.
+      this.identity(org).catch(() => null),
     ])
 
     const latest = latestIteration(iterations)
     const key = prKey(repo, number)
     const entry = this.activity.get(key)
-    const summary = mapPullRequestSummary(pr, org, [
-      latest?.createdDate,
-      entry?.changedAt,
-      entry?.iterationDate,
-    ])
+    const summary = mapPullRequestSummary(
+      pr,
+      org,
+      [latest?.createdDate, entry?.changedAt, entry?.iterationDate],
+      me?.id ?? null,
+    )
     const detail: PullRequestDetail = {
       ...summary,
       ciStatus: mapCiStatus(statuses, evaluations),
@@ -1267,6 +1282,50 @@ export class AzureScmProvider implements ScmProvider {
       return { completed: updated.status === 'completed' }
     } catch (error) {
       throw mapCompletionError(error)
+    }
+  }
+
+  /**
+   * The vote is `PUT …/pullRequests/{id}/reviewers/{me}` (it adds the user as
+   * an optional reviewer when they were not one); the summary is a PR-level
+   * thread. Azure DevOps has no review object tying both together, so the
+   * vote goes first (it is what the user asked for) and a summary that fails
+   * after it is reported (`summaryFailed`), not thrown: the vote stands.
+   * Azure DevOps cannot pin a vote to a commit; `./review.ts` re-checked the
+   * head right before this call.
+   */
+  async submitReview(req: ReviewWrite): Promise<ReviewWriteResult> {
+    const repo = this.scoped(req.repo)
+    const org = repo.organization
+    const vote = AZURE_VOTES[req.verdict]
+    if (vote !== null) {
+      const me = await this.identity(org)
+      await this.client.json<unknown>(
+        org,
+        this.repoUrl(repo, 'pullRequests', req.number, 'reviewers', me.id),
+        { method: 'PUT', body: { vote } },
+      )
+    }
+    if (!req.body) return {}
+    try {
+      await this.client.json<AzThread>(
+        org,
+        this.repoUrl(repo, 'pullRequests', req.number, 'threads'),
+        {
+          method: 'POST',
+          body: {
+            comments: [{ content: req.body, parentCommentId: 0, commentType: 1 }],
+            // An approval's summary is closed (4) so a "resolve all comments"
+            // policy doesn't block the PR it approves; the rest stay active (1).
+            status: vote !== null && vote > 0 ? 4 : 1,
+          },
+        },
+      )
+      return {}
+    } catch (error) {
+      // A plain comment is the whole review: nothing landed, so it is an error.
+      if (vote === null) throw error
+      return { summaryFailed: true }
     }
   }
 

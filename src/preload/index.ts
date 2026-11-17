@@ -394,6 +394,7 @@ const minervaApi = {
     getMergeOptions: invoke('scm:getMergeOptions'),
     merge: invoke('scm:merge'),
     setAutoMerge: invoke('scm:setAutoMerge'),
+    submitReview: invoke('scm:submitReview'),
     getStacks: invoke('scm:getStacks'),
     getDashboard: invoke('scm:getDashboard'),
   },

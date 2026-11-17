@@ -834,6 +834,45 @@ describe('payloadValidators', () => {
     })
   })
 
+  describe('scm:submitReview', () => {
+    const validate = payloadValidators['scm:submitReview']
+    const base = {
+      repo: validRepo,
+      number: 7,
+      expectedHeadSha: 'a'.repeat(40),
+      verdict: 'approved',
+      body: '',
+    }
+
+    it('accepts the GitHub verdicts with an empty or long summary', () => {
+      for (const verdict of ['comment', 'approved', 'changes_requested']) {
+        expect(validate({ ...base, verdict, body: 'LGTM' })).toBe(true)
+      }
+      expect(validate(base)).toBe(true)
+      expect(validate({ ...base, body: 'x'.repeat(65536) })).toBe(true)
+    })
+
+    it('Azure also: approve with suggestions and reject', () => {
+      for (const verdict of ['approved_with_suggestions', 'rejected', 'changes_requested']) {
+        expect(validate({ ...base, repo: validAzureRepo, verdict })).toBe(true)
+      }
+    })
+
+    it('rejects Azure-only verdicts on GitHub, unknown verdicts, bad shas, oversized bodies, missing or extra keys', () => {
+      expect(validate({ ...base, verdict: 'approved_with_suggestions' })).toBe(false)
+      expect(validate({ ...base, verdict: 'rejected' })).toBe(false)
+      expect(validate({ ...base, verdict: 'none' })).toBe(false)
+      expect(validate({ ...base, verdict: 'APPROVE' })).toBe(false)
+      expect(validate({ ...base, expectedHeadSha: 'abc1234' })).toBe(false)
+      expect(validate({ ...base, body: 'x'.repeat(65537) })).toBe(false)
+      expect(validate({ ...base, body: null })).toBe(false)
+      const { body: _drop, ...missing } = base
+      void _drop
+      expect(validate(missing)).toBe(false)
+      expect(validate({ ...base, event: 'APPROVE' })).toBe(false)
+    })
+  })
+
   describe('scm:setAutoMerge', () => {
     const validate = payloadValidators['scm:setAutoMerge']
     const on = {

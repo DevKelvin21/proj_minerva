@@ -19,8 +19,10 @@ import type {
   MergeOptions,
   PostCommentRequest,
   PrComment,
+  PrReviewer,
   PrViewerRelation,
   PullRequestDetail,
+  ReviewDecision,
   PullRequestSummary,
   SetThreadStatusRequest,
 } from '../../../shared/types'
@@ -32,6 +34,7 @@ import {
   type FileContent,
   type GithubRepoRef,
   type RepoRef,
+  type ReviewerVote,
 } from '../../../shared/scm'
 import { ScmError } from '../errors'
 import { mt } from '../../i18n'
@@ -40,6 +43,8 @@ import type {
   ListPullRequestsQuery,
   MergeWrite,
   MergeWriteResult,
+  ReviewWrite,
+  ReviewWriteResult,
   ScmDataSource,
   ScopePullRequest,
   SnapshotRequest,
@@ -151,6 +156,17 @@ function mockViewer(detail: PullRequestDetail): PrViewerRelation {
   return { isAuthor, reviewer: 'required', vote: entry.vote }
 }
 
+/** GitHub's overall decision after a vote changed (required reviewers gate it). */
+function mockReviewDecision(reviewers: PrReviewer[], current: ReviewDecision): ReviewDecision {
+  if (reviewers.some((reviewer) => reviewer.vote === 'changes_requested'))
+    return 'changes_requested'
+  if (reviewers.some((reviewer) => reviewer.isRequired && reviewer.vote !== 'approved')) {
+    return 'review_required'
+  }
+  if (reviewers.some((reviewer) => reviewer.vote === 'approved')) return 'approved'
+  return current
+}
+
 /**
  * A fresh summary of a record (detail-only fields dropped). Fresh on purpose:
  * the real service builds new objects on every fetch, and consumers such as
@@ -254,7 +270,8 @@ export class MockGithubService implements ScmDataSource {
 
   async getPullRequestDetail(repo: RepoRef, number: number): Promise<PullRequestDetail> {
     await delay(LATENCY_MS.getPullRequestDetail)
-    return this.getRecord(repo, number).detail
+    const { detail } = this.getRecord(repo, number)
+    return { ...detail, viewer: mockViewer(detail) }
   }
 
   async getPullRequestFiles(repo: RepoRef, number: number): Promise<DiffFile[]> {
@@ -499,6 +516,73 @@ export class MockGithubService implements ScmDataSource {
     record.detail.updatedAt = new Date().toISOString()
     delete record.detail.autoComplete
     return { completed: true }
+  }
+
+  /**
+   * A review in memory with GitHub's rules: pinned to the head, no vote on
+   * your own PR. The vote becomes (or replaces) "my" reviewer entry (a plain
+   * comment leaves a standing vote alone, like `latestReviews`) and the
+   * summary a PR-level comment, like a review body on github.com.
+   */
+  async submitReview(req: ReviewWrite): Promise<ReviewWriteResult> {
+    await delay(LATENCY_MS.postComment)
+    const record = this.getRecord(req.repo, req.number)
+    const repo = asGithubRepo(req.repo)
+    const { detail } = record
+    if (detail.headSha !== req.headSha) {
+      throw new ScmError(
+        'CONFLICT',
+        mt('github.reviewRefused', {
+          repo: repo.fullName,
+          reason: 'commit_id is not part of the pull request',
+        }),
+      )
+    }
+    const isAuthor = detail.author.login === MOCK_GITHUB_LOGIN
+    if (isAuthor && req.verdict !== 'comment') {
+      throw new ScmError('FORBIDDEN', mt('scm.review.ownPullRequest'))
+    }
+    const vote: ReviewerVote =
+      req.verdict === 'approved' || req.verdict === 'changes_requested' ? req.verdict : 'none'
+    const mine = detail.reviewers.find((reviewer) => reviewer.user.login === MOCK_GITHUB_LOGIN)
+    let reviewers = detail.reviewers
+    if (!isAuthor && mine && req.verdict !== 'comment') {
+      reviewers = reviewers.map((reviewer) =>
+        reviewer === mine ? { ...reviewer, vote } : reviewer,
+      )
+    } else if (!isAuthor && !mine) {
+      reviewers = [...reviewers, { user: { login: MOCK_GITHUB_LOGIN }, vote, isRequired: false }]
+    }
+    const now = new Date().toISOString()
+    if (req.body) {
+      const commentId = `c-mock-${this.nextCommentSeq}`
+      record.threads.push({
+        id: `thread-mock-${this.nextCommentSeq}`,
+        status: 'active',
+        isResolved: false,
+        isLineThread: false,
+        comments: [
+          {
+            id: commentId,
+            author: { login: MOCK_GITHUB_LOGIN },
+            bodyMarkdown: req.body,
+            createdAt: now,
+            isMinimized: false,
+            isViewer: true,
+            htmlUrl: mockCommentUrl(repo, req.number, commentId, false),
+          },
+        ],
+      })
+      this.nextCommentSeq += 1
+    }
+    record.detail = {
+      ...detail,
+      reviewers,
+      reviewDecision: mockReviewDecision(reviewers, detail.reviewDecision),
+      commentCount: (detail.commentCount ?? 0) + (req.body ? 1 : 0),
+      updatedAt: now,
+    }
+    return {}
   }
 
   async setAutoMerge(req: AutoMergeWrite): Promise<void> {

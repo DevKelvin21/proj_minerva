@@ -45,6 +45,7 @@ function makeFakeService(overrides: Partial<ScmDataSource> = {}): ScmDataSource 
     getMergeOptions: vi.fn().mockResolvedValue({}),
     mergePullRequest: vi.fn().mockResolvedValue({ completed: true }),
     setAutoMerge: vi.fn().mockResolvedValue(undefined),
+    submitReview: vi.fn().mockResolvedValue({}),
     listScopePullRequests: vi.fn().mockResolvedValue([]),
     listMergedBySourceBranch: vi.fn().mockResolvedValue([]),
     ...overrides,
@@ -141,6 +142,14 @@ describe('withGhCliTokenRetry', () => {
           transitionWorkItems: false,
         }),
       setAutoMerge: (w) => w.setAutoMerge({ repo: validRepo, number: 1, enable: false }),
+      submitReview: (w) =>
+        w.submitReview({
+          repo: validRepo,
+          number: 1,
+          headSha: 'abc',
+          verdict: 'approved',
+          body: '',
+        }),
       listScopePullRequests: (w) => w.listScopePullRequests(),
       listMergedBySourceBranch: (w) => w.listMergedBySourceBranch(validRepo, 'feature/x'),
     }

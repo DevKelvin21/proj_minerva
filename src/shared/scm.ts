@@ -90,6 +90,32 @@ export const SETTABLE_THREAD_STATUSES: Record<ScmProviderId, readonly ThreadStat
   azure: ['active', 'pending', 'resolved', 'wont_fix', 'closed', 'by_design'],
 }
 
+/**
+ * The verdict of a review the user submits (`scm:submitReview`), named after
+ * the vote it leaves (`ReviewerVote`):
+ * - `comment`: no vote, the summary only (GitHub COMMENT; Azure DevOps: a
+ *   PR-level comment thread);
+ * - `approved`: GitHub APPROVE / Azure DevOps 10;
+ * - `approved_with_suggestions`: Azure DevOps 5;
+ * - `changes_requested`: GitHub REQUEST_CHANGES / Azure DevOps -5 ("wait for author");
+ * - `rejected`: Azure DevOps -10.
+ */
+export type ReviewVerdict = 'comment' | Exclude<ReviewerVote, 'none'>
+
+/** Verdicts each provider can submit, in the order the Review control lists them. */
+export const REVIEW_VERDICTS: Record<ScmProviderId, readonly ReviewVerdict[]> = {
+  github: ['comment', 'approved', 'changes_requested'],
+  azure: ['comment', 'approved', 'approved_with_suggestions', 'changes_requested', 'rejected'],
+}
+
+/**
+ * Whether a verdict needs a summary: a plain comment always does (it is the
+ * whole review), and GitHub refuses REQUEST_CHANGES without a body.
+ */
+export function reviewVerdictNeedsBody(provider: ScmProviderId, verdict: ReviewVerdict): boolean {
+  return verdict === 'comment' || (provider === 'github' && verdict === 'changes_requested')
+}
+
 export function isThreadOpen(status: ThreadStatus): boolean {
   return status === 'active' || status === 'pending'
 }

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CommentThread, RepoRef } from '../../../shared/types'
 import { repoKey } from '../../../shared/scm'
 import { errorText } from '../lib/error-text'
+import { useAppStore } from '../stores/app-store'
 
 interface UseCommentThreadsResult {
   threads: CommentThread[]
@@ -63,6 +64,29 @@ export function useCommentThreads(repo: RepoRef, number: number): UseCommentThre
       await reload()
     })()
   }, [reload])
+
+  // A write elsewhere in the PR (a submitted review's summary, a merge) bumps
+  // `scmDataVersion`: refetch quietly, without the loading state, so open
+  // threads and the scroll position stay as they are.
+  const scmDataVersion = useAppStore((s) => s.scmDataVersion)
+  const seenVersion = useRef(scmDataVersion)
+  useEffect(() => {
+    if (seenVersion.current === scmDataVersion) return
+    seenVersion.current = scmDataVersion
+    let cancelled = false
+    void (async () => {
+      try {
+        const result = await window.minerva.scm.getCommentThreads({ repo, number })
+        if (!cancelled) setThreads(result)
+      } catch {
+        // Keep what is shown; the next explicit reload reports errors.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- se depende de campos primitivos de `repo`, no de su identidad de objeto.
+  }, [scmDataVersion, repoIdentity, number])
 
   const applyThreadStatus = useCallback((updated: CommentThread) => {
     setThreads((current) =>

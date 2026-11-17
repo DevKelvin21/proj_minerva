@@ -421,6 +421,7 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
           if (method === 'GET') return json({ count: list.length, value: list })
           if (method === 'POST') {
             const input = body as {
+              status?: number
               comments?: { content?: string }[]
               threadContext?: AzThread['threadContext']
               pullRequestThreadContext?: AzThread['pullRequestThreadContext']
@@ -428,7 +429,7 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
             const created: AzThread = {
               id: list.reduce((max, thread) => Math.max(max, thread.id), 0) + 1,
               publishedDate: tick(),
-              status: 'active',
+              status: input.status === 4 ? 'closed' : 'active',
               threadContext: input.threadContext ?? null,
               pullRequestThreadContext: input.pullRequestThreadContext ?? null,
               comments: [comment(1, 0, String(input.comments?.[0]?.content ?? ''))],
@@ -464,6 +465,29 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
           return json(created)
         }
         return notFound('thread route')
+      }
+      case 'reviewers': {
+        // PUT …/reviewers/{id} { vote }: adds the identity (optional) when it
+        // was not a reviewer yet, like Azure DevOps.
+        if (!fourth || fifth || method !== 'PUT') return notFound('reviewer route')
+        const identity = IDENTITIES.find((person) => person.id === fourth)
+        if (!identity) return json({ message: 'TF400813: unknown identity' }, 400)
+        const vote = (body as { vote?: unknown }).vote
+        if (typeof vote !== 'number' || ![10, 5, 0, -5, -10].includes(vote)) {
+          return json({ message: 'TF401181: invalid vote' }, 400)
+        }
+        if (pr.status !== 'active') {
+          return json({ message: 'TF401181: the pull request is not active' }, 409)
+        }
+        const reviewers = (pr.reviewers ??= [])
+        let entry = reviewers.find((reviewer) => reviewer.id === identity.id)
+        if (!entry) {
+          entry = { ...clone(identity), vote, isRequired: false }
+          reviewers.push(entry)
+        } else {
+          entry.vote = vote
+        }
+        return json(entry)
       }
       case 'statuses':
         return json({ value: STATUSES[prId] ?? [] })

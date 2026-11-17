@@ -35,8 +35,8 @@ unified patches built in main.
   under an aggregate budget (`diff-files.ts`). `updatedAt` is derived (see the header of
   `azure-provider.ts`).
 - Provider-neutral in `main/scm/`: `snapshot-store`, `seen-store`, `pr-watcher`,
-  `scm-settings` (enabled flags), `retarget` and `merge` (the PR writes: validate, native
-  confirm, re-check, write; merge pins the head commit the user reviewed),
+  `scm-settings` (enabled flags), `retarget`, `merge` and `review` (the PR writes: validate,
+  native confirm, re-check, write; merge and review pin the head commit the user reviewed),
   `stacks-service` (orphans via exact merged-by-source lookups), `dashboard-service`
   (`scm:getDashboard`: scope open PRs + the user's own, with `labels`/`reviewers`/`viewer`),
   `scope-cache` (ONE single-flight 60 s scope fetch shared by stacks and dashboard; the
@@ -72,6 +72,15 @@ unified patches built in main.
   through `scm:merge` / `scm:setAutoMerge`; refusals are `MERGE_CONFLICT`, `CHECKS_FAILING`,
   `MERGE_BLOCKED`, `FORBIDDEN`, or `CONFLICT` when the PR moved. GitHub auto-merge needs
   "Allow auto-merge" AND something pending (GitHub refuses it on a clean PR).
+- **Review control** (`pr-detail/ReviewControl.tsx`, just before Merge): T3 Code-style verdict
+  + summary + Submit review, through `scm:submitReview` (`main/scm/review.ts`). Verdicts per
+  provider in `REVIEW_VERDICTS` (GitHub: comment / approve / request changes; Azure adds approve
+  with suggestions and reject; -5 reads "Wait for author"). A vote gets the native confirm, a
+  plain comment does not. GitHub refuses votes on your own PR (`viewer.isAuthor`, so PR detail
+  carries `viewer` too) and needs a body for comment / request changes. Azure: vote = `PUT
+  …/reviewers/{me}`, summary = a PR thread (`summaryFailed` if only the vote landed). The
+  trigger shows your own vote. Bar labels give way: Review < 940, Walkthrough < 840, Details <
+  776, tabs < 700 (the default 1400 px window must keep tab labels; merge.spec.ts sweeps en + es).
 - **Notification sound + menu bar** (`notifications` in settings.json: `level`, `badge`, `sound`,
   `menuBar`; a file without the last two keeps its level/badge, missing = on): the sound rides the
   OS notification (`silent`, macOS `sound: 'Glass'`, `notificationSound` in `activity-notifier.ts`),

@@ -10,12 +10,18 @@
  * - `writeSnapshot` writes HOSTILE content: no symlinks, no paths outside
  *   `destDir`, size caps. It is only read by jailed AI tools, never executed.
  * - Tokens never leave main and never appear in `ScmAuthStatus`.
- * - Writes (comments, thread status, base branch, merge, auto-merge) only
- *   happen on explicit user actions routed through IPC; retarget validation
- *   lives in `./retarget.ts` and merge validation in `./merge.ts`, so they are
- *   the same for every provider.
+ * - Writes (comments, thread status, base branch, merge, auto-merge, reviews)
+ *   only happen on explicit user actions routed through IPC; retarget
+ *   validation lives in `./retarget.ts`, merge validation in `./merge.ts` and
+ *   review validation in `./review.ts`, so they are the same for every provider.
  */
-import type { FileContent, RepoRef, ScmAuthStatus, ScmProviderId } from '../../shared/scm'
+import type {
+  FileContent,
+  RepoRef,
+  ReviewVerdict,
+  ScmAuthStatus,
+  ScmProviderId,
+} from '../../shared/scm'
 import type {
   CommentThread,
   DiffFile,
@@ -89,6 +95,22 @@ export type AutoMergeWrite =
     }
   | { repo: RepoRef; number: number; enable: false }
 
+/** A raw review submission, already validated (and confirmed) by `./review.ts`. */
+export interface ReviewWrite {
+  repo: RepoRef
+  number: number
+  /** The head commit that was re-checked; GitHub pins the review to it. */
+  headSha: string
+  verdict: ReviewVerdict
+  /** Trimmed summary; `''` = none. */
+  body: string
+}
+
+export interface ReviewWriteResult {
+  /** Azure DevOps: the vote was recorded but the summary comment could not be posted. */
+  summaryFailed?: boolean
+}
+
 export interface ScmProvider {
   readonly id: ScmProviderId
   getAuthStatus(): Promise<ScmAuthStatus>
@@ -123,6 +145,8 @@ export interface ScmProvider {
   mergePullRequest(req: MergeWrite): Promise<MergeWriteResult>
   /** Raw auto-complete / auto-merge change. Call it only through `./merge.ts`. */
   setAutoMerge(req: AutoMergeWrite): Promise<void>
+  /** Raw review (vote + summary). Call it only through `./review.ts`, which re-validates first. */
+  submitReview(req: ReviewWrite): Promise<ReviewWriteResult>
 
   /**
    * Every OPEN PR of the configured scope (Azure: configured projects;

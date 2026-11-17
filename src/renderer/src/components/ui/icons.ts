@@ -35,6 +35,7 @@ import {
   CircleDashed,
   CircleQuestionMark,
   CircleSlash,
+  ClipboardCheck,
   Clock,
   Cloud,
   CodeXml,
@@ -315,6 +316,8 @@ export const icons = {
   reviewRequested: Eye,
   /** Approved. */
   approved: CircleCheck,
+  /** Submit your own review (approve, request changes, comment). */
+  review: ClipboardCheck,
   /** Auto-merge / auto-complete is scheduled. */
   autoMerge: Clock,
   /** Nothing matched / the page's subject does not exist. */

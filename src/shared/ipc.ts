@@ -30,6 +30,8 @@ import type {
   RetargetResult,
   ScmSettingsInfo,
   SetAutoMergeRequest,
+  SubmitReviewRequest,
+  SubmitReviewResult,
   SetAutoMergeResult,
   SetProviderSettingsRequest,
   SetThreadStatusRequest,
@@ -175,6 +177,15 @@ export interface IpcContract {
   'scm:merge': { req: MergeRequest; res: MergeResult }
   /** Turns auto-complete (Azure DevOps) / auto-merge (GitHub) on or off; same checks and dialog. */
   'scm:setAutoMerge': { req: SetAutoMergeRequest; res: SetAutoMergeResult }
+  /**
+   * Submits a review: approve, request changes (Azure DevOps also: approve
+   * with suggestions, reject) or a plain comment. Main re-validates (open,
+   * head still `expectedHeadSha`, verdict allowed, GitHub: not your own PR;
+   * see `main/scm/review.ts`), asks with a native dialog before a vote,
+   * re-checks and writes. Refusals: `[SCM:CONFLICT]` (PR moved / closed),
+   * `[SCM:FORBIDDEN]`.
+   */
+  'scm:submitReview': { req: SubmitReviewRequest; res: SubmitReviewResult }
   /**
    * Stacked PRs of every enabled provider, with orphan detection (a root that
    * still targets the source branch of an already merged PR). Cached ~60 s in
@@ -412,6 +423,7 @@ export const IPC_CHANNELS = [
   'scm:getMergeOptions',
   'scm:merge',
   'scm:setAutoMerge',
+  'scm:submitReview',
   'scm:getStacks',
   'scm:getDashboard',
   'activity:get',

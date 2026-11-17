@@ -52,6 +52,7 @@ function fake(overrides: Partial<ScmProvider> = {}): ScmProvider {
     getMergeOptions: notUsed,
     mergePullRequest: notUsed,
     setAutoMerge: notUsed,
+    submitReview: notUsed,
     listScopePullRequests: async () => [
       open(1, 'feature/a', 'main'),
       open(2, 'feature/b', 'feature/a'),

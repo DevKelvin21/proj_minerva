@@ -63,6 +63,7 @@ function fake(id: 'github' | 'azure', overrides: Partial<ScmProvider> = {}): Scm
     getMergeOptions: notUsed,
     mergePullRequest: notUsed,
     setAutoMerge: notUsed,
+    submitReview: notUsed,
     listScopePullRequests: async () => [],
     listMergedBySourceBranch: async () => [],
     ...overrides,
