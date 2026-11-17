@@ -209,6 +209,25 @@ export const en = {
       offMessage: 'Disable auto-merge for PR #{{number}}?',
       offConfirm: 'Disable auto-merge',
     },
+    review: {
+      message: {
+        approved: 'Approve PR #{{number}}?',
+        approved_with_suggestions: 'Approve PR #{{number}} with suggestions?',
+        changes_requested: 'Request changes on PR #{{number}}?',
+        changes_requestedAzure: 'Vote "Wait for author" on PR #{{number}}?',
+        rejected: 'Reject PR #{{number}}?',
+      },
+      confirm: {
+        approved: 'Approve',
+        approved_with_suggestions: 'Approve with suggestions',
+        changes_requested: 'Request changes',
+        changes_requestedAzure: 'Wait for author',
+        rejected: 'Reject',
+      },
+      headLine: 'Reviewed head {{sha}}',
+      summary: 'Summary ({{count}} chars): {{summary}}',
+      noSummary: 'No summary',
+    },
     retarget: {
       message: 'Retarget PR #{{number}}?',
       detail: 'Repository: {{repo}}\nTitle: {{title}}\n\nBase branch: {{from}} → {{to}}',
@@ -254,6 +273,14 @@ export const en = {
         rebase_merge: 'Semi-linear merge',
       },
     },
+    review: {
+      notOpen: 'Pull request #{{number}} is no longer open.',
+      headMoved:
+        'New commits were pushed to pull request #{{number}} (head is now {{current}}, you reviewed {{expected}}). Nothing was submitted. Reload to review them first.',
+      ownPullRequest: "GitHub doesn't let you approve or request changes on your own pull request.",
+      verdictNotAllowed: 'That review verdict is not available for this pull request.',
+      bodyRequired: 'This review needs a summary.',
+    },
     providerDisabled: 'Source-control provider not enabled: {{provider}}',
     invalidSettings: 'Invalid source-control settings.',
     prNotFound: 'Pull request not found: {{repo}}#{{number}}',
@@ -278,6 +305,7 @@ export const en = {
   github: {
     mergeRefused: 'GitHub refused the merge of {{repo}}: {{reason}}',
     mergeHeadMoved: 'The head of the pull request changed on GitHub. Nothing was merged. Reload and try again.',
+    reviewRefused: 'GitHub refused the review on {{repo}}: {{reason}}',
     notGithubRepo: 'Not a GitHub repository: {{repo}}',
     thisRepository: 'this repository',
     tokenInvalid: 'Not authenticated: the GitHub token is invalid or expired.',

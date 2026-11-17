@@ -10,6 +10,7 @@ import type {
   PrStack,
   RepoRef,
   ReviewerVote,
+  ReviewVerdict,
   ScmErrorCode,
   ScmProviderId,
   ScmProviderSettings,
@@ -420,6 +421,31 @@ export type SetAutoMergeRequest =
 
 export type SetAutoMergeResult =
   | { outcome: 'enabled' | 'disabled'; pr: PullRequestDetail }
+  | { outcome: 'cancelled' }
+
+/**
+ * `scm:submitReview`: approve / request changes / comment on a PR as the
+ * signed-in user. Main re-checks the PR (open, head still `expectedHeadSha`,
+ * the verdict allowed for this provider and user; see `main/scm/review.ts`)
+ * and asks with a native dialog before leaving a vote.
+ */
+export interface SubmitReviewRequest {
+  repo: RepoRef
+  number: number
+  /** The head commit the user reviewed: `CONFLICT` if the PR moved since. GitHub pins the review to it. */
+  expectedHeadSha: string
+  verdict: ReviewVerdict
+  /** The review summary (Markdown); may be empty unless `reviewVerdictNeedsBody`. */
+  body: string
+}
+
+export type SubmitReviewResult =
+  /**
+   * The review landed. `pr`: the PR read right after (absent when that read
+   * failed; refetch it). `summaryFailed` (Azure DevOps): the vote was
+   * recorded but the summary comment could not be posted.
+   */
+  | { outcome: 'submitted'; pr?: PullRequestDetail; summaryFailed?: boolean }
   | { outcome: 'cancelled' }
 
 /** One provider that failed while listing PRs (the others still return items). */

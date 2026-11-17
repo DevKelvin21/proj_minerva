@@ -4,12 +4,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { retargetPullRequest } from '../retarget'
+import { submitReview } from '../review'
 import { stacksForProvider } from '../stacks-service'
 import { createMockAzureProvider } from '.'
 import { MOCK_ORG, REPOS } from './fixtures/universe'
 import { mapRepo } from './mappers'
 
 const apiRepo = mapRepo(REPOS.api, MOCK_ORG)
+const webRepo = mapRepo(REPOS.web, MOCK_ORG)
 
 let dir: string
 beforeEach(async () => {
@@ -100,5 +102,49 @@ describe('MockAzureScmProvider', () => {
         async () => true,
       ),
     ).rejects.toMatchObject({ code: 'CONFLICT' })
+  })
+  it('submits a review: the vote lands on the signed-in identity, the summary is a PR thread', async () => {
+    const provider = createMockAzureProvider(() => ({ enabled: true, organizations: [] }), 0)
+    const before = await provider.getPullRequestDetail(webRepo, 104)
+    expect(before.viewer).toMatchObject({ isAuthor: false, vote: 'none' })
+    const threadsBefore = (await provider.getCommentThreads(webRepo, 104)).length
+
+    const result = await submitReview(
+      provider,
+      {
+        repo: webRepo,
+        number: 104,
+        expectedHeadSha: before.headSha,
+        verdict: 'changes_requested',
+        body: 'Please handle the empty cart.',
+      },
+      async () => true,
+    )
+    expect(result).toMatchObject({
+      outcome: 'submitted',
+      pr: { viewer: { vote: 'changes_requested' }, reviewDecision: 'changes_requested' },
+    })
+    const threads = await provider.getCommentThreads(webRepo, 104)
+    expect(threads).toHaveLength(threadsBefore + 1)
+    expect(threads.at(-1)?.comments[0]?.bodyMarkdown).toBe('Please handle the empty cart.')
+
+    // Approving afterwards replaces the vote; no summary = no new thread.
+    await submitReview(
+      provider,
+      {
+        repo: webRepo,
+        number: 104,
+        expectedHeadSha: before.headSha,
+        verdict: 'approved',
+        body: '',
+      },
+      async () => true,
+    )
+    const after = await provider.getPullRequestDetail(webRepo, 104)
+    expect(after.viewer?.vote).toBe('approved')
+    expect(
+      after.reviewers.filter((r) => r.vote === 'approved').map((r) => r.user.displayName),
+    ).toContain('Ada Lovelace')
+    expect(await provider.getCommentThreads(webRepo, 104)).toHaveLength(threadsBefore + 1)
   })
 })

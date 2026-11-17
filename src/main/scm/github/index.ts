@@ -84,6 +84,7 @@ export function createGithubProvider(): ScmProvider {
     getMergeOptions: (repo, number) => data.getMergeOptions(repo, number),
     mergePullRequest: (req) => data.mergePullRequest(req),
     setAutoMerge: (req) => data.setAutoMerge(req),
+    submitReview: (req) => data.submitReview(req),
     // A forced signed-out mock lists nothing here either (stacks, dashboard).
     listScopePullRequests: () =>
       listError ? Promise.reject(listError) : data.listScopePullRequests(),

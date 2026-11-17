@@ -24,7 +24,7 @@ import {
   MAX_OPEN_VSX_QUERY_LENGTH,
   OPEN_VSX_SORTS,
 } from '../../shared/theme/open-vsx'
-import { SETTABLE_THREAD_STATUSES, type ThreadStatus } from '../../shared/scm'
+import { REVIEW_VERDICTS, SETTABLE_THREAD_STATUSES, type ThreadStatus } from '../../shared/scm'
 import type { MergeStrategy } from '../../shared/types'
 import { MAX_CHAT_MESSAGE_LEN, MAX_CHAT_PAGE } from '../../shared/chat'
 import { isChatContext, isChatId } from '../chat/chat-guards'
@@ -268,6 +268,28 @@ function isSetAutoMergePayload(value: unknown): boolean {
   return hasValidMergeFields(value)
 }
 
+const REVIEW_KEYS = ['repo', 'number', 'expectedHeadSha', 'verdict', 'body'] as const
+
+/**
+ * `scm:submitReview`: the PR, the head commit the user reviewed, a verdict the
+ * repo's PROVIDER can submit (`REVIEW_VERDICTS`: GitHub has no "approve with
+ * suggestions" or "reject") and a summary (may be empty, capped like a
+ * comment). Open, head unchanged, authorship and a required summary are
+ * re-checked in main (`main/scm/review.ts`).
+ */
+function isSubmitReviewPayload(value: unknown): boolean {
+  if (!isPlainObject(value)) return false
+  if (!hasOnlyKeys(value, REVIEW_KEYS) || Object.keys(value).length !== REVIEW_KEYS.length) {
+    return false
+  }
+  if (!isRepoRef(value.repo)) return false
+  if (!isIntInRange(value.number, 1, MAX_PR_NUMBER)) return false
+  if (!isCommitSha(value.expectedHeadSha)) return false
+  if (typeof value.body !== 'string' || value.body.length > MAX_BODY_LEN) return false
+  const verdicts: readonly string[] = REVIEW_VERDICTS[value.repo.provider]
+  return typeof value.verdict === 'string' && verdicts.includes(value.verdict)
+}
+
 /** `scm:getStacks`: nothing, or `{ refresh?: boolean }`. */
 function isGetStacksPayload(value: unknown): boolean {
   if (value === undefined) return true
@@ -478,6 +500,7 @@ export const payloadValidators: Record<IpcChannel, (payload: unknown) => boolean
   'scm:getMergeOptions': isRepoAndNumberPayload,
   'scm:merge': isMergePayload,
   'scm:setAutoMerge': isSetAutoMergePayload,
+  'scm:submitReview': isSubmitReviewPayload,
   'scm:getStacks': isGetStacksPayload,
   'scm:getDashboard': isGetDashboardPayload,
   'activity:get': isVoidPayload,

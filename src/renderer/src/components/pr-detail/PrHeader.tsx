@@ -5,6 +5,7 @@ import { icons } from '../ui/icons'
 import { prKey } from '../../../../shared/scm'
 import type { PrCheck, PrMergeStatus, PullRequestDetail } from '../../../../shared/types'
 import { MergeControl } from './MergeControl'
+import { ReviewControl } from './ReviewControl'
 import { RetargetNote } from '../stacks/RetargetNote'
 import { RetargetPanel } from '../stacks/RetargetPanel'
 import { StackContext, StackOrphanFlag } from '../stacks/StackContext'
@@ -292,13 +293,22 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
   const barWidth = measuredBarWidth ?? 0
   const showSummaryText = barWidth >= 860
   const showBranches = barWidth >= 1040
-  // The label goes before the tabs' labels do: below this a labeled Walkthrough
-  // pushes the tab strip into clipping (measured bar content: ~736 px in English,
-  // ~796 px in Spanish; merge.spec.ts sweeps both). Icon-only it keeps its own
-  // glyph and tooltip.
-  const compactWalkthrough = barWidth < 820
+  // Labels give way in this order as the bar narrows: Review, Walkthrough,
+  // Details, then the tabs (the app's default 1400 px window leaves ~716 px
+  // with both panels docked, and the tab labels must survive there).
+  // Icon-only, each keeps its glyph and tooltip (Review still shows your
+  // vote's glyph). Measured bar content with labeled tabs (merge.spec.ts sweeps
+  // both languages): a labeled Walkthrough needs ~777 px in English / ~834 px
+  // in Spanish; a labeled Details ~698 / ~772 px; an icon-only Details
+  // ~653 / ~727 px (Spanish still clips its tab labels between 700 and 727).
+  const compactReview = barWidth < 940
+  const compactWalkthrough = barWidth < 840
+  const compactDetails = barWidth > 0 && barWidth < 776
   // Below this the three tab labels plus the actions don't fit: icon + count.
-  const compactTabs = barWidth > 0 && barWidth < 680
+  const compactTabs = barWidth > 0 && barWidth < 700
+  // The narrowest bars (a tiled window with both panels docked): tighter gaps,
+  // so Merge never leaves the bar.
+  const tightActions = barWidth > 0 && barWidth < 440
 
   const summary = (
     <div className="flex min-w-0 items-center gap-3 overflow-hidden text-xs text-muted">
@@ -372,14 +382,24 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
         <div className="flex h-full min-w-0 shrink items-stretch overflow-x-auto [scrollbar-width:none]">
           {tabs(compactTabs)}
         </div>
-        <div className="ml-auto flex min-w-0 shrink-[100] items-center justify-end overflow-hidden">
+        <div className="ml-auto flex min-w-0 shrink-[10000] items-center justify-end overflow-hidden">
           {summary}
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div className={`flex shrink-0 items-center ${tightActions ? 'gap-2' : 'gap-3'}`}>
           <details ref={detailsRef} className="relative shrink-0" data-testid="pr-details">
-            <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted transition-colors duration-150 hover:bg-border/60 hover:text-text">
-              {t('prDetail.header.details')}
-              <Icon icon={icons.dropdown} size="sm" />
+            <summary
+              className="flex cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted transition-colors duration-150 hover:bg-border/60 hover:text-text"
+              aria-label={compactDetails ? t('prDetail.header.details') : undefined}
+              title={compactDetails ? t('prDetail.header.details') : undefined}
+            >
+              {compactDetails ? (
+                <Icon icon={icons.info} size="sm" />
+              ) : (
+                <>
+                  {t('prDetail.header.details')}
+                  <Icon icon={icons.dropdown} size="sm" />
+                </>
+              )}
             </summary>
             <div className="absolute right-0 z-30 mt-2 flex max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col gap-3 overflow-y-auto rounded-lg border border-border bg-panel p-4 shadow-2xl">
               <p className="text-sm font-semibold text-text">
@@ -404,7 +424,8 @@ function PrHeaderBody({ pr, tabs, onWalkthrough }: PrHeaderProps): React.JSX.Ele
               {!compactWalkthrough && t('prDetail.header.walkthrough')}
             </Button>
           )}
-          {/* Last in the bar: finishing the PR is the last thing a review does. */}
+          {/* Your verdict, then finishing the PR: the last two things a review does. */}
+          <ReviewControl pr={pr} compact={compactReview} />
           <MergeControl pr={pr} compact={barWidth < 640} />
         </div>
       </div>

@@ -275,7 +275,7 @@ test('tiled sizes: the control stays reachable and its popover fits the window',
   }
 })
 
-/** Left/right edges of the PR bar's parts, in order: tabs, Details, Walkthrough, Merge. */
+/** Left/right edges of the PR bar's parts, in order: tabs, Details, Walkthrough, Review, Merge. */
 async function barEdges(page: Page) {
   return page.evaluate(() => {
     const box = (el: Element | null) => {
@@ -289,6 +289,7 @@ async function barEdges(page: Page) {
     const walkthrough = [...document.querySelectorAll('header button')].find((b) =>
       /Walkthrough|Recorrido/.test(b.getAttribute('aria-label') ?? b.textContent ?? ''),
     )
+    const review = document.querySelector('[data-testid="review-trigger"]')
     const merge = document.querySelector('[data-testid="merge-trigger"]')?.closest('[data-no-drag]')
     const bar = details?.closest('div.h-12')
     return {
@@ -296,26 +297,44 @@ async function barEdges(page: Page) {
       tabs: box(tabs),
       details: box(details),
       walkthrough: box(walkthrough ?? null),
+      review: box(review),
       merge: box(merge ?? null),
       bar: box(bar ?? null),
     }
   })
 }
 
-// With both panels docked, 1520 leaves a bar whose content (what PrHeader
-// measures: the box minus its 24 px padding) is ~836 px, past the 820 px
-// Walkthrough breakpoint; 1440–1300 leave ~756–656 px: the band where a labeled
-// Walkthrough would crowd the labeled tabs (Spanish labels are longer).
-const LABELED_WALKTHROUGH_WIDTH = 1520
+// With both panels docked, the bar content (what PrHeader measures: the box
+// minus its 24 px padding) is the window width minus ~684 px. 1560 leaves
+// ~876 px, past the 840 px Walkthrough breakpoint (a labeled Walkthrough plus
+// labeled Spanish tabs needs ~834 px); 1520–1300 leave ~836–616 px: the band
+// where labeled tabs, Details, Walkthrough and Review crowd each other; 860–760
+// leave ~400 px, the narrowest bar.
+// Known gap: Spanish tab labels clip on ~700–727 px bar contents (windows
+// ~1384–1411), between the tabs' 700 px breakpoint and what they need.
+const LABELED_WALKTHROUGH_WIDTH = 1560
 const BAR_WIDTHS = {
-  en: [LABELED_WALKTHROUGH_WIDTH, 1440, 1400, 1360, 1320, 1300, 1280, 960, 860, 760, 700, 600],
-  // Known gap (pre-existing): Spanish tab labels clip on ~686–726 px bar contents even
-  // with an icon-only Walkthrough, because the tabs' own breakpoint is 680.
-  es: [LABELED_WALKTHROUGH_WIDTH, 1440, 1420, 1360],
+  en: [
+    LABELED_WALKTHROUGH_WIDTH,
+    1520,
+    1480,
+    1440,
+    1400,
+    1360,
+    1320,
+    1300,
+    1280,
+    960,
+    860,
+    760,
+    700,
+    600,
+  ],
+  es: [LABELED_WALKTHROUGH_WIDTH, 1520, 1480, 1460, 1440, 1420, 1360, 1300, 860, 760],
 }
 
 for (const language of ['en', 'es'] as const) {
-  test(`narrow windows (${language}): tabs, Details, Walkthrough and Merge never overlap`, async ({
+  test(`narrow windows (${language}): tabs, Details, Walkthrough, Review and Merge never overlap`, async ({
     window,
   }, testInfo) => {
     await openPr(window, 'Checkout v2: submit validation')
@@ -335,7 +354,7 @@ for (const language of ['en', 'es'] as const) {
       }
       await expect(window.getByTestId('merge-trigger')).toBeVisible()
       const edges = await barEdges(window)
-      const parts = [edges.tabs, edges.details, edges.walkthrough, edges.merge]
+      const parts = [edges.tabs, edges.details, edges.walkthrough, edges.review, edges.merge]
       for (const part of parts) expect(part, `width ${width}`).not.toBeNull()
       for (let i = 1; i < parts.length; i++) {
         expect(
@@ -348,7 +367,7 @@ for (const language of ['en', 'es'] as const) {
         edges.bar!.right,
       )
       if (width === LABELED_WALKTHROUGH_WIDTH) {
-        // Pins the threshold from above: a breakpoint over 820 px would hide this label.
+        // Pins the threshold from above: a breakpoint over ~870 px would hide this label.
         // Icon-only, the name moves to aria-label; labeled, the visible text names it.
         const walkthrough = window.getByRole('button', { name: /^(Walkthrough|Recorrido)$/ })
         await expect(walkthrough, `width ${width}: Walkthrough keeps its label`).toHaveText(

@@ -205,6 +205,25 @@ export const es: MessageShape<typeof en> = {
       offMessage: '¿Desactivar auto-merge en el PR #{{number}}?',
       offConfirm: 'Desactivar auto-merge',
     },
+    review: {
+      message: {
+        approved: '¿Aprobar el PR #{{number}}?',
+        approved_with_suggestions: '¿Aprobar el PR #{{number}} con sugerencias?',
+        changes_requested: '¿Pedir cambios en el PR #{{number}}?',
+        changes_requestedAzure: '¿Votar "Esperar al autor" en el PR #{{number}}?',
+        rejected: '¿Rechazar el PR #{{number}}?',
+      },
+      confirm: {
+        approved: 'Aprobar',
+        approved_with_suggestions: 'Aprobar con sugerencias',
+        changes_requested: 'Pedir cambios',
+        changes_requestedAzure: 'Esperar al autor',
+        rejected: 'Rechazar',
+      },
+      headLine: 'Head revisado {{sha}}',
+      summary: 'Resumen ({{count}} caracteres): {{summary}}',
+      noSummary: 'Sin resumen',
+    },
     retarget: {
       message: '¿Cambiar la rama base del PR #{{number}}?',
       detail: 'Repositorio: {{repo}}\nTítulo: {{title}}\n\nRama base: {{from}} → {{to}}',
@@ -250,6 +269,14 @@ export const es: MessageShape<typeof en> = {
         rebase_merge: 'Merge semilineal',
       },
     },
+    review: {
+      notOpen: 'El pull request #{{number}} ya no está abierto.',
+      headMoved:
+        'Llegaron commits nuevos al pull request #{{number}} (el head ahora es {{current}}, revisaste {{expected}}). No se envió nada. Recarga para revisarlos primero.',
+      ownPullRequest: 'GitHub no te deja aprobar ni pedir cambios en tu propio pull request.',
+      verdictNotAllowed: 'Ese veredicto de revisión no está disponible para este pull request.',
+      bodyRequired: 'Esta revisión necesita un resumen.',
+    },
     providerDisabled: 'El proveedor de control de código no está habilitado: {{provider}}',
     invalidSettings: 'La configuración de control de código no es válida.',
     prNotFound: 'No se encontró el pull request: {{repo}}#{{number}}',
@@ -275,6 +302,7 @@ export const es: MessageShape<typeof en> = {
   github: {
     mergeRefused: 'GitHub rechazó el merge en {{repo}}: {{reason}}',
     mergeHeadMoved: 'El head del pull request cambió en GitHub. No se hizo el merge. Recarga e inténtalo de nuevo.',
+    reviewRefused: 'GitHub rechazó la revisión en {{repo}}: {{reason}}',
     notGithubRepo: 'No es un repositorio de GitHub: {{repo}}',
     thisRepository: 'este repositorio',
     tokenInvalid: 'Sin autenticar: el token de GitHub no es válido o expiró.',

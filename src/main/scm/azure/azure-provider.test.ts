@@ -822,6 +822,92 @@ describe('writes (fake server only)', () => {
   })
 })
 
+describe('submitReview', () => {
+  const HEAD = 'a'.repeat(40)
+
+  it('PUTs the vote on the signed-in identity, then posts the summary as a PR thread', async () => {
+    await provider().submitReview({
+      repo: webRepo,
+      number: 104,
+      headSha: HEAD,
+      verdict: 'approved_with_suggestions',
+      body: 'Nice. Maybe rename x.',
+    })
+    const sent = writes().map((entry) => ({
+      method: entry.method,
+      path: entry.path,
+      body: entry.body,
+    }))
+    expect(sent[0]).toMatchObject({
+      method: 'PUT',
+      path: expect.stringMatching(
+        new RegExp('/pullRequests/104/reviewers/' + PEOPLE.ada.id + '$', 'i'),
+      ),
+      body: { vote: 5 },
+    })
+    expect(sent[1]).toMatchObject({
+      method: 'POST',
+      path: expect.stringMatching(/\/pullRequests\/104\/threads$/i),
+      body: {
+        comments: [{ content: 'Nice. Maybe rename x.', parentCommentId: 0, commentType: 1 }],
+        // An approval's summary is closed: it must not block a comment-resolution policy.
+        status: 4,
+      },
+    })
+  })
+
+  it('a plain comment leaves no vote; no summary = no thread', async () => {
+    await provider().submitReview({
+      repo: webRepo,
+      number: 104,
+      headSha: HEAD,
+      verdict: 'comment',
+      body: 'Hi',
+    })
+    // A plain comment stays active: it is feedback to act on.
+    expect(writes()).toEqual([
+      expect.objectContaining({ method: 'POST', body: expect.objectContaining({ status: 1 }) }),
+    ])
+    server.log.length = 0
+    await provider().submitReview({
+      repo: webRepo,
+      number: 104,
+      headSha: HEAD,
+      verdict: 'rejected',
+      body: '',
+    })
+    expect(writes()).toEqual([expect.objectContaining({ method: 'PUT', body: { vote: -10 } })])
+  })
+
+  it('a summary that fails after the vote is reported, not thrown; a failed plain comment throws', async () => {
+    const failThreads = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (init?.method === 'POST' && /\/threads$/i.test(url.pathname)) {
+        return new Response(JSON.stringify({ message: 'boom' }), { status: 500 })
+      }
+      return server.fetch(input, init)
+    }) as typeof fetch
+    await expect(
+      provider({ fetch: failThreads }).submitReview({
+        repo: webRepo,
+        number: 104,
+        headSha: HEAD,
+        verdict: 'approved',
+        body: 'LGTM',
+      }),
+    ).resolves.toEqual({ summaryFailed: true })
+    await expect(
+      provider({ fetch: failThreads }).submitReview({
+        repo: webRepo,
+        number: 104,
+        headSha: HEAD,
+        verdict: 'comment',
+        body: 'LGTM',
+      }),
+    ).rejects.toBeInstanceOf(Error)
+  })
+})
+
 describe('merge / auto-complete', () => {
   it('reads merge options: allowed types from the merge-strategy policy, work items, ready', async () => {
     const options = await provider().getMergeOptions(webRepo, 108)

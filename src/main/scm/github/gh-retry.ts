@@ -58,6 +58,7 @@ export function withGhCliTokenRetry(inner: ScmDataSource): ScmDataSource {
     getMergeOptions: (repo, number) => guarded(() => inner.getMergeOptions(repo, number)),
     mergePullRequest: (req) => guarded(() => inner.mergePullRequest(req)),
     setAutoMerge: (req) => guarded(() => inner.setAutoMerge(req)),
+    submitReview: (req) => guarded(() => inner.submitReview(req)),
     listScopePullRequests: () => guarded(() => inner.listScopePullRequests()),
     listMergedBySourceBranch: (repo, branch) =>
       guarded(() => inner.listMergedBySourceBranch(repo, branch)),

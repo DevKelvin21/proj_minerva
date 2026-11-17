@@ -28,6 +28,7 @@ import { nativeConfirm } from '../scm/confirm'
 import { getAuthStatusMap, listAcrossProviders } from '../scm/registry'
 import { retargetPullRequest } from '../scm/retarget'
 import { mergePullRequest, setAutoMerge } from '../scm/merge'
+import { submitReview } from '../scm/review'
 import { seenStore } from '../scm/seen-store'
 import {
   isDidacticWindow,
@@ -323,6 +324,13 @@ export async function registerIpcHandlers(options: {
   })
   handle('scm:setAutoMerge', async (req, event) => {
     const result = await setAutoMerge(scm.forRepo(req.repo), req, nativeConfirm(event.sender))
+    if (result.outcome !== 'cancelled') scmRoot.invalidateListCaches()
+    return result
+  })
+  // Same pattern again (`review.ts`): validated, a vote confirmed in a native
+  // dialog, re-checked, then written.
+  handle('scm:submitReview', async (req, event) => {
+    const result = await submitReview(scm.forRepo(req.repo), req, nativeConfirm(event.sender))
     if (result.outcome !== 'cancelled') scmRoot.invalidateListCaches()
     return result
   })

@@ -32,6 +32,7 @@ function fakeProvider(id: ScmProviderId, overrides: Partial<ScmProvider> = {}): 
     getMergeOptions: notUsed,
     mergePullRequest: notUsed,
     setAutoMerge: notUsed,
+    submitReview: notUsed,
     listScopePullRequests: notUsed,
     listMergedBySourceBranch: notUsed,
     ...overrides,
