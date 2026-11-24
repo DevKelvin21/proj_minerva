@@ -4,7 +4,7 @@
  */
 import type { ParseKeys, TFunction } from 'i18next'
 import type { ReviewerVote, ScmAuthStatus, ScmProviderId, ThreadStatus } from '../../../shared/scm'
-import type { ReviewDecision } from '../../../shared/types'
+import type { DiffFile, ReviewDecision } from '../../../shared/types'
 
 export const SCM_PROVIDER_LABEL: Record<ScmProviderId, string> = {
   github: 'GitHub',
@@ -25,12 +25,10 @@ export function providerOfWebUrl(url: string): ScmProviderId {
 }
 
 /** Why a changed text file shows no diff (`DiffFile.patchOmitted`), or the generic fallback. */
-export function noPatchMessage(
-  reason: 'too_large' | 'diff_budget' | undefined,
-  t: TFunction,
-): string {
+export function noPatchMessage(reason: DiffFile['patchOmitted'], t: TFunction): string {
   if (reason === 'too_large') return t('prDetail.diff.tooLarge')
   if (reason === 'diff_budget') return t('prDetail.diff.overBudget')
+  if (reason === 'unavailable') return t('prDetail.diff.unavailable')
   return t('prDetail.diff.noPreview')
 }
 

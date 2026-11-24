@@ -29,6 +29,8 @@
  */
 import { setImmediate as yieldToLoop } from 'node:timers/promises'
 import type { DiffFile } from '../../../shared/types'
+import type { ScmErrorCode } from '../../../shared/scm'
+import { isScmError } from '../errors'
 import { AzureTooLargeError } from './client'
 import type { AzureChange } from './mappers'
 import { buildPatch, MAX_PATCH_SOURCE_BYTES } from './patch-builder'
@@ -112,6 +114,15 @@ export function hasBinaryExtension(path: string): boolean {
   return dot > 0 && BINARY_EXTENSIONS.has(name.slice(dot))
 }
 
+/** Codes that mean the PR as a whole can't be read; anything else degrades one file. */
+const PR_WIDE_ERRORS: ReadonlySet<ScmErrorCode> = new Set<ScmErrorCode>([
+  'UNAUTHENTICATED',
+  'FORBIDDEN',
+  'RATE_LIMITED',
+  'NETWORK',
+  'CLI_UNAVAILABLE',
+])
+
 export type FetchBlob = (objectId: string, maxBytes: number) => Promise<Uint8Array>
 
 export interface BuildDiffFilesDeps {
@@ -166,7 +177,21 @@ export async function buildDiffFiles(
     }
   }
 
+  // One file must never take the whole Files tab down: anything that fails
+  // while building ITS patch degrades that file to `unavailable`. Errors that
+  // say the whole PR is unreachable (signed out, no access, throttled,
+  // offline) still fail the call, so the tab shows the real reason.
   const processOne = async (change: AzureChange): Promise<DiffFile> => {
+    try {
+      return await processFile(change)
+    } catch (error) {
+      if (isScmError(error) && PR_WIDE_ERRORS.has(error.code)) throw error
+      console.warn('[azure] no patch for one file:', error instanceof Error ? error.message : error)
+      return { ...baseFile(change), patchOmitted: 'unavailable' }
+    }
+  }
+
+  const processFile = async (change: AzureChange): Promise<DiffFile> => {
     const file = baseFile(change)
     if (hasBinaryExtension(change.path)) return { ...file, isBinary: true }
     // Pure rename (same blob both sides): nothing to diff, nothing to download.

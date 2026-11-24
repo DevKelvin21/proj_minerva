@@ -454,6 +454,36 @@ describe('files', () => {
     expect(blobs).toHaveLength(3)
   })
 
+  it('lists deleted files by their old path (Azure sends item.path null on a delete)', async () => {
+    // #103 is a stacked PR whose deletes reach us as `item.path: null` +
+    // `originalPath`, like the real VCB - CMS API #12822 did.
+    const files = await provider().getPullRequestFiles(apiRepo, 103)
+    expect(files.map((file) => [file.path, file.status])).toEqual([
+      ['src/Api/CheckoutEndpoints.cs', 'added'],
+      ['src/Api/LegacyCheckoutController.cs', 'removed'],
+      ['db/procs/sp_LegacyCheckoutSubmit.sql', 'removed'],
+    ])
+    const proc = files[2]
+    expect(proc).toMatchObject({ additions: 0, deletions: 4, isBinary: false })
+    expect(proc.previousPath).toBeUndefined()
+    expect(proc.patch?.split('\n')[0]).toBe('@@ -1,4 +0,0 @@')
+    expect((await provider().getPullRequestDetail(apiRepo, 103)).changedFiles).toBe(3)
+  })
+
+  it('degrades one file whose blob fails instead of failing the whole Files tab', async () => {
+    let blobCalls = 0
+    const failing: typeof fetch = async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input)
+      if (url.includes('/blobs/') && ++blobCalls === 1) return new Response('{}', { status: 404 })
+      return server.fetch(input, init)
+    }
+    const p = provider({ fetch: failing, diffBudget: { concurrency: 1 } })
+    const files = await p.getPullRequestFiles(apiRepo, 103)
+    expect(files).toHaveLength(3)
+    expect(files.filter((file) => file.patchOmitted === 'unavailable')).toHaveLength(1)
+    expect(files.filter((file) => file.patch !== undefined)).toHaveLength(2)
+  })
+
   it('caches per iteration (iterations are immutable)', async () => {
     const p = provider()
     await p.getPullRequestFiles(webRepo, 108)

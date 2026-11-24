@@ -216,8 +216,12 @@ export function createFakeAzureServer(options: FakeAzureServerOptions = {}): Fak
 
   /** commitId -> path -> blob id: head files at the head commit, base files at the target commit. */
   const filesAtCommit = new Map<string, Map<string, string>>()
-  const addFile = (commit: string | undefined, path: string, blobId: string | undefined): void => {
-    if (!commit || !blobId) return
+  const addFile = (
+    commit: string | undefined,
+    path: string | null | undefined,
+    blobId: string | undefined,
+  ): void => {
+    if (!commit || !path || !blobId) return
     const files = filesAtCommit.get(commit) ?? new Map<string, string>()
     files.set(path, blobId)
     filesAtCommit.set(commit, files)

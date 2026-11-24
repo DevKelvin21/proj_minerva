@@ -546,6 +546,8 @@ export const es: MessageShape<typeof en> = {
       tooLarge: 'Diff no mostrado: el archivo es demasiado grande para compararlo aquí.',
       overBudget:
         'Diff no mostrado: este pull request es demasiado grande para comparar todos sus archivos. Ábrelo en el proveedor para ver este.',
+      unavailable:
+        'Diff no mostrado: no se pudo cargar este archivo. El resto del pull request no se ve afectado; ábrelo en el proveedor para ver este.',
       noPreview: 'Vista previa no disponible.',
       loadingUnplaced_one: 'Cargando el código alrededor de {{count}} comentario…',
       loadingUnplaced_other: 'Cargando el código alrededor de {{count}} comentarios…',

@@ -543,6 +543,8 @@ export const en = {
       tooLarge: 'Diff not shown: the file is too large to diff here.',
       overBudget:
         'Diff not shown: this pull request is too large to diff every file. Open it on the provider to see this one.',
+      unavailable:
+        'Diff not shown: this file could not be loaded. The rest of the pull request is unaffected; open it on the provider to see this one.',
       noPreview: 'No preview available.',
       loadingUnplaced_one: 'Loading the code around {{count}} comment…',
       loadingUnplaced_other: 'Loading the code around {{count}} comments…',
