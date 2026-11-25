@@ -120,6 +120,39 @@ test('Azure: renamed + binary files, and an outdated thread', async ({ window },
   await expect(window.getByText('Outdated').first()).toBeVisible()
 })
 
+// Regression: Azure sends a deleted file with `item.path: null` (the path is
+// only in `originalPath`); the Files tab used to fail as a whole with "Cannot
+// read properties of null (reading 'replace')". #103 is a stacked PR that adds
+// an endpoint and deletes a legacy controller + its stored procedure.
+test('Azure: a stacked PR with deleted files lists every file and shows the removed lines', async ({
+  window,
+}, testInfo) => {
+  await aside(window).getByText('Checkout v2: submit endpoint').first().click()
+  await window
+    .getByText(/^Files/)
+    .first()
+    .click()
+  for (const name of [
+    'CheckoutEndpoints.cs',
+    'LegacyCheckoutController.cs',
+    'sp_LegacyCheckoutSubmit.sql',
+  ]) {
+    await expect(window.getByText(name, { exact: true }).first()).toBeVisible()
+  }
+  // The two deletes carry the red "Deleted" status (old path kept as the path).
+  await expect(window.locator('[aria-label="Deleted"]')).not.toHaveCount(0)
+  await expect(window.getByText(/Could not load the files/)).toHaveCount(0)
+
+  await window.getByText('sp_LegacyCheckoutSubmit.sql', { exact: true }).first().click()
+  await expect(window.getByText('@@ -1,4 +0,0 @@').first()).toBeVisible()
+  await expect(
+    window.getByText('CREATE PROCEDURE sp_LegacyCheckoutSubmit', { exact: false }).first(),
+  ).toBeVisible()
+  // The whole file is in the hunk: a deleted file has nothing "below" to expand.
+  await expect(window.getByText('More lines below')).toHaveCount(0)
+  await attachScreenshot(window, testInfo, 'azure-deleted-files')
+})
+
 test('Azure channels via the preload: stacks + orphan, file content, status, retarget', async ({
   window,
 }) => {

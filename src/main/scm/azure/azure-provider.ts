@@ -103,6 +103,7 @@ import {
 import { organizationUrl, type AzureCredentialKind } from './credentials'
 import { buildDiffFiles, DEFAULT_DIFF_BUDGET, type DiffBudget } from './diff-files'
 import {
+  isFolderChange,
   isThreadOutdated,
   latestDate,
   mapChangeEntry,
@@ -958,12 +959,15 @@ export class AzureScmProvider implements ScmProvider {
       )
       for (const entry of data.changeEntries ?? []) {
         const change = mapChangeEntry(entry)
-        if (!change) continue
+        if (!change && isFolderChange(entry)) continue
         if (total >= MAX_CHANGES_COUNTED) {
           more = true
           break
         }
         total++
+        // No path anywhere: counted (so the PR reads "not every file listed")
+        // but not listed. One odd entry never fails the Files tab.
+        if (!change) continue
         allPaths.add(change.path)
         bytes += approxBytes(change.path)
         if (changes.length < maxFiles) changes.push(change)
@@ -1009,6 +1013,8 @@ export class AzureScmProvider implements ScmProvider {
       this.diffBudget,
     )
       .then((files) => {
+        // A file that failed on its own may work next time: keep it out of the cache.
+        if (files.some((file) => file.patchOmitted === 'unavailable')) return files
         iteration.files = files
         // Re-put (also if it was evicted meanwhile) so the bytes are counted.
         this.cachePut(cacheKey, { ...iteration, bytes: iteration.bytes + filesBytes(files) })

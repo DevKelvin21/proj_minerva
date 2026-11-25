@@ -66,6 +66,9 @@ describe('scm-labels', () => {
     expect(noPatchMessage('too_large', t)).toBe(
       'Diff not shown: the file is too large to diff here.',
     )
+    expect(noPatchMessage('unavailable', t)).toMatch(
+      /^Diff not shown: this file could not be loaded/,
+    )
     expect(noPatchMessage(undefined, t)).toBe('No preview available.')
   })
 

@@ -39,6 +39,7 @@ import { InlineThreadCard } from './InlineThreadCard'
 import type { ChatLineBinding, LineComposerBinding, LinePosition } from './diff-body'
 
 const EMPTY_KEYS: ReadonlySet<string> = new Set()
+const NO_HEAD_LINES: readonly string[] = []
 const NO_ITEMS: ChatContextItem[] = []
 
 interface DiffViewProps {
@@ -142,7 +143,10 @@ export function DiffView({
       ? { repo, number, headSha: actions.headSha, path: file.path, side: 'head' }
       : null,
   )
-  const headLines = head.status === 'ready' ? head.lines : null
+  // A deleted file's new side is empty (known without a fetch), so its diff
+  // has no "more lines below" to offer.
+  const headLines =
+    file.status === 'removed' ? NO_HEAD_LINES : head.status === 'ready' ? head.lines : null
 
   const sections = useMemo(() => {
     const auto = headLines

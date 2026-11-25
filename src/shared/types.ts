@@ -276,10 +276,12 @@ export interface DiffFile {
    * - `too_large`: one side is over the per-file cap, or its line diff timed out.
    * - `diff_budget`: the PR as a whole went over the per-PR diff budget
    *   (files, bytes or diff time), so later files were listed without a patch.
+   * - `unavailable`: building this one file's patch failed (a blob the server
+   *   would not serve, an odd entry); the rest of the PR still shows.
    * Absent when there is a patch, for binaries, and for providers that send
    * their own patch (GitHub).
    */
-  patchOmitted?: 'too_large' | 'diff_budget'
+  patchOmitted?: 'too_large' | 'diff_budget' | 'unavailable'
 }
 
 export interface PrComment {
@@ -420,8 +422,7 @@ export type SetAutoMergeRequest =
   | { repo: RepoRef; number: number; enable: false }
 
 export type SetAutoMergeResult =
-  | { outcome: 'enabled' | 'disabled'; pr: PullRequestDetail }
-  | { outcome: 'cancelled' }
+  { outcome: 'enabled' | 'disabled'; pr: PullRequestDetail } | { outcome: 'cancelled' }
 
 /**
  * `scm:submitReview`: approve / request changes / comment on a PR as the

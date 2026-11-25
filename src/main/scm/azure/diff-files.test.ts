@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ScmError } from '../errors'
 import { AzureTooLargeError } from './client'
 import { buildDiffFiles, hasBinaryExtension, type FetchBlob } from './diff-files'
 import type { AzureChange } from './mappers'
@@ -114,7 +115,7 @@ describe('buildDiffFiles', () => {
     expect(files[0].patch).toBeUndefined()
   })
 
-  it('never downloads binary extensions or pure renames; propagates other errors', async () => {
+  it('never downloads binary extensions or pure renames; degrades other errors to one file', async () => {
     const blobs = store()
     const files = await buildDiffFiles(
       [
@@ -135,16 +136,38 @@ describe('buildDiffFiles', () => {
     expect(files[2].additions).toBe(6)
     expect(blobs.calls).toEqual(['head2'])
 
-    await expect(
-      buildDiffFiles([change(0)], async () => {
-        throw new Error('boom')
-      }),
-    ).rejects.toThrow('boom')
+    // Any other error degrades that one file (see "one odd file" below).
+    const [failed] = await buildDiffFiles([change(0)], async () => {
+      throw new Error('boom')
+    })
+    expect(failed.patchOmitted).toBe('unavailable')
   })
 
   it('knows common binary extensions', () => {
     expect(hasBinaryExtension('a/b/c.woff2')).toBe(true)
     expect(hasBinaryExtension('a/b/c.ts')).toBe(false)
     expect(hasBinaryExtension('.png')).toBe(false)
+  })
+})
+
+describe('one odd file', () => {
+  it('degrades only the file whose blob fails, with a per-file reason', async () => {
+    const { fetch } = store()
+    const files = await buildDiffFiles([change(0), change(1), change(2)], async (id, max) => {
+      if (id === 'head1') throw new TypeError("Cannot read properties of null (reading 'replace')")
+      return fetch(id, max)
+    })
+    expect(files.map((file) => file.patchOmitted)).toEqual([undefined, 'unavailable', undefined])
+    expect(files[1]).toMatchObject({ path: 'src/file1.ts', additions: 0, deletions: 0 })
+    expect(files[0].patch).toBeDefined()
+    expect(files[2].patch).toBeDefined()
+  })
+
+  it('still fails the whole call when the PR itself is unreachable (signed out)', async () => {
+    await expect(
+      buildDiffFiles([change(0), change(1)], async () => {
+        throw new ScmError('UNAUTHENTICATED', 'signed out')
+      }),
+    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
   })
 })

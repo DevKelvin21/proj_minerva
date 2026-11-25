@@ -229,6 +229,24 @@ const ENDPOINTS_HEAD = lines(
   '}',
 )
 
+const LEGACY_CHECKOUT_CONTROLLER = lines(
+  'namespace Contoso.Orders.Api;',
+  '',
+  '[Route("api/legacy/checkout")]',
+  'public class LegacyCheckoutController : ControllerBase',
+  '{',
+  '    [HttpPost("{id}")]',
+  '    public IActionResult Submit(Guid id) => Ok(LegacyCheckout.Submit(id));',
+  '}',
+)
+
+const LEGACY_CHECKOUT_PROC = lines(
+  'CREATE PROCEDURE sp_LegacyCheckoutSubmit @OrderId UNIQUEIDENTIFIER AS',
+  'BEGIN',
+  "    UPDATE orders SET status = 'submitted' WHERE id = @OrderId;",
+  'END',
+)
+
 const REFUND_SCHEMA = lines(
   'CREATE TABLE refunds (',
   '    id UUID PRIMARY KEY,',
@@ -573,9 +591,17 @@ interface ChangeSpec {
 
 let changeTrackingSeq = 0
 
+/**
+ * Shaped like the real `iterations/{n}/changes` answer. A delete carries NO
+ * `item.path` (it is `null`) and no `gitObjectType`: the deleted path is only
+ * in `originalPath` (seen on a real PR, Nov 2026).
+ */
 function change(spec: ChangeSpec): AzChangeEntry {
   changeTrackingSeq++
-  const item: AzChangeEntry['item'] = { path: spec.path, gitObjectType: 'blob' }
+  const isDelete = spec.changeType.split(',').some((flag) => flag.trim() === 'delete')
+  const item: AzChangeEntry['item'] = isDelete
+    ? { path: null }
+    : { path: spec.path, gitObjectType: 'blob' }
   if (spec.head !== undefined) item.objectId = blob(spec.head)
   if (spec.base !== undefined) item.originalObjectId = blob(spec.base)
   const entry: AzChangeEntry = {
@@ -584,7 +610,8 @@ function change(spec: ChangeSpec): AzChangeEntry {
     item,
     changeType: spec.changeType,
   }
-  if (spec.originalPath) entry.originalPath = spec.originalPath
+  const originalPath = spec.originalPath ?? (isDelete ? spec.path : undefined)
+  if (originalPath) entry.originalPath = originalPath
   return entry
 }
 
@@ -610,7 +637,22 @@ export const CHANGES: Record<number, AzChangeEntry[]> = {
       head: CHECKOUT_SERVICE_HEAD,
     }),
   ],
-  103: [change({ path: '/src/Api/CheckoutEndpoints.cs', changeType: 'add', head: ENDPOINTS_HEAD })],
+  // Stacked (3 of 3): the new endpoint drops the legacy controller and its
+  // stored procedures, so most of its files are deletes (the shape that broke
+  // the Files tab: `item.path` is null on every delete).
+  103: [
+    change({ path: '/src/Api/CheckoutEndpoints.cs', changeType: 'add', head: ENDPOINTS_HEAD }),
+    change({
+      path: '/src/Api/LegacyCheckoutController.cs',
+      changeType: 'delete',
+      base: LEGACY_CHECKOUT_CONTROLLER,
+    }),
+    change({
+      path: '/db/procs/sp_LegacyCheckoutSubmit.sql',
+      changeType: 'delete',
+      base: LEGACY_CHECKOUT_PROC,
+    }),
+  ],
   105: [
     change({
       path: '/db/migrations/0008_refund_ledger.sql',
@@ -793,7 +835,8 @@ function thread(spec: ThreadSpec): AzThread {
 }
 
 const trackingId = (prId: number, path: string): number =>
-  CHANGES[prId].find((entry) => entry.item.path === path)?.changeTrackingId ?? 0
+  CHANGES[prId].find((entry) => (entry.item.path ?? entry.originalPath) === path)
+    ?.changeTrackingId ?? 0
 
 const CART = '/src/cart/total.ts'
 const SERVICE = '/src/Services/CheckoutService.cs'

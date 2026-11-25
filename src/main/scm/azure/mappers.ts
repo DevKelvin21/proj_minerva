@@ -547,28 +547,52 @@ export function mapThreads(
 
 /** `changeType` is a flag set such as `edit, rename`. */
 export function mapChangeStatus(changeType: string): AzureFileStatus {
-  const flags = changeType.split(',').map((flag) => flag.trim().toLowerCase())
+  const flags = String(changeType ?? '')
+    .split(',')
+    .map((flag) => flag.trim().toLowerCase())
   if (flags.includes('add')) return 'added'
   if (flags.includes('delete')) return 'removed'
   if (flags.some((flag) => flag === 'rename' || flag === 'sourcerename')) return 'renamed'
   return 'modified'
 }
 
-/** Folder entries are dropped; they have no content to diff. */
+const nonEmpty = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() !== '' ? value : null
+
+/**
+ * Folder entries are dropped; they have no content to diff. So is an entry
+ * with no path at all (never seen; the provider still counts it, so the PR
+ * reads as "some files not listed" instead of failing).
+ *
+ * Path: `item.path`, except on a DELETE, where Azure sends `item.path: null`
+ * and the deleted path only in `originalPath` (VCB - CMS API #12822). Then
+ * `sourceServerItem` as a last resort. Never throws on a malformed entry.
+ */
+export function isFolderChange(entry: AzChangeEntry): boolean {
+  const item = entry?.item
+  return item?.isFolder === true || item?.gitObjectType === 'tree'
+}
+
 export function mapChangeEntry(entry: AzChangeEntry): AzureChange | null {
-  if (entry.item.isFolder || entry.item.gitObjectType === 'tree') return null
+  if (isFolderChange(entry)) return null
+  const item: Partial<AzChangeEntry['item']> = entry?.item ?? {}
   const status = mapChangeStatus(entry.changeType)
+  const itemPath = nonEmpty(item.path)
+  const originalPath = nonEmpty(entry.originalPath)
+  const rawPath = itemPath ?? originalPath ?? nonEmpty(entry.sourceServerItem)
+  if (!rawPath) return null
+  const path = toRepoPath(rawPath)
+  // Only a move has a previous path: on a delete `originalPath` IS the path.
+  const previous = itemPath && originalPath ? toRepoPath(originalPath) : null
   return {
-    path: toRepoPath(entry.item.path),
-    previousPath: entry.originalPath ? toRepoPath(entry.originalPath) : null,
+    path,
+    previousPath: previous && previous !== path ? previous : null,
     status,
     baseObjectId:
       status === 'added'
         ? null
-        : (entry.item.originalObjectId ??
-          (status === 'removed' ? entry.item.objectId : undefined) ??
-          null),
-    headObjectId: status === 'removed' ? null : (entry.item.objectId ?? null),
+        : (item.originalObjectId ?? (status === 'removed' ? item.objectId : undefined) ?? null),
+    headObjectId: status === 'removed' ? null : (item.objectId ?? null),
     changeTrackingId: entry.changeTrackingId,
   }
 }

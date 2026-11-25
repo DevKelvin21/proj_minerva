@@ -600,4 +600,46 @@ describe('changes', () => {
     )
     expect(mapChangeEntry(entry('edit', { isFolder: true }))).toBeNull()
   })
+
+  // Real shape (VCB - CMS API #12822): a delete has `item.path: null` and no
+  // `gitObjectType`; its path is only in `originalPath`. Mapping it used to
+  // throw "Cannot read properties of null (reading 'replace')" and took the
+  // whole Files tab down.
+  it('maps a real delete entry (null item.path) to its old path', () => {
+    const deleted: AzChangeEntry = {
+      changeTrackingId: 3,
+      changeId: 3,
+      changeType: 'delete',
+      item: { path: null, originalObjectId: 'old' },
+      originalPath: '/Skyllful.Data/SqlScripts/Procedures/sp_GetAllDailyLearnersData.sql',
+    }
+    expect(mapChangeEntry(deleted)).toEqual({
+      path: 'Skyllful.Data/SqlScripts/Procedures/sp_GetAllDailyLearnersData.sql',
+      previousPath: null,
+      status: 'removed',
+      baseObjectId: 'old',
+      headObjectId: null,
+      changeTrackingId: 3,
+    })
+  })
+
+  it('falls back to sourceServerItem, and never throws on an entry without any path', () => {
+    const viaSource: AzChangeEntry = {
+      changeTrackingId: 4,
+      changeId: 4,
+      changeType: 'delete, sourceRename',
+      item: { path: null, originalObjectId: 'old' },
+      sourceServerItem: '/a/old.ts',
+    }
+    expect(mapChangeEntry(viaSource)).toMatchObject({ path: 'a/old.ts', status: 'removed' })
+    const pathless = {
+      changeTrackingId: 5,
+      changeId: 5,
+      changeType: null,
+      item: null,
+    } as unknown as AzChangeEntry
+    expect(() => mapChangeEntry(pathless)).not.toThrow()
+    expect(mapChangeEntry(pathless)).toBeNull()
+    expect(mapChangeStatus(undefined as unknown as string)).toBe('modified')
+  })
 })

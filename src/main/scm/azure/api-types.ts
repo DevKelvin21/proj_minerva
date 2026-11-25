@@ -115,7 +115,11 @@ export interface AzIteration {
 export type AzChangeType = string
 
 export interface AzChangeItem {
-  path: string
+  /**
+   * Repo path with a leading `/`. `null` on a DELETE: the server sends the
+   * deleted path only in `AzChangeEntry.originalPath` (seen on real PRs).
+   */
+  path?: string | null
   /** Blob id at the head side; absent for deletes. */
   objectId?: string
   /** Blob id at the base side; absent for adds. */
@@ -130,9 +134,9 @@ export interface AzChangeEntry {
   changeId: number
   item: AzChangeItem
   changeType: AzChangeType
-  /** Previous path for renames. */
-  originalPath?: string
-  sourceServerItem?: string
+  /** Previous path on a rename; the ONLY path on a delete (`item.path` is null there). */
+  originalPath?: string | null
+  sourceServerItem?: string | null
 }
 
 /** Body of `…/iterations/{n}/changes`: paged with `$top`/`$skip`, NOT a continuation header. */
